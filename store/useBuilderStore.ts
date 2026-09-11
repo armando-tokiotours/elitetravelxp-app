@@ -8,8 +8,19 @@ export interface LocationStop {
   nights: number;
 }
 
+export type HubTravelMode = "airport" | "cruise";
+
 export interface BuilderState {
   durationDays: number;
+  /** True when user chose Custom instead of 10/14/21 presets */
+  durationCustom: boolean;
+  /** ISO date YYYY-MM-DD — trip start / first city night */
+  arrivalDate: string | null;
+  /** Flight vs cruise filter for arrival hub dropdown */
+  arrivalMode: HubTravelMode;
+  /** Flight vs cruise filter for departure hub dropdown */
+  departureMode: HubTravelMode;
+  /** Selected hub id (airport or cruise terminal) */
   arrivalTransferId: string | null;
   departureTransferId: string | null;
   airportPickup: boolean;
@@ -28,6 +39,10 @@ export interface BuilderState {
 
 export interface BuilderActions {
   setDurationDays: (days: number) => void;
+  setDurationCustom: (v: boolean) => void;
+  setArrivalDate: (iso: string | null) => void;
+  setArrivalMode: (mode: HubTravelMode) => void;
+  setDepartureMode: (mode: HubTravelMode) => void;
   setArrivalTransferId: (id: string | null) => void;
   setDepartureTransferId: (id: string | null) => void;
   setAirportPickup: (v: boolean) => void;
@@ -48,11 +63,17 @@ export interface BuilderActions {
   setNeedDriver: (v: boolean) => void;
   totalGuests: () => number;
   totalNights: () => number;
+  /** Checkout / leave Japan day = arrival + durationDays */
+  departureDate: () => string | null;
   reset: () => void;
 }
 
 const initialState: BuilderState = {
   durationDays: 10,
+  durationCustom: false,
+  arrivalDate: null,
+  arrivalMode: "airport",
+  departureMode: "airport",
   arrivalTransferId: null,
   departureTransferId: null,
   airportPickup: true,
@@ -73,12 +94,48 @@ function uid() {
   return `loc_${Math.random().toString(36).slice(2, 10)}`;
 }
 
+/** Add N calendar days to YYYY-MM-DD (local). */
+export function addDaysIso(iso: string, days: number): string {
+  const [y, m, d] = iso.split("-").map(Number);
+  const dt = new Date(y, m - 1, d);
+  dt.setDate(dt.getDate() + days);
+  const yy = dt.getFullYear();
+  const mm = String(dt.getMonth() + 1).padStart(2, "0");
+  const dd = String(dt.getDate()).padStart(2, "0");
+  return `${yy}-${mm}-${dd}`;
+}
+
+export function formatDisplayDate(iso: string | null | undefined): string {
+  if (!iso) return "—";
+  const [y, m, d] = iso.split("-").map(Number);
+  if (!y || !m || !d) return iso;
+  return new Date(y, m - 1, d).toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+}
+
 export const useBuilderStore = create<BuilderState & BuilderActions>()(
   persist(
     (set, get) => ({
       ...initialState,
 
-      setDurationDays: (days) => set({ durationDays: days }),
+      setDurationDays: (days) =>
+        set({ durationDays: Math.max(1, Math.round(days) || 1) }),
+      setDurationCustom: (v) => set({ durationCustom: v }),
+      setArrivalDate: (iso) => set({ arrivalDate: iso }),
+      setArrivalMode: (mode) =>
+        set((s) => ({
+          arrivalMode: mode,
+          // Clear hub if it no longer matches the selected mode (handled in UI too)
+          arrivalTransferId: s.arrivalTransferId,
+        })),
+      setDepartureMode: (mode) =>
+        set((s) => ({
+          departureMode: mode,
+          departureTransferId: s.departureTransferId,
+        })),
       setArrivalTransferId: (id) => set({ arrivalTransferId: id }),
       setDepartureTransferId: (id) => set({ departureTransferId: id }),
       setAirportPickup: (v) => set({ airportPickup: v }),
@@ -101,14 +158,13 @@ export const useBuilderStore = create<BuilderState & BuilderActions>()(
       removeLocation: (key) =>
         set((s) => ({
           locations: s.locations.filter((l) => l.key !== key),
-          selectedTourIds: s.selectedTourIds, // pruned in UI against available cities
         })),
 
       setLocationNights: (key, nights) =>
         set((s) => ({
           locations: s.locations.map((l) =>
             l.key === key
-              ? { ...l, nights: Math.max(1, Math.min(30, nights)) }
+              ? { ...l, nights: Math.max(1, Math.min(90, nights)) }
               : l
           ),
         })),
@@ -135,6 +191,12 @@ export const useBuilderStore = create<BuilderState & BuilderActions>()(
       totalNights: () =>
         get().locations.reduce((sum, l) => sum + l.nights, 0),
 
+      departureDate: () => {
+        const { arrivalDate, durationDays } = get();
+        if (!arrivalDate || durationDays < 1) return null;
+        return addDaysIso(arrivalDate, durationDays);
+      },
+
       reset: () => set(initialState),
     }),
     {
@@ -142,6 +204,10 @@ export const useBuilderStore = create<BuilderState & BuilderActions>()(
       skipHydration: true,
       partialize: (s) => ({
         durationDays: s.durationDays,
+        durationCustom: s.durationCustom,
+        arrivalDate: s.arrivalDate,
+        arrivalMode: s.arrivalMode,
+        departureMode: s.departureMode,
         arrivalTransferId: s.arrivalTransferId,
         departureTransferId: s.departureTransferId,
         airportPickup: s.airportPickup,

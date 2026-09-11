@@ -22,7 +22,7 @@ export default function HomePage() {
 
       <header className="relative z-10 px-6 py-6 sm:px-10">
         <p className="text-[0.65rem] font-semibold uppercase tracking-[0.4em] text-[#C4A35A]">
-          Elite Travel Experiences Group
+          Elite Travel Experiences
         </p>
       </header>
 

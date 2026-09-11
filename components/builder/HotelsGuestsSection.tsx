@@ -3,7 +3,15 @@
 import { useEffect, useMemo, useState } from "react";
 import type { PbAccommodation } from "@/lib/pocketbase/client";
 import { useBuilderStore } from "@/store/useBuilderStore";
-import { FieldLabel, PillToggle, SectionBlock, SelectField } from "./ui";
+import { BuilderPortalSheet } from "./BuilderPortalSheet";
+import {
+  FieldLabel,
+  PillToggle,
+  SectionBlock,
+  SelectField,
+  ChoicePill,
+} from "./ui";
+import { SectionContinue } from "./SectionContinue";
 
 export function HotelsGuestsSection({
   accommodations,
@@ -41,9 +49,18 @@ export function HotelsGuestsSection({
   }, [roomTypes, roomType, setRoomType]);
 
   const totalGuests = adults + children;
+  const summary = needHotels
+    ? `${hotelTier === "5-star" ? "5-Star" : "4-Star"} · ${totalGuests} guest${totalGuests === 1 ? "" : "s"} · ${roomCount} room${roomCount === 1 ? "" : "s"}`
+    : `No hotels · ${totalGuests} guest${totalGuests === 1 ? "" : "s"}`;
 
   return (
-    <SectionBlock number={3} title="Hotels & Guests" id="section-hotels">
+    <SectionBlock
+      number={3}
+      title="Hotels & Guests"
+      id="section-hotels"
+      icon="hotel"
+      summary={summary}
+    >
       <div className="flex flex-col gap-5">
         <div>
           <FieldLabel>Need hotels?</FieldLabel>
@@ -54,20 +71,15 @@ export function HotelsGuestsSection({
           <>
             <div>
               <FieldLabel>Hotel standard</FieldLabel>
-              <div className="inline-flex rounded-full border border-[#D9D2C7] bg-[#F7F3EC] p-1">
+              <div className="flex flex-wrap gap-2.5">
                 {(["4-star", "5-star"] as const).map((tier) => (
-                  <button
+                  <ChoicePill
                     key={tier}
-                    type="button"
+                    active={hotelTier === tier}
                     onClick={() => setHotelTier(tier)}
-                    className={`rounded-full px-5 py-1.5 text-sm font-medium transition ${
-                      hotelTier === tier
-                        ? "bg-[#0B1F3A] text-white"
-                        : "text-[#5C6570]"
-                    }`}
                   >
                     {tier === "4-star" ? "4 star" : "5 star"}
-                  </button>
+                  </ChoicePill>
                 ))}
               </div>
             </div>
@@ -117,38 +129,25 @@ export function HotelsGuestsSection({
         </div>
       </div>
 
-      {guestOpen ? (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center">
-          <div className="w-full max-w-md rounded-t-3xl bg-white p-6 shadow-xl sm:rounded-3xl">
-            <div className="mb-5 flex items-center justify-between">
-              <h3 className="font-display text-2xl text-[#0B1F3A]">Guests</h3>
-              <button
-                type="button"
-                onClick={() => setGuestOpen(false)}
-                className="text-sm text-[#8A8278]"
-              >
-                Done
-              </button>
-            </div>
-            <GuestRow
-              label="Adults"
-              value={adults}
-              onChange={setAdults}
-              min={0}
-            />
-            <p className="mb-2 text-xs text-[#8A8278]">
-              Guidance: max {maxAdultsPerRoom} adults per room (from Team Access
-              rules).
-            </p>
-            <GuestRow
-              label="Children"
-              value={children}
-              onChange={setChildren}
-              min={0}
-            />
-          </div>
-        </div>
-      ) : null}
+      <BuilderPortalSheet
+        open={guestOpen}
+        onClose={() => setGuestOpen(false)}
+        title="Guests"
+      >
+        <GuestRow label="Adults" value={adults} onChange={setAdults} min={0} />
+        <p className="mb-2 text-xs text-[#8A8278]">
+          Guidance: max {maxAdultsPerRoom} adults per room (from Team Access
+          rules).
+        </p>
+        <GuestRow
+          label="Children"
+          value={children}
+          onChange={setChildren}
+          min={0}
+        />
+      </BuilderPortalSheet>
+
+      <SectionContinue next={4} label="Continue to Locations" />
     </SectionBlock>
   );
 }

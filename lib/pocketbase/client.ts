@@ -1,18 +1,26 @@
 import PocketBase from "pocketbase";
 
 export function getPbBaseUrl(): string {
+  // Prefer explicit env (set in .env.local for local, Docker build args for VPS).
+  const fromEnv =
+    process.env.NEXT_PUBLIC_POCKETBASE_URL || process.env.PUBLIC_URL || "";
+  if (fromEnv) return fromEnv.replace(/\/$/, "");
+
   if (typeof window !== "undefined") {
     const { protocol, hostname, port } = window.location;
-    if (port === "3000" || port === "3001" || port === "3200") {
+    // Local Next.js → local PocketBase on 8090
+    if (port === "3000" || port === "3001") {
+      return `${protocol}//${hostname}:8090`;
+    }
+    // VPS host-mapped Next (:3200) → PocketBase on :8091
+    if (port === "3200") {
       return `${protocol}//${hostname}:8091`;
     }
+    // Production behind same-origin Nginx
     return window.location.origin;
   }
-  return (
-    process.env.NEXT_PUBLIC_POCKETBASE_URL ||
-    process.env.PUBLIC_URL ||
-    "http://127.0.0.1:8090"
-  );
+
+  return "http://127.0.0.1:8090";
 }
 
 let client: PocketBase | null = null;
@@ -121,6 +129,26 @@ export interface PbTransfer {
   dropoff_fee?: number;
 }
 
+export interface PbHub {
+  id: string;
+  name: string;
+  type: "Airport" | "Cruise Terminal";
+  city_id?: string;
+  pickup_fee?: number;
+  dropoff_fee?: number;
+  is_active?: boolean;
+  sort_order?: number;
+  collectionId?: string;
+}
+
+export function hubPickup(h: PbHub): number {
+  return Number(h.pickup_fee ?? 0);
+}
+
+export function hubDropoff(h: PbHub): number {
+  return Number(h.dropoff_fee ?? 0);
+}
+
 export interface PbTour {
   id: string;
   city_id: string;
@@ -137,6 +165,22 @@ export interface PbTour {
   expand?: { city_id?: PbCity };
 }
 
+export interface PbSeasonalHighlight {
+  id: string;
+  title: string;
+  city_id?: string;
+  start_month: number;
+  start_day: number;
+  end_month: number;
+  end_day: number;
+  description?: string;
+  suggested_tour_id?: string;
+  badge_text?: string;
+  cover_photo?: string;
+  is_active?: boolean;
+  collectionId: string;
+}
+
 export interface PbTransitMode {
   id: string;
   label: string;
@@ -148,6 +192,78 @@ export interface PbAppSetting {
   key: string;
   value: string;
   description?: string;
+}
+
+export interface PbSiteBranding {
+  id: string;
+  logo_image?: string;
+  hero_background_image?: string;
+  hero_title_main?: string;
+  hero_title_highlight?: string;
+  hero_subtitle?: string;
+  font_h1?: string;
+  font_h2?: string;
+  font_body?: string;
+  /** Preferred field name */
+  google_fonts_url?: string;
+  /** Legacy alias — still read if present */
+  google_fonts_import_url?: string;
+  collectionId: string;
+}
+
+export const DEFAULT_SITE_BRANDING = {
+  hero_title_main: "Build Your",
+  hero_title_highlight: "Perfect Japan Trip",
+  hero_subtitle: "Design every detail. We'll take care of the rest.",
+  font_h1: "Montserrat ExtraBold",
+  font_h2: "Century Gothic",
+  font_body: "Poppins",
+  google_fonts_url:
+    "https://fonts.googleapis.com/css2?family=Montserrat:wght@100;400;700;800&display=swap",
+} as const;
+
+export function brandingGoogleFontsUrl(b: PbSiteBranding | null): string {
+  return (
+    (b?.google_fonts_url || b?.google_fonts_import_url || "").trim()
+  );
+}
+
+/** Default navbar logo (used until an admin uploads one in Site Branding). */
+export const DEFAULT_LOGO_IMAGE = "/brand/elite-travel-logo.png";
+
+/** Fallback Fuji/pagoda hero when no upload is set (public Unsplash). */
+export const DEFAULT_HERO_IMAGE =
+  "https://images.unsplash.com/photo-1493976040374-85c8e12f0c0e?auto=format&fit=crop&w=2000&q=80";
+
+export async function fetchSiteBranding(): Promise<PbSiteBranding | null> {
+  const pb = getPocketBase();
+  try {
+    const rows = await pb
+      .collection("site_branding")
+      .getFullList<PbSiteBranding>({ requestKey: "site_branding" });
+    return rows[0] ?? null;
+  } catch {
+    return null;
+  }
+}
+
+export function brandingLogoUrl(b: PbSiteBranding | null): string {
+  if (!b?.logo_image) return DEFAULT_LOGO_IMAGE;
+  return (
+    pbFileUrl(b.collectionId || "site_branding", b.id, b.logo_image) ||
+    DEFAULT_LOGO_IMAGE
+  );
+}
+
+export function brandingHeroUrl(b: PbSiteBranding | null): string {
+  if (!b?.hero_background_image) return DEFAULT_HERO_IMAGE;
+  return (
+    pbFileUrl(
+      b.collectionId || "site_branding",
+      b.id,
+      b.hero_background_image
+    ) || DEFAULT_HERO_IMAGE
+  );
 }
 
 export type SystemRulesMap = Record<string, string>;
@@ -200,8 +316,11 @@ export interface BuilderConfig {
   accommodations: PbAccommodation[];
   vehicles: PbVehicle[];
   transfers: PbTransfer[];
+  hubs: PbHub[];
   tours: PbTour[];
   transitModes: PbTransitMode[];
+  seasonalHighlights: PbSeasonalHighlight[];
+  branding: PbSiteBranding | null;
   rules: SystemRulesMap;
 }
 
@@ -238,8 +357,11 @@ export async function fetchBuilderConfig(): Promise<BuilderConfig> {
     accommodations,
     vehicles,
     transfers,
+    hubsRaw,
     toursRaw,
     transitModes,
+    seasonalHighlightsRaw,
+    brandingRows,
     settingsRows,
     legacyRules,
   ] = await Promise.all([
@@ -251,6 +373,10 @@ export async function fetchBuilderConfig(): Promise<BuilderConfig> {
       sort: "max_passengers",
     }),
     pb.collection("transfers").getFullList<PbTransfer>(),
+    pb
+      .collection("hubs")
+      .getFullList<PbHub>({ sort: "sort_order,name" })
+      .catch(() => [] as PbHub[]),
     pb.collection("tours").getFullList<PbTour>({
       sort: "title",
       expand: "city_id",
@@ -259,6 +385,14 @@ export async function fetchBuilderConfig(): Promise<BuilderConfig> {
       .collection("transit_modes")
       .getFullList<PbTransitMode>({ sort: "label" })
       .catch(() => [] as PbTransitMode[]),
+    pb
+      .collection("seasonal_highlights")
+      .getFullList<PbSeasonalHighlight>({ sort: "start_month,start_day" })
+      .catch(() => [] as PbSeasonalHighlight[]),
+    pb
+      .collection("site_branding")
+      .getFullList<PbSiteBranding>()
+      .catch(() => [] as PbSiteBranding[]),
     pb
       .collection("app_settings")
       .getFullList<PbAppSetting>({ sort: "key" })
@@ -271,6 +405,10 @@ export async function fetchBuilderConfig(): Promise<BuilderConfig> {
 
   const cities = citiesRaw.filter((c) => c.is_active !== false);
   const tours = toursRaw.filter((t) => t.is_active !== false);
+  const seasonalHighlights = seasonalHighlightsRaw.filter(
+    (h) => h.is_active !== false
+  );
+  const hubs = hubsRaw.filter((h) => h.is_active !== false);
 
   const rules = {
     ...Object.fromEntries(DEFAULT_APP_SETTINGS.map((r) => [r.key, r.value])),
@@ -289,8 +427,11 @@ export async function fetchBuilderConfig(): Promise<BuilderConfig> {
     accommodations,
     vehicles,
     transfers,
+    hubs,
     tours,
     transitModes,
+    seasonalHighlights,
+    branding: brandingRows[0] ?? null,
     rules,
   };
 }

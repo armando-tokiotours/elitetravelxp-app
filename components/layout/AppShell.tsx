@@ -15,11 +15,18 @@ export function AppShell({
   title,
   subtitle,
   hideBottomPad,
+  logoSrc,
+  /** Builder hero layout: logo left, hamburger right, no page title in header */
+  heroMode = false,
+  transparentHeader = false,
 }: {
   children: ReactNode;
   title?: string;
   subtitle?: string;
   hideBottomPad?: boolean;
+  logoSrc?: string;
+  heroMode?: boolean;
+  transparentHeader?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
@@ -35,36 +42,73 @@ export function AppShell({
     };
   }, [open]);
 
+  const headerClass = transparentHeader
+    ? "absolute inset-x-0 top-0 z-40 border-b border-white/10 bg-[#FBF8F2]/88 backdrop-blur-md"
+    : "sticky top-0 z-40 border-b border-[#E8E2D9]/80 bg-[#FBF8F2]/95 backdrop-blur-md";
+
   return (
     <div className="builder-theme relative min-h-screen bg-[#F5F0E8] text-[#0B1F3A]">
-      <header className="sticky top-0 z-40 border-b border-[#E8E2D9]/80 bg-[#FBF8F2]/95 backdrop-blur-md">
-        <div className="mx-auto flex max-w-3xl items-center gap-3 px-4 py-3.5 sm:px-6">
-          <button
-            type="button"
-            aria-label="Open menu"
-            aria-expanded={open}
-            onClick={() => setOpen(true)}
-            className="flex h-10 w-10 items-center justify-center rounded-xl border border-[#D9D2C7] bg-white text-[#0B1F3A] transition hover:border-[#C4A35A]"
-          >
-            <HamburgerIcon />
-          </button>
-          <div className="min-w-0 flex-1">
-            <p className="text-[0.6rem] font-semibold uppercase tracking-[0.35em] text-[#C4A35A]">
-              {subtitle ?? "Elite Travel Experiences Group"}
-            </p>
-            {title ? (
-              <h1 className="truncate font-display text-xl text-[#0B1F3A] sm:text-2xl">
-                {title}
-              </h1>
-            ) : null}
-          </div>
-          <div className="flex h-10 w-10 items-center justify-center rounded-full border border-[#C4A35A]/45 bg-white">
-            <span className="font-display text-sm text-[#C4A35A]">ET</span>
-          </div>
+      <header className={headerClass}>
+        <div
+          className={`mx-auto flex items-center gap-3 px-4 py-3 sm:px-6 ${
+            heroMode ? "max-w-5xl" : "max-w-3xl"
+          }`}
+        >
+          {heroMode ? (
+            <>
+              <BrandMark logoSrc={logoSrc} />
+              <div className="min-w-0 flex-1" />
+              <button
+                type="button"
+                aria-label="Open menu"
+                aria-expanded={open}
+                onClick={() => setOpen(true)}
+                className="flex h-10 w-10 items-center justify-center rounded-xl border border-[#D9D2C7] bg-white text-[#0B1F3A] transition hover:border-[#C4A35A]"
+              >
+                <HamburgerIcon />
+              </button>
+            </>
+          ) : (
+            <>
+              <button
+                type="button"
+                aria-label="Open menu"
+                aria-expanded={open}
+                onClick={() => setOpen(true)}
+                className="flex h-10 w-10 items-center justify-center rounded-xl border border-[#D9D2C7] bg-white text-[#0B1F3A] transition hover:border-[#C4A35A]"
+              >
+                <HamburgerIcon />
+              </button>
+              <div className="min-w-0 flex-1">
+                <p className="text-[0.6rem] font-semibold uppercase tracking-[0.35em] text-[#C4A35A]">
+                  {subtitle ?? "Elite Travel Experiences"}
+                </p>
+                {title ? (
+                  <h1 className="truncate font-display text-xl text-[#0B1F3A] sm:text-2xl">
+                    {title}
+                  </h1>
+                ) : null}
+              </div>
+              {logoSrc ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={logoSrc}
+                  alt="Elite Travel Experiences"
+                  className="h-9 w-auto max-w-[7rem] object-contain"
+                />
+              ) : (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src="/brand/elite-travel-logo.png"
+                  alt="Elite Travel Experiences"
+                  className="h-9 w-auto max-w-[7rem] object-contain"
+                />
+              )}
+            </>
+          )}
         </div>
       </header>
 
-      {/* Drawer overlay */}
       <div
         className={`fixed inset-0 z-50 transition ${
           open ? "pointer-events-auto" : "pointer-events-none"
@@ -79,8 +123,8 @@ export function AppShell({
           onClick={() => setOpen(false)}
         />
         <aside
-          className={`absolute inset-y-0 left-0 flex w-[min(86vw,20rem)] flex-col bg-[#0B1F3A] text-white shadow-2xl transition-transform duration-300 ease-out ${
-            open ? "translate-x-0" : "-translate-x-full"
+          className={`absolute inset-y-0 right-0 flex w-[min(86vw,20rem)] flex-col bg-[#0B1F3A] text-white shadow-2xl transition-transform duration-300 ease-out ${
+            open ? "translate-x-0" : "translate-x-full"
           }`}
         >
           <div className="flex items-center justify-between border-b border-white/10 px-5 py-5">
@@ -88,7 +132,7 @@ export function AppShell({
               <p className="text-[0.65rem] uppercase tracking-[0.3em] text-[#C4A35A]">
                 Menu
               </p>
-              <p className="mt-1 font-display text-xl">Elite Travel</p>
+              <p className="mt-1 font-display text-xl">Elite Travel Experiences</p>
             </div>
             <button
               type="button"
@@ -128,6 +172,18 @@ export function AppShell({
 
       <div className={hideBottomPad ? "" : "pb-24 md:pb-8"}>{children}</div>
     </div>
+  );
+}
+
+function BrandMark({ logoSrc }: { logoSrc?: string }) {
+  const src = logoSrc || "/brand/elite-travel-logo.png";
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={src}
+      alt="Elite Travel Experiences"
+      className="h-11 w-auto max-w-[9.5rem] object-contain sm:h-12"
+    />
   );
 }
 

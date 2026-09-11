@@ -7,16 +7,22 @@ import {
   transferLocation,
   tourPrice,
   type BuilderConfig,
+  type PbHub,
+  type PbTransfer,
 } from "@/lib/pocketbase/client";
 import {
   calculateBuilderQuote,
   formatUsd,
 } from "@/lib/builder-pricing";
-import { useBuilderStore } from "@/store/useBuilderStore";
+import {
+  formatDisplayDate,
+  useBuilderStore,
+} from "@/store/useBuilderStore";
 import { BottomNav } from "@/components/builder/BottomNav";
 
 export default function ItineraryPage() {
   const state = useBuilderStore();
+  const departureDate = useBuilderStore((s) => s.departureDate);
   const [config, setConfig] = useState<BuilderConfig | null>(null);
 
   useEffect(() => {
@@ -32,12 +38,12 @@ export default function ItineraryPage() {
   const cityName = (id: string) =>
     config?.cities.find((c) => c.id === id)?.name ?? id;
 
-  const arrival = config?.transfers.find(
-    (t) => t.id === state.arrivalTransferId
-  );
-  const departure = config?.transfers.find(
-    (t) => t.id === state.departureTransferId
-  );
+  const arrival =
+    config?.hubs.find((h) => h.id === state.arrivalTransferId) ||
+    config?.transfers.find((t) => t.id === state.arrivalTransferId);
+  const departure =
+    config?.hubs.find((h) => h.id === state.departureTransferId) ||
+    config?.transfers.find((t) => t.id === state.departureTransferId);
   const transit = config?.transitModes.find(
     (t) => t.id === state.transitModeId
   );
@@ -55,13 +61,36 @@ export default function ItineraryPage() {
         <Card title="Overview">
           <Row label="Duration" value={`${state.durationDays} days`} />
           <Row
+            label="Arrival date"
+            value={formatDisplayDate(state.arrivalDate)}
+          />
+          <Row
+            label="Departure date"
+            value={formatDisplayDate(departureDate())}
+          />
+          <Row
             label="Guests"
             value={`${state.adults + state.children} (${state.adults} adults, ${state.children} children)`}
           />
-          <Row label="Arrival" value={arrival ? transferLocation(arrival) : "—"} />
           <Row
-            label="Departure"
-            value={departure ? transferLocation(departure) : "—"}
+            label="Arrival hub"
+            value={
+              arrival
+                ? "name" in arrival
+                  ? (arrival as PbHub).name
+                  : transferLocation(arrival as PbTransfer)
+                : "—"
+            }
+          />
+          <Row
+            label="Departure hub"
+            value={
+              departure
+                ? "name" in departure
+                  ? (departure as PbHub).name
+                  : transferLocation(departure as PbTransfer)
+                : "—"
+            }
           />
           <Row
             label="Pickup / Drop-off"
@@ -78,6 +107,21 @@ export default function ItineraryPage() {
           <Row label="Transit" value={transit?.label ?? "—"} />
           <Row label="Driver" value={state.needDriver ? "Yes" : "No"} />
         </Card>
+
+        <div className="flex flex-col gap-3 sm:flex-row">
+          <Link
+            href="/builder/print"
+            className="flex-1 rounded-full bg-[#0B1F3A] py-3 text-center text-sm font-semibold text-white"
+          >
+            View / Print Itinerary
+          </Link>
+          <Link
+            href="/builder"
+            className="flex-1 rounded-full border border-[#0B1F3A] py-3 text-center text-sm font-semibold"
+          >
+            Continue editing
+          </Link>
+        </div>
 
         <Card title="Route">
           {state.locations.length === 0 ? (

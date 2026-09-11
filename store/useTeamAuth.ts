@@ -39,7 +39,15 @@ export const useTeamAuth = create<TeamAuthState>()(
 
       login: async (email, password) => {
         const pb = createPocketBase();
-        await pb.collection("_superusers").authWithPassword(email, password);
+        pb.authStore.clear();
+        try {
+          await pb.collection("_superusers").authWithPassword(email, password);
+        } catch (e) {
+          // Re-throw with URL context for the login form
+          const err = e as Error & { message?: string };
+          err.message = `${err.message || "Login failed"} (${pb.baseUrl})`;
+          throw err;
+        }
         set({
           token: pb.authStore.token,
           email,

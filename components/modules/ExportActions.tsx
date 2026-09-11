@@ -196,7 +196,7 @@ export function PrintQuotationContent() {
     <article className="print-content">
       <header className="border-b border-[#D4AF37] pb-6">
         <p className="text-[0.65rem] uppercase tracking-[0.4em] text-[#8a7420]">
-          Elite Travel Experiences Group
+          Elite Travel Experiences
         </p>
         <h1 className="mt-2 font-display text-3xl text-[#111]">
           Japan Itinerary Quotation
@@ -299,7 +299,7 @@ export function PrintQuotationContent() {
         <p className="mt-2 text-xs text-[#666]">
           This quotation is indicative and subject to seasonal availability,
           hotel confirmation, and final itinerary refinement by Elite Travel
-          Experiences Group.
+          Experiences.
         </p>
       </section>
 
@@ -343,7 +343,7 @@ export function PrintQuotationContent() {
       ) : null}
 
       <footer className="mt-10 border-t border-[#ddd] pt-4 text-xs text-[#888]">
-        travelexperiencesgroup.com · Elite Travel Experiences Group
+        travelexperiencesgroup.com · Elite Travel Experiences
       </footer>
     </article>
   );

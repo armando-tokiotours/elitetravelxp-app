@@ -34,7 +34,7 @@ export default function ItineraryDesignerPage() {
         <div className="mx-auto flex max-w-7xl items-center justify-between px-5 py-5 sm:px-8">
           <a href="/" className="group">
             <p className="text-[0.6rem] uppercase tracking-[0.4em] text-[#D4AF37] transition group-hover:text-[#e0c04a]">
-              Elite Travel Experiences Group
+              Elite Travel Experiences
             </p>
             <p className="mt-1 font-display text-lg tracking-wide text-white sm:text-xl">
               Itinerary Designer
@@ -87,7 +87,7 @@ export default function ItineraryDesignerPage() {
       </main>
 
       <footer className="relative z-10 border-t border-white/10 py-8 text-center text-xs tracking-wider text-white/30">
-        © {new Date().getFullYear()} Elite Travel Experiences Group · Private
+        © {new Date().getFullYear()} Elite Travel Experiences · Private
         &amp; Confidential
       </footer>
     </div>

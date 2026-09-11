@@ -2,6 +2,8 @@ import type { BuilderConfig, SystemRulesMap } from "@/lib/pocketbase/client";
 import {
   hotelMax,
   hotelMin,
+  hubDropoff,
+  hubPickup,
   ruleBool,
   ruleNumber,
   tourPrice,
@@ -85,19 +87,32 @@ export function calculateBuilderQuote(
     }
   }
 
-  const arrival = config.transfers.find(
+  const arrivalHub = config.hubs?.find((h) => h.id === state.arrivalTransferId);
+  const departureHub = config.hubs?.find(
+    (h) => h.id === state.departureTransferId
+  );
+  const arrivalTransfer = config.transfers.find(
     (t) => t.id === state.arrivalTransferId
   );
-  const departure = config.transfers.find(
+  const departureTransfer = config.transfers.find(
     (t) => t.id === state.departureTransferId
   );
-  if (state.airportPickup && arrival) {
-    const fee = transferPickup(arrival);
+
+  if (state.airportPickup) {
+    const fee = arrivalHub
+      ? hubPickup(arrivalHub)
+      : arrivalTransfer
+        ? transferPickup(arrivalTransfer)
+        : 0;
     min += fee;
     max += fee * 1.15;
   }
-  if (state.airportDropoff && departure) {
-    const fee = transferDropoff(departure);
+  if (state.airportDropoff) {
+    const fee = departureHub
+      ? hubDropoff(departureHub)
+      : departureTransfer
+        ? transferDropoff(departureTransfer)
+        : 0;
     min += fee;
     max += fee * 1.15;
   }

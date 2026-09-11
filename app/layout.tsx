@@ -1,23 +1,52 @@
 import type { Metadata } from "next";
-import { Cormorant_Garamond, Outfit } from "next/font/google";
+import localFont from "next/font/local";
+import { DynamicTypography } from "@/components/layout/DynamicTypography";
 import "./globals.css";
 
-const display = Cormorant_Garamond({
-  variable: "--font-display",
-  subsets: ["latin"],
-  weight: ["400", "500", "600"],
+/**
+ * Keep the font set lean — next/font re-encodes every listed file on first
+ * compile. Accent weights live in /public/fonts for later use, but aren't
+ * loaded until needed.
+ */
+const momoTrust = localFont({
+  src: "../public/fonts/MomoTrustDisplay-Regular.ttf",
+  variable: "--font-momo",
+  display: "swap",
+  weight: "400",
+  style: "normal",
 });
 
-const body = Outfit({
-  variable: "--font-body",
-  subsets: ["latin"],
-  weight: ["300", "400", "500", "600"],
+const poppins = localFont({
+  src: [
+    {
+      path: "../public/fonts/Poppins-Regular.ttf",
+      weight: "400",
+      style: "normal",
+    },
+    {
+      path: "../public/fonts/Poppins-Medium.ttf",
+      weight: "500",
+      style: "normal",
+    },
+    {
+      path: "../public/fonts/Poppins-SemiBold.ttf",
+      weight: "600",
+      style: "normal",
+    },
+    {
+      path: "../public/fonts/Poppins-Bold.ttf",
+      weight: "700",
+      style: "normal",
+    },
+  ],
+  variable: "--font-poppins",
+  display: "swap",
 });
 
 export const metadata: Metadata = {
   title: {
-    default: "Elite Travel Experiences Group",
-    template: "%s · Elite Travel Experiences Group",
+    default: "Elite Travel Experiences",
+    template: "%s · Elite Travel Experiences",
   },
   description:
     "Bespoke luxury Japan itineraries — design your journey with our live Trip Builder.",
@@ -28,9 +57,10 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="en"
-      className={`${display.variable} ${body.variable} h-full antialiased`}
+      className={`${momoTrust.variable} ${poppins.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col bg-[#F5F0E8] text-[#0B1F3A]">
+      <body className="flex min-h-full flex-col bg-[#F5F0E8] font-sans text-[#0B1F3A]">
+        <DynamicTypography />
         {children}
       </body>
     </html>

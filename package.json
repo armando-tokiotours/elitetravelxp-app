@@ -9,7 +9,11 @@
     "lint": "eslint",
     "pb": "cd backend && ./pocketbase serve --http=127.0.0.1:8090",
     "pb:superuser": "cd backend && ./pocketbase superuser upsert admin@travelexperiencesgroup.com EliteTravelAdmin2026!",
-    "pb:seed": "node scripts/seed-pocketbase.mjs"
+    "pb:seed": "node scripts/seed-pocketbase.mjs",
+    "pb:pull": "bash scripts/pb-pull-from-vps.sh",
+    "pb:push": "bash scripts/pb-push-to-vps.sh",
+    "seed:excel": "node scripts/seed-from-excel.mjs",
+    "seed": "node scripts/seed-from-excel.mjs"
   },
   "dependencies": {
     "framer-motion": "^13.2.0",
@@ -17,6 +21,7 @@
     "pocketbase": "^0.28.1",
     "react": "19.2.8",
     "react-dom": "19.2.8",
+    "xlsx": "^0.18.5",
     "zustand": "^5.0.15"
   },
   "devDependencies": {

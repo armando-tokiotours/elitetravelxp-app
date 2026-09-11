@@ -48,3 +48,4 @@ backend/pocketbase
 backend/CHANGELOG.md
 backend/LICENSE.md
 scripts/.seed-tmp/
+backend/.pb_backups/

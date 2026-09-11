@@ -1,11 +1,58 @@
 @import "tailwindcss";
 
+/* Self-hosted faces under friendly CSS family names (admin typography) */
+@font-face {
+  font-family: "Momo Trust Display";
+  src: url("/fonts/MomoTrustDisplay-Regular.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Poppins";
+  src: url("/fonts/Poppins-Regular.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Poppins";
+  src: url("/fonts/Poppins-Medium.ttf") format("truetype");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Poppins";
+  src: url("/fonts/Poppins-SemiBold.ttf") format("truetype");
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Poppins";
+  src: url("/fonts/Poppins-Bold.ttf") format("truetype");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
 :root {
   --background: #f5f0e8;
   --foreground: #0b1f3a;
   --navy: #0b1f3a;
   --gold: #c4a35a;
   --cream: #fbf8f2;
+  --font-h1: "Montserrat", system-ui, sans-serif;
+  --font-h2: "Century Gothic", CenturyGothic, AppleGothic, sans-serif;
+  --font-body: "Poppins", var(--font-poppins), system-ui, sans-serif;
+  --font-display: var(--font-h1);
+  --font-h1-weight: 800;
+  --font-h2-weight: 400;
 }
 
 @theme inline {
@@ -14,21 +61,66 @@
   --color-navy: var(--navy);
   --color-gold: var(--gold);
   --font-sans: var(--font-body);
-  --font-display: var(--font-display);
+  --font-display: var(--font-h1);
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-body), "Segoe UI", sans-serif;
+  font-family: var(--font-body);
+  font-weight: 400;
 }
 
-.font-display {
-  font-family: var(--font-display), "Georgia", "Times New Roman", serif;
+h1,
+.text-h1 {
+  font-family: var(--font-h1);
+  font-weight: var(--font-h1-weight, 800);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 
-.builder-theme {
-  color: #0b1f3a;
+h2,
+.text-h2 {
+  font-family: var(--font-h2);
+  font-weight: var(--font-h2-weight, 400);
+}
+
+h3,
+.text-h3 {
+  font-family: var(--font-h2);
+}
+
+.font-display,
+.font-momo {
+  font-family: var(--font-h1);
+  font-weight: var(--font-h1-weight, 800);
+  letter-spacing: -0.01em;
+}
+
+.font-sans,
+.font-poppins {
+  font-family: var(--font-body);
+}
+
+/* Desktop: native fixed parallax via bg-fixed */
+.builder-hero-bg {
+  background-attachment: fixed;
+}
+
+@media (max-width: 768px) {
+  /*
+   * iOS Safari ignores / glitches background-attachment: fixed.
+   * Use a viewport-fixed layer clipped by the hero's overflow:hidden parent
+   * so the photo stays put while the builder card scrolls over it.
+   */
+  .builder-hero-bg {
+    position: fixed !important;
+    inset: 0 auto auto 0;
+    width: 100%;
+    height: 70vh;
+    background-attachment: scroll !important;
+    transform: translateZ(0);
+  }
 }
 
 @keyframes fade-up {
@@ -48,11 +140,28 @@ body {
 
 @media print {
   nav,
-  .no-print {
+  .no-print,
+  header.sticky,
+  .builder-theme header,
+  aside {
     display: none !important;
   }
 
   body {
     background: white !important;
+    color: #0b1f3a !important;
+  }
+
+  .print-document {
+    background: white !important;
+  }
+
+  .print-document article {
+    padding: 0 !important;
+    max-width: none !important;
+  }
+
+  a[href]::after {
+    content: none !important;
   }
 }
