@@ -3,7 +3,7 @@
 import { Reorder, useDragControls } from "framer-motion";
 import { useMemo, useState } from "react";
 import type { PbCity, PbTransitMode } from "@/lib/pocketbase/client";
-import { pbFileUrl } from "@/lib/pocketbase/client";
+import { cityPhoto, pbFileUrl } from "@/lib/pocketbase/client";
 import { useBuilderStore, type LocationStop } from "@/store/useBuilderStore";
 import {
   FieldLabel,
@@ -120,8 +120,9 @@ export function LocationsNightsSection({
             </div>
             <ul className="space-y-2">
               {availableCities.map((city) => {
-                const img = city.image
-                  ? pbFileUrl(city.collectionId, city.id, city.image, "100x100")
+                const filename = cityPhoto(city);
+                const img = filename
+                  ? pbFileUrl(city.collectionId, city.id, filename, "100x100")
                   : "";
                 return (
                   <li key={city.id}>
@@ -170,9 +171,10 @@ function LocationRow({
   onRemove: () => void;
 }) {
   const controls = useDragControls();
+  const filename = city ? cityPhoto(city) : "";
   const img =
-    city?.image && city
-      ? pbFileUrl(city.collectionId, city.id, city.image, "80x80")
+    filename && city
+      ? pbFileUrl(city.collectionId, city.id, filename, "80x80")
       : "";
 
   return (

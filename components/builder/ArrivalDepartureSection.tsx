@@ -1,6 +1,7 @@
 "use client";
 
 import type { PbTransfer } from "@/lib/pocketbase/client";
+import { transferLocation } from "@/lib/pocketbase/client";
 import { useBuilderStore } from "@/store/useBuilderStore";
 import { FieldLabel, PillToggle, SectionBlock, SelectField } from "./ui";
 
@@ -20,10 +21,18 @@ export function ArrivalDepartureSection({
   const setAirportPickup = useBuilderStore((s) => s.setAirportPickup);
   const setAirportDropoff = useBuilderStore((s) => s.setAirportDropoff);
 
-  const options = transfers.map((t) => ({
-    value: t.id,
-    label: t.location,
-  }));
+  const arrivalOptions = transfers
+    .filter((t) => !t.type || t.type === "Arrival" || t.type === "Both")
+    .map((t) => ({
+      value: t.id,
+      label: transferLocation(t),
+    }));
+  const departureOptions = transfers
+    .filter((t) => !t.type || t.type === "Departure" || t.type === "Both")
+    .map((t) => ({
+      value: t.id,
+      label: transferLocation(t),
+    }));
 
   return (
     <SectionBlock number={2} title="Arrival & Departure" id="section-arrival">
@@ -33,7 +42,7 @@ export function ArrivalDepartureSection({
           <SelectField
             value={arrivalTransferId ?? ""}
             onChange={(v) => setArrivalTransferId(v || null)}
-            options={options}
+            options={arrivalOptions}
             placeholder="Select arrival hub"
           />
         </div>
@@ -42,7 +51,7 @@ export function ArrivalDepartureSection({
           <SelectField
             value={departureTransferId ?? ""}
             onChange={(v) => setDepartureTransferId(v || null)}
-            options={options}
+            options={departureOptions}
             placeholder="Select departure hub"
           />
         </div>

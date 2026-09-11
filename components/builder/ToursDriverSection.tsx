@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import type { PbTour } from "@/lib/pocketbase/client";
+import { tourPrice } from "@/lib/pocketbase/client";
 import { formatUsd } from "@/lib/builder-pricing";
 import { useBuilderStore } from "@/store/useBuilderStore";
 import { FieldLabel, PillToggle, SectionBlock } from "./ui";
@@ -110,7 +111,10 @@ export function ToursDriverSection({
                           </p>
                         </div>
                         <span className="shrink-0 text-sm font-semibold text-[#0B1F3A]">
-                          {formatUsd(tour.price)}
+                          {tour.duration_hours
+                            ? `${tour.duration_hours}h · `
+                            : ""}
+                          {formatUsd(tourPrice(tour))}
                         </span>
                       </button>
                     </li>

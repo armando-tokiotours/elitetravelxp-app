@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
+  cityPhoto,
   fetchBuilderConfig,
   pbFileUrl,
   type BuilderConfig,
@@ -40,9 +41,10 @@ export default function PreviewPage() {
         <div className="space-y-4">
           {state.locations.map((loc, i) => {
             const city = config?.cities.find((c) => c.id === loc.cityId);
+            const filename = city ? cityPhoto(city) : "";
             const img =
-              city?.image && city
-                ? pbFileUrl(city.collectionId, city.id, city.image, "600x400")
+              filename && city
+                ? pbFileUrl(city.collectionId, city.id, filename, "600x400")
                 : "";
             const cityTours =
               config?.tours.filter(

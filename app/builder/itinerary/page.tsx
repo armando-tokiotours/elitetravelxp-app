@@ -4,6 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   fetchBuilderConfig,
+  transferLocation,
+  tourPrice,
   type BuilderConfig,
 } from "@/lib/pocketbase/client";
 import {
@@ -56,8 +58,11 @@ export default function ItineraryPage() {
             label="Guests"
             value={`${state.adults + state.children} (${state.adults} adults, ${state.children} children)`}
           />
-          <Row label="Arrival" value={arrival?.location ?? "—"} />
-          <Row label="Departure" value={departure?.location ?? "—"} />
+          <Row label="Arrival" value={arrival ? transferLocation(arrival) : "—"} />
+          <Row
+            label="Departure"
+            value={departure ? transferLocation(departure) : "—"}
+          />
           <Row
             label="Pickup / Drop-off"
             value={`${state.airportPickup ? "Yes" : "No"} / ${state.airportDropoff ? "Yes" : "No"}`}
@@ -110,7 +115,7 @@ export default function ItineraryPage() {
                   <li key={id} className="flex justify-between gap-3">
                     <span>{tour?.title ?? id}</span>
                     <span className="text-[#5C6570]">
-                      {tour ? formatUsd(tour.price) : ""}
+                      {tour ? formatUsd(tourPrice(tour)) : ""}
                     </span>
                   </li>
                 );

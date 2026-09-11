@@ -1,5 +1,13 @@
 import type { BuilderConfig, SystemRulesMap } from "@/lib/pocketbase/client";
-import { ruleBool, ruleNumber } from "@/lib/pocketbase/client";
+import {
+  hotelMax,
+  hotelMin,
+  ruleBool,
+  ruleNumber,
+  tourPrice,
+  transferDropoff,
+  transferPickup,
+} from "@/lib/pocketbase/client";
 import type { BuilderState } from "@/store/useBuilderStore";
 
 export interface QuoteResult {
@@ -23,7 +31,6 @@ export function allocateVehicles(
   );
   const labelOf = (v: (typeof vehicles)[0]) => v.name || v.type || "Vehicle";
 
-  // If over threshold, prefer enough capacity / second vehicle
   if (guestCount > threshold) {
     const fit = sorted.find((v) => v.max_passengers >= guestCount);
     if (fit) {
@@ -54,9 +61,14 @@ export function calculateBuilderQuote(
 
   const nights = state.locations.reduce((s, l) => s + l.nights, 0);
   const guests = state.adults + state.children;
+
+  const seasonalPct = ruleNumber(rules, "seasonal_markup_percentage", 0);
+  const seasonalFromPct = 1 + seasonalPct / 100;
   const pricingMult =
     ruleNumber(rules, "pricing_multiplier", 1) *
-    ruleNumber(rules, "seasonal_multiplier", 1);
+    (rules.seasonal_markup_percentage != null
+      ? seasonalFromPct
+      : ruleNumber(rules, "seasonal_multiplier", 1));
 
   if (state.needHotels && nights > 0) {
     const matches = config.accommodations.filter(
@@ -68,21 +80,8 @@ export function calculateBuilderQuote(
       matches[0] ||
       config.accommodations.find((a) => a.tier === state.hotelTier);
     if (row) {
-      min += row.min_price * state.roomCount * nights;
-      max += row.max_price * state.roomCount * nights;
-    }
-  }
-
-  for (const loc of state.locations) {
-    const city = config.cities.find((c) => c.id === loc.cityId);
-    if (!city) continue;
-    if (city.base_price) {
-      min += city.base_price * loc.nights * 0.9;
-      max += city.base_price * loc.nights * 1.15;
-    } else if (city.base_price_modifier) {
-      const uplift = (city.base_price_modifier - 1) * 200 * loc.nights;
-      min += Math.max(0, uplift * 0.8);
-      max += Math.max(0, uplift * 1.2);
+      min += hotelMin(row) * state.roomCount * nights;
+      max += hotelMax(row) * state.roomCount * nights;
     }
   }
 
@@ -93,12 +92,14 @@ export function calculateBuilderQuote(
     (t) => t.id === state.departureTransferId
   );
   if (state.airportPickup && arrival) {
-    min += arrival.pickup_fee;
-    max += arrival.pickup_fee * 1.15;
+    const fee = transferPickup(arrival);
+    min += fee;
+    max += fee * 1.15;
   }
   if (state.airportDropoff && departure) {
-    min += departure.dropoff_fee;
-    max += departure.dropoff_fee * 1.15;
+    const fee = transferDropoff(departure);
+    min += fee;
+    max += fee * 1.15;
   }
 
   const legs = Math.max(0, state.locations.length - 1);
@@ -113,8 +114,9 @@ export function calculateBuilderQuote(
   for (const id of state.selectedTourIds) {
     const tour = config.tours.find((t) => t.id === id);
     if (tour) {
-      min += tour.price;
-      max += tour.price * 1.2;
+      const p = tourPrice(tour) * Math.max(1, guests);
+      min += p;
+      max += p * 1.15;
     }
   }
 
@@ -128,12 +130,9 @@ export function calculateBuilderQuote(
     max += veh.dailyCost * 1.2 * days;
   }
 
-  min = Math.round(min * pricingMult);
-  max = Math.round(max * pricingMult);
-
   return {
-    min,
-    max,
+    min: Math.round(min * pricingMult),
+    max: Math.round(max * pricingMult),
     vehiclesNeeded: veh.label,
   };
 }
@@ -144,4 +143,14 @@ export function formatUsd(n: number): string {
     currency: "USD",
     maximumFractionDigits: 0,
   }).format(n);
+}
+
+/** Suggested rooms from max_occupancy rules */
+export function suggestedRooms(
+  guests: number,
+  occupancy: number,
+  maxAdultsPerRoom: number
+): number {
+  const perRoom = Math.max(1, Math.min(occupancy || 2, maxAdultsPerRoom || 3));
+  return Math.max(1, Math.ceil(guests / perRoom));
 }

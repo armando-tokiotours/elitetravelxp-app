@@ -3,31 +3,21 @@
 import type PocketBase from "pocketbase";
 import { useEffect, useMemo, useState } from "react";
 import {
-  DEFAULT_SYSTEM_RULES,
+  COLLECTIONS,
+  type CollectionDef,
+  type CollectionKey,
+} from "@/lib/pocketbase/admin-schema";
+import {
+  DEFAULT_APP_SETTINGS,
   ensureDefaultRules,
   pbFileUrl,
+  type PbAppSetting,
   type PbCity,
-  type PbSystemRule,
 } from "@/lib/pocketbase/client";
 import { useTeamAuth } from "@/store/useTeamAuth";
 import { AppShell } from "@/components/layout/AppShell";
 
 type PbClient = PocketBase;
-
-type Category =
-  | "cities"
-  | "vehicles"
-  | "tours"
-  | "accommodations"
-  | "transfers";
-
-const CATEGORIES: { id: Category; label: string }[] = [
-  { id: "cities", label: "Cities" },
-  { id: "tours", label: "Tours" },
-  { id: "vehicles", label: "Vehicles" },
-  { id: "accommodations", label: "Hotels" },
-  { id: "transfers", label: "Transfers" },
-];
 
 export function TeamAccessApp() {
   const [ready, setReady] = useState(false);
@@ -65,8 +55,8 @@ export function TeamAccessApp() {
           <div className="rounded-2xl border border-[#E8E2D9] bg-white p-6 shadow-sm">
             <h2 className="font-display text-2xl text-[#0B1F3A]">Team login</h2>
             <p className="mt-2 text-sm text-[#8A8278]">
-              Sign in with your PocketBase admin credentials to manage Source of
-              Truth and Rules of Logic.
+              Sign in with PocketBase admin credentials to manage Source of Truth
+              and Rules of Logic.
             </p>
             <form
               className="mt-6 space-y-4"
@@ -83,30 +73,26 @@ export function TeamAccessApp() {
                 }
               }}
             >
-              <div>
-                <label className="mb-1 block text-xs uppercase tracking-wider text-[#8A8278]">
-                  Email
-                </label>
+              <label className="block text-xs uppercase tracking-wider text-[#8A8278]">
+                Email
                 <input
                   type="email"
                   required
                   value={emailInput}
                   onChange={(e) => setEmailInput(e.target.value)}
-                  className="w-full rounded-xl border border-[#D9D2C7] px-3 py-2.5 text-sm outline-none focus:border-[#C4A35A]"
+                  className="mt-1 w-full rounded-xl border border-[#D9D2C7] px-3 py-2.5 text-sm outline-none focus:border-[#C4A35A]"
                 />
-              </div>
-              <div>
-                <label className="mb-1 block text-xs uppercase tracking-wider text-[#8A8278]">
-                  Password
-                </label>
+              </label>
+              <label className="block text-xs uppercase tracking-wider text-[#8A8278]">
+                Password
                 <input
                   type="password"
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full rounded-xl border border-[#D9D2C7] px-3 py-2.5 text-sm outline-none focus:border-[#C4A35A]"
+                  className="mt-1 w-full rounded-xl border border-[#D9D2C7] px-3 py-2.5 text-sm outline-none focus:border-[#C4A35A]"
                 />
-              </div>
+              </label>
               {authError ? (
                 <p className="text-sm text-red-600">{authError}</p>
               ) : null}
@@ -182,7 +168,8 @@ function TabButton({
 }
 
 function SourceOfTruthPanel({ getClient }: { getClient: () => PbClient }) {
-  const [category, setCategory] = useState<Category>("cities");
+  const [category, setCategory] = useState<CollectionKey>("cities");
+  const def = COLLECTIONS.find((c) => c.id === category)!;
   const [rows, setRows] = useState<Record<string, unknown>[]>([]);
   const [cities, setCities] = useState<PbCity[]>([]);
   const [loading, setLoading] = useState(true);
@@ -198,13 +185,12 @@ function SourceOfTruthPanel({ getClient }: { getClient: () => PbClient }) {
       const list = await pb.collection(category).getFullList({ sort: "-created" });
       setRows(list as unknown as Record<string, unknown>[]);
       if (category === "tours") {
-        const c = await pb
-          .collection("cities")
-          .getFullList<PbCity>({ sort: "name" });
-        setCities(c);
+        setCities(
+          await pb.collection("cities").getFullList<PbCity>({ sort: "name" })
+        );
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to load records");
+      setError(e instanceof Error ? e.message : "Failed to load");
     } finally {
       setLoading(false);
     }
@@ -215,10 +201,22 @@ function SourceOfTruthPanel({ getClient }: { getClient: () => PbClient }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [category]);
 
+  const subtitle = (row: Record<string, unknown>) => {
+    if (row.price_per_person != null) return `$${row.price_per_person}/person`;
+    if (row.min_price_per_night != null)
+      return `$${row.min_price_per_night}–$${row.max_price_per_night}/night`;
+    if (row.price_per_day != null) return `$${row.price_per_day}/day`;
+    if (row.base_pickup_fee != null)
+      return `pickup $${row.base_pickup_fee} · drop $${row.base_dropoff_fee}`;
+    if (row.is_active === false) return "Inactive";
+    if (row.tier) return String(row.tier);
+    return "";
+  };
+
   return (
     <div className="grid gap-4 lg:grid-cols-[200px_1fr]">
       <aside className="flex flex-row flex-wrap gap-2 lg:flex-col">
-        {CATEGORIES.map((c) => (
+        {COLLECTIONS.map((c) => (
           <button
             key={c.id}
             type="button"
@@ -240,7 +238,7 @@ function SourceOfTruthPanel({ getClient }: { getClient: () => PbClient }) {
 
       <section className="rounded-2xl border border-[#E8E2D9] bg-white p-4 sm:p-5">
         <div className="mb-4 flex items-center justify-between gap-3">
-          <h2 className="font-display text-2xl capitalize">{category}</h2>
+          <h2 className="font-display text-2xl">{def.label}</h2>
           <button
             type="button"
             onClick={() => {
@@ -254,72 +252,61 @@ function SourceOfTruthPanel({ getClient }: { getClient: () => PbClient }) {
         </div>
 
         {error ? <p className="mb-3 text-sm text-red-600">{error}</p> : null}
+
         {loading ? (
           <p className="text-sm text-[#8A8278]">Loading…</p>
         ) : (
-          <ul className="space-y-2">
-            {rows.map((row) => (
-              <li
-                key={String(row.id)}
-                className="flex items-center justify-between gap-3 rounded-xl border border-[#F0EBE3] px-3 py-3"
-              >
-                <div className="min-w-0">
-                  <p className="truncate font-medium text-[#0B1F3A]">
-                    {String(
-                      row.name ??
-                        row.title ??
-                        row.location ??
-                        row.room_type ??
-                        row.id
-                    )}
-                  </p>
-                  <p className="truncate text-xs text-[#8A8278]">
-                    {row.price != null
-                      ? `$${row.price}`
-                      : row.min_price != null
-                        ? `$${row.min_price}–$${row.max_price}`
-                        : row.price_per_day != null
-                          ? `$${row.price_per_day}/day`
-                          : row.base_price != null
-                            ? `base $${row.base_price}`
-                            : row.tier
-                              ? String(row.tier)
-                              : ""}
-                  </p>
-                </div>
-                <div className="flex shrink-0 gap-2">
-                  <button
-                    type="button"
-                    className="text-sm text-[#C4A35A]"
-                    onClick={() => {
-                      setEditing(row);
-                      setCreating(false);
-                    }}
-                  >
-                    Edit
-                  </button>
-                  <button
-                    type="button"
-                    className="text-sm text-red-600"
-                    onClick={async () => {
-                      if (!confirm("Delete this record?")) return;
-                      await getClient()
-                        .collection(category)
-                        .delete(String(row.id));
-                      await load();
-                    }}
-                  >
-                    Delete
-                  </button>
-                </div>
-              </li>
-            ))}
-          </ul>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[480px] text-left text-sm">
+              <thead>
+                <tr className="border-b border-[#EEE8DF] text-xs uppercase tracking-wider text-[#8A8278]">
+                  <th className="pb-2 font-medium">Record</th>
+                  <th className="pb-2 font-medium">Details</th>
+                  <th className="pb-2 text-right font-medium">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((row) => (
+                  <tr key={String(row.id)} className="border-b border-[#F5F0E8]">
+                    <td className="py-3 pr-3 font-medium text-[#0B1F3A]">
+                      {String(row[def.titleKey] ?? row.name ?? row.title ?? row.id)}
+                    </td>
+                    <td className="py-3 pr-3 text-[#8A8278]">{subtitle(row)}</td>
+                    <td className="py-3 text-right">
+                      <button
+                        type="button"
+                        className="mr-3 text-[#C4A35A]"
+                        onClick={() => {
+                          setEditing(row);
+                          setCreating(false);
+                        }}
+                      >
+                        Edit
+                      </button>
+                      <button
+                        type="button"
+                        className="text-red-600"
+                        onClick={async () => {
+                          if (!confirm("Delete this record?")) return;
+                          await getClient()
+                            .collection(category)
+                            .delete(String(row.id));
+                          await load();
+                        }}
+                      >
+                        Delete
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
 
         {(creating || editing) && (
           <RecordForm
-            category={category}
+            def={def}
             cities={cities}
             initial={creating ? null : editing}
             onCancel={() => {
@@ -340,79 +327,41 @@ function SourceOfTruthPanel({ getClient }: { getClient: () => PbClient }) {
 }
 
 function RecordForm({
-  category,
+  def,
   cities,
   initial,
   onCancel,
   onSaved,
   getClient,
 }: {
-  category: Category;
+  def: CollectionDef;
   cities: PbCity[];
   initial: Record<string, unknown> | null;
   onCancel: () => void;
   onSaved: () => Promise<void>;
   getClient: () => PbClient;
 }) {
-  const [form, setForm] = useState<Record<string, string>>(() =>
-    Object.fromEntries(
-      Object.entries(initial ?? {}).map(([k, v]) => [
-        k,
-        v == null ? "" : String(v),
-      ])
-    )
-  );
-  const [file, setFile] = useState<File | null>(null);
-  const [dragOver, setDragOver] = useState(false);
+  const [form, setForm] = useState<Record<string, string>>(() => {
+    const base: Record<string, string> = {};
+    for (const f of def.fields) {
+      if (f.type === "file") continue;
+      const v = initial?.[f.key];
+      if (f.type === "bool") {
+        base[f.key] =
+          v === false || v === "false" ? "false" : "true";
+      } else {
+        base[f.key] = v == null ? "" : String(v);
+      }
+    }
+    return base;
+  });
+  const [files, setFiles] = useState<Record<string, File | null>>({});
+  const [dragKey, setDragKey] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
   const set = (key: string, value: string) =>
     setForm((f) => ({ ...f, [key]: value }));
-
-  const fields = useMemo(() => {
-    switch (category) {
-      case "cities":
-        return [
-          ["name", "Name", "text"],
-          ["description", "Description", "textarea"],
-          ["base_price", "Base price", "number"],
-          ["base_price_modifier", "Price modifier", "number"],
-          ["sort_order", "Sort order", "number"],
-        ] as const;
-      case "tours":
-        return [
-          ["title", "Title", "text"],
-          ["description", "Description", "textarea"],
-          ["price", "Price", "number"],
-          ["city_id", "City", "city"],
-        ] as const;
-      case "vehicles":
-        return [
-          ["name", "Name", "text"],
-          ["type", "Type (legacy)", "text"],
-          ["max_passengers", "Max passengers", "number"],
-          ["price_per_day", "Price per day", "number"],
-        ] as const;
-      case "accommodations":
-        return [
-          ["tier", "Tier (4-star / 5-star)", "text"],
-          ["room_type", "Room type", "text"],
-          ["min_price", "Min price", "number"],
-          ["max_price", "Max price", "number"],
-        ] as const;
-      case "transfers":
-        return [
-          ["location", "Location", "text"],
-          ["pickup_fee", "Pickup fee", "number"],
-          ["dropoff_fee", "Dropoff fee", "number"],
-        ] as const;
-      default:
-        return [] as const;
-    }
-  }, [category]);
-
-  const supportsImage = category === "cities" || category === "tours";
 
   const save = async () => {
     setSaving(true);
@@ -420,20 +369,26 @@ function RecordForm({
     try {
       const pb = getClient();
       const fd = new FormData();
-      for (const [key, , type] of fields) {
-        const val = form[key] ?? "";
-        if (type === "number") {
-          if (val !== "") fd.append(key, val);
-        } else if (key === "city_id" || val) {
-          fd.append(key, val);
+      for (const f of def.fields) {
+        if (f.type === "file") {
+          const file = files[f.key];
+          if (file) fd.append(f.key, file);
+          continue;
+        }
+        const val = form[f.key] ?? "";
+        if (f.type === "bool") {
+          fd.append(f.key, val === "true" ? "true" : "false");
+        } else if (f.type === "number") {
+          if (val !== "") fd.append(f.key, val);
+        } else if (f.required || val) {
+          fd.append(f.key, val);
         }
       }
-      if (supportsImage && file) fd.append("image", file);
 
       if (initial?.id) {
-        await pb.collection(category).update(String(initial.id), fd);
+        await pb.collection(def.id).update(String(initial.id), fd);
       } else {
-        await pb.collection(category).create(fd);
+        await pb.collection(def.id).create(fd);
       }
       await onSaved();
     } catch (e) {
@@ -443,105 +398,147 @@ function RecordForm({
     }
   };
 
-  const existingImage =
-    supportsImage && initial?.image && initial?.id
-      ? pbFileUrl(
-          String(initial.collectionId ?? category),
-          String(initial.id),
-          String(initial.image),
-          "200x200"
-        )
-      : "";
-
   return (
     <div className="mt-5 rounded-2xl border border-[#C4A35A]/40 bg-[#FBF8F2] p-4">
       <h3 className="mb-3 font-display text-xl">
         {initial ? "Edit record" : "New record"}
       </h3>
       <div className="grid gap-3 sm:grid-cols-2">
-        {fields.map(([key, label, type]) => (
-          <div
-            key={key}
-            className={
-              type === "textarea" || type === "city" ? "sm:col-span-2" : ""
-            }
-          >
-            <label className="mb-1 block text-xs uppercase tracking-wider text-[#8A8278]">
-              {label}
-            </label>
-            {type === "textarea" ? (
-              <textarea
-                rows={3}
-                value={form[key] ?? ""}
-                onChange={(e) => set(key, e.target.value)}
-                className="w-full rounded-xl border border-[#D9D2C7] bg-white px-3 py-2 text-sm"
-              />
-            ) : type === "city" ? (
-              <select
-                value={form[key] ?? ""}
-                onChange={(e) => set(key, e.target.value)}
-                className="w-full rounded-xl border border-[#D9D2C7] bg-white px-3 py-2 text-sm"
-              >
-                <option value="">Select city</option>
-                {cities.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
-            ) : (
-              <input
-                type={type === "number" ? "number" : "text"}
-                value={form[key] ?? ""}
-                onChange={(e) => set(key, e.target.value)}
-                className="w-full rounded-xl border border-[#D9D2C7] bg-white px-3 py-2 text-sm"
-              />
-            )}
-          </div>
-        ))}
+        {def.fields.map((f) => {
+          if (f.type === "file") {
+            const existing =
+              initial?.[f.key] && initial?.id
+                ? pbFileUrl(
+                    String(initial.collectionId ?? def.id),
+                    String(initial.id),
+                    String(initial[f.key]),
+                    "200x200"
+                  )
+                : "";
+            return (
+              <div key={f.key} className="sm:col-span-2">
+                <p className="mb-1 text-xs uppercase tracking-wider text-[#8A8278]">
+                  {f.label}
+                </p>
+                <div
+                  className={`rounded-2xl border-2 border-dashed p-5 text-center ${
+                    dragKey === f.key
+                      ? "border-[#C4A35A] bg-[#F3EBD9]"
+                      : "border-[#D9D2C7] bg-white"
+                  }`}
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    setDragKey(f.key);
+                  }}
+                  onDragLeave={() => setDragKey(null)}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    setDragKey(null);
+                    const file = e.dataTransfer.files?.[0];
+                    if (file) setFiles((s) => ({ ...s, [f.key]: file }));
+                  }}
+                >
+                  {existing && !files[f.key] ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={existing}
+                      alt=""
+                      className="mx-auto mb-2 h-20 w-20 rounded-xl object-cover"
+                    />
+                  ) : null}
+                  <p className="text-sm text-[#5C6570]">
+                    {files[f.key]?.name ||
+                      "Drag & drop image, or choose a file"}
+                  </p>
+                  <input
+                    type="file"
+                    accept={f.accept || "image/*"}
+                    className="mt-2 block w-full text-sm"
+                    onChange={(e) =>
+                      setFiles((s) => ({
+                        ...s,
+                        [f.key]: e.target.files?.[0] ?? null,
+                      }))
+                    }
+                  />
+                </div>
+              </div>
+            );
+          }
+
+          const span =
+            f.type === "textarea" || f.type === "city" ? "sm:col-span-2" : "";
+
+          return (
+            <div key={f.key} className={span}>
+              <label className="mb-1 block text-xs uppercase tracking-wider text-[#8A8278]">
+                {f.label}
+                {f.required ? " *" : ""}
+              </label>
+              {f.type === "textarea" ? (
+                <textarea
+                  rows={3}
+                  value={form[f.key] ?? ""}
+                  onChange={(e) => set(f.key, e.target.value)}
+                  className="w-full rounded-xl border border-[#D9D2C7] bg-white px-3 py-2 text-sm"
+                />
+              ) : f.type === "bool" ? (
+                <div className="inline-flex rounded-full border border-[#D9D2C7] bg-white p-1">
+                  {["true", "false"].map((v) => (
+                    <button
+                      key={v}
+                      type="button"
+                      onClick={() => set(f.key, v)}
+                      className={`rounded-full px-4 py-1.5 text-sm ${
+                        (form[f.key] ?? "true") === v
+                          ? "bg-[#0B1F3A] text-white"
+                          : "text-[#5C6570]"
+                      }`}
+                    >
+                      {v === "true" ? "Yes" : "No"}
+                    </button>
+                  ))}
+                </div>
+              ) : f.type === "select" ? (
+                <select
+                  value={form[f.key] ?? ""}
+                  onChange={(e) => set(f.key, e.target.value)}
+                  className="w-full rounded-xl border border-[#D9D2C7] bg-white px-3 py-2 text-sm"
+                >
+                  <option value="">Select…</option>
+                  {(f.options || []).map((o) => (
+                    <option key={o} value={o}>
+                      {o}
+                    </option>
+                  ))}
+                </select>
+              ) : f.type === "city" ? (
+                <select
+                  value={form[f.key] ?? ""}
+                  onChange={(e) => set(f.key, e.target.value)}
+                  className="w-full rounded-xl border border-[#D9D2C7] bg-white px-3 py-2 text-sm"
+                >
+                  <option value="">Select city</option>
+                  {cities.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <input
+                  type={f.type === "number" ? "number" : "text"}
+                  value={form[f.key] ?? ""}
+                  onChange={(e) => set(f.key, e.target.value)}
+                  className="w-full rounded-xl border border-[#D9D2C7] bg-white px-3 py-2 text-sm"
+                />
+              )}
+            </div>
+          );
+        })}
       </div>
 
-      {supportsImage ? (
-        <div
-          className={`mt-4 rounded-2xl border-2 border-dashed p-6 text-center transition ${
-            dragOver
-              ? "border-[#C4A35A] bg-[#F3EBD9]"
-              : "border-[#D9D2C7] bg-white"
-          }`}
-          onDragOver={(e) => {
-            e.preventDefault();
-            setDragOver(true);
-          }}
-          onDragLeave={() => setDragOver(false)}
-          onDrop={(e) => {
-            e.preventDefault();
-            setDragOver(false);
-            const f = e.dataTransfer.files?.[0];
-            if (f) setFile(f);
-          }}
-        >
-          {existingImage && !file ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={existingImage}
-              alt=""
-              className="mx-auto mb-3 h-24 w-24 rounded-xl object-cover"
-            />
-          ) : null}
-          <p className="text-sm text-[#5C6570]">
-            {file ? file.name : "Drag & drop a cover photo, or choose a file"}
-          </p>
-          <input
-            type="file"
-            accept="image/*"
-            className="mt-3 block w-full text-sm"
-            onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-          />
-        </div>
-      ) : null}
-
       {err ? <p className="mt-3 text-sm text-red-600">{err}</p> : null}
-
       <div className="mt-4 flex gap-2">
         <button
           type="button"
@@ -564,22 +561,22 @@ function RecordForm({
 }
 
 function RulesOfLogicPanel({ getClient }: { getClient: () => PbClient }) {
-  const [rules, setRules] = useState<PbSystemRule[]>([]);
+  const [rows, setRows] = useState<PbAppSetting[]>([]);
+  const [draft, setDraft] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
-  const [draft, setDraft] = useState<Record<string, string>>({});
 
   const load = async () => {
     setLoading(true);
     try {
       const pb = getClient();
       await ensureDefaultRules(pb);
-      const rows = await pb
-        .collection("system_rules")
-        .getFullList<PbSystemRule>({ sort: "group,key" });
-      setRules(rows);
-      setDraft(Object.fromEntries(rows.map((r) => [r.key, r.value])));
+      const list = await pb
+        .collection("app_settings")
+        .getFullList<PbAppSetting>({ sort: "key" });
+      setRows(list);
+      setDraft(Object.fromEntries(list.map((r) => [r.key, String(r.value)])));
     } finally {
       setLoading(false);
     }
@@ -590,18 +587,23 @@ function RulesOfLogicPanel({ getClient }: { getClient: () => PbClient }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const meta = useMemo(
+    () => Object.fromEntries(DEFAULT_APP_SETTINGS.map((d) => [d.key, d])),
+    []
+  );
+
   const saveAll = async () => {
     setSaving(true);
     setMsg(null);
     try {
       const pb = getClient();
-      for (const rule of rules) {
-        const next = draft[rule.key] ?? rule.value;
-        if (next !== rule.value) {
-          await pb.collection("system_rules").update(rule.id, { value: next });
+      for (const row of rows) {
+        const next = draft[row.key] ?? row.value;
+        if (String(next) !== String(row.value)) {
+          await pb.collection("app_settings").update(row.id, { value: next });
         }
       }
-      setMsg("Rules saved. Builder will use them on next load.");
+      setMsg("Rules saved. Builder applies them on next load.");
       await load();
     } catch (e) {
       setMsg(e instanceof Error ? e.message : "Save failed");
@@ -610,89 +612,65 @@ function RulesOfLogicPanel({ getClient }: { getClient: () => PbClient }) {
     }
   };
 
-  const byGroup = useMemo(() => {
-    const map = new Map<string, PbSystemRule[]>();
-    for (const r of rules) {
-      const g = r.group || "general";
-      if (!map.has(g)) map.set(g, []);
-      map.get(g)!.push(r);
-    }
-    return map;
-  }, [rules]);
-
   if (loading) {
-    return <p className="text-sm text-[#8A8278]">Loading rules…</p>;
+    return <p className="text-sm text-[#8A8278]">Loading app_settings…</p>;
   }
 
   return (
     <div className="rounded-2xl border border-[#E8E2D9] bg-white p-5">
       <h2 className="font-display text-2xl">Rules of Logic</h2>
       <p className="mt-1 text-sm text-[#8A8278]">
-        These values power vehicle allocation, tour availability, and pricing
-        multipliers in the Trip Builder.
+        Stored in <code>app_settings</code> — vehicle allocation, tour days, and
+        pricing multipliers.
       </p>
 
-      <div className="mt-6 space-y-8">
-        {[...byGroup.entries()].map(([group, items]) => (
-          <div key={group}>
-            <h3 className="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-[#C4A35A]">
-              {group}
-            </h3>
-            <div className="space-y-4">
-              {items.map((rule) => {
-                const meta =
-                  DEFAULT_SYSTEM_RULES.find((d) => d.key === rule.key) ?? rule;
-                const isBool = rule.key === "allow_tours_on_travel_days";
-                return (
-                  <div
-                    key={rule.id}
-                    className="flex flex-col gap-2 border-b border-[#F0EBE3] pb-4 sm:flex-row sm:items-center sm:justify-between"
-                  >
-                    <div>
-                      <p className="font-medium text-[#0B1F3A]">
-                        {meta.label || rule.key}
-                      </p>
-                      <p className="text-xs text-[#8A8278]">{rule.key}</p>
-                    </div>
-                    {isBool ? (
-                      <div className="inline-flex rounded-full border border-[#D9D2C7] bg-[#F7F3EC] p-1">
-                        {["true", "false"].map((v) => (
-                          <button
-                            key={v}
-                            type="button"
-                            onClick={() =>
-                              setDraft((d) => ({ ...d, [rule.key]: v }))
-                            }
-                            className={`rounded-full px-4 py-1.5 text-sm ${
-                              (draft[rule.key] ?? rule.value) === v
-                                ? "bg-[#0B1F3A] text-white"
-                                : "text-[#5C6570]"
-                            }`}
-                          >
-                            {v === "true" ? "On" : "Off"}
-                          </button>
-                        ))}
-                      </div>
-                    ) : (
-                      <input
-                        type="number"
-                        step="any"
-                        value={draft[rule.key] ?? rule.value}
-                        onChange={(e) =>
-                          setDraft((d) => ({
-                            ...d,
-                            [rule.key]: e.target.value,
-                          }))
-                        }
-                        className="w-full max-w-[10rem] rounded-xl border border-[#D9D2C7] px-3 py-2 text-sm sm:text-right"
-                      />
-                    )}
-                  </div>
-                );
-              })}
+      <div className="mt-6 space-y-4">
+        {rows.map((row) => {
+          const info = meta[row.key];
+          const isBool = row.key === "allow_tours_on_travel_days";
+          return (
+            <div
+              key={row.id}
+              className="flex flex-col gap-2 border-b border-[#F0EBE3] pb-4 sm:flex-row sm:items-center sm:justify-between"
+            >
+              <div className="max-w-md">
+                <p className="font-medium text-[#0B1F3A]">{row.key}</p>
+                <p className="text-xs text-[#8A8278]">
+                  {row.description || info?.description}
+                </p>
+              </div>
+              {isBool ? (
+                <div className="inline-flex rounded-full border border-[#D9D2C7] bg-[#F7F3EC] p-1">
+                  {["true", "false"].map((v) => (
+                    <button
+                      key={v}
+                      type="button"
+                      onClick={() =>
+                        setDraft((d) => ({ ...d, [row.key]: v }))
+                      }
+                      className={`rounded-full px-4 py-1.5 text-sm ${
+                        (draft[row.key] ?? row.value) === v
+                          ? "bg-[#0B1F3A] text-white"
+                          : "text-[#5C6570]"
+                      }`}
+                    >
+                      {v === "true" ? "On" : "Off"}
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <input
+                  type="text"
+                  value={draft[row.key] ?? row.value}
+                  onChange={(e) =>
+                    setDraft((d) => ({ ...d, [row.key]: e.target.value }))
+                  }
+                  className="w-full max-w-[12rem] rounded-xl border border-[#D9D2C7] px-3 py-2 text-sm sm:text-right"
+                />
+              )}
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       <button
