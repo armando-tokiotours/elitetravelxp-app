@@ -1,0 +1,19 @@
+---
+description: When deploying to VPS, also sync PocketBase data and public brand files
+alwaysApply: true
+---
+
+# VPS deploy habit (for now)
+
+When the user asks to **push GitHub and/or VPS**:
+
+1. **Commit + push** code to `origin/main` (GitHub).
+2. **Rsync code** to `tokiotours-vps:/root/elitetravelxp-app/` and `docker compose up -d --build` (keep remote `.env`).
+3. **Also push PocketBase data** with:
+   ```bash
+   I_UNDERSTAND_REPLACE_VPS_DATA=yes npm run pb:push
+   ```
+   This replaces VPS `pb_data` (records + uploaded photos) with local `backend/pb_data`.
+4. Include **public brand assets** already in the repo (`public/brand/*`, hero background, etc.) in the git/rsync deploy — do not leave them local-only.
+
+Do not skip the PocketBase push unless the user explicitly says code-only.
