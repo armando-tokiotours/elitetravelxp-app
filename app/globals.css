@@ -102,9 +102,21 @@ h3,
   font-family: var(--font-body);
 }
 
+/* Hero mockup title — Montserrat Black; escapes DynamicTypography h1 rules */
+.builder-hero-title {
+  font-family: "Montserrat", system-ui, sans-serif !important;
+  font-weight: 900 !important;
+  font-size: clamp(2.5rem, 8vw, 4.5rem) !important;
+  line-height: 0.9 !important;
+  letter-spacing: -0.02em !important;
+  text-transform: uppercase !important;
+}
+
 /* Desktop: native fixed parallax via bg-fixed */
 .builder-hero-bg {
   background-attachment: fixed;
+  background-size: cover;
+  background-position: center center;
 }
 
 @media (max-width: 768px) {
@@ -112,14 +124,24 @@ h3,
    * iOS Safari ignores / glitches background-attachment: fixed.
    * Use a viewport-fixed layer clipped by the hero's overflow:hidden parent
    * so the photo stays put while the builder card scrolls over it.
+   * Shorter height + right-biased position keeps more landscape / pagoda in frame.
    */
   .builder-hero-bg {
     position: fixed !important;
     inset: 0 auto auto 0;
     width: 100%;
-    height: 70vh;
+    height: 50vh;
+    max-height: 480px;
     background-attachment: scroll !important;
+    background-position: 60% center !important;
+    background-size: cover !important;
     transform: translateZ(0);
+  }
+}
+
+@media (min-width: 769px) {
+  .builder-hero-bg {
+    background-position: center center !important;
   }
 }
 

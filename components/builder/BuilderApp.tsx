@@ -116,8 +116,8 @@ export function BuilderApp() {
         {/* Full-width cream shell — masks fixed parallax leaking past card margins */}
         <div className="relative z-20 w-full bg-[#F5F0E8]">
           <div className="-mt-14 px-3 pb-8 sm:-mt-16 sm:px-4">
-            <div className="mx-auto max-w-3xl overflow-hidden rounded-t-3xl border border-[#E8E2D9] border-b-0 bg-[#FBF8F2] shadow-[0_-8px_40px_rgba(11,31,58,0.12)]">
-              <div className="border-b border-[#E8E2D9] px-5 py-5 sm:px-6">
+            <div className="mx-auto max-w-3xl rounded-t-3xl border border-[#E8E2D9] border-b-0 bg-[#FBF8F2] shadow-[0_-8px_40px_rgba(11,31,58,0.12)]">
+              <div className="overflow-hidden rounded-t-3xl border-b border-[#E8E2D9] px-5 py-5 sm:px-6">
                 <p className="text-[0.65rem] font-semibold uppercase tracking-[0.3em] text-[#C4A35A]">
                   Your Trip Builder
                 </p>
@@ -126,7 +126,7 @@ export function BuilderApp() {
                 </h2>
               </div>
 
-              <div className="px-4 pb-40 pt-4 sm:px-6">
+              <div className="px-4 pb-40 pt-0 sm:px-6">
                 {loading ? (
                   <p className="rounded-2xl bg-white/70 p-8 text-center text-sm text-[#8A8278]">
                     Loading your trip builder…
@@ -140,19 +140,22 @@ export function BuilderApp() {
                   <BuilderAccordionProvider defaultOpen={1}>
                     <ProgressBar />
                     <div className="mt-6 flex flex-col gap-4">
-                      <TripDurationSection />
+                      <TripDurationSection
+                        seasonTiers={config.seasonTiers}
+                      />
                       <ArrivalDepartureSection hubs={config.hubs} />
-                      <HotelsGuestsSection
-                        accommodations={config.accommodations}
-                        maxAdultsPerRoom={Number(
-                          config.rules.max_adults_per_room || 3
-                        )}
-                      />
-                      <LocationsNightsSection
-                        cities={config.cities}
-                        transitModes={config.transitModes}
-                        seasonalHighlights={config.seasonalHighlights}
-                      />
+                    <LocationsNightsSection
+                      cities={config.cities}
+                      transitModes={config.transitModes}
+                      seasonalHighlights={config.seasonalHighlights}
+                    />
+                    <HotelsGuestsSection
+                      accommodations={config.accommodations}
+                      cities={config.cities}
+                      maxAdultsPerRoom={Number(
+                        config.rules.max_adults_per_room || 3
+                      )}
+                    />
                       <ToursDriverSection
                         tours={config.tours}
                         cityNames={cityNames}

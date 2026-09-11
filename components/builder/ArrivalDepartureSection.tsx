@@ -123,7 +123,7 @@ export function ArrivalDepartureSection({ hubs }: { hubs: PbHub[] }) {
           <PillToggle value={airportDropoff} onChange={setAirportDropoff} />
         </div>
       </div>
-      <SectionContinue next={3} label="Continue to Hotels" />
+      <SectionContinue next={3} label="Continue to Locations" />
     </SectionBlock>
   );
 }

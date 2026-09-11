@@ -76,7 +76,7 @@ export function LocationsNightsSection({
 
   return (
     <SectionBlock
-      number={4}
+      number={3}
       title="Locations & Nights"
       id="section-locations"
       icon="map"
@@ -191,7 +191,7 @@ export function LocationsNightsSection({
           })}
         </ul>
       </BuilderPortalSheet>
-      <SectionContinue next={5} label="Continue to Tours" />
+      <SectionContinue next={4} label="Continue to Hotels" />
     </SectionBlock>
   );
 }

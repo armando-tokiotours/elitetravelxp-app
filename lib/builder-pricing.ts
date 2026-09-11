@@ -73,17 +73,60 @@ export function calculateBuilderQuote(
       : ruleNumber(rules, "seasonal_multiplier", 1));
 
   if (state.needHotels && nights > 0) {
-    const matches = config.accommodations.filter(
-      (a) =>
-        a.tier === state.hotelTier &&
-        a.room_type.toLowerCase() === state.roomType.toLowerCase()
-    );
-    const row =
-      matches[0] ||
-      config.accommodations.find((a) => a.tier === state.hotelTier);
-    if (row) {
-      min += hotelMin(row) * state.roomCount * nights;
-      max += hotelMax(row) * state.roomCount * nights;
+    const monthName = state.arrivalDate
+      ? new Date(
+          Number(state.arrivalDate.slice(0, 4)),
+          Number(state.arrivalDate.slice(5, 7)) - 1,
+          1
+        ).toLocaleString("en-US", { month: "long" })
+      : null;
+
+    for (const loc of state.locations) {
+      const pref = state.cityHotels?.[loc.cityId];
+      const needsHotel = pref ? pref.needsHotel : state.needHotels;
+      if (!needsHotel || loc.nights < 1) continue;
+
+      const star = pref ? `${pref.starRating}-star` : state.hotelTier;
+      const room = pref?.roomType || state.roomType;
+      const breakfast = pref
+        ? pref.breakfast
+          ? "Included"
+          : "Not Included"
+        : null;
+
+      const scored = config.accommodations
+        .map((a) => {
+          let score = 0;
+          const aStar = a.star_rating || a.tier;
+          if (aStar === star) score += 4;
+          if (
+            (a.room_type || "").toLowerCase().includes(String(room).toLowerCase())
+          )
+            score += 3;
+          if (a.city_id && a.city_id === loc.cityId) score += 5;
+          if (breakfast && a.breakfast === breakfast) score += 2;
+          if (monthName && a.month === monthName) score += 2;
+          return { a, score };
+        })
+        .filter((x) => x.score >= 4)
+        .sort((x, y) => y.score - x.score);
+
+      const row =
+        scored[0]?.a ||
+        config.accommodations.find(
+          (a) => (a.star_rating || a.tier) === star
+        ) ||
+        config.accommodations.find((a) => a.tier === state.hotelTier);
+
+      if (row) {
+        const rooms = Math.max(
+          1,
+          state.roomCount ||
+            Math.ceil(Math.max(1, state.adults + state.children) / 2)
+        );
+        min += hotelMin(row) * rooms * loc.nights;
+        max += hotelMax(row) * rooms * loc.nights;
+      }
     }
   }
 

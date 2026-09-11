@@ -42,16 +42,24 @@ export function builderSectionSummaries(
     state.airportPickup ? "Pickup: Yes" : "Pickup: No",
   ];
 
-  const hotelBits = state.needHotels
-    ? [
-        state.hotelTier === "5-star" ? "5-Star" : "4-Star",
-        `${state.adults + state.children} guest${state.adults + state.children === 1 ? "" : "s"}`,
-        `${state.roomCount} room${state.roomCount === 1 ? "" : "s"}`,
-      ]
-    : [
-        "No hotels",
-        `${state.adults + state.children} guest${state.adults + state.children === 1 ? "" : "s"}`,
-      ];
+  const hotelCities = Object.values(state.cityHotels || {}).filter(
+    (h) => h.needsHotel
+  );
+  const hotelBits =
+    hotelCities.length > 0
+      ? [
+          `${hotelCities.length} hotel stop${hotelCities.length === 1 ? "" : "s"}`,
+          `${state.adults + state.children} guest${state.adults + state.children === 1 ? "" : "s"}`,
+        ]
+      : state.needHotels
+        ? [
+            state.hotelTier === "5-star" ? "5-Star" : "4-Star",
+            `${state.adults + state.children} guest${state.adults + state.children === 1 ? "" : "s"}`,
+          ]
+        : [
+            "No hotels",
+            `${state.adults + state.children} guest${state.adults + state.children === 1 ? "" : "s"}`,
+          ];
 
   const locBits =
     state.locations.length === 0
@@ -74,8 +82,8 @@ export function builderSectionSummaries(
   return {
     1: durationBits.join(" · "),
     2: arrivalBits.join(" · "),
-    3: hotelBits.join(" · "),
-    4: locBits,
+    3: locBits,
+    4: hotelBits.join(" · "),
     5: tourBits.join(" · "),
   };
 }

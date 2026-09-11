@@ -22,14 +22,16 @@ import {
 import { useTeamAuth } from "@/store/useTeamAuth";
 import { AppShell } from "@/components/layout/AppShell";
 import { SiteBrandingPanel } from "@/components/team/SiteBrandingPanel";
+import { HotelRatesUploader } from "@/components/team/HotelRatesUploader";
+import { SeasonalityPanel } from "@/components/team/SeasonalityPanel";
 
 type PbClient = PocketBase;
 
 export function TeamAccessApp() {
   const [ready, setReady] = useState(false);
-  const [tab, setTab] = useState<"truth" | "rules" | "users" | "branding">(
-    "truth"
-  );
+  const [tab, setTab] = useState<
+    "truth" | "rules" | "seasonality" | "users" | "branding"
+  >("truth");
   const isAuthenticated = useTeamAuth((s) => s.isAuthenticated);
   const email = useTeamAuth((s) => s.email);
   const login = useTeamAuth((s) => s.login);
@@ -148,6 +150,12 @@ export function TeamAccessApp() {
             Rules of Logic
           </TabButton>
           <TabButton
+            active={tab === "seasonality"}
+            onClick={() => setTab("seasonality")}
+          >
+            Seasonality
+          </TabButton>
+          <TabButton
             active={tab === "branding"}
             onClick={() => setTab("branding")}
           >
@@ -162,6 +170,8 @@ export function TeamAccessApp() {
           <SourceOfTruthPanel getClient={getClient} />
         ) : tab === "rules" ? (
           <RulesOfLogicPanel getClient={getClient} />
+        ) : tab === "seasonality" ? (
+          <SeasonalityPanel getClient={getClient} />
         ) : tab === "branding" ? (
           <SiteBrandingPanel getClient={getClient} />
         ) : (
@@ -256,10 +266,12 @@ function rowSubtitle(def: CollectionDef, row: Record<string, unknown>): string {
       .join(" · ");
   }
   if (def.id === "accommodations") {
-    const min = row.min_price_per_night ?? row.min_price;
-    const max = row.max_price_per_night ?? row.max_price;
+    const min = row.price_min ?? row.min_price_per_night ?? row.min_price;
+    const max = row.price_max ?? row.max_price_per_night ?? row.max_price;
     return [
-      row.tier ? String(row.tier) : null,
+      row.star_rating || row.tier ? String(row.star_rating || row.tier) : null,
+      row.season_tier ? String(row.season_tier) : null,
+      row.month ? String(row.month) : null,
       min != null && max != null ? `€${min}–€${max}/night` : null,
     ]
       .filter(Boolean)
@@ -301,7 +313,7 @@ function SourceOfTruthPanel({ getClient }: { getClient: () => PbClient }) {
           .getFullList()) as unknown as Record<string, unknown>[];
       }
       setRows(list);
-      if (category === "tours" || category === "seasonal_highlights" || category === "hubs") {
+      if (category === "tours" || category === "seasonal_highlights" || category === "hubs" || category === "accommodations") {
         setCities(
           await pb.collection("cities").getFullList<PbCity>({ sort: "name" })
         );
@@ -399,6 +411,10 @@ function SourceOfTruthPanel({ getClient }: { getClient: () => PbClient }) {
               </pre>
             ) : null}
           </div>
+        ) : null}
+
+        {category === "accommodations" ? (
+          <HotelRatesUploader getClient={getClient} onImported={() => void load()} />
         ) : null}
 
         {loading ? (

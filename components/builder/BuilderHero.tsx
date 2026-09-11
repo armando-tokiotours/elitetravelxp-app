@@ -1,53 +1,73 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import {
   DEFAULT_HERO_IMAGE,
   DEFAULT_SITE_BRANDING,
   brandingHeroUrl,
+  fetchPublicBrandAssets,
   type PbSiteBranding,
 } from "@/lib/pocketbase/client";
 
+const HERO_SUBTITLE_DEFAULT =
+  "Design every detail we'll take care of the rest";
+
 export function BuilderHero({ branding }: { branding: PbSiteBranding | null }) {
-  const heroUrl = brandingHeroUrl(branding) || DEFAULT_HERO_IMAGE;
-  const main = branding?.hero_title_main || DEFAULT_SITE_BRANDING.hero_title_main;
-  const highlight =
-    branding?.hero_title_highlight || DEFAULT_SITE_BRANDING.hero_title_highlight;
+  const [heroUrl, setHeroUrl] = useState(
+    () => brandingHeroUrl(branding) || DEFAULT_HERO_IMAGE
+  );
   const subtitle =
-    branding?.hero_subtitle || DEFAULT_SITE_BRANDING.hero_subtitle;
+    branding?.hero_subtitle?.trim() ||
+    DEFAULT_SITE_BRANDING.hero_subtitle ||
+    HERO_SUBTITLE_DEFAULT;
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const publicAssets = await fetchPublicBrandAssets();
+      if (cancelled) return;
+      setHeroUrl(brandingHeroUrl(branding, publicAssets) || DEFAULT_HERO_IMAGE);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [branding]);
 
   return (
     <section
-      className="builder-hero relative flex min-h-[52vh] items-end sm:min-h-[58vh]"
+      className="builder-hero relative h-[50vh] max-h-[480px] w-full min-h-[260px] md:h-[60vh] md:max-h-none md:min-h-[420px]"
       aria-label="Hero"
     >
-      {/*
-        Clip wrapper: keeps the fixed/parallax photo visible only within the hero.
-        As the cream builder card scrolls up, it covers this clipped region.
-      */}
       <div
         aria-hidden
         className="pointer-events-none absolute inset-0 z-0 overflow-hidden"
       >
-        {/* True fixed parallax photo (bg-fixed on desktop; fixed-position fallback on iOS) */}
         <div
-          className="builder-hero-bg absolute inset-0 bg-[#F5F0E8] bg-cover bg-center bg-no-repeat bg-fixed"
+          className="builder-hero-bg absolute inset-0 bg-[#F5F0E8] bg-cover bg-[position:60%_center] bg-no-repeat md:bg-center"
           style={{ backgroundImage: `url(${heroUrl})` }}
         />
-        {/* Tight left cream dégradé — keeps pagoda/sky clear on the right */}
-        <div className="absolute inset-y-0 left-0 w-[78%] md:w-[70%] bg-gradient-to-r from-[#FBF8F2]/95 via-[#FBF8F2]/55 to-transparent" />
-        {/* Soft bottom blend into the cream content shell only */}
-        <div className="absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-[#F5F0E8]/85 to-transparent" />
+        {/* Soft wash — keep sky readable without hiding the landscape */}
+        <div className="absolute inset-x-0 top-0 h-20 bg-gradient-to-b from-black/10 to-transparent" />
+        <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-[#F5F0E8]/85 to-transparent sm:h-28" />
       </div>
 
-      <div className="relative z-10 mx-auto w-full max-w-3xl px-5 pb-20 pt-28 sm:px-8 sm:pb-24">
-        <h1 className="max-w-xl font-display text-4xl leading-[1.08] uppercase tracking-[0.04em] sm:text-5xl md:text-[3.35rem]">
-          <span className="text-[#0B1F3A]">{main}</span>
-          <br />
-          <span className="text-[#C4A35A]">{highlight}</span>
-        </h1>
-        <p className="mt-4 max-w-md text-sm leading-relaxed text-[#3D4A5C] sm:text-base">
-          {subtitle}
-        </p>
+      {/* Vertically centered, left-aligned text stack */}
+      <div className="absolute inset-0 z-10 flex items-center justify-start px-5 pb-14 pt-16 sm:px-8 sm:pb-16 sm:pt-20 md:px-12">
+        <div className="flex max-w-[min(100%,28rem)] flex-col items-start text-left md:max-w-2xl">
+          <h1 className="builder-hero-title flex flex-col items-start uppercase leading-none">
+            <span className="text-[#0B132B]">BUILD</span>
+            <span className="text-[0.8em] text-[#0B132B]">YOUR PERFECT</span>
+            <span className="text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.45)]">
+              JAPAN TRIP
+            </span>
+          </h1>
+
+          <div className="mt-4 bg-[#C5A059] px-4 py-1.5 shadow-sm">
+            <p className="font-medium text-sm text-[#0B132B] md:text-base">
+              {subtitle}
+            </p>
+          </div>
+        </div>
       </div>
     </section>
   );

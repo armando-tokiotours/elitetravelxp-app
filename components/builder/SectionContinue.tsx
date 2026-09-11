@@ -23,8 +23,8 @@ export function SectionContinue({
             "",
             "section-duration",
             "section-arrival",
-            "section-hotels",
             "section-locations",
+            "section-hotels",
             "section-tours",
           ][next];
           if (id) {

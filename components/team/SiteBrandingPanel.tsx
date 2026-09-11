@@ -7,7 +7,9 @@ import {
   DEFAULT_SITE_BRANDING,
   brandingHeroUrl,
   brandingLogoUrl,
+  fetchPublicBrandAssets,
   type PbSiteBranding,
+  type PublicBrandAssets,
 } from "@/lib/pocketbase/client";
 
 type PbClient = PocketBase;
@@ -28,6 +30,7 @@ const FONT_PRESETS = [
 
 export function SiteBrandingPanel({ getClient }: { getClient: () => PbClient }) {
   const [record, setRecord] = useState<PbSiteBranding | null>(null);
+  const [publicAssets, setPublicAssets] = useState<PublicBrandAssets>({});
   const [main, setMain] = useState<string>(DEFAULT_SITE_BRANDING.hero_title_main);
   const [highlight, setHighlight] = useState<string>(
     DEFAULT_SITE_BRANDING.hero_title_highlight
@@ -45,6 +48,8 @@ export function SiteBrandingPanel({ getClient }: { getClient: () => PbClient }) 
   );
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [heroFile, setHeroFile] = useState<File | null>(null);
+  const [saveHeroToPublic, setSaveHeroToPublic] = useState(true);
+  const [saveLogoToPublic, setSaveLogoToPublic] = useState(false);
   const [logoPreview, setLogoPreview] = useState("");
   const [heroPreview, setHeroPreview] = useState("");
   const [loading, setLoading] = useState(true);
@@ -67,6 +72,8 @@ export function SiteBrandingPanel({ getClient }: { getClient: () => PbClient }) 
         rows = [created as unknown as PbSiteBranding];
       }
       const row = rows[0];
+      const assets = await fetchPublicBrandAssets();
+      setPublicAssets(assets);
       setRecord(row);
       setMain(row.hero_title_main || DEFAULT_SITE_BRANDING.hero_title_main);
       setHighlight(
@@ -81,8 +88,8 @@ export function SiteBrandingPanel({ getClient }: { getClient: () => PbClient }) 
           row.google_fonts_import_url ||
           DEFAULT_SITE_BRANDING.google_fonts_url
       );
-      setLogoPreview(brandingLogoUrl(row));
-      setHeroPreview(brandingHeroUrl(row));
+      setLogoPreview(brandingLogoUrl(row, assets));
+      setHeroPreview(brandingHeroUrl(row, assets));
       setLogoFile(null);
       setHeroFile(null);
     } catch (e) {
@@ -122,6 +129,26 @@ export function SiteBrandingPanel({ getClient }: { getClient: () => PbClient }) 
     link.href = url;
   }, [googleUrl]);
 
+  const savePublicAsset = async (kind: "hero" | "logo", file: File) => {
+    const fd = new FormData();
+    fd.append("file", file);
+    fd.append("kind", kind);
+    const res = await fetch("/api/branding/public-asset", {
+      method: "POST",
+      body: fd,
+    });
+    const data = (await res.json()) as {
+      ok?: boolean;
+      path?: string;
+      error?: string;
+      absolute?: string;
+    };
+    if (!res.ok) {
+      throw new Error(data.error || `Failed to save ${kind} to public/brand`);
+    }
+    return data;
+  };
+
   const save = async () => {
     setSaving(true);
     setMsg(null);
@@ -149,14 +176,39 @@ export function SiteBrandingPanel({ getClient }: { getClient: () => PbClient }) 
           .collection("site_branding")
           .create(fd)) as unknown as PbSiteBranding;
       }
+
+      const notes: string[] = [];
+      let nextAssets = { ...publicAssets };
+
+      if (heroFile && saveHeroToPublic) {
+        const result = await savePublicAsset("hero", heroFile);
+        if (result.path) {
+          nextAssets = { ...nextAssets, hero: result.path };
+          notes.push(`Hero also saved to ${result.absolute || result.path}`);
+        }
+      }
+      if (logoFile && saveLogoToPublic) {
+        const result = await savePublicAsset("logo", logoFile);
+        if (result.path) {
+          nextAssets = { ...nextAssets, logo: result.path };
+          notes.push(`Logo also saved to ${result.absolute || result.path}`);
+        }
+      }
+
+      setPublicAssets(nextAssets);
       setRecord(saved);
-      setLogoPreview(brandingLogoUrl(saved));
-      setHeroPreview(brandingHeroUrl(saved));
+      setLogoPreview(brandingLogoUrl(saved, nextAssets));
+      setHeroPreview(brandingHeroUrl(saved, nextAssets));
       setLogoFile(null);
       setHeroFile(null);
-      setMsg("Branding saved. Refresh the site to see typography updates.");
+      setMsg(
+        [
+          "Branding saved. Refresh the site to see typography updates.",
+          ...notes,
+        ].join(" ")
+      );
     } catch (e) {
-      setError(formatPbError(e));
+      setError(e instanceof Error ? e.message : formatPbError(e));
     } finally {
       setSaving(false);
     }
@@ -191,15 +243,29 @@ export function SiteBrandingPanel({ getClient }: { getClient: () => PbClient }) 
               setLogoFile(f);
               if (f) setLogoPreview(URL.createObjectURL(f));
             }}
+            publicOption={{
+              checked: saveLogoToPublic,
+              onChange: setSaveLogoToPublic,
+              pathHint: publicAssets.logo
+                ? `Current public file: ${publicAssets.logo}`
+                : "Saves a copy to public/brand/site-logo.*",
+            }}
           />
           <UploadField
             label="Hero background"
-            hint="Wide landscape photo (Fuji, temples…)"
+            hint="Wide landscape · ideal 2400×1400 JPG/WebP"
             preview={heroPreview}
             previewClass="aspect-[16/9] w-full object-cover"
             onFile={(f) => {
               setHeroFile(f);
               if (f) setHeroPreview(URL.createObjectURL(f));
+            }}
+            publicOption={{
+              checked: saveHeroToPublic,
+              onChange: setSaveHeroToPublic,
+              pathHint: publicAssets.hero
+                ? `Current public file: ${publicAssets.hero}`
+                : "Saves a copy to public/brand/hero-background.*",
             }}
           />
         </div>
@@ -349,12 +415,18 @@ function UploadField({
   preview,
   previewClass,
   onFile,
+  publicOption,
 }: {
   label: string;
   hint: string;
   preview: string;
   previewClass: string;
   onFile: (f: File | null) => void;
+  publicOption?: {
+    checked: boolean;
+    onChange: (v: boolean) => void;
+    pathHint: string;
+  };
 }) {
   return (
     <div>
@@ -381,6 +453,24 @@ function UploadField({
           className="mt-3 block w-full text-sm"
           onChange={(e) => onFile(e.target.files?.[0] ?? null)}
         />
+        {publicOption ? (
+          <label className="mt-3 flex cursor-pointer items-start gap-2.5 text-sm text-[#0B1F3A]">
+            <input
+              type="checkbox"
+              checked={publicOption.checked}
+              onChange={(e) => publicOption.onChange(e.target.checked)}
+              className="mt-0.5 h-4 w-4 rounded border-[#D9D2C7] accent-[#C4A35A]"
+            />
+            <span>
+              <span className="font-medium">
+                Also save to project public assets
+              </span>
+              <span className="mt-0.5 block text-xs text-[#8A8278]">
+                {publicOption.pathHint}
+              </span>
+            </span>
+          </label>
+        ) : null}
       </div>
     </div>
   );

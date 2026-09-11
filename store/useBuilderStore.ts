@@ -10,6 +10,23 @@ export interface LocationStop {
 
 export type HubTravelMode = "airport" | "cruise";
 
+export type HotelStarRating = 3 | 4 | 5;
+export type HotelRoomType = "Standard" | "Twin" | "Superior";
+export type SeasonTierName = "Low" | "Mid" | "High";
+
+export interface ActiveSeasonNote {
+  crowds: string;
+  note: string;
+}
+
+export interface CityHotelPref {
+  cityId: string;
+  needsHotel: boolean;
+  starRating: HotelStarRating;
+  roomType: HotelRoomType;
+  breakfast: boolean;
+}
+
 export interface BuilderState {
   durationDays: number;
   /** True when user chose Custom instead of 10/14/21 presets */
@@ -32,9 +49,14 @@ export interface BuilderState {
   adults: number;
   children: number;
   locations: LocationStop[];
+  /** Per-city hotel preferences (keyed by cityId) */
+  cityHotels: Record<string, CityHotelPref>;
   transitModeId: string | null;
   selectedTourIds: string[];
   needDriver: boolean;
+  /** Resolved from season_tiers for the chosen arrival date */
+  activeSeasonTier: SeasonTierName | null;
+  activeSeasonNote: ActiveSeasonNote | null;
 }
 
 export interface BuilderActions {
@@ -53,6 +75,8 @@ export interface BuilderActions {
   setRoomType: (t: string) => void;
   setAdults: (n: number) => void;
   setChildren: (n: number) => void;
+  setCityHotel: (cityId: string, patch: Partial<CityHotelPref>) => void;
+  ensureCityHotels: (cityIds: string[]) => void;
   addLocation: (cityId: string) => void;
   removeLocation: (key: string) => void;
   setLocationNights: (key: string, nights: number) => void;
@@ -61,6 +85,10 @@ export interface BuilderActions {
   toggleTour: (tourId: string) => void;
   setSelectedTourIds: (ids: string[]) => void;
   setNeedDriver: (v: boolean) => void;
+  setActiveSeason: (
+    tier: SeasonTierName | null,
+    note: ActiveSeasonNote | null
+  ) => void;
   totalGuests: () => number;
   totalNights: () => number;
   /** Checkout / leave Japan day = arrival + durationDays */
@@ -85,9 +113,12 @@ const initialState: BuilderState = {
   adults: 2,
   children: 0,
   locations: [],
+  cityHotels: {},
   transitModeId: null,
   selectedTourIds: [],
   needDriver: false,
+  activeSeasonTier: null,
+  activeSeasonNote: null,
 };
 
 function uid() {
@@ -116,6 +147,16 @@ export function formatDisplayDate(iso: string | null | undefined): string {
   });
 }
 
+function defaultCityHotel(cityId: string): CityHotelPref {
+  return {
+    cityId,
+    needsHotel: true,
+    starRating: 4,
+    roomType: "Standard",
+    breakfast: true,
+  };
+}
+
 export const useBuilderStore = create<BuilderState & BuilderActions>()(
   persist(
     (set, get) => ({
@@ -128,7 +169,6 @@ export const useBuilderStore = create<BuilderState & BuilderActions>()(
       setArrivalMode: (mode) =>
         set((s) => ({
           arrivalMode: mode,
-          // Clear hub if it no longer matches the selected mode (handled in UI too)
           arrivalTransferId: s.arrivalTransferId,
         })),
       setDepartureMode: (mode) =>
@@ -147,18 +187,54 @@ export const useBuilderStore = create<BuilderState & BuilderActions>()(
       setAdults: (n) => set({ adults: Math.max(0, n) }),
       setChildren: (n) => set({ children: Math.max(0, n) }),
 
+      setCityHotel: (cityId, patch) =>
+        set((s) => ({
+          cityHotels: {
+            ...s.cityHotels,
+            [cityId]: {
+              ...(s.cityHotels[cityId] || defaultCityHotel(cityId)),
+              ...patch,
+              cityId,
+            },
+          },
+        })),
+
+      ensureCityHotels: (cityIds) =>
+        set((s) => {
+          const next = { ...s.cityHotels };
+          let changed = false;
+          for (const id of cityIds) {
+            if (!next[id]) {
+              next[id] = defaultCityHotel(id);
+              changed = true;
+            }
+          }
+          return changed ? { cityHotels: next } : s;
+        }),
+
       addLocation: (cityId) =>
         set((s) => {
           if (s.locations.some((l) => l.cityId === cityId)) return s;
           return {
             locations: [...s.locations, { key: uid(), cityId, nights: 1 }],
+            cityHotels: {
+              ...s.cityHotels,
+              [cityId]: s.cityHotels[cityId] || defaultCityHotel(cityId),
+            },
           };
         }),
 
       removeLocation: (key) =>
-        set((s) => ({
-          locations: s.locations.filter((l) => l.key !== key),
-        })),
+        set((s) => {
+          const removed = s.locations.find((l) => l.key === key);
+          const locations = s.locations.filter((l) => l.key !== key);
+          const stillUsed = removed
+            ? locations.some((l) => l.cityId === removed.cityId)
+            : true;
+          const cityHotels = { ...s.cityHotels };
+          if (removed && !stillUsed) delete cityHotels[removed.cityId];
+          return { locations, cityHotels };
+        }),
 
       setLocationNights: (key, nights) =>
         set((s) => ({
@@ -182,6 +258,9 @@ export const useBuilderStore = create<BuilderState & BuilderActions>()(
 
       setSelectedTourIds: (ids) => set({ selectedTourIds: ids }),
       setNeedDriver: (v) => set({ needDriver: v }),
+
+      setActiveSeason: (tier, note) =>
+        set({ activeSeasonTier: tier, activeSeasonNote: note }),
 
       totalGuests: () => {
         const s = get();
@@ -219,6 +298,7 @@ export const useBuilderStore = create<BuilderState & BuilderActions>()(
         adults: s.adults,
         children: s.children,
         locations: s.locations,
+        cityHotels: s.cityHotels,
         transitModeId: s.transitModeId,
         selectedTourIds: s.selectedTourIds,
         needDriver: s.needDriver,

@@ -59,7 +59,8 @@ function resolveFont(name: string, role: "display" | "sans"): ResolvedFont {
   // Montserrat Thin / Light / ExtraBold via Google Fonts
   if (n.startsWith("montserrat") || n.startsWith("monserrat")) {
     let weight: string | undefined;
-    if (n.includes("extrabold") || n.includes("extra bold") || n.includes("800"))
+    if (n.includes("black") || n.includes("900")) weight = "900";
+    else if (n.includes("extrabold") || n.includes("extra bold") || n.includes("800"))
       weight = "800";
     else if (n.includes("bold") || n.includes("700")) weight = "700";
     else if (n.includes("thin")) weight = "100";

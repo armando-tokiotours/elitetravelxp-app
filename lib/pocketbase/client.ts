@@ -29,12 +29,17 @@ export function getPocketBase(): PocketBase {
   const url = getPbBaseUrl();
   if (!client || client.baseUrl !== url) {
     client = new PocketBase(url);
+    // React Strict Mode + parallel panels share one client; default auto-cancel
+    // aborts in-flight duplicate GETs (e.g. site_branding) with a confusing error.
+    client.autoCancellation(false);
   }
   return client;
 }
 
 export function createPocketBase(): PocketBase {
-  return new PocketBase(getPbBaseUrl());
+  const pb = new PocketBase(getPbBaseUrl());
+  pb.autoCancellation(false);
+  return pb;
 }
 
 export function pbFileUrl(
@@ -74,11 +79,11 @@ export function transferDropoff(t: PbTransfer): number {
 }
 
 export function hotelMin(a: PbAccommodation): number {
-  return Number(a.min_price_per_night ?? a.min_price ?? 0);
+  return Number(a.price_min ?? a.min_price_per_night ?? a.min_price ?? 0);
 }
 
 export function hotelMax(a: PbAccommodation): number {
-  return Number(a.max_price_per_night ?? a.max_price ?? 0);
+  return Number(a.price_max ?? a.max_price_per_night ?? a.max_price ?? 0);
 }
 
 export interface PbCity {
@@ -96,7 +101,14 @@ export interface PbCity {
 
 export interface PbAccommodation {
   id: string;
-  tier: "4-star" | "5-star";
+  city_id?: string;
+  star_rating?: "3-star" | "4-star" | "5-star";
+  month?: string;
+  season_tier?: "Low" | "Mid" | "High";
+  breakfast?: "Included" | "Not Included";
+  price_min?: number;
+  price_max?: number;
+  tier: "4-star" | "5-star" | "3-star" | string;
   room_type: string;
   min_price_per_night?: number;
   max_price_per_night?: number;
@@ -104,6 +116,7 @@ export interface PbAccommodation {
   /** @deprecated legacy */
   min_price?: number;
   max_price?: number;
+  collectionId?: string;
 }
 
 export interface PbVehicle {
@@ -181,6 +194,18 @@ export interface PbSeasonalHighlight {
   collectionId: string;
 }
 
+export interface PbSeasonTier {
+  id: string;
+  month: string;
+  start_day: number;
+  end_day: number;
+  tier: "Low" | "Mid" | "High";
+  crowd_level?: string;
+  concierge_note?: string;
+  sort_order?: number;
+  is_active?: boolean;
+}
+
 export interface PbTransitMode {
   id: string;
   label: string;
@@ -214,12 +239,12 @@ export interface PbSiteBranding {
 export const DEFAULT_SITE_BRANDING = {
   hero_title_main: "Build Your",
   hero_title_highlight: "Perfect Japan Trip",
-  hero_subtitle: "Design every detail. We'll take care of the rest.",
+  hero_subtitle: "Design every detail we'll take care of the rest.",
   font_h1: "Montserrat ExtraBold",
   font_h2: "Century Gothic",
   font_body: "Poppins",
   google_fonts_url:
-    "https://fonts.googleapis.com/css2?family=Montserrat:wght@100;400;700;800&display=swap",
+    "https://fonts.googleapis.com/css2?family=Montserrat:wght@100;400;500;700;800;900&display=swap",
 } as const;
 
 export function brandingGoogleFontsUrl(b: PbSiteBranding | null): string {
@@ -235,19 +260,43 @@ export const DEFAULT_LOGO_IMAGE = "/brand/elite-travel-logo.png";
 export const DEFAULT_HERO_IMAGE =
   "https://images.unsplash.com/photo-1493976040374-85c8e12f0c0e?auto=format&fit=crop&w=2000&q=80";
 
+/** Paths written by Team Access → “save to public/brand”. */
+export type PublicBrandAssets = {
+  hero?: string;
+  logo?: string;
+};
+
+export async function fetchPublicBrandAssets(): Promise<PublicBrandAssets> {
+  try {
+    const base =
+      typeof window !== "undefined" ? "" : process.env.NEXT_PUBLIC_SITE_URL || "";
+    const res = await fetch(`${base}/brand/assets.json`, {
+      cache: "no-store",
+    });
+    if (!res.ok) return {};
+    return (await res.json()) as PublicBrandAssets;
+  } catch {
+    return {};
+  }
+}
+
 export async function fetchSiteBranding(): Promise<PbSiteBranding | null> {
   const pb = getPocketBase();
   try {
     const rows = await pb
       .collection("site_branding")
-      .getFullList<PbSiteBranding>({ requestKey: "site_branding" });
+      .getFullList<PbSiteBranding>({ requestKey: null });
     return rows[0] ?? null;
   } catch {
     return null;
   }
 }
 
-export function brandingLogoUrl(b: PbSiteBranding | null): string {
+export function brandingLogoUrl(
+  b: PbSiteBranding | null,
+  publicAssets?: PublicBrandAssets | null
+): string {
+  if (publicAssets?.logo) return publicAssets.logo;
   if (!b?.logo_image) return DEFAULT_LOGO_IMAGE;
   return (
     pbFileUrl(b.collectionId || "site_branding", b.id, b.logo_image) ||
@@ -255,7 +304,12 @@ export function brandingLogoUrl(b: PbSiteBranding | null): string {
   );
 }
 
-export function brandingHeroUrl(b: PbSiteBranding | null): string {
+export function brandingHeroUrl(
+  b: PbSiteBranding | null,
+  publicAssets?: PublicBrandAssets | null
+): string {
+  // Prefer project public asset when present (ships with the repo / VPS deploy)
+  if (publicAssets?.hero) return publicAssets.hero;
   if (!b?.hero_background_image) return DEFAULT_HERO_IMAGE;
   return (
     pbFileUrl(
@@ -320,6 +374,7 @@ export interface BuilderConfig {
   tours: PbTour[];
   transitModes: PbTransitMode[];
   seasonalHighlights: PbSeasonalHighlight[];
+  seasonTiers: PbSeasonTier[];
   branding: PbSiteBranding | null;
   rules: SystemRulesMap;
 }
@@ -361,6 +416,7 @@ export async function fetchBuilderConfig(): Promise<BuilderConfig> {
     toursRaw,
     transitModes,
     seasonalHighlightsRaw,
+    seasonTiersRaw,
     brandingRows,
     settingsRows,
     legacyRules,
@@ -390,6 +446,10 @@ export async function fetchBuilderConfig(): Promise<BuilderConfig> {
       .getFullList<PbSeasonalHighlight>({ sort: "start_month,start_day" })
       .catch(() => [] as PbSeasonalHighlight[]),
     pb
+      .collection("season_tiers")
+      .getFullList<PbSeasonTier>({ sort: "sort_order,month,start_day" })
+      .catch(() => [] as PbSeasonTier[]),
+    pb
       .collection("site_branding")
       .getFullList<PbSiteBranding>()
       .catch(() => [] as PbSiteBranding[]),
@@ -408,6 +468,7 @@ export async function fetchBuilderConfig(): Promise<BuilderConfig> {
   const seasonalHighlights = seasonalHighlightsRaw.filter(
     (h) => h.is_active !== false
   );
+  const seasonTiers = seasonTiersRaw.filter((t) => t.is_active !== false);
   const hubs = hubsRaw.filter((h) => h.is_active !== false);
 
   const rules = {
@@ -431,6 +492,7 @@ export async function fetchBuilderConfig(): Promise<BuilderConfig> {
     tours,
     transitModes,
     seasonalHighlights,
+    seasonTiers,
     branding: brandingRows[0] ?? null,
     rules,
   };
