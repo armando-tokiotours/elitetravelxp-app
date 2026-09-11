@@ -9,9 +9,11 @@ import { FieldLabel, PillToggle, SectionBlock } from "./ui";
 export function ToursDriverSection({
   tours,
   cityNames,
+  allowToursOnTravelDays = false,
 }: {
   tours: PbTour[];
   cityNames: Record<string, string>;
+  allowToursOnTravelDays?: boolean;
 }) {
   const locations = useBuilderStore((s) => s.locations);
   const selectedTourIds = useBuilderStore((s) => s.selectedTourIds);
@@ -33,14 +35,16 @@ export function ToursDriverSection({
   );
 
   const travelDays = Math.max(0, locations.length - 1);
-  const tourableDays = Math.max(0, durationDays - travelDays);
+  const tourableDays = allowToursOnTravelDays
+    ? durationDays
+    : Math.max(0, durationDays - travelDays);
 
   return (
     <SectionBlock number={5} title="Tours & Driver" id="section-tours">
       <div className="mb-5 rounded-xl bg-[#F7F3EC] px-4 py-3 text-sm text-[#5C6570]">
-        Tours (no tours on travel days) · ~{tourableDays} available day
-        {tourableDays === 1 ? "" : "s"} after {travelDays} travel day
-        {travelDays === 1 ? "" : "s"}.
+        {allowToursOnTravelDays
+          ? `Tours allowed on travel days · ~${tourableDays} day${tourableDays === 1 ? "" : "s"} available.`
+          : `Tours (no tours on travel days) · ~${tourableDays} available day${tourableDays === 1 ? "" : "s"} after ${travelDays} travel day${travelDays === 1 ? "" : "s"}.`}
       </div>
 
       <div className="mb-6">

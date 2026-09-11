@@ -49,18 +49,12 @@ export default function HomePage() {
           >
             Open Trip Builder
           </Link>
-          <a
-            href={
-              process.env.NEXT_PUBLIC_POCKETBASE_URL
-                ? `${process.env.NEXT_PUBLIC_POCKETBASE_URL}/_/`
-                : "http://127.0.0.1:8090/_/"
-            }
+          <Link
+            href="/team-access"
             className="rounded-full border border-[#0B1F3A]/30 px-8 py-3.5 text-sm font-semibold tracking-[0.12em] text-[#0B1F3A] uppercase transition hover:border-[#C4A35A] hover:text-[#C4A35A]"
-            target="_blank"
-            rel="noreferrer"
           >
-            Admin Panel
-          </a>
+            Team Access
+          </Link>
         </div>
       </main>
     </div>

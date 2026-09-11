@@ -66,21 +66,22 @@ async function seed() {
     "vehicles",
     "transfers",
     "transit_modes",
+    "system_rules",
   ]) {
     await clearCollection(c);
   }
 
   const cityDefs = [
-    { name: "Tokyo", modifier: 1.15, hue: 210 },
-    { name: "Kyoto", modifier: 1.1, hue: 340 },
-    { name: "Osaka", modifier: 1.05, hue: 25 },
-    { name: "Kawaguchiko", modifier: 1.0, hue: 200 },
-    { name: "Hakone", modifier: 1.08, hue: 15 },
-    { name: "Hiroshima", modifier: 0.95, hue: 160 },
-    { name: "Kanazawa", modifier: 0.98, hue: 280 },
-    { name: "Takayama", modifier: 0.92, hue: 90 },
-    { name: "Nagasaki", modifier: 0.94, hue: 190 },
-    { name: "Fukuoka", modifier: 0.96, hue: 230 },
+    { name: "Tokyo", modifier: 1.15, hue: 210, base: 180, desc: "Neon nights, temples, and contemporary luxury." },
+    { name: "Kyoto", modifier: 1.1, hue: 340, base: 160, desc: "Geisha districts, gardens, and quiet heritage stays." },
+    { name: "Osaka", modifier: 1.05, hue: 25, base: 140, desc: "Food capital energy with castle and bay views." },
+    { name: "Kawaguchiko", modifier: 1.0, hue: 200, base: 150, desc: "Mt. Fuji lakeside retreats." },
+    { name: "Hakone", modifier: 1.08, hue: 15, base: 170, desc: "Onsen ryokan and volcanic scenery." },
+    { name: "Hiroshima", modifier: 0.95, hue: 160, base: 130, desc: "Peace memorials and Miyajima gateway." },
+    { name: "Kanazawa", modifier: 0.98, hue: 280, base: 135, desc: "Samurai districts and Kenrokuen garden." },
+    { name: "Takayama", modifier: 0.92, hue: 90, base: 125, desc: "Alpine old town charm." },
+    { name: "Nagasaki", modifier: 0.94, hue: 190, base: 120, desc: "Harbor history and hillside streets." },
+    { name: "Fukuoka", modifier: 0.96, hue: 230, base: 128, desc: "Kyushu gateway with yatai nightlife." },
   ];
 
   const cityIds = {};
@@ -88,6 +89,8 @@ async function seed() {
   for (const c of cityDefs) {
     const form = new FormData();
     form.append("name", c.name);
+    form.append("description", c.desc);
+    form.append("base_price", String(c.base));
     form.append("base_price_modifier", String(c.modifier));
     form.append("sort_order", String(order++));
     const imgPath = cityImageFile(c.name, c.hue);
@@ -114,8 +117,8 @@ async function seed() {
   console.log(`  accommodations: ${accommodations.length}`);
 
   const vehicles = [
-    { type: "Alphard", max_passengers: 3, price_per_day: 450 },
-    { type: "HiAce", max_passengers: 8, price_per_day: 580 },
+    { name: "Alphard", type: "Alphard", max_passengers: 3, price_per_day: 450 },
+    { name: "HiAce", type: "HiAce", max_passengers: 8, price_per_day: 580 },
   ];
   for (const v of vehicles) {
     await pb.collection("vehicles").create(v);
@@ -151,6 +154,7 @@ async function seed() {
     await pb.collection("tours").create({
       city_id: cityIds[city],
       title,
+      description: `Private guided experience in ${city}.`,
       price,
     });
   }
@@ -164,6 +168,18 @@ async function seed() {
     await pb.collection("transit_modes").create(mode);
   }
   console.log("  transit_modes: 3");
+
+  const rules = [
+    { key: "max_adults_per_room", value: "3", label: "Max adults per room", group: "hotels" },
+    { key: "second_vehicle_guest_threshold", value: "3", label: "Guests before a second vehicle is assigned", group: "vehicles" },
+    { key: "allow_tours_on_travel_days", value: "false", label: "Allow tours on inter-city travel days", group: "transit" },
+    { key: "pricing_multiplier", value: "1", label: "Global pricing multiplier", group: "pricing" },
+    { key: "seasonal_multiplier", value: "1", label: "Seasonal pricing multiplier", group: "pricing" },
+  ];
+  for (const r of rules) {
+    await pb.collection("system_rules").create(r);
+  }
+  console.log(`  system_rules: ${rules.length}`);
 
   console.log("✓ Seed complete. Admin UI:", `${PB_URL}/_/`);
 }

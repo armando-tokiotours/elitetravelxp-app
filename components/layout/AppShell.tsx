@@ -1,0 +1,145 @@
+"use client";
+
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { useEffect, useState, type ReactNode } from "react";
+
+const LINKS = [
+  { href: "/builder", label: "Home / Builder" },
+  { href: "/builder/itinerary", label: "My Saved Itineraries" },
+  { href: "/team-access", label: "Team Access (Admin)" },
+] as const;
+
+export function AppShell({
+  children,
+  title,
+  subtitle,
+  hideBottomPad,
+}: {
+  children: ReactNode;
+  title?: string;
+  subtitle?: string;
+  hideBottomPad?: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const pathname = usePathname();
+
+  useEffect(() => {
+    setOpen(false);
+  }, [pathname]);
+
+  useEffect(() => {
+    document.body.style.overflow = open ? "hidden" : "";
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [open]);
+
+  return (
+    <div className="builder-theme relative min-h-screen bg-[#F5F0E8] text-[#0B1F3A]">
+      <header className="sticky top-0 z-40 border-b border-[#E8E2D9]/80 bg-[#FBF8F2]/95 backdrop-blur-md">
+        <div className="mx-auto flex max-w-3xl items-center gap-3 px-4 py-3.5 sm:px-6">
+          <button
+            type="button"
+            aria-label="Open menu"
+            aria-expanded={open}
+            onClick={() => setOpen(true)}
+            className="flex h-10 w-10 items-center justify-center rounded-xl border border-[#D9D2C7] bg-white text-[#0B1F3A] transition hover:border-[#C4A35A]"
+          >
+            <HamburgerIcon />
+          </button>
+          <div className="min-w-0 flex-1">
+            <p className="text-[0.6rem] font-semibold uppercase tracking-[0.35em] text-[#C4A35A]">
+              {subtitle ?? "Elite Travel Experiences Group"}
+            </p>
+            {title ? (
+              <h1 className="truncate font-display text-xl text-[#0B1F3A] sm:text-2xl">
+                {title}
+              </h1>
+            ) : null}
+          </div>
+          <div className="flex h-10 w-10 items-center justify-center rounded-full border border-[#C4A35A]/45 bg-white">
+            <span className="font-display text-sm text-[#C4A35A]">ET</span>
+          </div>
+        </div>
+      </header>
+
+      {/* Drawer overlay */}
+      <div
+        className={`fixed inset-0 z-50 transition ${
+          open ? "pointer-events-auto" : "pointer-events-none"
+        }`}
+      >
+        <button
+          type="button"
+          aria-label="Close menu"
+          className={`absolute inset-0 bg-black/45 transition-opacity ${
+            open ? "opacity-100" : "opacity-0"
+          }`}
+          onClick={() => setOpen(false)}
+        />
+        <aside
+          className={`absolute inset-y-0 left-0 flex w-[min(86vw,20rem)] flex-col bg-[#0B1F3A] text-white shadow-2xl transition-transform duration-300 ease-out ${
+            open ? "translate-x-0" : "-translate-x-full"
+          }`}
+        >
+          <div className="flex items-center justify-between border-b border-white/10 px-5 py-5">
+            <div>
+              <p className="text-[0.65rem] uppercase tracking-[0.3em] text-[#C4A35A]">
+                Menu
+              </p>
+              <p className="mt-1 font-display text-xl">Elite Travel</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setOpen(false)}
+              className="flex h-9 w-9 items-center justify-center rounded-full border border-white/20 text-white/80"
+              aria-label="Close"
+            >
+              ×
+            </button>
+          </div>
+          <nav className="flex flex-1 flex-col gap-1 p-3">
+            {LINKS.map((link) => {
+              const active =
+                link.href === "/builder"
+                  ? pathname === "/builder"
+                  : pathname.startsWith(link.href);
+              return (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  className={`rounded-xl px-4 py-3.5 text-sm tracking-wide transition ${
+                    active
+                      ? "bg-[#C4A35A]/20 text-[#C4A35A]"
+                      : "text-white/85 hover:bg-white/8"
+                  }`}
+                >
+                  {link.label}
+                </Link>
+              );
+            })}
+          </nav>
+          <p className="border-t border-white/10 px-5 py-4 text-xs text-white/40">
+            travelexperiencesgroup.com
+          </p>
+        </aside>
+      </div>
+
+      <div className={hideBottomPad ? "" : "pb-24 md:pb-8"}>{children}</div>
+    </div>
+  );
+}
+
+function HamburgerIcon() {
+  return (
+    <svg width="20" height="14" viewBox="0 0 20 14" fill="none" aria-hidden>
+      <path
+        d="M1 1h18M1 7h18M1 13h18"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}

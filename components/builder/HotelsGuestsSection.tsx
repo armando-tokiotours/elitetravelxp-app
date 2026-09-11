@@ -7,8 +7,10 @@ import { FieldLabel, PillToggle, SectionBlock, SelectField } from "./ui";
 
 export function HotelsGuestsSection({
   accommodations,
+  maxAdultsPerRoom = 3,
 }: {
   accommodations: PbAccommodation[];
+  maxAdultsPerRoom?: number;
 }) {
   const needHotels = useBuilderStore((s) => s.needHotels);
   const hotelTier = useBuilderStore((s) => s.hotelTier);
@@ -134,6 +136,10 @@ export function HotelsGuestsSection({
               onChange={setAdults}
               min={0}
             />
+            <p className="mb-2 text-xs text-[#8A8278]">
+              Guidance: max {maxAdultsPerRoom} adults per room (from Team Access
+              rules).
+            </p>
             <GuestRow
               label="Children"
               value={children}

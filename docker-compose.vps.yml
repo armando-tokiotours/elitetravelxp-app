@@ -1,0 +1,45 @@
+# VPS stack for Hostinger — sits behind host Nginx (ports 80/443 already used).
+# Web :3200 · PocketBase :8091
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_POCKETBASE_URL: ${PUBLIC_URL:-https://travelexperiencesgroup.com}
+    container_name: elite-web
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+      HOSTNAME: "0.0.0.0"
+      NEXT_PUBLIC_POCKETBASE_URL: ${PUBLIC_URL:-https://travelexperiencesgroup.com}
+    ports:
+      - "3200:3000"
+    depends_on:
+      - pocketbase
+    networks:
+      - elite-net
+
+  pocketbase:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: elite-pocketbase
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      - pb_data:/pb/pb_data
+      - ./backend/pb_migrations:/pb/pb_migrations:ro
+    ports:
+      - "8091:8090"
+    networks:
+      - elite-net
+
+volumes:
+  pb_data:
+
+networks:
+  elite-net:
+    driver: bridge
