@@ -1,0 +1,14 @@
+Dockerfile
+docker-compose.yml
+.dockerignore
+.git
+.gitignore
+README.md
+.next
+node_modules
+npm-debug.log*
+.env*.local
+certbot
+nginx
+*.md
+.DS_Store

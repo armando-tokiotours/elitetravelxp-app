@@ -1,36 +1,48 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Elite Travel XP — Trip Builder + PocketBase Admin
 
-## Getting Started
+Mobile-first Japan trip builder for [travelexperiencesgroup.com](https://travelexperiencesgroup.com).
 
-First, run the development server:
+## Architecture
+
+| Layer | Role |
+|-------|------|
+| **Next.js `/builder`** | Client trip builder (cream / navy / gold UI) |
+| **PocketBase** | Admin “truth” — cities, hotels, vehicles, transfers, tours |
+| **Zustand `useBuilderStore`** | Persisted user selections |
+| **Docker Compose** | Independent VPS stack (web + PocketBase + Nginx + Certbot) |
+
+## Local development
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm run pb:superuser
+npm run pb          # http://127.0.0.1:8090
+npm run pb:seed
+cp .env.example .env.local
+npm run dev -- -p 3001
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+- Builder: http://localhost:3001/builder  
+- Admin: http://127.0.0.1:8090/_/
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## VPS deploy (independent Docker)
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+On the server (DNS already pointing to the VPS):
 
-## Learn More
+```bash
+git clone <this-repo> travelxp && cd travelxp
+cp .env.production.example .env   # edit passwords
+chmod +x scripts/vps-deploy.sh
+./scripts/vps-deploy.sh
+```
 
-To learn more about Next.js, take a look at the following resources:
+Or manually:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```bash
+docker compose up -d --build
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Services: `web` (Next.js :3000), `pocketbase` (:8090), `nginx` (80/443), `certbot` (renewal).
 
-## Deploy on Vercel
+## PocketBase collections
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+`cities`, `accommodations`, `vehicles`, `transfers`, `tours`, `transit_modes` — edit in Admin UI; the builder loads them live.

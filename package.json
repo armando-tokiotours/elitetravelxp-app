@@ -6,12 +6,18 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "pb": "cd backend && ./pocketbase serve --http=127.0.0.1:8090",
+    "pb:superuser": "cd backend && ./pocketbase superuser upsert admin@travelexperiencesgroup.com EliteTravelAdmin2026!",
+    "pb:seed": "node scripts/seed-pocketbase.mjs"
   },
   "dependencies": {
+    "framer-motion": "^13.2.0",
     "next": "16.3.4",
+    "pocketbase": "^0.28.1",
     "react": "19.2.8",
-    "react-dom": "19.2.8"
+    "react-dom": "19.2.8",
+    "zustand": "^5.0.15"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
