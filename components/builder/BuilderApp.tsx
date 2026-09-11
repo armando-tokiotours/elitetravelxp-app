@@ -106,6 +106,14 @@ export function BuilderApp() {
               <div className="rounded-2xl border border-red-200 bg-white p-6 text-sm text-red-700">
                 <p className="font-semibold">PocketBase unavailable</p>
                 <p className="mt-2 text-[#5C6570]">{error}</p>
+                <p className="mt-3 text-xs text-[#8A8278]">
+                  Open the site via{" "}
+                  <code className="rounded bg-[#F5F0E8] px-1">
+                    http://travelexperiencesgroup.com/builder
+                  </code>{" "}
+                  (not only port 3200). Confirm PocketBase is running on the
+                  VPS.
+                </p>
               </div>
             ) : config ? (
               <div className="flex flex-col gap-4">

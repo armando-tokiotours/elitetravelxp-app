@@ -1,20 +1,40 @@
 import PocketBase from "pocketbase";
 
-const PB_URL =
-  process.env.NEXT_PUBLIC_POCKETBASE_URL || "http://127.0.0.1:8090";
+/**
+ * Resolve PocketBase base URL in the browser.
+ * Prefer the page origin so HTTP vs HTTPS matches how the user opened the site.
+ * Direct Next ports (3000/3001/3200) fall back to host :80/:443 via hostname only.
+ */
+export function getPbBaseUrl(): string {
+  if (typeof window !== "undefined") {
+    const { protocol, hostname, port } = window.location;
+    // Direct Next.js publish ports → talk to PocketBase publish port
+    if (port === "3000" || port === "3001" || port === "3200") {
+      return `${protocol}//${hostname}:8091`;
+    }
+    // Via host Nginx (80/443) → same origin proxies /api and /_/
+    return window.location.origin;
+  }
+  return (
+    process.env.NEXT_PUBLIC_POCKETBASE_URL ||
+    process.env.PUBLIC_URL ||
+    "http://127.0.0.1:8090"
+  );
+}
 
 let client: PocketBase | null = null;
 
 export function getPocketBase(): PocketBase {
-  if (!client) {
-    client = new PocketBase(PB_URL);
+  const url = getPbBaseUrl();
+  if (!client || client.baseUrl !== url) {
+    client = new PocketBase(url);
   }
   return client;
 }
 
 /** Fresh client for admin sessions (avoids sharing auth with public fetches). */
 export function createPocketBase(): PocketBase {
-  return new PocketBase(PB_URL);
+  return new PocketBase(getPbBaseUrl());
 }
 
 export function pbFileUrl(
@@ -24,7 +44,7 @@ export function pbFileUrl(
   thumb?: string
 ): string {
   if (!filename) return "";
-  const base = `${PB_URL}/api/files/${collectionIdOrName}/${recordId}/${encodeURIComponent(filename)}`;
+  const base = `${getPbBaseUrl()}/api/files/${collectionIdOrName}/${recordId}/${encodeURIComponent(filename)}`;
   return thumb ? `${base}?thumb=${thumb}` : base;
 }
 
