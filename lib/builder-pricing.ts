@@ -161,12 +161,41 @@ export function calculateBuilderQuote(
   }
 
   const legs = Math.max(0, state.locations.length - 1);
-  const transit = config.transitModes.find(
-    (t) => t.id === state.transitModeId
-  );
-  if (legs > 0 && transit) {
-    min += transit.price_per_leg * legs * Math.max(1, guests);
-    max += transit.price_per_leg * 1.25 * legs * Math.max(1, guests);
+  if (legs > 0) {
+    let transitMin = 0;
+    let transitMax = 0;
+    let pricedLegs = 0;
+    for (let i = 0; i < state.locations.length - 1; i++) {
+      const from = state.locations[i];
+      const to = state.locations[i + 1];
+      const movement = config.cityMovements?.find(
+        (m) => m.from_city_id === from.cityId && m.to_city_id === to.cityId
+      );
+      const usePrivate = from.transitType === "private";
+      if (movement) {
+        const cost = Number(
+          usePrivate
+            ? movement.private_transit_cost ?? 0
+            : movement.public_transit_cost ?? 0
+        );
+        transitMin += cost;
+        transitMax += cost * 1.25;
+        pricedLegs++;
+      }
+    }
+    if (pricedLegs < legs) {
+      const transit = config.transitModes.find(
+        (t) => t.id === state.transitModeId
+      );
+      if (transit) {
+        const remaining = legs - pricedLegs;
+        transitMin += transit.price_per_leg * remaining * Math.max(1, guests);
+        transitMax +=
+          transit.price_per_leg * 1.25 * remaining * Math.max(1, guests);
+      }
+    }
+    min += transitMin;
+    max += transitMax;
   }
 
   for (const id of state.selectedTourIds) {

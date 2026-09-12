@@ -93,7 +93,18 @@ export function buildCityStays(
   let cursor = new Date(arrival.getFullYear(), arrival.getMonth(), arrival.getDate());
 
   for (const loc of locations) {
-    const nights = Math.max(1, Number(loc.nights) || 1);
+    const nights = Math.max(0, Number(loc.nights) || 0);
+    if (nights < 1) {
+      // Arrival/departure waypoints — same calendar day, no overnight stay window
+      const day = new Date(cursor);
+      stays.push({
+        cityId: loc.cityId,
+        start: day,
+        end: day,
+        nights: 0,
+      });
+      continue;
+    }
     const start = new Date(cursor);
     const end = new Date(cursor);
     end.setDate(end.getDate() + nights - 1);
@@ -168,6 +179,7 @@ export function matchSeasonalHighlights(
   const seen = new Set<string>();
 
   for (const stay of stays) {
+    if (stay.nights < 1) continue;
     for (const highlight of active) {
       const appliesToCity =
         !highlight.city_id || highlight.city_id === stay.cityId;

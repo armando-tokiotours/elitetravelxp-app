@@ -9,6 +9,7 @@ export type CollectionKey =
   | "accommodations"
   | "seasonal_highlights"
   | "season_tiers"
+  | "city_movements"
   | "app_settings";
 
 export type FieldType =
@@ -353,6 +354,51 @@ export const COLLECTIONS: CollectionDef[] = [
       },
       { key: "sort_order", label: "Sort order", type: "number" },
       { key: "is_active", label: "Active", type: "bool" },
+    ],
+  },
+  {
+    id: "city_movements",
+    label: "Inter-City Routes",
+    titleKey: "from_city_id",
+    sort: "from_city_id,to_city_id",
+    fields: [
+      {
+        key: "from_city_id",
+        label: "From city",
+        type: "city",
+        required: true,
+      },
+      {
+        key: "to_city_id",
+        label: "To city",
+        type: "city",
+        required: true,
+      },
+      {
+        key: "public_transit_time_mins",
+        label: "Public transit time (mins)",
+        type: "number",
+      },
+      {
+        key: "public_transit_cost",
+        label: "Public transit cost (€)",
+        type: "number",
+      },
+      {
+        key: "private_transit_time_mins",
+        label: "Private transit time (mins)",
+        type: "number",
+      },
+      {
+        key: "private_transit_cost",
+        label: "Private transit cost (€)",
+        type: "number",
+      },
+      {
+        key: "is_recommended_order",
+        label: "Recommended travel direction",
+        type: "bool",
+      },
     ],
   },
 ];

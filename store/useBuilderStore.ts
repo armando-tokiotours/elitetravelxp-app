@@ -1,11 +1,46 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import {
+  canAppendCity,
+  coerceVisitTypeForPosition,
+  correctLocationVisitTypes,
+  hasConsecutiveDuplicateCities,
+} from "@/lib/locationRules";
+
+export type CityTransitType = "public" | "private";
+export type CityVisitType = "stay" | "arrival" | "departure";
 
 export interface LocationStop {
-  /** Stable client id for DnD */
+  /** Unique instance id for the itinerary array (DnD / React key) */
   key: string;
+  /** PocketBase cities collection id */
   cityId: string;
   nights: number;
+  /** Stay nights vs 0-night arrival/departure waypoint */
+  visitType: CityVisitType;
+  /** Transit mode to the *next* city (ignored on last stop) */
+  transitType: CityTransitType;
+}
+
+function normalizeLocation(
+  l: Partial<LocationStop> & { cityId: string; key: string },
+  index = 0,
+  length = 1
+): LocationStop {
+  const visitType = coerceVisitTypeForPosition(l.visitType, index, length);
+  const transitType: CityTransitType =
+    l.transitType === "private" ? "private" : "public";
+  const nights =
+    visitType === "stay"
+      ? Math.max(1, Math.min(90, Math.round(Number(l.nights) || 1)))
+      : 0;
+  return {
+    key: l.key,
+    cityId: l.cityId,
+    visitType,
+    nights,
+    transitType,
+  };
 }
 
 export type HubTravelMode = "airport" | "cruise";
@@ -77,10 +112,13 @@ export interface BuilderActions {
   setChildren: (n: number) => void;
   setCityHotel: (cityId: string, patch: Partial<CityHotelPref>) => void;
   ensureCityHotels: (cityIds: string[]) => void;
-  addLocation: (cityId: string) => void;
+  addLocation: (cityId: string) => boolean;
   removeLocation: (key: string) => void;
   setLocationNights: (key: string, nights: number) => void;
-  reorderLocations: (locations: LocationStop[]) => void;
+  setLocationVisitType: (key: string, visitType: CityVisitType) => void;
+  setLocationTransitType: (key: string, transitType: CityTransitType) => void;
+  /** Returns false when reorder would create consecutive duplicate cities. */
+  reorderLocations: (locations: LocationStop[]) => boolean;
   setTransitModeId: (id: string | null) => void;
   toggleTour: (tourId: string) => void;
   setSelectedTourIds: (ids: string[]) => void;
@@ -122,6 +160,9 @@ const initialState: BuilderState = {
 };
 
 function uid() {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
   return `loc_${Math.random().toString(36).slice(2, 10)}`;
 }
 
@@ -212,22 +253,38 @@ export const useBuilderStore = create<BuilderState & BuilderActions>()(
           return changed ? { cityHotels: next } : s;
         }),
 
-      addLocation: (cityId) =>
-        set((s) => {
-          if (s.locations.some((l) => l.cityId === cityId)) return s;
-          return {
-            locations: [...s.locations, { key: uid(), cityId, nights: 1 }],
-            cityHotels: {
-              ...s.cityHotels,
-              [cityId]: s.cityHotels[cityId] || defaultCityHotel(cityId),
-            },
-          };
-        }),
+      addLocation: (cityId) => {
+        const s = get();
+        if (!canAppendCity(s.locations, cityId)) return false;
+        set({
+          locations: correctLocationVisitTypes([
+            ...s.locations,
+            normalizeLocation(
+              {
+                key: uid(),
+                cityId,
+                nights: 1,
+                visitType: "stay",
+                transitType: "public",
+              },
+              s.locations.length,
+              s.locations.length + 1
+            ),
+          ]),
+          cityHotels: {
+            ...s.cityHotels,
+            [cityId]: s.cityHotels[cityId] || defaultCityHotel(cityId),
+          },
+        });
+        return true;
+      },
 
       removeLocation: (key) =>
         set((s) => {
           const removed = s.locations.find((l) => l.key === key);
-          const locations = s.locations.filter((l) => l.key !== key);
+          const locations = correctLocationVisitTypes(
+            s.locations.filter((l) => l.key !== key)
+          );
           const stillUsed = removed
             ? locations.some((l) => l.cityId === removed.cityId)
             : true;
@@ -238,14 +295,65 @@ export const useBuilderStore = create<BuilderState & BuilderActions>()(
 
       setLocationNights: (key, nights) =>
         set((s) => ({
+          locations: s.locations.map((l) => {
+            if (l.key !== key) return l;
+            if (l.visitType !== "stay") return { ...l, nights: 0 };
+            return {
+              ...l,
+              nights: Math.max(1, Math.min(90, Math.round(nights) || 1)),
+            };
+          }),
+        })),
+
+      setLocationVisitType: (key, visitType) =>
+        set((s) => {
+          const index = s.locations.findIndex((l) => l.key === key);
+          if (index < 0) return s;
+          const coerced = coerceVisitTypeForPosition(
+            visitType,
+            index,
+            s.locations.length
+          );
+          // Reject Arrival/Departure when invalid for this position
+          if (
+            (visitType === "arrival" || visitType === "departure") &&
+            coerced !== visitType
+          ) {
+            return s;
+          }
+          return {
+            locations: s.locations.map((l) => {
+              if (l.key !== key) return l;
+              if (coerced === "stay") {
+                return {
+                  ...l,
+                  visitType: "stay" as const,
+                  nights: l.nights > 0 ? l.nights : 1,
+                };
+              }
+              return { ...l, visitType: coerced, nights: 0 };
+            }),
+          };
+        }),
+
+      setLocationTransitType: (key, transitType) =>
+        set((s) => ({
           locations: s.locations.map((l) =>
-            l.key === key
-              ? { ...l, nights: Math.max(1, Math.min(90, nights)) }
-              : l
+            l.key === key ? { ...l, transitType } : l
           ),
         })),
 
-      reorderLocations: (locations) => set({ locations }),
+      reorderLocations: (locations) => {
+        if (hasConsecutiveDuplicateCities(locations)) return false;
+        set({
+          locations: correctLocationVisitTypes(
+            locations.map((l, i) =>
+              normalizeLocation(l, i, locations.length)
+            )
+          ),
+        });
+        return true;
+      },
 
       setTransitModeId: (id) => set({ transitModeId: id }),
 
@@ -281,6 +389,14 @@ export const useBuilderStore = create<BuilderState & BuilderActions>()(
     {
       name: "elite-travel-builder",
       skipHydration: true,
+      merge: (persisted, current) => {
+        const p = (persisted ?? {}) as Partial<BuilderState>;
+        const raw = (p.locations ?? current.locations).map((l) =>
+          normalizeLocation(l)
+        );
+        const locations = correctLocationVisitTypes(raw);
+        return { ...current, ...p, locations };
+      },
       partialize: (s) => ({
         durationDays: s.durationDays,
         durationCustom: s.durationCustom,

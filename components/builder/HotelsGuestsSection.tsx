@@ -171,6 +171,9 @@ export function HotelsGuestsSection({
     const seen = new Set<string>();
     const ids: string[] = [];
     for (const loc of locations) {
+      // Arrival/departure waypoints are 0-night — no hotel stop
+      if (loc.visitType && loc.visitType !== "stay") continue;
+      if (loc.nights <= 0) continue;
       if (!seen.has(loc.cityId)) {
         seen.add(loc.cityId);
         ids.push(loc.cityId);

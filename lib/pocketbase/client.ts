@@ -154,6 +154,22 @@ export interface PbHub {
   collectionId?: string;
 }
 
+export interface PbCityMovement {
+  id: string;
+  from_city_id: string;
+  to_city_id: string;
+  public_transit_time_mins?: number;
+  public_transit_cost?: number;
+  private_transit_time_mins?: number;
+  private_transit_cost?: number;
+  is_recommended_order?: boolean;
+  collectionId?: string;
+  expand?: {
+    from_city_id?: PbCity;
+    to_city_id?: PbCity;
+  };
+}
+
 export function hubPickup(h: PbHub): number {
   return Number(h.pickup_fee ?? 0);
 }
@@ -373,6 +389,7 @@ export interface BuilderConfig {
   hubs: PbHub[];
   tours: PbTour[];
   transitModes: PbTransitMode[];
+  cityMovements: PbCityMovement[];
   seasonalHighlights: PbSeasonalHighlight[];
   seasonTiers: PbSeasonTier[];
   branding: PbSiteBranding | null;
@@ -415,6 +432,7 @@ export async function fetchBuilderConfig(): Promise<BuilderConfig> {
     hubsRaw,
     toursRaw,
     transitModes,
+    cityMovements,
     seasonalHighlightsRaw,
     seasonTiersRaw,
     brandingRows,
@@ -441,6 +459,13 @@ export async function fetchBuilderConfig(): Promise<BuilderConfig> {
       .collection("transit_modes")
       .getFullList<PbTransitMode>({ sort: "label" })
       .catch(() => [] as PbTransitMode[]),
+    pb
+      .collection("city_movements")
+      .getFullList<PbCityMovement>({
+        sort: "from_city_id,to_city_id",
+        expand: "from_city_id,to_city_id",
+      })
+      .catch(() => [] as PbCityMovement[]),
     pb
       .collection("seasonal_highlights")
       .getFullList<PbSeasonalHighlight>({ sort: "start_month,start_day" })
@@ -491,6 +516,7 @@ export async function fetchBuilderConfig(): Promise<BuilderConfig> {
     hubs,
     tours,
     transitModes,
+    cityMovements,
     seasonalHighlights,
     seasonTiers,
     branding: brandingRows[0] ?? null,

@@ -146,6 +146,8 @@ export function BuilderApp() {
                       <ArrivalDepartureSection hubs={config.hubs} />
                     <LocationsNightsSection
                       cities={config.cities}
+                      hubs={config.hubs}
+                      cityMovements={config.cityMovements}
                       transitModes={config.transitModes}
                       seasonalHighlights={config.seasonalHighlights}
                     />

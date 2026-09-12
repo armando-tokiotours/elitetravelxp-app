@@ -204,6 +204,23 @@ function TabButton({
   );
 }
 
+function displayRowTitle(
+  def: CollectionDef,
+  row: Record<string, unknown>,
+  cities: PbCity[]
+): string {
+  if (def.id === "city_movements") {
+    const from =
+      cities.find((c) => c.id === row.from_city_id)?.name ??
+      String(row.from_city_id ?? "From");
+    const to =
+      cities.find((c) => c.id === row.to_city_id)?.name ??
+      String(row.to_city_id ?? "To");
+    return `${from} → ${to}`;
+  }
+  return rowTitle(def, row);
+}
+
 function rowSubtitle(def: CollectionDef, row: Record<string, unknown>): string {
   if (def.id === "hubs") {
     return [
@@ -277,6 +294,19 @@ function rowSubtitle(def: CollectionDef, row: Record<string, unknown>): string {
       .filter(Boolean)
       .join(" · ");
   }
+  if (def.id === "city_movements") {
+    const pub = row.public_transit_time_mins;
+    const priv = row.private_transit_time_mins;
+    return [
+      pub != null ? `public ${pub}m / €${row.public_transit_cost ?? "—"}` : null,
+      priv != null
+        ? `private ${priv}m / €${row.private_transit_cost ?? "—"}`
+        : null,
+      row.is_recommended_order ? "recommended →" : "alt direction",
+    ]
+      .filter(Boolean)
+      .join(" · ");
+  }
   return "";
 }
 
@@ -313,7 +343,13 @@ function SourceOfTruthPanel({ getClient }: { getClient: () => PbClient }) {
           .getFullList()) as unknown as Record<string, unknown>[];
       }
       setRows(list);
-      if (category === "tours" || category === "seasonal_highlights" || category === "hubs" || category === "accommodations") {
+      if (
+        category === "tours" ||
+        category === "seasonal_highlights" ||
+        category === "hubs" ||
+        category === "accommodations" ||
+        category === "city_movements"
+      ) {
         setCities(
           await pb.collection("cities").getFullList<PbCity>({ sort: "name" })
         );
@@ -470,7 +506,7 @@ function SourceOfTruthPanel({ getClient }: { getClient: () => PbClient }) {
                         )}
                       </td>
                       <td className="py-3 pr-3 font-medium text-[#0B1F3A]">
-                        {rowTitle(def, row)}
+                        {displayRowTitle(def, row, cities)}
                       </td>
                       <td className="py-3 pr-3 text-[#8A8278]">
                         {rowSubtitle(def, row)}
@@ -488,6 +524,18 @@ function SourceOfTruthPanel({ getClient }: { getClient: () => PbClient }) {
                           >
                             {active ? "Active" : "Inactive"}
                           </button>
+                        ) : def.id === "city_movements" ? (
+                          <span
+                            className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                              row.is_recommended_order
+                                ? "bg-emerald-50 text-emerald-800"
+                                : "bg-[#F3EDE4] text-[#8A8278]"
+                            }`}
+                          >
+                            {row.is_recommended_order
+                              ? "Recommended"
+                              : "Alt direction"}
+                          </span>
                         ) : (
                           <span className="text-xs text-[#8A8278]">—</span>
                         )}
@@ -676,7 +724,9 @@ function RecordEditModal({
       <div className="relative z-10 max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-t-3xl border border-[#E8E2D9] bg-[#FBF8F2] p-5 shadow-xl sm:rounded-3xl sm:p-6">
         <div className="mb-4 flex items-start justify-between gap-3">
           <h3 className="font-display text-2xl text-[#0B1F3A]">
-            {initial ? `Edit · ${rowTitle(def, initial)}` : `New ${def.label.slice(0, -1)}`}
+            {initial
+              ? `Edit · ${displayRowTitle(def, initial, cities)}`
+              : `New ${def.label.slice(0, -1)}`}
           </h3>
           <button
             type="button"

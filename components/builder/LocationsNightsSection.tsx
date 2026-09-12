@@ -1,60 +1,114 @@
 "use client";
 
-import { Reorder, useDragControls } from "framer-motion";
-import { useMemo, useState } from "react";
-import type { PbCity, PbTransitMode } from "@/lib/pocketbase/client";
+import { Reorder } from "framer-motion";
+import { useEffect, useMemo, useState } from "react";
+import { calculateCityDateRanges } from "@/lib/dateCascade";
+import { canAppendCity } from "@/lib/locationRules";
+import type {
+  PbCity,
+  PbCityMovement,
+  PbHub,
+  PbTransitMode,
+} from "@/lib/pocketbase/client";
 import { cityPhoto, pbFileUrl } from "@/lib/pocketbase/client";
+import { validateCityRoute } from "@/lib/routeValidator";
 import {
   matchSeasonalHighlights,
   matchesForCity,
   type SeasonalHighlight,
-  type SeasonalMatch,
 } from "@/lib/seasonalMatcher";
-import { useBuilderStore, type LocationStop } from "@/store/useBuilderStore";
-import { BuilderPortalSheet } from "./BuilderPortalSheet";
-import { ConciergeSuggestionCard } from "./ConciergeSuggestionCard";
 import {
-  FieldLabel,
-  NightCounter,
-  SectionBlock,
-  SelectField,
-} from "./ui";
+  useBuilderStore,
+  type LocationStop,
+} from "@/store/useBuilderStore";
+import { BuilderPortalSheet } from "./BuilderPortalSheet";
+import { CityAccordionItem } from "./CityAccordionItem";
 import { SectionContinue } from "./SectionContinue";
+import { SectionBlock } from "./ui";
 
 export function LocationsNightsSection({
   cities,
-  transitModes,
+  hubs = [],
+  cityMovements = [],
+  transitModes: _transitModes = [],
   seasonalHighlights = [],
 }: {
   cities: PbCity[];
-  transitModes: PbTransitMode[];
+  hubs?: PbHub[];
+  cityMovements?: PbCityMovement[];
+  transitModes?: PbTransitMode[];
   seasonalHighlights?: SeasonalHighlight[];
 }) {
+  void _transitModes;
+
   const locations = useBuilderStore((s) => s.locations);
   const durationDays = useBuilderStore((s) => s.durationDays);
   const arrivalDate = useBuilderStore((s) => s.arrivalDate);
-  const transitModeId = useBuilderStore((s) => s.transitModeId);
+  const arrivalTransferId = useBuilderStore((s) => s.arrivalTransferId);
+  const departureTransferId = useBuilderStore((s) => s.departureTransferId);
   const selectedTourIds = useBuilderStore((s) => s.selectedTourIds);
   const addLocation = useBuilderStore((s) => s.addLocation);
   const removeLocation = useBuilderStore((s) => s.removeLocation);
   const setLocationNights = useBuilderStore((s) => s.setLocationNights);
+  const setLocationVisitType = useBuilderStore((s) => s.setLocationVisitType);
+  const setLocationTransitType = useBuilderStore(
+    (s) => s.setLocationTransitType
+  );
   const reorderLocations = useBuilderStore((s) => s.reorderLocations);
-  const setTransitModeId = useBuilderStore((s) => s.setTransitModeId);
   const toggleTour = useBuilderStore((s) => s.toggleTour);
 
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [expandedKey, setExpandedKey] = useState<string | null>(null);
+  const [routeToast, setRouteToast] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (locations.length === 0) {
+      setExpandedKey(null);
+      return;
+    }
+    setExpandedKey((prev) =>
+      prev && locations.some((l) => l.key === prev) ? prev : locations[0].key
+    );
+  }, [locations]);
+
+  useEffect(() => {
+    if (!routeToast) return;
+    const t = window.setTimeout(() => setRouteToast(null), 3200);
+    return () => window.clearTimeout(t);
+  }, [routeToast]);
 
   const totalNights = locations.reduce((s, l) => s + l.nights, 0);
   const matches = totalNights === durationDays;
-
-  const availableCities = useMemo(
-    () => cities.filter((c) => !locations.some((l) => l.cityId === c.id)),
-    [cities, locations]
-  );
+  const lastCityId = locations[locations.length - 1]?.cityId ?? null;
 
   const cityMap = useMemo(
     () => Object.fromEntries(cities.map((c) => [c.id, c])),
     [cities]
+  );
+
+  const dateRanges = useMemo(
+    () => calculateCityDateRanges(arrivalDate, locations),
+    [arrivalDate, locations]
+  );
+
+  const dateByKey = useMemo(
+    () => Object.fromEntries(dateRanges.map((r) => [r.key ?? r.cityId, r])),
+    [dateRanges]
+  );
+
+  const arrivalHub = hubs.find((h) => h.id === arrivalTransferId) ?? null;
+  const departureHub = hubs.find((h) => h.id === departureTransferId) ?? null;
+
+  const routeWarnings = useMemo(
+    () =>
+      validateCityRoute(
+        arrivalHub,
+        departureHub,
+        locations,
+        cities,
+        cityMovements
+      ),
+    [arrivalHub, departureHub, locations, cities, cityMovements]
   );
 
   const seasonalMatches = useMemo(
@@ -71,8 +125,25 @@ export function LocationsNightsSection({
     locations.length === 0
       ? "No cities yet"
       : locations
-          .map((l) => `${cityMap[l.cityId]?.name ?? "City"} (${l.nights}n)`)
+          .map((l) => {
+            const name = cityMap[l.cityId]?.name ?? "City";
+            if (l.visitType === "arrival") return `${name} (arrival)`;
+            if (l.visitType === "departure") return `${name} (departure)`;
+            return `${name} (${l.nights}n)`;
+          })
           .join(", ");
+
+  const hubShortName = (hub: PbHub | null) => {
+    if (!hub) return "Arrival";
+    return hub.name.replace(/\s*\([^)]*\)\s*$/, "").trim() || hub.name;
+  };
+
+  const handleReorder = (next: LocationStop[]) => {
+    const ok = reorderLocations(next);
+    if (!ok) {
+      setRouteToast("Consecutive identical cities are not allowed.");
+    }
+  };
 
   return (
     <SectionBlock
@@ -88,38 +159,83 @@ export function LocationsNightsSection({
         </p>
       ) : null}
 
+      {routeToast ? (
+        <div
+          role="status"
+          className="mb-3 rounded-xl border border-[#C4A35A]/50 bg-[#F7EFD9] px-3.5 py-2.5 text-sm text-[#6B5420]"
+        >
+          {routeToast}
+        </div>
+      ) : null}
+
+      {routeWarnings.map((w) => (
+        <div
+          key={w.type}
+          className={`mb-3 rounded-xl px-3.5 py-3 text-sm ${
+            w.type === "inefficient"
+              ? "border border-[#C4A35A]/35 bg-[#FBF6EA] text-[#5C4A1F]"
+              : "border border-[#C4A35A]/50 bg-[#F7EFD9] text-[#6B5420]"
+          }`}
+        >
+          <p className="font-semibold text-[#0B1F3A]">
+            {w.type === "inefficient" ? "💡 " : "⚠️ "}
+            {w.title}
+          </p>
+          <p className="mt-1 leading-relaxed">{w.body}</p>
+        </div>
+      ))}
+
       {locations.length === 0 ? (
         <p className="mb-4 text-sm text-[#8A8278]">
-          Add cities to shape your route. Drag to reorder travel order.
+          Add cities to shape your route. Drag to reorder travel order. The same
+          city can appear more than once (e.g. round-trip), but not consecutively.
         </p>
       ) : (
         <Reorder.Group
           axis="y"
           values={locations}
-          onReorder={reorderLocations}
-          className="mb-4 flex flex-col gap-2.5"
+          onReorder={handleReorder}
+          className="mb-4 flex flex-col gap-3"
         >
-          {locations.map((loc) => (
-            <LocationRow
-              key={loc.key}
-              loc={loc}
-              city={cityMap[loc.cityId]}
-              suggestions={matchesForCity(seasonalMatches, loc.cityId)}
-              selectedTourIds={selectedTourIds}
-              onNights={(n) => setLocationNights(loc.key, n)}
-              onRemove={() => removeLocation(loc.key)}
-              onAddTour={(id) => {
-                if (!selectedTourIds.includes(id)) toggleTour(id);
-              }}
-            />
-          ))}
+          {locations.map((loc, index) => {
+            const prev = index > 0 ? locations[index - 1] : null;
+            const fromLabel =
+              index === 0
+                ? hubShortName(arrivalHub)
+                : cityMap[prev!.cityId]?.name ?? "Previous city";
+            const range = dateByKey[loc.key];
+            return (
+              <CityAccordionItem
+                key={loc.key}
+                loc={loc}
+                city={cityMap[loc.cityId]}
+                dateLabel={range?.label ?? ""}
+                fromLabel={fromLabel}
+                index={index}
+                totalLocations={locations.length}
+                expanded={expandedKey === loc.key}
+                onToggle={() =>
+                  setExpandedKey((k) => (k === loc.key ? null : loc.key))
+                }
+                suggestions={matchesForCity(seasonalMatches, loc.cityId)}
+                selectedTourIds={selectedTourIds}
+                onNights={(n) => setLocationNights(loc.key, n)}
+                onVisitType={(t) => setLocationVisitType(loc.key, t)}
+                onTransit={(t) => setLocationTransitType(loc.key, t)}
+                onRemove={() => removeLocation(loc.key)}
+                onAddTour={(id) => {
+                  if (!selectedTourIds.includes(id)) toggleTour(id);
+                }}
+              />
+            );
+          })}
         </Reorder.Group>
       )}
 
       <button
         type="button"
         onClick={() => setPickerOpen(true)}
-        disabled={availableCities.length === 0}
+        disabled={cities.length === 0}
         className="mb-5 w-full rounded-full border border-dashed border-[#C4A35A] bg-[#FBF8F2] py-3 text-sm font-semibold text-[#0B1F3A] transition hover:bg-[#F3EBD9] disabled:opacity-40"
       >
         + Add Location
@@ -138,39 +254,43 @@ export function LocationsNightsSection({
           : `(Should match your ${durationDays}-day trip)`}
       </div>
 
-      <div>
-        <FieldLabel>Travel from location to location</FieldLabel>
-        <SelectField
-          value={transitModeId ?? ""}
-          onChange={(v) => setTransitModeId(v || null)}
-          options={transitModes.map((t) => ({
-            value: t.id,
-            label: t.label,
-          }))}
-          placeholder="Select transit mode"
-        />
-      </div>
-
       <BuilderPortalSheet
         open={pickerOpen}
         onClose={() => setPickerOpen(false)}
         title="Add Location"
       >
+        {lastCityId ? (
+          <p className="mb-3 text-xs text-[#8A8278]">
+            You can add a city again later for a round-trip, but not immediately
+            after itself.
+          </p>
+        ) : null}
         <ul className="space-y-2">
-          {availableCities.map((city) => {
+          {cities.map((city) => {
             const filename = cityPhoto(city);
             const img = filename
               ? pbFileUrl(city.collectionId, city.id, filename, "100x100")
               : "";
+            const disabled = !canAppendCity(locations, city.id);
             return (
               <li key={city.id}>
                 <button
                   type="button"
+                  disabled={disabled}
                   onClick={() => {
-                    addLocation(city.id);
+                    if (!addLocation(city.id)) {
+                      setRouteToast(
+                        "Consecutive identical cities are not allowed."
+                      );
+                      return;
+                    }
                     setPickerOpen(false);
                   }}
-                  className="flex w-full items-center gap-3 rounded-xl border border-[#EEE8DF] px-3 py-2.5 text-left hover:border-[#C4A35A]"
+                  className={`flex w-full items-center gap-3 rounded-xl border px-3 py-2.5 text-left transition ${
+                    disabled
+                      ? "cursor-not-allowed border-[#EEE8DF] bg-[#F7F3EC] opacity-50"
+                      : "border-[#EEE8DF] hover:border-[#C4A35A]"
+                  }`}
                 >
                   {img ? (
                     // eslint-disable-next-line @next/next/no-img-element
@@ -182,8 +302,15 @@ export function LocationsNightsSection({
                   ) : (
                     <div className="h-11 w-11 rounded-lg bg-[#E8E2D9]" />
                   )}
-                  <span className="font-medium text-[#0B1F3A]">
-                    {city.name}
+                  <span className="min-w-0 flex-1">
+                    <span className="block font-medium text-[#0B1F3A]">
+                      {city.name}
+                    </span>
+                    {disabled ? (
+                      <span className="text-xs text-[#8A8278]">
+                        Already last in your route
+                      </span>
+                    ) : null}
                   </span>
                 </button>
               </li>
@@ -193,101 +320,5 @@ export function LocationsNightsSection({
       </BuilderPortalSheet>
       <SectionContinue next={4} label="Continue to Hotels" />
     </SectionBlock>
-  );
-}
-
-function LocationRow({
-  loc,
-  city,
-  suggestions,
-  selectedTourIds,
-  onNights,
-  onRemove,
-  onAddTour,
-}: {
-  loc: LocationStop;
-  city?: PbCity;
-  suggestions: SeasonalMatch[];
-  selectedTourIds: string[];
-  onNights: (n: number) => void;
-  onRemove: () => void;
-  onAddTour: (tourId: string) => void;
-}) {
-  const controls = useDragControls();
-  const filename = city ? cityPhoto(city) : "";
-  const img =
-    filename && city
-      ? pbFileUrl(city.collectionId, city.id, filename, "80x80")
-      : "";
-
-  return (
-    <Reorder.Item
-      value={loc}
-      dragListener={false}
-      dragControls={controls}
-      className="rounded-xl border border-[#EEE8DF] bg-[#FBF8F2] px-3 py-2.5"
-    >
-      <div className="flex items-center gap-3">
-        <button
-          type="button"
-          aria-label="Drag to reorder"
-          onPointerDown={(e) => controls.start(e)}
-          className="cursor-grab touch-none px-1 text-[#C4A35A] active:cursor-grabbing"
-        >
-          <DragIcon />
-        </button>
-
-        {img ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={img}
-            alt=""
-            className="h-10 w-10 shrink-0 rounded-lg object-cover"
-          />
-        ) : (
-          <div className="h-10 w-10 shrink-0 rounded-lg bg-[#E8E2D9]" />
-        )}
-
-        <span className="min-w-0 flex-1 truncate font-medium text-[#0B1F3A]">
-          {city?.name ?? "City"}
-        </span>
-
-        <NightCounter value={loc.nights} onChange={onNights} />
-
-        <button
-          type="button"
-          aria-label="Remove location"
-          onClick={onRemove}
-          className="ml-1 flex h-8 w-8 items-center justify-center rounded-full text-[#8A8278] hover:bg-white hover:text-[#8A3B2A]"
-        >
-          ×
-        </button>
-      </div>
-
-      {suggestions.map((m) => (
-        <ConciergeSuggestionCard
-          key={`${m.highlight.id}-${m.cityId}`}
-          match={m}
-          tourAlreadyAdded={
-            !!m.highlight.suggested_tour_id &&
-            selectedTourIds.includes(m.highlight.suggested_tour_id)
-          }
-          onAddTour={onAddTour}
-        />
-      ))}
-    </Reorder.Item>
-  );
-}
-
-function DragIcon() {
-  return (
-    <svg width="14" height="18" viewBox="0 0 14 18" fill="currentColor">
-      <circle cx="4" cy="3" r="1.4" />
-      <circle cx="10" cy="3" r="1.4" />
-      <circle cx="4" cy="9" r="1.4" />
-      <circle cx="10" cy="9" r="1.4" />
-      <circle cx="4" cy="15" r="1.4" />
-      <circle cx="10" cy="15" r="1.4" />
-    </svg>
   );
 }

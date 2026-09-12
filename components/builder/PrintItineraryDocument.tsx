@@ -11,6 +11,7 @@ import {
   type PbTransfer,
 } from "@/lib/pocketbase/client";
 import { calculateBuilderQuote, formatUsd } from "@/lib/builder-pricing";
+import { calculateCityDateRanges } from "@/lib/dateCascade";
 import {
   formatDisplayDate,
   useBuilderStore,
@@ -45,6 +46,11 @@ export function PrintItineraryDocument() {
     config?.transfers.find((t) => t.id === state.departureTransferId);
   const transit = config?.transitModes.find(
     (t) => t.id === state.transitModeId
+  );
+
+  const dateRanges = useMemo(
+    () => calculateCityDateRanges(state.arrivalDate, state.locations),
+    [state.arrivalDate, state.locations]
   );
 
   if (!ready) {
@@ -181,20 +187,52 @@ export function PrintItineraryDocument() {
             <p className="mt-2 text-sm text-[#8A8278]">No cities selected yet.</p>
           ) : (
             <ol className="mt-3 space-y-2">
-              {state.locations.map((loc, i) => (
-                <li
-                  key={loc.key}
-                  className="flex items-baseline justify-between border-b border-[#EEE8DF] py-2 text-sm"
-                >
-                  <span>
-                    <span className="mr-2 text-[#C4A35A]">{i + 1}.</span>
-                    {cityName(loc.cityId)}
-                  </span>
-                  <span className="text-[#8A8278]">
-                    {loc.nights} night{loc.nights === 1 ? "" : "s"}
-                  </span>
-                </li>
-              ))}
+              {state.locations.map((loc, i) => {
+                const range = dateRanges[i];
+                const next = state.locations[i + 1];
+                const visit =
+                  loc.visitType === "arrival"
+                    ? "Arrival waypoint"
+                    : loc.visitType === "departure"
+                      ? "Departure waypoint"
+                      : null;
+                const transitLabel = next
+                  ? loc.transitType === "private"
+                    ? "Private (car)"
+                    : "Public (train)"
+                  : null;
+                return (
+                  <li
+                    key={loc.key}
+                    className="flex items-baseline justify-between gap-3 border-b border-[#EEE8DF] py-2 text-sm"
+                  >
+                    <span>
+                      <span className="mr-2 text-[#C4A35A]">{i + 1}.</span>
+                      {cityName(loc.cityId)}
+                      {range?.label ? (
+                        <span className="ml-2 text-[#8A8278]">
+                          {range.label}
+                        </span>
+                      ) : null}
+                      {visit ? (
+                        <span className="mt-0.5 block text-xs text-[#8A8278]">
+                          {visit}
+                        </span>
+                      ) : null}
+                      {transitLabel ? (
+                        <span className="mt-0.5 block text-xs text-[#8A8278]">
+                          Travel to next: {transitLabel}
+                        </span>
+                      ) : null}
+                    </span>
+                    <span className="shrink-0 text-[#8A8278]">
+                      {loc.visitType === "stay" || !loc.visitType
+                        ? `${loc.nights} night${loc.nights === 1 ? "" : "s"}`
+                        : "0 nights"}
+                    </span>
+                  </li>
+                );
+              })}
             </ol>
           )}
         </section>
