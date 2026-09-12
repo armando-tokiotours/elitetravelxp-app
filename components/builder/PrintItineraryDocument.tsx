@@ -173,6 +173,16 @@ export function PrintItineraryDocument() {
             />
             <Line label="Inter-city transit" value={transit?.label ?? "—"} />
             <Line
+              label="Experiences"
+              value={
+                state.isEliteConcierge
+                  ? "Elite Concierge day-by-day design"
+                  : state.selectedTourIds.length
+                    ? `${state.selectedTourIds.length} selected`
+                    : "None yet"
+              }
+            />
+            <Line
               label="Private chauffeur"
               value={state.needDriver ? "Requested" : "Not requested"}
             />

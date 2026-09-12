@@ -160,6 +160,7 @@ export function BuilderApp() {
                     />
                       <ToursDriverSection
                         tours={config.tours}
+                        cities={config.cities}
                         cityNames={cityNames}
                         allowToursOnTravelDays={ruleBool(
                           config.rules,

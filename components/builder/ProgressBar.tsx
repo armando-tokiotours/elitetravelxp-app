@@ -31,7 +31,7 @@ const SECTIONS = [
   },
   {
     id: "tours",
-    label: "Tours & Transfers",
+    label: "Tours & Experiences",
     href: "#section-tours",
     number: 5,
   },

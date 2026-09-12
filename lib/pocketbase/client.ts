@@ -59,11 +59,27 @@ export function cityPhoto(city: PbCity): string {
 }
 
 export function tourPhoto(tour: PbTour): string {
-  return tour.cover_photo || tour.image || "";
+  if (tour.media_type === "Video") {
+    return tour.cover_photo || tour.image || "";
+  }
+  return tour.media_file || tour.cover_photo || tour.image || "";
+}
+
+export function tourMediaFile(tour: PbTour): string {
+  return tour.media_file || tour.cover_photo || tour.image || "";
+}
+
+export function tourMediaType(tour: PbTour): "Image" | "Video" {
+  if (tour.media_type === "Video") return "Video";
+  if (tour.media_type === "Image") return "Image";
+  // Infer from filename when media_type unset
+  const file = tourMediaFile(tour);
+  if (/\.(mp4|webm|mov)(\?|$)/i.test(file)) return "Video";
+  return "Image";
 }
 
 export function tourPrice(tour: PbTour): number {
-  return Number(tour.price_per_person ?? tour.price ?? 0);
+  return Number(tour.base_price ?? tour.price_per_person ?? tour.price ?? 0);
 }
 
 export function transferLocation(t: PbTransfer): string {
@@ -184,6 +200,9 @@ export interface PbTour {
   title: string;
   description?: string;
   cover_photo?: string;
+  media_type?: "Image" | "Video";
+  media_file?: string;
+  base_price?: number;
   price_per_person?: number;
   duration_hours?: number;
   is_active?: boolean;
@@ -370,6 +389,12 @@ export const DEFAULT_APP_SETTINGS: {
     key: "seasonal_markup_percentage",
     value: "0",
     description: "Extra seasonal markup percentage (e.g. 10 = +10%).",
+  },
+  {
+    key: "elite_concierge_fee",
+    value: "2800",
+    description:
+      "Flat USD estimate for the Elite Concierge day-by-day design package.",
   },
 ];
 

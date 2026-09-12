@@ -87,7 +87,12 @@ export interface BuilderState {
   /** Per-city hotel preferences (keyed by cityId) */
   cityHotels: Record<string, CityHotelPref>;
   transitModeId: string | null;
+  /** Flat unique tour ids (pricing / print) */
   selectedTourIds: string[];
+  /** City id → selected tour ids for Step 5 capacity rules */
+  selectedToursByCity: Record<string, string[]>;
+  /** Premium all-inclusive concierge package */
+  isEliteConcierge: boolean;
   needDriver: boolean;
   /** Resolved from season_tiers for the chosen arrival date */
   activeSeasonTier: SeasonTierName | null;
@@ -121,7 +126,10 @@ export interface BuilderActions {
   reorderLocations: (locations: LocationStop[]) => boolean;
   setTransitModeId: (id: string | null) => void;
   toggleTour: (tourId: string) => void;
+  /** Add/remove a tour for a specific city. */
+  toggleCityTour: (cityId: string, tourId: string) => boolean;
   setSelectedTourIds: (ids: string[]) => void;
+  setEliteConcierge: (v: boolean) => void;
   setNeedDriver: (v: boolean) => void;
   setActiveSeason: (
     tier: SeasonTierName | null,
@@ -154,6 +162,8 @@ const initialState: BuilderState = {
   cityHotels: {},
   transitModeId: null,
   selectedTourIds: [],
+  selectedToursByCity: {},
+  isEliteConcierge: false,
   needDriver: false,
   activeSeasonTier: null,
   activeSeasonNote: null,
@@ -358,13 +368,47 @@ export const useBuilderStore = create<BuilderState & BuilderActions>()(
       setTransitModeId: (id) => set({ transitModeId: id }),
 
       toggleTour: (tourId) =>
-        set((s) => ({
-          selectedTourIds: s.selectedTourIds.includes(tourId)
+        set((s) => {
+          const selectedTourIds = s.selectedTourIds.includes(tourId)
             ? s.selectedTourIds.filter((id) => id !== tourId)
-            : [...s.selectedTourIds, tourId],
-        })),
+            : [...s.selectedTourIds, tourId];
+          return { selectedTourIds };
+        }),
+
+      toggleCityTour: (cityId, tourId) => {
+        const s = get();
+        if (s.isEliteConcierge) return false;
+        const current = s.selectedToursByCity[cityId] ?? [];
+        const isSelected = current.includes(tourId);
+        const nextForCity = isSelected
+          ? current.filter((id) => id !== tourId)
+          : [...current, tourId];
+
+        const selectedToursByCity = { ...s.selectedToursByCity };
+        if (nextForCity.length === 0) delete selectedToursByCity[cityId];
+        else selectedToursByCity[cityId] = nextForCity;
+
+        const selectedTourIds = Array.from(
+          new Set(Object.values(selectedToursByCity).flat())
+        );
+
+        set({ selectedToursByCity, selectedTourIds });
+        return true;
+      },
 
       setSelectedTourIds: (ids) => set({ selectedTourIds: ids }),
+
+      setEliteConcierge: (v) =>
+        set(
+          v
+            ? {
+                isEliteConcierge: true,
+                selectedTourIds: [],
+                selectedToursByCity: {},
+              }
+            : { isEliteConcierge: false }
+        ),
+
       setNeedDriver: (v) => set({ needDriver: v }),
 
       setActiveSeason: (tier, note) =>
@@ -395,7 +439,20 @@ export const useBuilderStore = create<BuilderState & BuilderActions>()(
           normalizeLocation(l)
         );
         const locations = correctLocationVisitTypes(raw);
-        return { ...current, ...p, locations };
+        const selectedToursByCity =
+          p.selectedToursByCity ?? current.selectedToursByCity ?? {};
+        const selectedTourIds =
+          p.selectedTourIds ??
+          Array.from(new Set(Object.values(selectedToursByCity).flat())) ??
+          current.selectedTourIds;
+        return {
+          ...current,
+          ...p,
+          locations,
+          selectedToursByCity,
+          selectedTourIds,
+          isEliteConcierge: Boolean(p.isEliteConcierge),
+        };
       },
       partialize: (s) => ({
         durationDays: s.durationDays,
@@ -417,6 +474,8 @@ export const useBuilderStore = create<BuilderState & BuilderActions>()(
         cityHotels: s.cityHotels,
         transitModeId: s.transitModeId,
         selectedTourIds: s.selectedTourIds,
+        selectedToursByCity: s.selectedToursByCity,
+        isEliteConcierge: s.isEliteConcierge,
         needDriver: s.needDriver,
       }),
     }

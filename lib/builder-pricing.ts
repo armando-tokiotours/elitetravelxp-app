@@ -199,12 +199,19 @@ export function calculateBuilderQuote(
   }
 
   for (const id of state.selectedTourIds) {
+    if (state.isEliteConcierge) break;
     const tour = config.tours.find((t) => t.id === id);
     if (tour) {
       const p = tourPrice(tour) * Math.max(1, guests);
       min += p;
       max += p * 1.15;
     }
+  }
+
+  if (state.isEliteConcierge) {
+    const fee = ruleNumber(rules, "elite_concierge_fee", 2800);
+    min += fee;
+    max += fee * 1.2;
   }
 
   const veh = allocateVehicles(guests, config.vehicles, rules);
