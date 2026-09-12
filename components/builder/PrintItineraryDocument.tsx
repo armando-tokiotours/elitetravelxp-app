@@ -18,7 +18,14 @@ import {
 } from "@/store/useBuilderStore";
 
 /** Formal luxury quotation / print document from persisted builder state. */
-export function PrintItineraryDocument() {
+export function PrintItineraryDocument({
+  embedded = false,
+  showToolbar = true,
+}: {
+  /** When true, omit page chrome — used inside My Itinerary dual-view. */
+  embedded?: boolean;
+  showToolbar?: boolean;
+} = {}) {
   const state = useBuilderStore();
   const departureDate = useBuilderStore((s) => s.departureDate);
   const [config, setConfig] = useState<BuilderConfig | null>(null);
@@ -62,34 +69,46 @@ export function PrintItineraryDocument() {
   }
 
   return (
-    <div className="print-document min-h-screen bg-[#F5F0E8] text-[#0B1F3A]">
-      <div className="no-print border-b border-[#E8E2D9] bg-[#FBF8F2] px-4 py-4">
-        <div className="mx-auto flex max-w-3xl flex-wrap items-center justify-between gap-3">
-          <div>
-            <p className="text-[0.65rem] font-semibold uppercase tracking-[0.3em] text-[#C4A35A]">
-              Elite Travel Experiences
-            </p>
-            <h1 className="font-display text-2xl">View / Print Itinerary</h1>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <Link
-              href="/builder"
-              className="rounded-full border border-[#D9D2C7] px-4 py-2 text-sm"
-            >
-              ← Edit builder
-            </Link>
-            <button
-              type="button"
-              onClick={() => window.print()}
-              className="rounded-full bg-[#0B1F3A] px-5 py-2 text-sm font-semibold text-white"
-            >
-              Print / Save PDF
-            </button>
+    <div
+      className={`print-document text-[#0B1F3A] ${
+        embedded ? "" : "min-h-screen bg-[#F5F0E8]"
+      }`}
+    >
+      {!embedded && showToolbar ? (
+        <div className="no-print border-b border-[#E8E2D9] bg-[#FBF8F2] px-4 py-4">
+          <div className="mx-auto flex max-w-3xl flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-[0.65rem] font-semibold uppercase tracking-[0.3em] text-[#C4A35A]">
+                Elite Travel Experiences
+              </p>
+              <h1 className="font-display text-2xl">View / Print Itinerary</h1>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Link
+                href="/builder"
+                className="rounded-full border border-[#D9D2C7] px-4 py-2 text-sm"
+              >
+                ← Edit builder
+              </Link>
+              <button
+                type="button"
+                onClick={() => window.print()}
+                className="rounded-full bg-[#0B1F3A] px-5 py-2 text-sm font-semibold text-white"
+              >
+                Print / Save PDF
+              </button>
+            </div>
           </div>
         </div>
-      </div>
+      ) : null}
 
-      <article className="mx-auto max-w-3xl px-4 py-8 sm:px-6 print:max-w-none print:px-0 print:py-0">
+      <article
+        className={
+          embedded
+            ? "print:max-w-none print:px-0 print:py-0"
+            : "mx-auto max-w-3xl px-4 py-8 sm:px-6 print:max-w-none print:px-0 print:py-0"
+        }
+      >
         <header className="border-b border-[#C4A35A]/40 pb-6 text-center">
           <p className="text-[0.7rem] font-semibold uppercase tracking-[0.4em] text-[#C4A35A]">
             Private Quotation

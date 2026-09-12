@@ -184,11 +184,11 @@ export function BuilderApp() {
         </div>
 
         {/* Sticky CTA — below BottomNav (z-40), well below modals (z-[100]) */}
-        <div className="fixed inset-x-0 bottom-[3.75rem] z-30 px-4 pb-2 md:bottom-6">
+        <div className="no-print sticky-action-bar fixed inset-x-0 bottom-[3.75rem] z-30 px-4 pb-2 md:bottom-6">
           <div className="mx-auto max-w-3xl">
             <Link
-              href="/builder/print"
-              className="flex w-full flex-col items-center rounded-2xl bg-[#0B1F3A] px-6 py-4 text-center shadow-[0_12px_40px_rgba(11,31,58,0.35)] transition hover:bg-[#143052]"
+              href="/builder/itinerary"
+              className="no-print flex w-full flex-col items-center rounded-2xl bg-[#0B1F3A] px-6 py-4 text-center shadow-[0_12px_40px_rgba(11,31,58,0.35)] transition hover:bg-[#143052]"
             >
               <span className="text-base font-semibold tracking-wide text-white">
                 ✨ VIEW / PRINT ITINERARY

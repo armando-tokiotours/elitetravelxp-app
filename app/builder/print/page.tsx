@@ -1,10 +1,6 @@
-import type { Metadata } from "next";
-import { PrintItineraryDocument } from "@/components/builder/PrintItineraryDocument";
+import { redirect } from "next/navigation";
 
-export const metadata: Metadata = {
-  title: "Print Itinerary",
-};
-
+/** Legacy print URL — summary page hosts dossier + invoice dual-view. */
 export default function BuilderPrintPage() {
-  return <PrintItineraryDocument />;
+  redirect("/builder/itinerary?view=invoice");
 }

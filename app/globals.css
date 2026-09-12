@@ -163,8 +163,9 @@ h3,
 @media print {
   nav,
   .no-print,
+  .sticky-action-bar,
   header.sticky,
-  .builder-theme header,
+  .builder-theme > header.no-print,
   aside {
     display: none !important;
   }
@@ -176,6 +177,8 @@ h3,
 
   .print-document {
     background: white !important;
+    border: none !important;
+    box-shadow: none !important;
   }
 
   .print-document article {
