@@ -1,22 +1,46 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import type { PbCity, PbTour } from "@/lib/pocketbase/client";
-import { cityPhoto, pbFileUrl } from "@/lib/pocketbase/client";
+import { useEffect, useMemo, useState } from "react";
+import type {
+  PbChauffeurRate,
+  PbCity,
+  PbTour,
+  PbVehicle,
+} from "@/lib/pocketbase/client";
+import {
+  cityPhoto,
+  pbFileUrl,
+  tourPrice,
+} from "@/lib/pocketbase/client";
+import {
+  countBillableChauffeurDays,
+  isBillableChauffeurDay,
+  type DailyChauffeurSelection,
+  type DriverMode,
+} from "@/lib/chauffeurSelections";
+import { chauffeurDaysForCity } from "@/lib/dateCascade";
+import { formatUsd } from "@/lib/builder-pricing";
+import type { SelectedTour } from "@/lib/selectedTours";
+import { toursOnDate } from "@/lib/selectedTours";
 import {
   canAddTourToCity,
   cityTourCapacityHours,
-  selectedTourHours,
+  selectedTourRowsHours,
   TOUR_HOURS_PER_NIGHT,
 } from "@/lib/tourValidator";
 import {
   matchSeasonalHighlights,
   type SeasonalHighlight,
 } from "@/lib/seasonalMatcher";
+import {
+  formatTransferPriceRange,
+  priceFleetChauffeurDay,
+} from "@/lib/vehicleAllocator";
 import { useBuilderStore } from "@/store/useBuilderStore";
 import { ConciergeSuggestionCard } from "./ConciergeSuggestionCard";
 import { ExperiencesDrawer } from "./ExperiencesDrawer";
-import { FieldLabel, PillToggle, SectionBlock } from "./ui";
+import { ExplainerTriggerButton } from "./ExplainerTriggerButton";
+import { FieldLabel, SectionBlock } from "./ui";
 
 export function ToursDriverSection({
   tours,
@@ -24,52 +48,75 @@ export function ToursDriverSection({
   cityNames,
   allowToursOnTravelDays = false,
   seasonalHighlights = [],
+  vehicles = [],
+  chauffeurRates = [],
 }: {
   tours: PbTour[];
   cities?: PbCity[];
   cityNames: Record<string, string>;
   allowToursOnTravelDays?: boolean;
   seasonalHighlights?: SeasonalHighlight[];
+  vehicles?: PbVehicle[];
+  chauffeurRates?: PbChauffeurRate[];
 }) {
   const locations = useBuilderStore((s) => s.locations);
   const arrivalDate = useBuilderStore((s) => s.arrivalDate);
   const selectedTourIds = useBuilderStore((s) => s.selectedTourIds);
+  const selectedToursMap = useBuilderStore((s) => s.selectedTours);
   const selectedToursByCity = useBuilderStore((s) => s.selectedToursByCity);
   const isEliteConcierge = useBuilderStore((s) => s.isEliteConcierge);
-  const needDriver = useBuilderStore((s) => s.needDriver);
+  const chauffeurSelections = useBuilderStore((s) => s.chauffeurSelections);
+  const adults = useBuilderStore((s) => s.adults);
+  const children = useBuilderStore((s) => s.children);
   const toggleTour = useBuilderStore((s) => s.toggleTour);
-  const toggleCityTour = useBuilderStore((s) => s.toggleCityTour);
+  const addCityTour = useBuilderStore((s) => s.addCityTour);
+  const removeCityTour = useBuilderStore((s) => s.removeCityTour);
   const setEliteConcierge = useBuilderStore((s) => s.setEliteConcierge);
-  const setNeedDriver = useBuilderStore((s) => s.setNeedDriver);
+  const setChauffeurDayMode = useBuilderStore((s) => s.setChauffeurDayMode);
+  const toggleChauffeurDayTour = useBuilderStore(
+    (s) => s.toggleChauffeurDayTour
+  );
   const durationDays = useBuilderStore((s) => s.durationDays);
+  const totalPax = adults + children;
 
   const [drawerCityId, setDrawerCityId] = useState<string | null>(null);
+  const [expandedKey, setExpandedKey] = useState<string | null>(null);
 
   const cityMap = useMemo(
     () => Object.fromEntries(cities.map((c) => [c.id, c])),
     [cities]
   );
 
-  /** Stay nights aggregated per city (arrival/departure waypoints excluded). */
-  const cityStops = useMemo(() => {
+  /** Stay stops only, Step 3 order (read-only — no reorder). */
+  const stayStops = useMemo(
+    () =>
+      locations.filter(
+        (loc) =>
+          loc.visitType !== "arrival" &&
+          loc.visitType !== "departure" &&
+          loc.nights > 0
+      ),
+    [locations]
+  );
+
+  /** Aggregate nights per city for capacity rules when the same city repeats. */
+  const nightsByCity = useMemo(() => {
     const map = new Map<string, number>();
-    for (const loc of locations) {
-      if (loc.visitType && loc.visitType !== "stay") continue;
-      if (loc.nights <= 0) continue;
+    for (const loc of stayStops) {
       map.set(loc.cityId, (map.get(loc.cityId) ?? 0) + loc.nights);
     }
-    // Preserve Step 3 order
-    const ordered: { cityId: string; nights: number }[] = [];
-    const seen = new Set<string>();
-    for (const loc of locations) {
-      if (seen.has(loc.cityId)) continue;
-      const nights = map.get(loc.cityId);
-      if (nights == null || nights <= 0) continue;
-      seen.add(loc.cityId);
-      ordered.push({ cityId: loc.cityId, nights });
+    return map;
+  }, [stayStops]);
+
+  useEffect(() => {
+    if (stayStops.length === 0) {
+      setExpandedKey(null);
+      return;
     }
-    return ordered;
-  }, [locations]);
+    setExpandedKey((prev) =>
+      prev && stayStops.some((l) => l.key === prev) ? prev : stayStops[0].key
+    );
+  }, [stayStops]);
 
   const travelDays = Math.max(0, locations.length - 1);
   const tourableDays = allowToursOnTravelDays
@@ -86,14 +133,15 @@ export function ToursDriverSection({
     [seasonalHighlights, arrivalDate, locations]
   );
 
-  const drawerCity = drawerCityId
-    ? cityStops.find((c) => c.cityId === drawerCityId)
-    : null;
+  const drawerCityNights = drawerCityId
+    ? (nightsByCity.get(drawerCityId) ?? 0)
+    : 0;
   const drawerTours = useMemo(() => {
     if (!drawerCityId) return [];
     return tours.filter((t) => t.city_id === drawerCityId);
   }, [tours, drawerCityId]);
 
+  const chauffeurDayCount = countBillableChauffeurDays(chauffeurSelections);
   const tourCount = selectedTourIds.length;
   const summary = isEliteConcierge
     ? "Elite Concierge package"
@@ -101,7 +149,11 @@ export function ToursDriverSection({
         tourCount === 0
           ? "No tours"
           : `${tourCount} experience${tourCount === 1 ? "" : "s"}`
-      } · Chauffeur: ${needDriver ? "Yes" : "No"}`;
+      } · Chauffeur: ${
+        chauffeurDayCount === 0
+          ? "No"
+          : `${chauffeurDayCount} day${chauffeurDayCount === 1 ? "" : "s"}`
+      }`;
 
   return (
     <SectionBlock
@@ -111,7 +163,6 @@ export function ToursDriverSection({
       icon="tour"
       summary={summary}
     >
-      {/* Elite Concierge upsell */}
       <div
         className={`mb-5 overflow-hidden rounded-2xl border px-4 py-4 sm:px-5 ${
           isEliteConcierge
@@ -175,143 +226,470 @@ export function ToursDriverSection({
                   if (!selectedTourIds.includes(id)) toggleTour(id);
                   return;
                 }
-                const nights =
-                  cityStops.find((c) => c.cityId === m.cityId)?.nights ?? 0;
+                const nights = nightsByCity.get(m.cityId) ?? 0;
+                const cityRows = selectedToursMap[m.cityId] ?? [];
                 const citySelected = selectedToursByCity[m.cityId] ?? [];
                 const check = canAddTourToCity({
                   cityName: cityNames[m.cityId] ?? "this city",
                   nights,
                   selectedTourIds: citySelected,
+                  selectedRows: cityRows,
                   tourId: id,
                   tours,
                 });
                 if (!check.ok) return;
-                if (!citySelected.includes(id)) toggleCityTour(m.cityId, id);
+                const tour = tours.find((t) => t.id === id);
+                if (!tour) return;
+                const days = chauffeurDaysForCity(
+                  arrivalDate,
+                  locations,
+                  m.cityId
+                );
+                const date = days[0]?.date;
+                if (!date) return;
+                if (!citySelected.includes(id)) {
+                  addCityTour(m.cityId, {
+                    tourId: tour.id,
+                    title: tour.title,
+                    duration_hours: Number(tour.duration_hours) || 0,
+                    scheduledDate: date,
+                    price: tourPrice(tour),
+                  });
+                }
               }}
             />
           ))}
         </div>
       ) : null}
 
-      <div className="mb-6">
+      <div className="mb-2">
         <FieldLabel>Your cities</FieldLabel>
-        {cityStops.length === 0 ? (
-          <p className="text-sm text-[#8A8278]">
-            Add stay cities in Step 3 to browse experiences.
+        {stayStops.length === 0 ? (
+          <p className="rounded-xl border border-dashed border-[#D9D2C7] bg-[#FBF8F2] p-4 text-sm text-[#8A8278]">
+            Add stay cities in Step 3 to browse experiences and book a private
+            chauffeur by day.
           </p>
         ) : (
-          <ul className="flex gap-3 overflow-x-auto pb-1">
-            {cityStops.map((stop) => {
+          <div
+            className={`flex flex-col gap-3 ${
+              isEliteConcierge ? "pointer-events-none opacity-45" : ""
+            }`}
+          >
+            {stayStops.map((stop) => {
               const city = cityMap[stop.cityId];
               const name = cityNames[stop.cityId] ?? city?.name ?? "City";
-              const filename = city ? cityPhoto(city) : "";
-              const img =
-                filename && city
-                  ? pbFileUrl(city.collectionId, city.id, filename, "200x140")
-                  : "";
-              const cityTourIds = selectedToursByCity[stop.cityId] ?? [];
-              const used = selectedTourHours(cityTourIds, tours);
-              const capacity = cityTourCapacityHours(stop.nights);
-              const muted = isEliteConcierge;
+              const cityRows = selectedToursMap[stop.cityId] ?? [];
+              const citySelections = chauffeurSelections[stop.cityId] ?? {};
+              const driverDayCount = Object.values(citySelections).filter(
+                (sel) => isBillableChauffeurDay(sel)
+              ).length;
+              const nights = nightsByCity.get(stop.cityId) ?? stop.nights;
+              const used = selectedTourRowsHours(cityRows);
+              const capacity = cityTourCapacityHours(nights);
+              const dayOptions = chauffeurDaysForCity(
+                arrivalDate,
+                locations,
+                stop.cityId
+              );
+              const quote = priceFleetChauffeurDay({
+                cityId: stop.cityId,
+                totalPax,
+                vehicles,
+                rates: chauffeurRates,
+              });
+              const dailyLabel =
+                quote?.fromRates && quote.min > 0
+                  ? formatTransferPriceRange(quote.min, quote.max)
+                  : null;
+              const fleetLabel = quote?.fleet?.label?.replace("×", "x") ?? null;
 
               return (
-                <li
-                  key={stop.cityId}
-                  className={`w-[11.5rem] shrink-0 overflow-hidden rounded-2xl border bg-white ${
-                    muted
-                      ? "border-[#EEE8DF] opacity-45"
-                      : "border-[#EEE8DF]"
-                  }`}
-                >
-                  {img ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={img}
-                      alt=""
-                      className="h-24 w-full object-cover"
-                    />
-                  ) : (
-                    <div className="flex h-24 items-end bg-gradient-to-br from-[#1a3355] to-[#0B1F3A] px-3 pb-2">
-                      <span className="font-display text-lg text-white/90">
-                        {name}
-                      </span>
-                    </div>
-                  )}
-                  <div className="px-3 py-3">
-                    <p className="truncate font-medium text-[#0B1F3A]">{name}</p>
-                    <p className="text-xs text-[#C4A35A]">
-                      {stop.nights} night{stop.nights === 1 ? "" : "s"}
-                      {!muted && cityTourIds.length > 0
-                        ? ` · ${cityTourIds.length} selected`
-                        : ""}
-                    </p>
-                    {!muted ? (
-                      <p className="mt-0.5 text-[11px] text-[#A39A8E]">
-                        {used}/{capacity}h
-                      </p>
-                    ) : null}
-                    <button
-                      type="button"
-                      disabled={muted}
-                      onClick={() => setDrawerCityId(stop.cityId)}
-                      className="mt-3 w-full rounded-full border border-[#0B1F3A] py-2 text-xs font-semibold text-[#0B1F3A] transition hover:bg-[#0B1F3A] hover:text-white disabled:cursor-not-allowed disabled:border-[#D9D2C7] disabled:text-[#A39A8E] disabled:hover:bg-transparent"
-                    >
-                      Browse Experiences ➔
-                    </button>
-                  </div>
-                </li>
+                <Step5CityAccordion
+                  key={stop.key}
+                  city={city}
+                  cityName={name}
+                  expanded={expandedKey === stop.key}
+                  onToggle={() =>
+                    setExpandedKey((k) =>
+                      k === stop.key ? null : stop.key
+                    )
+                  }
+                  experienceCount={cityRows.length}
+                  driverDayCount={driverDayCount}
+                  selectedTours={cityRows}
+                  dayOptions={dayOptions}
+                  usedHours={used}
+                  capacityHours={capacity}
+                  onRemoveTour={(tourId) =>
+                    removeCityTour(stop.cityId, tourId)
+                  }
+                  onBrowse={() => setDrawerCityId(stop.cityId)}
+                  dailyRateLabel={dailyLabel}
+                  fleetLabel={fleetLabel}
+                  daySelections={citySelections}
+                  cityId={stop.cityId}
+                  onSetDayMode={(date, mode) =>
+                    setChauffeurDayMode(stop.cityId, date, mode)
+                  }
+                  onToggleDayTour={(date, tourId) =>
+                    toggleChauffeurDayTour(stop.cityId, date, tourId)
+                  }
+                  arrivalDateMissing={!arrivalDate}
+                />
               );
             })}
-          </ul>
+          </div>
         )}
       </div>
 
-      <div>
-        <FieldLabel>Private chauffeur</FieldLabel>
-        <PillToggle value={needDriver} onChange={setNeedDriver} />
-      </div>
-
       <ExperiencesDrawer
-        open={!!drawerCity}
+        open={!!drawerCityId}
         onClose={() => setDrawerCityId(null)}
         cityName={
-          drawerCity
-            ? cityNames[drawerCity.cityId] ??
-              cityMap[drawerCity.cityId]?.name ??
+          drawerCityId
+            ? cityNames[drawerCityId] ??
+              cityMap[drawerCityId]?.name ??
               "City"
             : ""
         }
-        nights={drawerCity?.nights ?? 0}
+        nights={drawerCityNights}
         tours={drawerTours}
-        selectedTourIds={
-          drawerCity ? selectedToursByCity[drawerCity.cityId] ?? [] : []
+        selectedTours={
+          drawerCityId ? selectedToursMap[drawerCityId] ?? [] : []
         }
-        onToggleTour={(tourId) => {
-          if (!drawerCity) return { ok: false };
-          const citySelected =
-            selectedToursByCity[drawerCity.cityId] ?? [];
-          const already = citySelected.includes(tourId);
-          if (already) {
-            toggleCityTour(drawerCity.cityId, tourId);
-            return { ok: true };
-          }
+        dayOptions={
+          drawerCityId
+            ? chauffeurDaysForCity(arrivalDate, locations, drawerCityId)
+            : []
+        }
+        onRemoveTour={(tourId) => {
+          if (!drawerCityId) return;
+          removeCityTour(drawerCityId, tourId);
+        }}
+        onAddTour={(tour, scheduledDate) => {
+          if (!drawerCityId) return { ok: false };
+          const cityRows = selectedToursMap[drawerCityId] ?? [];
+          const citySelected = selectedToursByCity[drawerCityId] ?? [];
           const check = canAddTourToCity({
             cityName:
-              cityNames[drawerCity.cityId] ??
-              cityMap[drawerCity.cityId]?.name ??
+              cityNames[drawerCityId] ??
+              cityMap[drawerCityId]?.name ??
               "this city",
-            nights: drawerCity.nights,
+            nights: drawerCityNights,
             selectedTourIds: citySelected,
-            tourId,
+            selectedRows: cityRows,
+            tourId: tour.id,
             tours,
           });
           if (!check.ok) {
             return { ok: false, message: check.message };
           }
-          toggleCityTour(drawerCity.cityId, tourId);
-          return { ok: true };
+          const ok = addCityTour(drawerCityId, {
+            tourId: tour.id,
+            title: tour.title,
+            duration_hours: Number(tour.duration_hours) || 0,
+            scheduledDate,
+            price: tourPrice(tour),
+          });
+          return { ok };
         }}
       />
     </SectionBlock>
+  );
+}
+
+function Step5CityAccordion({
+  city,
+  cityName,
+  expanded,
+  onToggle,
+  experienceCount,
+  driverDayCount,
+  selectedTours,
+  dayOptions,
+  usedHours,
+  capacityHours,
+  onRemoveTour,
+  onBrowse,
+  dailyRateLabel,
+  fleetLabel,
+  daySelections,
+  cityId,
+  onSetDayMode,
+  onToggleDayTour,
+  arrivalDateMissing,
+}: {
+  city?: PbCity;
+  cityName: string;
+  expanded: boolean;
+  onToggle: () => void;
+  experienceCount: number;
+  driverDayCount: number;
+  selectedTours: SelectedTour[];
+  dayOptions: ReturnType<typeof chauffeurDaysForCity>;
+  usedHours: number;
+  capacityHours: number;
+  onRemoveTour: (tourId: string) => void;
+  onBrowse: () => void;
+  dailyRateLabel: string | null;
+  fleetLabel: string | null;
+  daySelections: Record<string, DailyChauffeurSelection>;
+  cityId: string;
+  onSetDayMode: (date: string, mode: DriverMode) => void;
+  onToggleDayTour: (date: string, tourId: string) => void;
+  arrivalDateMissing: boolean;
+}) {
+  const filename = city ? cityPhoto(city) : "";
+  const img =
+    filename && city
+      ? pbFileUrl(city.collectionId, city.id, filename, "200x140")
+      : "";
+
+  const summaryBits = [
+    `${experienceCount} Experience${experienceCount === 1 ? "" : "s"}`,
+    `${driverDayCount} Driver Day${driverDayCount === 1 ? "" : "s"}`,
+  ].join(" · ");
+
+  const dateLabel = (iso: string) =>
+    dayOptions.find((d) => d.date === iso)?.label ?? iso;
+
+  return (
+    <div className="overflow-hidden rounded-2xl border border-[#EEE8DF] bg-white shadow-[0_2px_12px_rgba(11,31,58,0.04)]">
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={expanded}
+        className="flex w-full items-center gap-3 px-3 py-2.5 text-left sm:px-4"
+      >
+        {img ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={img}
+            alt=""
+            className="h-12 w-16 shrink-0 rounded-lg object-cover sm:w-20"
+          />
+        ) : (
+          <div className="flex h-12 w-16 shrink-0 items-end rounded-lg bg-gradient-to-br from-[#1a3355] to-[#0B1F3A] px-1.5 pb-1 sm:w-20">
+            <span className="truncate font-display text-xs text-white/90">
+              {cityName}
+            </span>
+          </div>
+        )}
+        <span className="min-w-0 flex-1">
+          <span className="block truncate font-medium text-[#0B1F3A]">
+            {cityName}
+          </span>
+          <span className="block truncate text-xs text-[#8A8278]">
+            {summaryBits}
+          </span>
+        </span>
+        <span
+          className={`shrink-0 text-[#C4A35A] transition ${
+            expanded ? "rotate-180" : ""
+          }`}
+          aria-hidden
+        >
+          ▾
+        </span>
+      </button>
+
+      {expanded ? (
+        <div className="space-y-5 border-t border-[#EEE8DF] px-4 py-4">
+          <section>
+            <div className="mb-2 flex items-baseline justify-between gap-2">
+              <h4 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#C4A35A]">
+                Experiences
+              </h4>
+              <p className="text-[11px] text-[#A39A8E]">
+                {usedHours}/{capacityHours}h
+              </p>
+            </div>
+
+            {selectedTours.length === 0 ? (
+              <p className="mb-3 text-sm text-[#8A8278]">
+                No experiences selected yet for {cityName}.
+              </p>
+            ) : (
+              <ul className="mb-3 divide-y divide-[#F0EAE1] rounded-xl border border-[#EEE8DF] bg-[#FBF8F2]">
+                {selectedTours.map((tour) => {
+                  const hours = Number(tour.duration_hours) || 0;
+                  return (
+                    <li
+                      key={`${tour.tourId}-${tour.scheduledDate}`}
+                      className="flex items-start justify-between gap-3 px-3 py-2.5"
+                    >
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium text-[#0B1F3A]">
+                          {tour.title}
+                        </p>
+                        <p className="mt-0.5 text-[11px] text-[#8A8278]">
+                          {tour.scheduledDate
+                            ? dateLabel(tour.scheduledDate)
+                            : "Date not set"}
+                          {hours > 0 ? ` · ${hours}h` : ""}
+                          {tour.price > 0 ? ` · ${formatUsd(tour.price)}` : ""}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        aria-label={`Remove ${tour.title}`}
+                        onClick={() => onRemoveTour(tour.tourId)}
+                        className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[#8A8278] hover:bg-white hover:text-[#8A3B2A]"
+                      >
+                        ×
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+
+            <button
+              type="button"
+              onClick={onBrowse}
+              className="flex w-full items-center justify-center gap-2 rounded-full border border-[#0B1F3A] bg-white py-2.5 text-sm font-semibold text-[#0B1F3A] transition hover:bg-[#0B1F3A] hover:text-white"
+            >
+              <span
+                className="flex h-5 w-5 items-center justify-center rounded-full bg-[#0B1F3A] text-[9px] text-white"
+                aria-hidden
+              >
+                ▶
+              </span>
+              Browse City Experiences
+            </button>
+          </section>
+
+          <section>
+            <div className="mb-2">
+              <h4 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#C4A35A]">
+                Private Driver &amp; Vehicle
+              </h4>
+              <p className="mt-1 text-sm text-[#5C6570]">
+                {dailyRateLabel ? (
+                  <>
+                    Daily rate:{" "}
+                    <span className="font-semibold text-[#0B1F3A]">
+                      {dailyRateLabel}
+                    </span>
+                    {fleetLabel ? (
+                      <span className="text-[#8A8278]">
+                        {" "}
+                        (Includes {fleetLabel})
+                      </span>
+                    ) : null}
+                  </>
+                ) : (
+                  "Daily rate calculated from your party size once rates are set."
+                )}
+              </p>
+            </div>
+
+            <div className="mb-4">
+              <ExplainerTriggerButton
+                featureKey="private_chauffeur"
+                title="The Private Chauffeur Experience"
+                contextId={cityId}
+              />
+            </div>
+
+            {arrivalDateMissing ? (
+              <p className="rounded-xl bg-[#F7F3EC] px-3 py-2.5 text-sm text-[#8A8278]">
+                Set your arrival date in Step 1 to choose chauffeur days.
+              </p>
+            ) : dayOptions.length === 0 ? (
+              <p className="rounded-xl bg-[#F7F3EC] px-3 py-2.5 text-sm text-[#8A8278]">
+                No stay nights found for this city.
+              </p>
+            ) : (
+              <ul className="space-y-2.5">
+                {dayOptions.map((day) => {
+                  const sel = daySelections[day.date];
+                  const mode: DriverMode = sel?.mode ?? "none";
+                  const toursThatDay = toursOnDate(selectedTours, day.date);
+                  return (
+                    <li
+                      key={day.date}
+                      className="rounded-xl border border-[#EEE8DF] bg-[#FBF8F2] px-3 py-3"
+                    >
+                      <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between">
+                        <p className="text-sm font-medium text-[#0B1F3A]">
+                          {day.label}
+                        </p>
+                        <div className="inline-flex rounded-full border border-[#D9D2C7] bg-white p-0.5">
+                          {(
+                            [
+                              ["none", "Off"],
+                              ["full_day", "By Day"],
+                              ["by_tour", "By Tour"],
+                            ] as const
+                          ).map(([value, label]) => (
+                            <button
+                              key={value}
+                              type="button"
+                              onClick={() => onSetDayMode(day.date, value)}
+                              className={`rounded-full px-2.5 py-1 text-[11px] font-semibold transition sm:px-3 ${
+                                mode === value
+                                  ? "bg-[#0B1F3A] text-white"
+                                  : "text-[#5C6570] hover:text-[#0B1F3A]"
+                              }`}
+                            >
+                              {label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {mode === "by_tour" ? (
+                        toursThatDay.length === 0 ? (
+                          <p className="mt-2 text-[11px] text-[#8A8278]">
+                            No experiences scheduled on this day yet. Add one
+                            and pick this date in Browse Experiences.
+                          </p>
+                        ) : (
+                          <ul className="mt-2 space-y-1.5 border-t border-[#EEE8DF] pt-2">
+                            {toursThatDay.map((tour) => {
+                              const checked = (
+                                sel?.selectedTourIds ?? []
+                              ).includes(tour.tourId);
+                              return (
+                                <li key={tour.tourId}>
+                                  <label className="flex cursor-pointer items-center gap-2.5 text-sm text-[#0B1F3A]">
+                                    <input
+                                      type="checkbox"
+                                      checked={checked}
+                                      onChange={() =>
+                                        onToggleDayTour(day.date, tour.tourId)
+                                      }
+                                      className="h-4 w-4 rounded border-[#D9D2C7] text-[#0B1F3A] focus:ring-[#C4A35A]"
+                                    />
+                                    <span className="min-w-0 truncate">
+                                      {tour.title}
+                                      {tour.duration_hours
+                                        ? ` · ${tour.duration_hours}h`
+                                        : ""}
+                                    </span>
+                                  </label>
+                                </li>
+                              );
+                            })}
+                          </ul>
+                        )
+                      ) : null}
+
+                      {mode === "full_day" ? (
+                        <p className="mt-2 text-[11px] text-[#8A8278]">
+                          Full-day disposal — covers transfers and experiences
+                          that day.
+                        </p>
+                      ) : null}
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </section>
+        </div>
+      ) : null}
+    </div>
   );
 }

@@ -6,6 +6,29 @@ import {
   correctLocationVisitTypes,
   hasConsecutiveDuplicateCities,
 } from "@/lib/locationRules";
+import {
+  chauffeurDaysFromSelections,
+  countBillableChauffeurDays,
+  emptyChauffeurSelection,
+  migrateLegacyChauffeurDays,
+  upsertChauffeurSelection,
+  type ChauffeurSelections,
+  type DailyChauffeurSelection,
+  type DriverMode,
+} from "@/lib/chauffeurSelections";
+import {
+  migrateLegacySelectedTours,
+  syncTourDerived,
+  type SelectedTour,
+  type SelectedToursByCity,
+} from "@/lib/selectedTours";
+
+export type {
+  ChauffeurSelections,
+  DailyChauffeurSelection,
+  DriverMode,
+} from "@/lib/chauffeurSelections";
+export type { SelectedTour, SelectedToursByCity } from "@/lib/selectedTours";
 
 export type CityTransitType = "public" | "private";
 export type CityVisitType = "stay" | "arrival" | "departure";
@@ -87,12 +110,28 @@ export interface BuilderState {
   /** Per-city hotel preferences (keyed by cityId) */
   cityHotels: Record<string, CityHotelPref>;
   transitModeId: string | null;
-  /** Flat unique tour ids (pricing / print) */
+  /**
+   * Date-bound experiences: cityId → scheduled tours.
+   * Source of truth for Step 5 + chauffeur-by-tour sync.
+   */
+  selectedTours: SelectedToursByCity;
+  /** @deprecated unique tour ids — derived from selectedTours */
   selectedTourIds: string[];
-  /** City id → selected tour ids for Step 5 capacity rules */
+  /** @deprecated city → tour ids — derived from selectedTours */
   selectedToursByCity: Record<string, string[]>;
   /** Premium all-inclusive concierge package */
   isEliteConcierge: boolean;
+  /**
+   * Per-city, per-day chauffeur booking:
+   * cityId → date → { mode, selectedTourIds }
+   */
+  chauffeurSelections: ChauffeurSelections;
+  /**
+   * @deprecated derived from chauffeurSelections — kept for older summary UIs
+   * cityId → ISO dates with an active driver booking
+   */
+  chauffeurDays: Record<string, string[]>;
+  /** @deprecated derived — true when any chauffeur day is billable */
   needDriver: boolean;
   /** Resolved from season_tiers for the chosen arrival date */
   activeSeasonTier: SeasonTierName | null;
@@ -126,11 +165,34 @@ export interface BuilderActions {
   reorderLocations: (locations: LocationStop[]) => boolean;
   setTransitModeId: (id: string | null) => void;
   toggleTour: (tourId: string) => void;
-  /** Add/remove a tour for a specific city. */
+  /**
+   * Remove a city tour, or toggle without a date (legacy).
+   * Prefer addCityTour / removeCityTour for date-bound booking.
+   */
   toggleCityTour: (cityId: string, tourId: string) => boolean;
+  /** Schedule a tour on a specific stay date (required for chauffeur-by-tour). */
+  addCityTour: (cityId: string, tour: SelectedTour) => boolean;
+  removeCityTour: (cityId: string, tourId: string) => void;
   setSelectedTourIds: (ids: string[]) => void;
   setEliteConcierge: (v: boolean) => void;
   setNeedDriver: (v: boolean) => void;
+  setChauffeurDay: (cityId: string, date: string, on: boolean) => void;
+  setChauffeurDaysForCity: (cityId: string, dates: string[]) => void;
+  setChauffeurDayMode: (
+    cityId: string,
+    date: string,
+    mode: DriverMode
+  ) => void;
+  toggleChauffeurDayTour: (
+    cityId: string,
+    date: string,
+    tourId: string
+  ) => void;
+  setChauffeurSelection: (
+    cityId: string,
+    date: string,
+    selection: DailyChauffeurSelection | null
+  ) => void;
   setActiveSeason: (
     tier: SeasonTierName | null,
     note: ActiveSeasonNote | null
@@ -161,13 +223,54 @@ const initialState: BuilderState = {
   locations: [],
   cityHotels: {},
   transitModeId: null,
+  selectedTours: {},
   selectedTourIds: [],
   selectedToursByCity: {},
   isEliteConcierge: false,
+  chauffeurSelections: {},
+  chauffeurDays: {},
   needDriver: false,
   activeSeasonTier: null,
   activeSeasonNote: null,
 };
+
+function syncChauffeurDerived(selections: ChauffeurSelections) {
+  const chauffeurDays = chauffeurDaysFromSelections(selections);
+  return {
+    chauffeurSelections: selections,
+    chauffeurDays,
+    needDriver: countBillableChauffeurDays(selections) > 0,
+  };
+}
+
+function scrubTourFromChauffeur(
+  selections: ChauffeurSelections,
+  cityId: string,
+  tourId: string
+): ChauffeurSelections {
+  const city = selections[cityId];
+  if (!city) return selections;
+  let changed = false;
+  const nextCity: Record<string, DailyChauffeurSelection> = {};
+  for (const [date, sel] of Object.entries(city)) {
+    if (sel.mode !== "by_tour") {
+      nextCity[date] = sel;
+      continue;
+    }
+    const ids = (sel.selectedTourIds ?? []).filter((id) => id !== tourId);
+    if (ids.length !== (sel.selectedTourIds ?? []).length) changed = true;
+    if (ids.length === 0) {
+      changed = true;
+      continue;
+    }
+    nextCity[date] = { mode: "by_tour", selectedTourIds: ids };
+  }
+  if (!changed) return selections;
+  const out = { ...selections };
+  if (Object.keys(nextCity).length === 0) delete out[cityId];
+  else out[cityId] = nextCity;
+  return out;
+}
 
 function uid() {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
@@ -235,7 +338,7 @@ export const useBuilderStore = create<BuilderState & BuilderActions>()(
       setHotelTier: (tier) => set({ hotelTier: tier }),
       setRoomCount: (n) => set({ roomCount: Math.max(1, n) }),
       setRoomType: (t) => set({ roomType: t }),
-      setAdults: (n) => set({ adults: Math.max(0, n) }),
+      setAdults: (n) => set({ adults: Math.max(1, n) }),
       setChildren: (n) => set({ children: Math.max(0, n) }),
 
       setCityHotel: (cityId, patch) =>
@@ -378,22 +481,81 @@ export const useBuilderStore = create<BuilderState & BuilderActions>()(
       toggleCityTour: (cityId, tourId) => {
         const s = get();
         if (s.isEliteConcierge) return false;
-        const current = s.selectedToursByCity[cityId] ?? [];
-        const isSelected = current.includes(tourId);
-        const nextForCity = isSelected
-          ? current.filter((id) => id !== tourId)
-          : [...current, tourId];
+        const current = s.selectedTours[cityId] ?? [];
+        const isSelected = current.some((t) => t.tourId === tourId);
+        let nextRows: SelectedTour[];
+        if (isSelected) {
+          nextRows = current.filter((t) => t.tourId !== tourId);
+        } else {
+          nextRows = [
+            ...current,
+            {
+              tourId,
+              title: tourId,
+              duration_hours: 0,
+              scheduledDate: "",
+              price: 0,
+            },
+          ];
+        }
+        const selectedTours = { ...s.selectedTours };
+        if (nextRows.length === 0) delete selectedTours[cityId];
+        else selectedTours[cityId] = nextRows;
 
-        const selectedToursByCity = { ...s.selectedToursByCity };
-        if (nextForCity.length === 0) delete selectedToursByCity[cityId];
-        else selectedToursByCity[cityId] = nextForCity;
+        // Drop chauffeur-by-tour refs when removing
+        let chauffeurSelections = s.chauffeurSelections;
+        if (isSelected) {
+          chauffeurSelections = scrubTourFromChauffeur(
+            chauffeurSelections,
+            cityId,
+            tourId
+          );
+        }
 
-        const selectedTourIds = Array.from(
-          new Set(Object.values(selectedToursByCity).flat())
-        );
-
-        set({ selectedToursByCity, selectedTourIds });
+        set({
+          ...syncTourDerived(selectedTours),
+          ...syncChauffeurDerived(chauffeurSelections),
+        });
         return true;
+      },
+
+      addCityTour: (cityId, tour) => {
+        const s = get();
+        if (s.isEliteConcierge) return false;
+        if (!tour.scheduledDate) return false;
+        const current = s.selectedTours[cityId] ?? [];
+        const without = current.filter((t) => t.tourId !== tour.tourId);
+        const selectedTours = {
+          ...s.selectedTours,
+          [cityId]: [
+            ...without,
+            {
+              tourId: tour.tourId,
+              title: tour.title,
+              duration_hours: Number(tour.duration_hours) || 0,
+              scheduledDate: tour.scheduledDate,
+              price: Number(tour.price) || 0,
+            },
+          ],
+        };
+        set(syncTourDerived(selectedTours));
+        return true;
+      },
+
+      removeCityTour: (cityId, tourId) => {
+        const s = get();
+        const current = s.selectedTours[cityId] ?? [];
+        if (!current.some((t) => t.tourId === tourId)) return;
+        const nextRows = current.filter((t) => t.tourId !== tourId);
+        const selectedTours = { ...s.selectedTours };
+        if (nextRows.length === 0) delete selectedTours[cityId];
+        else selectedTours[cityId] = nextRows;
+        set({
+          ...syncTourDerived(selectedTours),
+          ...syncChauffeurDerived(
+            scrubTourFromChauffeur(s.chauffeurSelections, cityId, tourId)
+          ),
+        });
       },
 
       setSelectedTourIds: (ids) => set({ selectedTourIds: ids }),
@@ -403,13 +565,94 @@ export const useBuilderStore = create<BuilderState & BuilderActions>()(
           v
             ? {
                 isEliteConcierge: true,
-                selectedTourIds: [],
-                selectedToursByCity: {},
+                ...syncTourDerived({}),
               }
             : { isEliteConcierge: false }
         ),
 
-      setNeedDriver: (v) => set({ needDriver: v }),
+      setNeedDriver: (v) =>
+        set(() =>
+          v
+            ? { needDriver: true }
+            : syncChauffeurDerived({})
+        ),
+
+      setChauffeurDay: (cityId, date, on) =>
+        set((s) => {
+          const next = upsertChauffeurSelection(
+            s.chauffeurSelections,
+            cityId,
+            date,
+            on ? emptyChauffeurSelection("full_day") : null
+          );
+          return syncChauffeurDerived(next);
+        }),
+
+      setChauffeurDaysForCity: (cityId, dates) =>
+        set((s) => {
+          let next: ChauffeurSelections = { ...s.chauffeurSelections };
+          delete next[cityId];
+          for (const date of dates) {
+            next = upsertChauffeurSelection(
+              next,
+              cityId,
+              date,
+              emptyChauffeurSelection("full_day")
+            );
+          }
+          return syncChauffeurDerived(next);
+        }),
+
+      setChauffeurDayMode: (cityId, date, mode) =>
+        set((s) => {
+          const current =
+            s.chauffeurSelections[cityId]?.[date] ??
+            emptyChauffeurSelection("none");
+          const nextSel: DailyChauffeurSelection | null =
+            mode === "none"
+              ? null
+              : {
+                  mode,
+                  selectedTourIds:
+                    mode === "by_tour" ? current.selectedTourIds ?? [] : [],
+                };
+          return syncChauffeurDerived(
+            upsertChauffeurSelection(
+              s.chauffeurSelections,
+              cityId,
+              date,
+              nextSel
+            )
+          );
+        }),
+
+      toggleChauffeurDayTour: (cityId, date, tourId) =>
+        set((s) => {
+          const current =
+            s.chauffeurSelections[cityId]?.[date] ??
+            emptyChauffeurSelection("by_tour");
+          const setIds = new Set(current.selectedTourIds ?? []);
+          if (setIds.has(tourId)) setIds.delete(tourId);
+          else setIds.add(tourId);
+          return syncChauffeurDerived(
+            upsertChauffeurSelection(s.chauffeurSelections, cityId, date, {
+              mode: "by_tour",
+              selectedTourIds: Array.from(setIds),
+            })
+          );
+        }),
+
+      setChauffeurSelection: (cityId, date, selection) =>
+        set((s) =>
+          syncChauffeurDerived(
+            upsertChauffeurSelection(
+              s.chauffeurSelections,
+              cityId,
+              date,
+              selection
+            )
+          )
+        ),
 
       setActiveSeason: (tier, note) =>
         set({ activeSeasonTier: tier, activeSeasonNote: note }),
@@ -439,19 +682,29 @@ export const useBuilderStore = create<BuilderState & BuilderActions>()(
           normalizeLocation(l)
         );
         const locations = correctLocationVisitTypes(raw);
-        const selectedToursByCity =
-          p.selectedToursByCity ?? current.selectedToursByCity ?? {};
-        const selectedTourIds =
-          p.selectedTourIds ??
-          Array.from(new Set(Object.values(selectedToursByCity).flat())) ??
-          current.selectedTourIds;
+        const selectedTours: SelectedToursByCity =
+          p.selectedTours && Object.keys(p.selectedTours).length > 0
+            ? p.selectedTours
+            : migrateLegacySelectedTours(
+                p.selectedToursByCity ?? current.selectedToursByCity,
+                p.selectedTourIds ?? current.selectedTourIds
+              );
+        const tourDerived = syncTourDerived(selectedTours);
+        const chauffeurSelections =
+          p.chauffeurSelections &&
+          Object.keys(p.chauffeurSelections).length > 0
+            ? p.chauffeurSelections
+            : migrateLegacyChauffeurDays(
+                p.chauffeurDays ?? current.chauffeurDays
+              );
+        const derived = syncChauffeurDerived(chauffeurSelections);
         return {
           ...current,
           ...p,
           locations,
-          selectedToursByCity,
-          selectedTourIds,
+          ...tourDerived,
           isEliteConcierge: Boolean(p.isEliteConcierge),
+          ...derived,
         };
       },
       partialize: (s) => ({
@@ -473,9 +726,12 @@ export const useBuilderStore = create<BuilderState & BuilderActions>()(
         locations: s.locations,
         cityHotels: s.cityHotels,
         transitModeId: s.transitModeId,
+        selectedTours: s.selectedTours,
         selectedTourIds: s.selectedTourIds,
         selectedToursByCity: s.selectedToursByCity,
         isEliteConcierge: s.isEliteConcierge,
+        chauffeurSelections: s.chauffeurSelections,
+        chauffeurDays: s.chauffeurDays,
         needDriver: s.needDriver,
       }),
     }

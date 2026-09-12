@@ -107,3 +107,74 @@ export function formatCityDateSingle(iso: string): string {
   if (!a) return "";
   return `${a.d} ${MONTHS_SHORT[a.m - 1]}`;
 }
+
+export interface ChauffeurDayOption {
+  /** YYYY-MM-DD */
+  date: string;
+  /** 1-based day index from trip arrival */
+  tripDay: number;
+  /** e.g. "Day 1 · Monday, Oct 12" */
+  label: string;
+}
+
+/** Inclusive ISO dates from start through day before end (stay nights). */
+export function stayNightDates(startIso: string, endIso: string): string[] {
+  if (!startIso || !endIso || startIso >= endIso) {
+    return startIso && startIso === endIso ? [startIso] : [];
+  }
+  const out: string[] = [];
+  let cursor = startIso;
+  while (cursor < endIso) {
+    out.push(cursor);
+    cursor = addDaysIso(cursor, 1);
+  }
+  return out;
+}
+
+function formatChauffeurDayLabel(iso: string, tripDay: number): string {
+  const [y, m, d] = iso.split("-").map(Number);
+  if (!y || !m || !d) return `Day ${tripDay}`;
+  const dt = new Date(y, m - 1, d);
+  const weekday = dt.toLocaleDateString("en-US", { weekday: "long" });
+  const monthDay = dt.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+  });
+  return `Day ${tripDay} · ${weekday}, ${monthDay}`;
+}
+
+/**
+ * Full in-city days for chauffeur selection (stay nights; excludes departure
+ * morning of the following city). Aggregates multiple stays in the same city.
+ */
+export function chauffeurDaysForCity(
+  arrivalDate: string | null | undefined,
+  locations: LocationNightsLike[],
+  cityId: string
+): ChauffeurDayOption[] {
+  if (!arrivalDate || !cityId) return [];
+  const ranges = calculateCityDateRanges(arrivalDate, locations).filter(
+    (r) => r.cityId === cityId && r.nights > 0
+  );
+  const seen = new Set<string>();
+  const days: ChauffeurDayOption[] = [];
+  for (const range of ranges) {
+    for (const date of stayNightDates(range.startDate, range.endDate)) {
+      if (seen.has(date)) continue;
+      seen.add(date);
+      const tripDay =
+        Math.round(
+          (new Date(date + "T12:00:00").getTime() -
+            new Date(arrivalDate + "T12:00:00").getTime()) /
+            86400000
+        ) + 1;
+      days.push({
+        date,
+        tripDay: Math.max(1, tripDay),
+        label: formatChauffeurDayLabel(date, Math.max(1, tripDay)),
+      });
+    }
+  }
+  days.sort((a, b) => a.date.localeCompare(b.date));
+  return days;
+}

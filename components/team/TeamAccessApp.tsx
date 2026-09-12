@@ -10,7 +10,7 @@ import {
   type CollectionDef,
   type CollectionKey,
 } from "@/lib/pocketbase/admin-schema";
-import type { PbTour } from "@/lib/pocketbase/client";
+import type { PbTour, PbHub, PbVehicle } from "@/lib/pocketbase/client";
 import {
   DEFAULT_APP_SETTINGS,
   ensureDefaultRules,
@@ -45,9 +45,16 @@ export function TeamAccessApp() {
   const [authLoading, setAuthLoading] = useState(false);
 
   useEffect(() => {
-    useTeamAuth.persist.rehydrate();
-    hydrateAuth();
-    setReady(true);
+    let cancelled = false;
+    (async () => {
+      await useTeamAuth.persist.rehydrate();
+      if (cancelled) return;
+      await hydrateAuth();
+      if (!cancelled) setReady(true);
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [hydrateAuth]);
 
   if (!ready) {
@@ -81,8 +88,7 @@ export function TeamAccessApp() {
                   await login(emailInput.trim(), password);
                 } catch (err) {
                   setAuthError(
-                    formatPbError(err) ||
-                      `Login failed against ${getPbBaseUrl()}`
+                    `${formatPbError(err)} · ${getPbBaseUrl()}`
                   );
                 } finally {
                   setAuthLoading(false);
@@ -207,7 +213,9 @@ function TabButton({
 function displayRowTitle(
   def: CollectionDef,
   row: Record<string, unknown>,
-  cities: PbCity[]
+  cities: PbCity[],
+  hubs: PbHub[] = [],
+  vehicles: PbVehicle[] = []
 ): string {
   if (def.id === "city_movements") {
     const from =
@@ -218,6 +226,26 @@ function displayRowTitle(
       String(row.to_city_id ?? "To");
     return `${from} → ${to}`;
   }
+  if (def.id === "airport_transfers") {
+    const hub =
+      hubs.find((h) => h.id === row.hub_id)?.name ??
+      String(row.hub_id ?? "Hub");
+    const veh =
+      vehicles.find((v) => v.id === row.vehicle_id)?.name ||
+      vehicles.find((v) => v.id === row.vehicle_id)?.type ||
+      String(row.vehicle_id ?? "Vehicle");
+    return `${hub} · ${veh}`;
+  }
+  if (def.id === "chauffeur_rates") {
+    const city =
+      cities.find((c) => c.id === row.city_id)?.name ??
+      String(row.city_id ?? "City");
+    const veh =
+      vehicles.find((v) => v.id === row.vehicle_id)?.name ||
+      vehicles.find((v) => v.id === row.vehicle_id)?.type ||
+      String(row.vehicle_id ?? "Vehicle");
+    return `${city} · ${veh}`;
+  }
   return rowTitle(def, row);
 }
 
@@ -225,8 +253,7 @@ function rowSubtitle(def: CollectionDef, row: Record<string, unknown>): string {
   if (def.id === "hubs") {
     return [
       row.type ? String(row.type) : null,
-      row.pickup_fee != null ? `pickup €${row.pickup_fee}` : null,
-      row.dropoff_fee != null ? `drop €${row.dropoff_fee}` : null,
+      "vehicle rates in editor",
     ]
       .filter(Boolean)
       .join(" · ");
@@ -282,6 +309,39 @@ function rowSubtitle(def: CollectionDef, row: Record<string, unknown>): string {
       .filter(Boolean)
       .join(" · ");
   }
+  if (def.id === "feature_explainers") {
+    return [
+      row.feature_key ? String(row.feature_key) : null,
+      row.media_type ? String(row.media_type) : null,
+    ]
+      .filter(Boolean)
+      .join(" · ");
+  }
+  if (def.id === "airport_transfers") {
+    return [
+      row.base_pickup_fee != null
+        ? `pickup €${row.base_pickup_fee}`
+        : row.pickup_price_min != null
+          ? `pickup €${row.pickup_price_min}`
+          : null,
+      row.base_dropoff_fee != null
+        ? `drop €${row.base_dropoff_fee}`
+        : row.dropoff_price_min != null
+          ? `drop €${row.dropoff_price_min}`
+          : null,
+      "(+30% max)",
+    ]
+      .filter(Boolean)
+      .join(" · ");
+  }
+  if (def.id === "chauffeur_rates") {
+    return [
+      row.base_daily_rate != null ? `€${row.base_daily_rate}/day` : null,
+      "(+30% max)",
+    ]
+      .filter(Boolean)
+      .join(" · ");
+  }
   if (def.id === "accommodations") {
     const min = row.price_min ?? row.min_price_per_night ?? row.min_price;
     const max = row.price_max ?? row.max_price_per_night ?? row.max_price;
@@ -316,6 +376,8 @@ function SourceOfTruthPanel({ getClient }: { getClient: () => PbClient }) {
   const [rows, setRows] = useState<Record<string, unknown>[]>([]);
   const [cities, setCities] = useState<PbCity[]>([]);
   const [tours, setTours] = useState<PbTour[]>([]);
+  const [hubs, setHubs] = useState<PbHub[]>([]);
+  const [vehicles, setVehicles] = useState<PbVehicle[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [debug, setDebug] = useState<string | null>(null);
@@ -328,7 +390,7 @@ function SourceOfTruthPanel({ getClient }: { getClient: () => PbClient }) {
     setDebug(null);
     try {
       const pb = getClient();
-      if (!pb.authStore.isValid) {
+      if (!useTeamAuth.getState().ensureAuth()) {
         throw new Error("Admin session expired — please sign in again.");
       }
       let list: Record<string, unknown>[] = [];
@@ -348,10 +410,27 @@ function SourceOfTruthPanel({ getClient }: { getClient: () => PbClient }) {
         category === "seasonal_highlights" ||
         category === "hubs" ||
         category === "accommodations" ||
-        category === "city_movements"
+        category === "city_movements" ||
+        category === "chauffeur_rates"
       ) {
         setCities(
           await pb.collection("cities").getFullList<PbCity>({ sort: "name" })
+        );
+      }
+      if (
+        category === "airport_transfers" ||
+        category === "hubs" ||
+        category === "chauffeur_rates"
+      ) {
+        if (category === "airport_transfers") {
+          setHubs(
+            await pb.collection("hubs").getFullList<PbHub>({ sort: "name" })
+          );
+        }
+        setVehicles(
+          await pb
+            .collection("vehicles")
+            .getFullList<PbVehicle>({ sort: "max_passengers" })
         );
       }
       if (category === "seasonal_highlights") {
@@ -492,13 +571,17 @@ function SourceOfTruthPanel({ getClient }: { getClient: () => PbClient }) {
                       className="border-b border-[#F5F0E8]"
                     >
                       <td className="py-3 pr-2">
-                        {thumb ? (
+                        {thumb && row.media_type !== "Video" ? (
                           // eslint-disable-next-line @next/next/no-img-element
                           <img
                             src={thumb}
                             alt=""
                             className="h-10 w-10 rounded-lg object-cover"
                           />
+                        ) : thumb && row.media_type === "Video" ? (
+                          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#0B1F3A] text-[10px] text-white">
+                            ▶
+                          </div>
                         ) : (
                           <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#F3EDE4] text-[10px] text-[#8A8278]">
                             —
@@ -506,7 +589,7 @@ function SourceOfTruthPanel({ getClient }: { getClient: () => PbClient }) {
                         )}
                       </td>
                       <td className="py-3 pr-3 font-medium text-[#0B1F3A]">
-                        {displayRowTitle(def, row, cities)}
+                        {displayRowTitle(def, row, cities, hubs, vehicles)}
                       </td>
                       <td className="py-3 pr-3 text-[#8A8278]">
                         {rowSubtitle(def, row)}
@@ -582,6 +665,8 @@ function SourceOfTruthPanel({ getClient }: { getClient: () => PbClient }) {
             def={def}
             cities={cities}
             tours={tours}
+            hubs={hubs}
+            vehicles={vehicles}
             initial={creating ? null : editing}
             onCancel={() => {
               setCreating(false);
@@ -604,6 +689,8 @@ function RecordEditModal({
   def,
   cities,
   tours,
+  hubs,
+  vehicles,
   initial,
   onCancel,
   onSaved,
@@ -612,6 +699,8 @@ function RecordEditModal({
   def: CollectionDef;
   cities: PbCity[];
   tours: PbTour[];
+  hubs: PbHub[];
+  vehicles: PbVehicle[];
   initial: Record<string, unknown> | null;
   onCancel: () => void;
   onSaved: () => Promise<void>;
@@ -625,12 +714,21 @@ function RecordEditModal({
       if ((v == null || v === "") && f.legacyKey) {
         v = initial?.[f.legacyKey];
       }
+      // Tours: base_price may only exist on legacy `price`
+      if (
+        (v == null || v === "") &&
+        def.id === "tours" &&
+        f.key === "base_price"
+      ) {
+        v = initial?.price;
+      }
       if (f.type === "bool") {
         base[f.key] = v === false || v === "false" ? "false" : "true";
       } else if (f.key === "base_price_modifier" && (v == null || v === "")) {
         base[f.key] = "1";
       } else if (f.key === "type" && (v == null || v === "")) {
-        base[f.key] = "Both";
+        base[f.key] =
+          def.id === "hubs" ? "Airport" : "Both";
       } else {
         base[f.key] = v == null ? "" : String(v);
       }
@@ -642,6 +740,60 @@ function RecordEditModal({
   const [dragKey, setDragKey] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [vehicleRates, setVehicleRates] = useState<HubVehicleRateDraft[]>([]);
+  const [ratesLoading, setRatesLoading] = useState(def.id === "hubs");
+  const [removedRateIds, setRemovedRateIds] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (def.id !== "hubs") return;
+    let cancelled = false;
+    (async () => {
+      setRatesLoading(true);
+      try {
+        if (!initial?.id) {
+          if (!cancelled) {
+            setVehicleRates([]);
+            setRemovedRateIds([]);
+          }
+          return;
+        }
+        const pb = getClient();
+        const rows = await pb.collection("airport_transfers").getFullList({
+          filter: `hub_id="${String(initial.id)}"`,
+          sort: "vehicle_id",
+        });
+        if (cancelled) return;
+        setVehicleRates(
+          rows.map((r) => ({
+            key: String(r.id),
+            id: String(r.id),
+            vehicle_id: String(r.vehicle_id ?? ""),
+            base_pickup_fee: String(
+              (r as { base_pickup_fee?: number }).base_pickup_fee ??
+                (r as { pickup_price_min?: number }).pickup_price_min ??
+                ""
+            ),
+            base_dropoff_fee: String(
+              (r as { base_dropoff_fee?: number }).base_dropoff_fee ??
+                (r as { dropoff_price_min?: number }).dropoff_price_min ??
+                ""
+            ),
+          }))
+        );
+        setRemovedRateIds([]);
+      } catch (e) {
+        if (!cancelled) {
+          console.warn("[Team Access] hub rates load failed", e);
+          setVehicleRates([]);
+        }
+      } finally {
+        if (!cancelled) setRatesLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [def.id, initial?.id, getClient]);
 
   const set = (key: string, value: string) =>
     setForm((f) => ({ ...f, [key]: value }));
@@ -660,12 +812,42 @@ function RecordEditModal({
     );
   };
 
+  const syncHubVehicleRates = async (pb: PbClient, hubId: string) => {
+    for (const id of removedRateIds) {
+      await pb.collection("airport_transfers").delete(id);
+    }
+    for (const rate of vehicleRates) {
+      if (!rate.vehicle_id) continue;
+      const pickup = Number(rate.base_pickup_fee);
+      const dropoff = Number(rate.base_dropoff_fee);
+      if (!Number.isFinite(pickup) || !Number.isFinite(dropoff)) {
+        throw new Error(
+          "Each vehicle rate needs numeric base pickup and drop-off fees."
+        );
+      }
+      const payload = {
+        hub_id: hubId,
+        vehicle_id: rate.vehicle_id,
+        base_pickup_fee: pickup,
+        base_dropoff_fee: dropoff,
+      };
+      if (rate.id) {
+        await pb.collection("airport_transfers").update(rate.id, payload);
+      } else {
+        await pb.collection("airport_transfers").create(payload);
+      }
+    }
+  };
+
   const save = async () => {
     setSaving(true);
     setErr(null);
     try {
       const pb = getClient();
-      if (!pb.authStore.isValid) {
+      if (
+        !useTeamAuth.getState().ensureAuth() ||
+        !pb.authStore.isSuperuser
+      ) {
         throw new Error("Admin session expired — please sign in again.");
       }
       const fd = new FormData();
@@ -686,8 +868,8 @@ function RecordEditModal({
             fd.append(f.key, val);
             if (f.legacyKey) fd.append(f.legacyKey, val);
           }
-        } else if (f.type === "city" || f.type === "tour") {
-          // Empty string clears the relation (All Japan / no tour)
+        } else if (f.type === "city" || f.type === "tour" || f.type === "hub" || f.type === "vehicle") {
+          // Empty string clears the relation
           fd.append(f.key, val);
         } else if (f.required || val) {
           fd.append(f.key, val);
@@ -695,16 +877,46 @@ function RecordEditModal({
         }
       }
 
-      // Vehicles: keep required legacy `type` in sync with name
+      // Vehicles: keep required legacy `type` + max_pax in sync
       if (def.id === "vehicles" && form.name) {
-        fd.append("type", form.name);
+        fd.set("name", form.name);
+        fd.set("type", form.name);
+      }
+      if (def.id === "vehicles" && form.max_passengers) {
+        fd.set("max_passengers", form.max_passengers);
+        fd.set("max_pax", form.max_passengers);
       }
 
+      // Tours: required legacy `price` is not on the form — sync from base_price
+      if (def.id === "tours") {
+        const price = (form.base_price || form.price_per_person || "").trim();
+        if (price !== "") {
+          fd.set("base_price", price);
+          fd.set("price_per_person", price);
+          fd.set("price", price);
+        }
+      }
+
+      let hubId = initial?.id ? String(initial.id) : "";
       if (initial?.id) {
         await pb.collection(def.id).update(String(initial.id), fd);
       } else {
-        await pb.collection(def.id).create(fd);
+        const created = await pb.collection(def.id).create(fd);
+        hubId = String(created.id);
       }
+
+      if (def.id === "hubs" && hubId) {
+        const seen = new Set<string>();
+        for (const rate of vehicleRates) {
+          if (!rate.vehicle_id) continue;
+          if (seen.has(rate.vehicle_id)) {
+            throw new Error("Each vehicle can only have one rate per hub.");
+          }
+          seen.add(rate.vehicle_id);
+        }
+        await syncHubVehicleRates(pb, hubId);
+      }
+
       await onSaved();
     } catch (e) {
       setErr(formatPbError(e));
@@ -725,7 +937,7 @@ function RecordEditModal({
         <div className="mb-4 flex items-start justify-between gap-3">
           <h3 className="font-display text-2xl text-[#0B1F3A]">
             {initial
-              ? `Edit · ${displayRowTitle(def, initial, cities)}`
+              ? `Edit · ${displayRowTitle(def, initial, cities, hubs, vehicles)}`
               : `New ${def.label.slice(0, -1)}`}
           </h3>
           <button
@@ -806,6 +1018,8 @@ function RecordEditModal({
             const span =
               f.type === "textarea" ||
               f.type === "city" ||
+              f.type === "hub" ||
+              f.type === "vehicle" ||
               f.type === "tour"
                 ? "sm:col-span-2"
                 : "";
@@ -870,6 +1084,35 @@ function RecordEditModal({
                       </option>
                     ))}
                   </select>
+                ) : f.type === "hub" ? (
+                  <select
+                    value={form[f.key] ?? ""}
+                    onChange={(e) => set(f.key, e.target.value)}
+                    className="w-full rounded-xl border border-[#D9D2C7] bg-white px-3 py-2 text-sm"
+                  >
+                    <option value="">Select airport / hub</option>
+                    {hubs.map((h) => (
+                      <option key={h.id} value={h.id}>
+                        {h.name}
+                      </option>
+                    ))}
+                  </select>
+                ) : f.type === "vehicle" ? (
+                  <select
+                    value={form[f.key] ?? ""}
+                    onChange={(e) => set(f.key, e.target.value)}
+                    className="w-full rounded-xl border border-[#D9D2C7] bg-white px-3 py-2 text-sm"
+                  >
+                    <option value="">Select vehicle</option>
+                    {vehicles.map((v) => (
+                      <option key={v.id} value={v.id}>
+                        {v.name || v.type || v.id}
+                        {v.max_passengers != null
+                          ? ` (${v.max_passengers} pax)`
+                          : ""}
+                      </option>
+                    ))}
+                  </select>
                 ) : f.type === "tour" ? (
                   <select
                     value={form[f.key] ?? ""}
@@ -897,6 +1140,137 @@ function RecordEditModal({
           })}
         </div>
 
+        {def.id === "hubs" ? (
+          <div className="mt-5 rounded-2xl border border-[#E8E2D9] bg-white p-4">
+            <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
+              <div>
+                <h4 className="text-sm font-semibold uppercase tracking-wider text-[#0B1F3A]">
+                  Vehicle Pricing
+                </h4>
+                <p className="mt-1 text-xs text-[#8A8278]">
+                  Base fees per vehicle. Client max = base × 1.30.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() =>
+                  setVehicleRates((rows) => [
+                    ...rows,
+                    {
+                      key: `new-${Date.now()}-${rows.length}`,
+                      vehicle_id: "",
+                      base_pickup_fee: "",
+                      base_dropoff_fee: "",
+                    },
+                  ])
+                }
+                className="rounded-full border border-[#C4A35A] bg-[#FBF8F2] px-3 py-1.5 text-xs font-semibold text-[#0B1F3A]"
+              >
+                + Add Vehicle Rate
+              </button>
+            </div>
+
+            {ratesLoading ? (
+              <p className="text-sm text-[#8A8278]">Loading rates…</p>
+            ) : vehicleRates.length === 0 ? (
+              <p className="text-sm text-[#8A8278]">
+                No vehicle rates yet. Add Alphard, 10-seater, 14-seater, etc.
+              </p>
+            ) : (
+              <div className="space-y-3">
+                {vehicleRates.map((rate, idx) => (
+                  <div
+                    key={rate.key}
+                    className="grid gap-2 rounded-xl border border-[#EEE8DF] bg-[#FBF8F2] p-3 sm:grid-cols-[1.4fr_1fr_1fr_auto]"
+                  >
+                    <label className="block text-[10px] uppercase tracking-wider text-[#8A8278]">
+                      Vehicle
+                      <select
+                        value={rate.vehicle_id}
+                        onChange={(e) =>
+                          setVehicleRates((rows) =>
+                            rows.map((r, i) =>
+                              i === idx
+                                ? { ...r, vehicle_id: e.target.value }
+                                : r
+                            )
+                          )
+                        }
+                        className="mt-1 w-full rounded-lg border border-[#D9D2C7] bg-white px-2 py-2 text-sm"
+                      >
+                        <option value="">Select vehicle…</option>
+                        {vehicles.map((v) => (
+                          <option key={v.id} value={v.id}>
+                            {v.name || v.type || v.id}
+                            {v.max_passengers != null
+                              ? ` (${v.max_passengers} pax)`
+                              : ""}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="block text-[10px] uppercase tracking-wider text-[#8A8278]">
+                      Pickup base (€)
+                      <input
+                        type="number"
+                        step="any"
+                        min="0"
+                        value={rate.base_pickup_fee}
+                        onChange={(e) =>
+                          setVehicleRates((rows) =>
+                            rows.map((r, i) =>
+                              i === idx
+                                ? { ...r, base_pickup_fee: e.target.value }
+                                : r
+                            )
+                          )
+                        }
+                        className="mt-1 w-full rounded-lg border border-[#D9D2C7] bg-white px-2 py-2 text-sm"
+                      />
+                    </label>
+                    <label className="block text-[10px] uppercase tracking-wider text-[#8A8278]">
+                      Drop-off base (€)
+                      <input
+                        type="number"
+                        step="any"
+                        min="0"
+                        value={rate.base_dropoff_fee}
+                        onChange={(e) =>
+                          setVehicleRates((rows) =>
+                            rows.map((r, i) =>
+                              i === idx
+                                ? { ...r, base_dropoff_fee: e.target.value }
+                                : r
+                            )
+                          )
+                        }
+                        className="mt-1 w-full rounded-lg border border-[#D9D2C7] bg-white px-2 py-2 text-sm"
+                      />
+                    </label>
+                    <div className="flex items-end">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setVehicleRates((rows) =>
+                            rows.filter((_, i) => i !== idx)
+                          );
+                          if (rate.id) {
+                            setRemovedRateIds((ids) => [...ids, rate.id!]);
+                          }
+                        }}
+                        className="rounded-lg px-2 py-2 text-sm text-red-600"
+                        aria-label="Remove vehicle rate"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        ) : null}
+
         {err ? (
           <p className="mt-3 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
             {err}
@@ -923,6 +1297,14 @@ function RecordEditModal({
     </div>
   );
 }
+
+type HubVehicleRateDraft = {
+  key: string;
+  id?: string;
+  vehicle_id: string;
+  base_pickup_fee: string;
+  base_dropoff_fee: string;
+};
 
 function RulesOfLogicPanel({ getClient }: { getClient: () => PbClient }) {
   const [rows, setRows] = useState<PbAppSetting[]>([]);

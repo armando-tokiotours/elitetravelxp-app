@@ -21,10 +21,14 @@ export function TripDurationSection({
   const arrivalDate = useBuilderStore((s) => s.arrivalDate);
   const activeSeasonTier = useBuilderStore((s) => s.activeSeasonTier);
   const activeSeasonNote = useBuilderStore((s) => s.activeSeasonNote);
+  const adults = useBuilderStore((s) => s.adults);
+  const children = useBuilderStore((s) => s.children);
   const setDurationDays = useBuilderStore((s) => s.setDurationDays);
   const setDurationCustom = useBuilderStore((s) => s.setDurationCustom);
   const setArrivalDate = useBuilderStore((s) => s.setArrivalDate);
   const setActiveSeason = useBuilderStore((s) => s.setActiveSeason);
+  const setAdults = useBuilderStore((s) => s.setAdults);
+  const setChildren = useBuilderStore((s) => s.setChildren);
 
   const [customDraft, setCustomDraft] = useState(String(durationDays));
 
@@ -79,19 +83,20 @@ export function TripDurationSection({
       icon="calendar"
       summary={`${durationDays} day${durationDays === 1 ? "" : "s"}${
         arrivalDate ? ` · ${formatDisplayDate(arrivalDate)}` : ""
-      }`}
+      } · ${adults + children} guest${adults + children === 1 ? "" : "s"}`}
     >
-      <div className="flex flex-wrap gap-2.5">
+      <div className="flex flex-wrap gap-2">
         {PRESETS.map((days) => (
           <ChoicePill
             key={days}
+            size="sm"
             active={!durationCustom && durationDays === days}
             onClick={() => selectPreset(days)}
           >
             {days} days
           </ChoicePill>
         ))}
-        <ChoicePill active={durationCustom} onClick={selectCustom}>
+        <ChoicePill size="sm" active={durationCustom} onClick={selectCustom}>
           Custom
         </ChoicePill>
       </div>
@@ -162,8 +167,69 @@ export function TripDurationSection({
           ) : null}
         </AnimatePresence>
       </div>
+
+      <div className="mt-6">
+        <FieldLabel>Guests</FieldLabel>
+        <div className="mt-2 overflow-hidden rounded-2xl border border-[#E8E2D9] bg-white">
+          <GuestStepper
+            label="Adults"
+            value={adults}
+            onChange={setAdults}
+            min={1}
+          />
+          <GuestStepper
+            label="Children"
+            value={children}
+            onChange={setChildren}
+            min={0}
+          />
+        </div>
+        <p className="mt-1.5 text-xs text-[#8A8278]">
+          Used for airport transfers, vehicles, and hotel room guidance.
+        </p>
+      </div>
+
       <SectionContinue next={2} label="Continue to Arrival" />
     </SectionBlock>
+  );
+}
+
+function GuestStepper({
+  label,
+  value,
+  onChange,
+  min,
+}: {
+  label: string;
+  value: number;
+  onChange: (n: number) => void;
+  min: number;
+}) {
+  return (
+    <div className="flex items-center justify-between border-b border-[#EEE8DF] px-4 py-3.5 last:border-b-0">
+      <span className="text-sm font-medium text-[#0B1F3A]">{label}</span>
+      <div className="flex items-center gap-3">
+        <button
+          type="button"
+          aria-label={`Decrease ${label}`}
+          onClick={() => onChange(Math.max(min, value - 1))}
+          className="flex h-9 w-9 items-center justify-center rounded-full border border-[#D9D2C7] text-[#0B1F3A] transition hover:bg-[#FBF8F2]"
+        >
+          −
+        </button>
+        <span className="w-6 text-center text-sm font-semibold text-[#0B1F3A]">
+          {value}
+        </span>
+        <button
+          type="button"
+          aria-label={`Increase ${label}`}
+          onClick={() => onChange(value + 1)}
+          className="flex h-9 w-9 items-center justify-center rounded-full border border-[#D9D2C7] text-[#0B1F3A] transition hover:bg-[#FBF8F2]"
+        >
+          +
+        </button>
+      </div>
+    </div>
   );
 }
 

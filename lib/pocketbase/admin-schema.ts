@@ -10,6 +10,9 @@ export type CollectionKey =
   | "seasonal_highlights"
   | "season_tiers"
   | "city_movements"
+  | "airport_transfers"
+  | "chauffeur_rates"
+  | "feature_explainers"
   | "app_settings";
 
 export type FieldType =
@@ -19,6 +22,8 @@ export type FieldType =
   | "bool"
   | "select"
   | "city"
+  | "hub"
+  | "vehicle"
   | "tour"
   | "file";
 
@@ -106,13 +111,9 @@ export const COLLECTIONS: CollectionDef[] = [
         key: "base_price",
         label: "Base price (€)",
         type: "number",
+        required: true,
+        // Saved as base_price + price_per_person + required legacy `price`
         legacyKey: "price_per_person",
-      },
-      {
-        key: "price_per_person",
-        label: "Legacy price per person (€)",
-        type: "number",
-        legacyKey: "price",
       },
       { key: "duration_hours", label: "Duration (hours)", type: "number" },
       { key: "is_active", label: "Active", type: "bool" },
@@ -134,9 +135,10 @@ export const COLLECTIONS: CollectionDef[] = [
       },
       {
         key: "max_passengers",
-        label: "Max passengers",
+        label: "Max passengers (max_pax)",
         type: "number",
         required: true,
+        legacyKey: "max_pax",
       },
       { key: "max_luggage", label: "Max luggage", type: "number" },
       {
@@ -204,18 +206,6 @@ export const COLLECTIONS: CollectionDef[] = [
       },
       { key: "name", label: "Hub name", type: "text", required: true },
       { key: "city_id", label: "City (optional)", type: "city" },
-      {
-        key: "pickup_fee",
-        label: "Pickup fee (€)",
-        type: "number",
-        required: true,
-      },
-      {
-        key: "dropoff_fee",
-        label: "Drop-off fee (€)",
-        type: "number",
-        required: true,
-      },
       { key: "is_active", label: "Active", type: "bool" },
       { key: "sort_order", label: "Sort order", type: "number" },
     ],
@@ -418,6 +408,113 @@ export const COLLECTIONS: CollectionDef[] = [
       },
     ],
   },
+  {
+    id: "airport_transfers",
+    label: "Airport Transfers",
+    titleKey: "hub_id",
+    sort: "hub_id,vehicle_id",
+    fields: [
+      {
+        key: "hub_id",
+        label: "Airport / hub",
+        type: "hub",
+        required: true,
+      },
+      {
+        key: "vehicle_id",
+        label: "Vehicle",
+        type: "vehicle",
+        required: true,
+      },
+      {
+        key: "base_pickup_fee",
+        label: "Base pickup fee (€)",
+        type: "number",
+        required: true,
+      },
+      {
+        key: "base_dropoff_fee",
+        label: "Base drop-off fee (€)",
+        type: "number",
+        required: true,
+      },
+    ],
+  },
+  {
+    id: "chauffeur_rates",
+    label: "Chauffeur Rates",
+    titleKey: "city_id",
+    sort: "city_id,vehicle_id",
+    fields: [
+      {
+        key: "city_id",
+        label: "City",
+        type: "city",
+        required: true,
+      },
+      {
+        key: "vehicle_id",
+        label: "Vehicle",
+        type: "vehicle",
+        required: true,
+      },
+      {
+        key: "base_daily_rate",
+        label: "Base daily rate (€)",
+        type: "number",
+        required: true,
+      },
+    ],
+  },
+  {
+    id: "feature_explainers",
+    label: "Explanations",
+    titleKey: "title",
+    sort: "feature_key,title",
+    fileFields: ["thumbnail_image", "media_file"],
+    fields: [
+      {
+        key: "feature_key",
+        label: "Feature key",
+        type: "select",
+        required: true,
+        options: [
+          "airport_transfers",
+          "airport_pickup",
+          "airport_dropoff",
+          "private_chauffeur",
+          "elite_concierge",
+        ],
+      },
+      { key: "title", label: "Title", type: "text", required: true },
+      {
+        key: "description",
+        label: "Description",
+        type: "textarea",
+      },
+      {
+        key: "thumbnail_image",
+        label: "Button Thumbnail Image",
+        type: "file",
+        required: true,
+        accept: "image/jpeg,image/png,image/webp,image/gif,image/*",
+      },
+      {
+        key: "media_type",
+        label: "Modal media type",
+        type: "select",
+        options: ["Video", "Image"],
+      },
+      {
+        key: "media_file",
+        label: "Modal Looping Video",
+        type: "file",
+        required: true,
+        accept:
+          "video/mp4,video/webm,video/quicktime,video/x-m4v,.m4v,image/*",
+      },
+    ],
+  },
 ];
 
 export function formatPbError(e: unknown): string {
@@ -428,6 +525,13 @@ export function formatPbError(e: unknown): string {
     response?: { message?: string; data?: Record<string, { message?: string; code?: string }> };
     data?: Record<string, { message?: string; code?: string }>;
   };
+  // Status 0 = network failure (PocketBase down / wrong URL / CORS)
+  if (err.status === 0) {
+    return "Cannot reach PocketBase — is it running on http://127.0.0.1:8090? (npm run pb)";
+  }
+  if (err.status === 403) {
+    return "Admin session expired or missing — sign out and sign in again to Team Access.";
+  }
   const data = err.response?.data || err.data;
   const parts: string[] = [];
   if (err.response?.message || err.message) {
@@ -459,6 +563,12 @@ export function rowPhotoFilename(
   def: CollectionDef,
   row: Record<string, unknown>
 ): string {
+  if (def.id === "feature_explainers") {
+    if (row.thumbnail_image) return String(row.thumbnail_image);
+    if (row.media_file && !/\.(mp4|webm|mov|m4v)(\?|$)/i.test(String(row.media_file))) {
+      return String(row.media_file);
+    }
+  }
   for (const f of def.fields) {
     if (f.type !== "file") continue;
     const primary = row[f.key];

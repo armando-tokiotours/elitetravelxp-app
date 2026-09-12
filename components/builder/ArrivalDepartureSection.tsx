@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo } from "react";
-import type { PbHub } from "@/lib/pocketbase/client";
+import type { PbAirportTransfer, PbHub, PbVehicle } from "@/lib/pocketbase/client";
 import {
   useBuilderStore,
   type HubTravelMode,
@@ -14,12 +14,21 @@ import {
   SelectField,
 } from "./ui";
 import { SectionContinue } from "./SectionContinue";
+import { ExplainerTriggerButton } from "./ExplainerTriggerButton";
 
 function hubTypeForMode(mode: HubTravelMode): PbHub["type"] {
   return mode === "cruise" ? "Cruise Terminal" : "Airport";
 }
 
-export function ArrivalDepartureSection({ hubs }: { hubs: PbHub[] }) {
+export function ArrivalDepartureSection({
+  hubs,
+  vehicles = [],
+  airportTransfers = [],
+}: {
+  hubs: PbHub[];
+  vehicles?: PbVehicle[];
+  airportTransfers?: PbAirportTransfer[];
+}) {
   const arrivalTransferId = useBuilderStore((s) => s.arrivalTransferId);
   const departureTransferId = useBuilderStore((s) => s.departureTransferId);
   const arrivalMode = useBuilderStore((s) => s.arrivalMode);
@@ -69,11 +78,13 @@ export function ArrivalDepartureSection({ hubs }: { hubs: PbHub[] }) {
     departureMode === "cruise" ? "Port drop off?" : "Airport drop off?";
 
   const arriveName =
-    hubs.find((h) => h.id === arrivalTransferId)?.name.replace(/\s*\([^)]*\)\s*$/, "") ||
-    "—";
+    hubs
+      .find((h) => h.id === arrivalTransferId)
+      ?.name.replace(/\s*\([^)]*\)\s*$/, "") || "—";
   const departName =
-    hubs.find((h) => h.id === departureTransferId)?.name.replace(/\s*\([^)]*\)\s*$/, "") ||
-    "—";
+    hubs
+      .find((h) => h.id === departureTransferId)
+      ?.name.replace(/\s*\([^)]*\)\s*$/, "") || "—";
   const summary = `${arriveName} → ${departName} · Pickup: ${airportPickup ? "Yes" : "No"}`;
 
   return (
@@ -113,16 +124,43 @@ export function ArrivalDepartureSection({ hubs }: { hubs: PbHub[] }) {
         />
       </div>
 
-      <div className="mt-5 flex flex-col gap-4 sm:flex-row sm:gap-10">
-        <div>
-          <FieldLabel>{pickupLabel}</FieldLabel>
-          <PillToggle value={airportPickup} onChange={setAirportPickup} />
+      <div className="mt-5">
+        <div className="grid grid-cols-2 gap-3 md:gap-6">
+          <div>
+            <label className="mb-1 block text-[10px] font-medium uppercase tracking-[0.12em] text-[#8A8278] sm:text-xs sm:tracking-[0.14em]">
+              {pickupLabel}
+            </label>
+            <PillToggle
+              value={airportPickup}
+              onChange={setAirportPickup}
+              size="xs"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-[10px] font-medium uppercase tracking-[0.12em] text-[#8A8278] sm:text-xs sm:tracking-[0.14em]">
+              {dropoffLabel}
+            </label>
+            <PillToggle
+              value={airportDropoff}
+              onChange={setAirportDropoff}
+              size="xs"
+            />
+          </div>
         </div>
-        <div>
-          <FieldLabel>{dropoffLabel}</FieldLabel>
-          <PillToggle value={airportDropoff} onChange={setAirportDropoff} />
+        <div className="mt-3.5">
+          <ExplainerTriggerButton
+            featureKey="airport_transfers"
+            title="The VIP Airport Arrival"
+            contextId={arrivalTransferId}
+            arrivalHubId={arrivalTransferId}
+            departureHubId={departureTransferId}
+            hubs={hubs}
+            vehicles={vehicles}
+            airportTransfers={airportTransfers}
+          />
         </div>
       </div>
+
       <SectionContinue next={3} label="Continue to Locations" />
     </SectionBlock>
   );
@@ -167,7 +205,9 @@ function HubPicker({
         onChange={onChange}
         options={hubs.map((h) => ({ value: h.id, label: h.name }))}
         placeholder={
-          hubs.length === 0 ? "No hubs available — add in Team Access" : placeholder
+          hubs.length === 0
+            ? "No hubs available — add in Team Access"
+            : placeholder
         }
       />
     </div>

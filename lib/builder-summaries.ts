@@ -1,5 +1,6 @@
 import type { PbHub, PbTransfer } from "@/lib/pocketbase/client";
 import { transferLocation } from "@/lib/pocketbase/client";
+import { countBillableChauffeurDays } from "@/lib/chauffeurSelections";
 import {
   formatDisplayDate,
   type BuilderState,
@@ -76,7 +77,13 @@ export function builderSectionSummaries(
     tourCount === 0
       ? "No tours"
       : `${tourCount} tour${tourCount === 1 ? "" : "s"} selected`,
-    `Chauffeur: ${state.needDriver ? "Yes" : "No"}`,
+    `Chauffeur: ${
+      countBillableChauffeurDays(state.chauffeurSelections) > 0
+        ? `${countBillableChauffeurDays(state.chauffeurSelections)} day(s)`
+        : state.needDriver
+          ? "Yes"
+          : "No"
+    }`,
   ];
 
   return {

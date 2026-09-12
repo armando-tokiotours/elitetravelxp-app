@@ -11,6 +11,13 @@ import {
   transferPickup,
 } from "@/lib/pocketbase/client";
 import type { BuilderState } from "@/store/useBuilderStore";
+import { priceFleetTransfer, priceFleetChauffeurDay } from "@/lib/vehicleAllocator";
+import { transferFeeForPax } from "@/lib/transferVehicle";
+import { chauffeurDaysForCity } from "@/lib/dateCascade";
+import {
+  chauffeurDaysFromSelections,
+  isBillableChauffeurDay,
+} from "@/lib/chauffeurSelections";
 
 export interface QuoteResult {
   min: number;
@@ -142,22 +149,52 @@ export function calculateBuilderQuote(
   );
 
   if (state.airportPickup) {
-    const fee = arrivalHub
-      ? hubPickup(arrivalHub)
-      : arrivalTransfer
-        ? transferPickup(arrivalTransfer)
-        : 0;
-    min += fee;
-    max += fee * 1.15;
+    const quote = arrivalHub
+      ? priceFleetTransfer({
+          hubId: arrivalHub.id,
+          direction: "pickup",
+          totalPax: guests,
+          vehicles: config.vehicles,
+          rates: config.airportTransfers ?? [],
+        })
+      : null;
+    if (quote?.fromRates && quote.min > 0) {
+      min += quote.min;
+      max += quote.max;
+    } else {
+      const base = arrivalHub
+        ? hubPickup(arrivalHub)
+        : arrivalTransfer
+          ? transferPickup(arrivalTransfer)
+          : 0;
+      const fee = transferFeeForPax(base, guests);
+      min += fee;
+      max += Math.round(fee * 1.3);
+    }
   }
   if (state.airportDropoff) {
-    const fee = departureHub
-      ? hubDropoff(departureHub)
-      : departureTransfer
-        ? transferDropoff(departureTransfer)
-        : 0;
-    min += fee;
-    max += fee * 1.15;
+    const quote = departureHub
+      ? priceFleetTransfer({
+          hubId: departureHub.id,
+          direction: "dropoff",
+          totalPax: guests,
+          vehicles: config.vehicles,
+          rates: config.airportTransfers ?? [],
+        })
+      : null;
+    if (quote?.fromRates && quote.min > 0) {
+      min += quote.min;
+      max += quote.max;
+    } else {
+      const base = departureHub
+        ? hubDropoff(departureHub)
+        : departureTransfer
+          ? transferDropoff(departureTransfer)
+          : 0;
+      const fee = transferFeeForPax(base, guests);
+      min += fee;
+      max += Math.round(fee * 1.3);
+    }
   }
 
   const legs = Math.max(0, state.locations.length - 1);
@@ -198,13 +235,31 @@ export function calculateBuilderQuote(
     max += transitMax;
   }
 
-  for (const id of state.selectedTourIds) {
+  for (const rows of Object.values(state.selectedTours ?? {})) {
     if (state.isEliteConcierge) break;
-    const tour = config.tours.find((t) => t.id === id);
-    if (tour) {
-      const p = tourPrice(tour) * Math.max(1, guests);
-      min += p;
-      max += p * 1.15;
+    for (const row of rows) {
+      const p =
+        (Number(row.price) || 0) > 0
+          ? Number(row.price) * Math.max(1, guests)
+          : (() => {
+              const tour = config.tours.find((t) => t.id === row.tourId);
+              return tour ? tourPrice(tour) * Math.max(1, guests) : 0;
+            })();
+      if (p > 0) {
+        min += p;
+        max += p * 1.15;
+      }
+    }
+  }
+  if (!state.selectedTours || Object.keys(state.selectedTours).length === 0) {
+    for (const id of state.selectedTourIds) {
+      if (state.isEliteConcierge) break;
+      const tour = config.tours.find((t) => t.id === id);
+      if (tour) {
+        const p = tourPrice(tour) * Math.max(1, guests);
+        min += p;
+        max += p * 1.15;
+      }
     }
   }
 
@@ -215,13 +270,59 @@ export function calculateBuilderQuote(
   }
 
   const veh = allocateVehicles(guests, config.vehicles, rules);
-  if (state.needDriver) {
+
+  // Day-by-day chauffeur (full_day or by_tour with tours)
+  let chauffeurDayCount = 0;
+  const selectionMap =
+    state.chauffeurSelections &&
+    Object.keys(state.chauffeurSelections).length > 0
+      ? state.chauffeurSelections
+      : null;
+  const legacyDays = selectionMap
+    ? chauffeurDaysFromSelections(selectionMap)
+    : state.chauffeurDays ?? {};
+
+  for (const [cityId, dates] of Object.entries(legacyDays)) {
+    const valid = new Set(
+      chauffeurDaysForCity(state.arrivalDate, state.locations, cityId).map(
+        (d) => d.date
+      )
+    );
+    let activeCount = 0;
+    if (selectionMap?.[cityId]) {
+      for (const date of Object.keys(selectionMap[cityId])) {
+        if (!valid.has(date)) continue;
+        if (isBillableChauffeurDay(selectionMap[cityId][date])) activeCount++;
+      }
+    } else {
+      activeCount = dates.filter((d) => valid.has(d)).length;
+    }
+    if (activeCount === 0) continue;
+    const quote = priceFleetChauffeurDay({
+      cityId,
+      totalPax: guests,
+      vehicles: config.vehicles,
+      rates: config.chauffeurRates ?? [],
+    });
+    if (quote?.fromRates && quote.min > 0) {
+      min += quote.min * activeCount;
+      max += quote.max * activeCount;
+      chauffeurDayCount += activeCount;
+    } else if (veh.dailyCost > 0) {
+      min += veh.dailyCost * activeCount;
+      max += veh.dailyCost * 1.3 * activeCount;
+      chauffeurDayCount += activeCount;
+    }
+  }
+
+  // Legacy global chauffeur toggle (no granular days yet)
+  if (state.needDriver && chauffeurDayCount === 0) {
     const allowOnTravel = ruleBool(rules, "allow_tours_on_travel_days", false);
     const days = allowOnTravel
       ? state.durationDays
       : Math.max(1, state.durationDays - legs);
     min += veh.dailyCost * days;
-    max += veh.dailyCost * 1.2 * days;
+    max += veh.dailyCost * 1.3 * days;
   }
 
   return {
@@ -234,7 +335,7 @@ export function calculateBuilderQuote(
 export function formatUsd(n: number): string {
   return new Intl.NumberFormat("en-US", {
     style: "currency",
-    currency: "USD",
+    currency: "EUR",
     maximumFractionDigits: 0,
   }).format(n);
 }

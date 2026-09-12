@@ -25,7 +25,7 @@ const SECTIONS = [
   },
   {
     id: "hotels",
-    label: "Hotels & Guests",
+    label: "Hotels",
     href: "#section-hotels",
     number: 4,
   },
@@ -61,10 +61,10 @@ export function StickyProgressBar() {
   const nights = locations.reduce((n, l) => n + l.nights, 0);
 
   const checks = [
-    durationDays > 0,
+    durationDays > 0 && adults + children > 0,
     !!arrivalTransferId && !!departureTransferId,
     locations.length >= 1 && nights === durationDays,
-    adults + children > 0,
+    locations.some((l) => l.nights > 0 && (!l.visitType || l.visitType === "stay")),
     visitedTours,
   ];
 

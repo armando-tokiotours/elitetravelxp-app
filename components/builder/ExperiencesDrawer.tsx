@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import type { PbTour } from "@/lib/pocketbase/client";
@@ -11,9 +11,11 @@ import {
   tourPrice,
 } from "@/lib/pocketbase/client";
 import { formatUsd } from "@/lib/builder-pricing";
+import type { ChauffeurDayOption } from "@/lib/dateCascade";
+import type { SelectedTour } from "@/lib/selectedTours";
 import {
   cityTourCapacityHours,
-  selectedTourHours,
+  selectedTourRowsHours,
 } from "@/lib/tourValidator";
 
 export function ExperiencesDrawer({
@@ -22,26 +24,37 @@ export function ExperiencesDrawer({
   cityName,
   nights,
   tours,
-  selectedTourIds,
-  onToggleTour,
+  selectedTours,
+  dayOptions,
+  onAddTour,
+  onRemoveTour,
 }: {
   open: boolean;
   onClose: () => void;
   cityName: string;
   nights: number;
   tours: PbTour[];
-  selectedTourIds: string[];
-  onToggleTour: (tourId: string) => { ok: boolean; message?: string };
+  selectedTours: SelectedTour[];
+  dayOptions: ChauffeurDayOption[];
+  onAddTour: (
+    tour: PbTour,
+    scheduledDate: string
+  ) => { ok: boolean; message?: string };
+  onRemoveTour: (tourId: string) => void;
 }) {
   const [mounted, setMounted] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
+  const [pickingTourId, setPickingTourId] = useState<string | null>(null);
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      setPickingTourId(null);
+      return;
+    }
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     return () => {
@@ -56,7 +69,14 @@ export function ExperiencesDrawer({
   }, [toast]);
 
   const capacity = cityTourCapacityHours(nights);
-  const used = selectedTourHours(selectedTourIds, tours);
+  const used = selectedTourRowsHours(selectedTours);
+  const selectedById = useMemo(
+    () => Object.fromEntries(selectedTours.map((t) => [t.tourId, t])),
+    [selectedTours]
+  );
+  const pickingTour = pickingTourId
+    ? tours.find((t) => t.id === pickingTourId) ?? null
+    : null;
 
   if (!mounted) return null;
 
@@ -79,13 +99,13 @@ export function ExperiencesDrawer({
             onClick={onClose}
           />
           <motion.div
-            className="relative z-[1] flex h-[95vh] w-full max-w-lg flex-col overflow-hidden rounded-t-3xl bg-[#FBF8F2] shadow-2xl sm:h-[min(92vh,52rem)] sm:rounded-3xl"
+            className="relative z-[1] flex h-[90dvh] max-h-[90dvh] w-full max-w-lg flex-col overflow-hidden rounded-t-3xl bg-[#FBF8F2] shadow-2xl sm:h-[min(90dvh,52rem)] sm:max-h-[min(90dvh,52rem)] sm:rounded-3xl"
             initial={{ y: "100%" }}
             animate={{ y: 0 }}
             exit={{ y: "100%" }}
             transition={{ type: "spring", damping: 28, stiffness: 320 }}
           >
-            <div className="flex shrink-0 items-start justify-between gap-3 border-b border-[#EEE8DF] bg-white px-5 pb-4 pt-5">
+            <div className="sticky top-0 z-20 flex shrink-0 items-start justify-between gap-3 border-b border-[#EEE8DF] bg-white px-4 pb-4 pt-6 sm:px-5">
               <div className="min-w-0">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#C4A35A]">
                   Experiences
@@ -116,28 +136,117 @@ export function ExperiencesDrawer({
               </div>
             ) : null}
 
-            <div className="flex-1 space-y-5 overflow-y-auto px-4 py-4 pb-28">
+            <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-4 py-4 pb-[max(7rem,env(safe-area-inset-bottom))]">
               {tours.length === 0 ? (
                 <p className="py-12 text-center text-sm text-[#8A8278]">
                   No experiences listed for {cityName} yet. Add tours in Team
                   Access.
                 </p>
               ) : (
-                tours.map((tour) => (
-                  <TourMediaCard
-                    key={tour.id}
-                    tour={tour}
-                    selected={selectedTourIds.includes(tour.id)}
-                    onAdd={() => {
-                      const result = onToggleTour(tour.id);
-                      if (!result.ok && result.message) {
-                        setToast(result.message);
+                tours.map((tour) => {
+                  const booked = selectedById[tour.id];
+                  return (
+                    <TourMediaCard
+                      key={tour.id}
+                      tour={tour}
+                      scheduledLabel={
+                        booked?.scheduledDate
+                          ? dayOptions.find(
+                              (d) => d.date === booked.scheduledDate
+                            )?.label ?? booked.scheduledDate
+                          : null
                       }
-                    }}
-                  />
-                ))
+                      selected={Boolean(booked)}
+                      onAdd={() => {
+                        if (booked) {
+                          onRemoveTour(tour.id);
+                          return;
+                        }
+                        if (dayOptions.length === 0) {
+                          setToast(
+                            "Set your arrival date and city nights in Steps 1–3 before scheduling experiences."
+                          );
+                          return;
+                        }
+                        if (dayOptions.length === 1) {
+                          const result = onAddTour(tour, dayOptions[0].date);
+                          if (!result.ok && result.message) {
+                            setToast(result.message);
+                          }
+                          return;
+                        }
+                        setPickingTourId(tour.id);
+                      }}
+                    />
+                  );
+                })
               )}
             </div>
+
+            <AnimatePresence>
+              {pickingTour ? (
+                <motion.div
+                  className="absolute inset-0 z-30 flex items-end bg-black/40"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                >
+                  <button
+                    type="button"
+                    className="absolute inset-0"
+                    aria-label="Cancel day selection"
+                    onClick={() => setPickingTourId(null)}
+                  />
+                  <motion.div
+                    className="relative w-full rounded-t-3xl bg-white px-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-4 shadow-2xl"
+                    initial={{ y: "100%" }}
+                    animate={{ y: 0 }}
+                    exit={{ y: "100%" }}
+                    transition={{ type: "spring", damping: 28, stiffness: 320 }}
+                  >
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#C4A35A]">
+                      Schedule experience
+                    </p>
+                    <h4 className="mt-1 font-display text-xl text-[#0B1F3A]">
+                      {pickingTour.title}
+                    </h4>
+                    <p className="mt-1 text-sm text-[#8A8278]">
+                      Which day in {cityName} should this run?
+                    </p>
+                    <ul className="mt-4 max-h-[40dvh] space-y-2 overflow-y-auto">
+                      {dayOptions.map((day) => (
+                        <li key={day.date}>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const result = onAddTour(pickingTour, day.date);
+                              if (!result.ok && result.message) {
+                                setToast(result.message);
+                                return;
+                              }
+                              setPickingTourId(null);
+                            }}
+                            className="flex w-full items-center justify-between rounded-2xl border border-[#EEE8DF] bg-[#FBF8F2] px-4 py-3 text-left transition hover:border-[#C4A35A]/70 hover:bg-white"
+                          >
+                            <span className="text-sm font-medium text-[#0B1F3A]">
+                              {day.label}
+                            </span>
+                            <span className="text-xs text-[#C4A35A]">Select</span>
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                    <button
+                      type="button"
+                      onClick={() => setPickingTourId(null)}
+                      className="mt-3 w-full rounded-full border border-[#D9D2C7] py-2.5 text-sm text-[#5C6570]"
+                    >
+                      Cancel
+                    </button>
+                  </motion.div>
+                </motion.div>
+              ) : null}
+            </AnimatePresence>
           </motion.div>
         </div>
       ) : null}
@@ -149,10 +258,12 @@ export function ExperiencesDrawer({
 function TourMediaCard({
   tour,
   selected,
+  scheduledLabel,
   onAdd,
 }: {
   tour: PbTour;
   selected: boolean;
+  scheduledLabel: string | null;
   onAdd: () => void;
 }) {
   const mediaType = tourMediaType(tour);
@@ -165,16 +276,18 @@ function TourMediaCard({
 
   return (
     <article className="overflow-hidden rounded-2xl border border-[#EEE8DF] bg-white shadow-[0_4px_20px_rgba(11,31,58,0.06)]">
-      <div className="relative aspect-[4/5] max-h-[60vh] w-full bg-[#0B1F3A]">
+      <div className="relative aspect-[4/5] max-h-[50dvh] w-full bg-[#0B1F3A]">
         {mediaUrl && mediaType === "Video" ? (
           <video
-            className="h-full w-full object-cover"
+            key={mediaUrl}
             src={mediaUrl}
             autoPlay
             muted
             loop
             playsInline
-            preload="metadata"
+            disablePictureInPicture
+            preload="auto"
+            className="h-full w-full object-cover"
           />
         ) : mediaUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
@@ -212,6 +325,11 @@ function TourMediaCard({
             {tour.description}
           </p>
         ) : null}
+        {selected && scheduledLabel ? (
+          <p className="mt-2 text-xs font-medium text-[#C4A35A]">
+            Scheduled · {scheduledLabel}
+          </p>
+        ) : null}
         <button
           type="button"
           onClick={onAdd}
@@ -221,7 +339,7 @@ function TourMediaCard({
               : "bg-[#0B1F3A] text-white hover:bg-[#143052]"
           }`}
         >
-          {selected ? "✓ Added to itinerary" : "+ Add to Itinerary"}
+          {selected ? "✓ Remove from itinerary" : "+ Add to Itinerary"}
         </button>
       </div>
     </article>

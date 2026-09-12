@@ -166,26 +166,49 @@ export function ChoicePill({
   onClick,
   children,
   className = "",
+  size = "default",
 }: {
   active: boolean;
   onClick: () => void;
   children: ReactNode;
   className?: string;
+  /** sm ≈15% smaller; xs for dense 2-col Yes/No rows */
+  size?: "default" | "sm" | "xs";
 }) {
+  const sizing =
+    size === "xs"
+      ? active
+        ? "min-h-[2rem] gap-1 px-3 py-1.5 pr-7 text-xs"
+        : "min-h-[2rem] gap-1 px-3 py-1.5 text-xs"
+      : size === "sm"
+        ? active
+          ? "min-h-[2.35rem] gap-1.5 px-5 py-2 pr-9 text-[0.8125rem]"
+          : "min-h-[2.35rem] gap-1.5 px-5 py-2 text-[0.8125rem]"
+        : active
+          ? "min-h-[2.75rem] gap-2 px-6 py-2.5 pr-11 text-sm"
+          : "min-h-[2.75rem] gap-2 px-6 py-2.5 text-sm";
+  const checkSize =
+    size === "xs"
+      ? "h-4 w-4 text-[0.55rem]"
+      : size === "sm"
+        ? "h-5 w-5 text-[0.6rem]"
+        : "h-6 w-6 text-[0.7rem]";
+  const checkRight = size === "xs" ? "right-1.5" : "right-2";
+
   return (
     <button
       type="button"
       onClick={onClick}
-      className={`relative inline-flex min-h-[2.75rem] items-center justify-center gap-2 rounded-full px-6 py-2.5 text-sm font-semibold tracking-wide transition ${
+      className={`relative inline-flex items-center justify-center rounded-full font-semibold tracking-wide transition ${sizing} ${
         active
-          ? "bg-[#0B1F3A] text-white shadow-md pr-11"
+          ? "bg-[#0B1F3A] text-white shadow-md"
           : "border border-[#D4C9B5] bg-[#FBF8F2] text-[#0B1F3A] hover:border-[#C4A35A]"
       } ${className}`}
     >
       {children}
       {active ? (
         <span
-          className="absolute right-2 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-full text-[0.7rem] font-bold text-white"
+          className={`absolute ${checkRight} top-1/2 flex -translate-y-1/2 items-center justify-center rounded-full font-bold text-white ${checkSize}`}
           style={{ background: GOLD }}
           aria-hidden
         >
@@ -201,18 +224,28 @@ export function PillToggle({
   onChange,
   yesLabel = "Yes",
   noLabel = "No",
+  size = "default",
 }: {
   value: boolean;
   onChange: (v: boolean) => void;
   yesLabel?: string;
   noLabel?: string;
+  size?: "default" | "sm" | "xs";
 }) {
   return (
-    <div className="inline-flex gap-2">
-      <ChoicePill active={value} onClick={() => onChange(true)}>
+    <div className={`inline-flex ${size === "default" ? "gap-2" : "gap-1.5"}`}>
+      <ChoicePill
+        active={value}
+        onClick={() => onChange(true)}
+        size={size}
+      >
         {yesLabel}
       </ChoicePill>
-      <ChoicePill active={!value} onClick={() => onChange(false)}>
+      <ChoicePill
+        active={!value}
+        onClick={() => onChange(false)}
+        size={size}
+      >
         {noLabel}
       </ChoicePill>
     </div>

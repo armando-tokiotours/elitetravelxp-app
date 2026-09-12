@@ -1,4 +1,4 @@
-import PocketBase from "pocketbase";
+import PocketBase, { BaseAuthStore } from "pocketbase";
 
 export function getPbBaseUrl(): string {
   // Prefer explicit env (set in .env.local for local, Docker build args for VPS).
@@ -42,6 +42,20 @@ export function createPocketBase(): PocketBase {
   return pb;
 }
 
+/** Isolated Team Access client — does not share localStorage with the public builder. */
+let teamClient: PocketBase | null = null;
+
+export function getTeamPocketBase(): PocketBase {
+  const url = getPbBaseUrl();
+  if (!teamClient || teamClient.baseUrl !== url) {
+    // Memory-only auth store; Zustand persists the superuser token.
+    // Avoids clobbering / being clobbered by the builder's `pocketbase_auth` key.
+    teamClient = new PocketBase(url, new BaseAuthStore());
+    teamClient.autoCancellation(false);
+  }
+  return teamClient;
+}
+
 export function pbFileUrl(
   collectionIdOrName: string,
   recordId: string,
@@ -59,7 +73,7 @@ export function cityPhoto(city: PbCity): string {
 }
 
 export function tourPhoto(tour: PbTour): string {
-  if (tour.media_type === "Video") {
+  if (tourMediaType(tour) === "Video") {
     return tour.cover_photo || tour.image || "";
   }
   return tour.media_file || tour.cover_photo || tour.image || "";
@@ -70,11 +84,11 @@ export function tourMediaFile(tour: PbTour): string {
 }
 
 export function tourMediaType(tour: PbTour): "Image" | "Video" {
+  const file = tourMediaFile(tour);
+  // Always trust video file extensions (legacy rows often leave media_type blank)
+  if (/\.(mp4|webm|mov|m4v)(\?|$)/i.test(file)) return "Video";
   if (tour.media_type === "Video") return "Video";
   if (tour.media_type === "Image") return "Image";
-  // Infer from filename when media_type unset
-  const file = tourMediaFile(tour);
-  if (/\.(mp4|webm|mov)(\?|$)/i.test(file)) return "Video";
   return "Image";
 }
 
@@ -139,11 +153,53 @@ export interface PbVehicle {
   id: string;
   name: string;
   max_passengers: number;
+  /** Optional alias of max_passengers */
+  max_pax?: number;
   max_luggage?: number;
   price_per_day: number;
   vehicle_image?: string;
   /** @deprecated legacy */
   type?: string;
+}
+
+export function vehicleMaxPax(v: PbVehicle): number {
+  return Number(v.max_pax ?? v.max_passengers ?? 0);
+}
+
+export function vehicleLabel(v: PbVehicle): string {
+  return v.name || v.type || "Vehicle";
+}
+
+export interface PbAirportTransfer {
+  id: string;
+  hub_id: string;
+  vehicle_id: string;
+  /** Net pickup cost for this hub × vehicle (client adds 30% for max) */
+  base_pickup_fee?: number;
+  base_dropoff_fee?: number;
+  /** @deprecated migrated to base_* */
+  pickup_price_min?: number;
+  pickup_price_max?: number;
+  dropoff_price_min?: number;
+  dropoff_price_max?: number;
+  collectionId?: string;
+  expand?: {
+    hub_id?: PbHub;
+    vehicle_id?: PbVehicle;
+  };
+}
+
+export interface PbChauffeurRate {
+  id: string;
+  city_id: string;
+  vehicle_id: string;
+  /** Net full-day disposal rate (client adds 30% for max) */
+  base_daily_rate: number;
+  collectionId?: string;
+  expand?: {
+    city_id?: PbCity;
+    vehicle_id?: PbVehicle;
+  };
 }
 
 export interface PbTransfer {
@@ -184,6 +240,88 @@ export interface PbCityMovement {
     from_city_id?: PbCity;
     to_city_id?: PbCity;
   };
+}
+
+export type FeatureExplainerKey =
+  | "airport_pickup"
+  | "airport_dropoff"
+  | "elite_concierge"
+  | (string & {});
+
+export interface PbFeatureExplainer {
+  id: string;
+  feature_key: string;
+  title: string;
+  description?: string;
+  media_type?: "Video" | "Image";
+  media_file?: string;
+  /** Cover image for ExplainerTriggerButton */
+  thumbnail_image?: string;
+  collectionId?: string;
+}
+
+export function featureExplainerMediaType(
+  row: PbFeatureExplainer
+): "Video" | "Image" {
+  if (row.media_type === "Video") return "Video";
+  if (row.media_type === "Image") return "Image";
+  const file = row.media_file || "";
+  if (/\.(mp4|webm|mov|m4v)(\?|$)/i.test(file)) return "Video";
+  return "Image";
+}
+
+export function featureExplainerKeysToTry(featureKey: string): string[] {
+  if (
+    featureKey === "airport_transfers" ||
+    featureKey === "airport_transfers_combined"
+  ) {
+    return [
+      "airport_transfers",
+      "airport_transfers_combined",
+      "airport_pickup",
+    ];
+  }
+  return [featureKey];
+}
+
+export async function fetchFeatureExplainer(
+  featureKey: string
+): Promise<PbFeatureExplainer | null> {
+  const pb = getPocketBase();
+  try {
+    return await pb
+      .collection("feature_explainers")
+      .getFirstListItem<PbFeatureExplainer>(
+        pb.filter("feature_key = {:key}", { key: featureKey })
+      );
+  } catch {
+    return null;
+  }
+}
+
+/** Resolve explainer trying aliases (e.g. airport_transfers → airport_pickup). */
+export async function fetchFeatureExplainerResolved(
+  featureKey: string
+): Promise<PbFeatureExplainer | null> {
+  for (const key of featureExplainerKeysToTry(featureKey)) {
+    const row = await fetchFeatureExplainer(key);
+    if (row) return row;
+  }
+  return null;
+}
+
+export function featureExplainerThumbnailUrl(
+  row: PbFeatureExplainer | null | undefined
+): string {
+  if (!row) return "";
+  const file = row.thumbnail_image || "";
+  if (!file) return "";
+  return pbFileUrl(
+    String(row.collectionId ?? "feature_explainers"),
+    row.id,
+    file,
+    "800x400"
+  );
 }
 
 export function hubPickup(h: PbHub): number {
@@ -415,6 +553,8 @@ export interface BuilderConfig {
   tours: PbTour[];
   transitModes: PbTransitMode[];
   cityMovements: PbCityMovement[];
+  airportTransfers: PbAirportTransfer[];
+  chauffeurRates: PbChauffeurRate[];
   seasonalHighlights: PbSeasonalHighlight[];
   seasonTiers: PbSeasonTier[];
   branding: PbSiteBranding | null;
@@ -458,6 +598,8 @@ export async function fetchBuilderConfig(): Promise<BuilderConfig> {
     toursRaw,
     transitModes,
     cityMovements,
+    airportTransfers,
+    chauffeurRates,
     seasonalHighlightsRaw,
     seasonTiersRaw,
     brandingRows,
@@ -491,6 +633,14 @@ export async function fetchBuilderConfig(): Promise<BuilderConfig> {
         expand: "from_city_id,to_city_id",
       })
       .catch(() => [] as PbCityMovement[]),
+    pb
+      .collection("airport_transfers")
+      .getFullList<PbAirportTransfer>({ sort: "hub_id,vehicle_id" })
+      .catch(() => [] as PbAirportTransfer[]),
+    pb
+      .collection("chauffeur_rates")
+      .getFullList<PbChauffeurRate>({ sort: "city_id,vehicle_id" })
+      .catch(() => [] as PbChauffeurRate[]),
     pb
       .collection("seasonal_highlights")
       .getFullList<PbSeasonalHighlight>({ sort: "start_month,start_day" })
@@ -542,6 +692,8 @@ export async function fetchBuilderConfig(): Promise<BuilderConfig> {
     tours,
     transitModes,
     cityMovements,
+    airportTransfers,
+    chauffeurRates,
     seasonalHighlights,
     seasonTiers,
     branding: brandingRows[0] ?? null,

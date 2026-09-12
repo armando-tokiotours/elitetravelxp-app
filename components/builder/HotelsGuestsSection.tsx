@@ -8,7 +8,6 @@ import {
   type HotelRoomType,
   type HotelStarRating,
 } from "@/store/useBuilderStore";
-import { BuilderPortalSheet } from "./BuilderPortalSheet";
 import { FieldLabel, SectionBlock } from "./ui";
 import { SectionContinue } from "./SectionContinue";
 
@@ -160,12 +159,8 @@ export function HotelsGuestsSection({
   const children = useBuilderStore((s) => s.children);
   const arrivalDate = useBuilderStore((s) => s.arrivalDate);
   const activeSeasonTier = useBuilderStore((s) => s.activeSeasonTier);
-  const setAdults = useBuilderStore((s) => s.setAdults);
-  const setChildren = useBuilderStore((s) => s.setChildren);
   const setCityHotel = useBuilderStore((s) => s.setCityHotel);
   const ensureCityHotels = useBuilderStore((s) => s.ensureCityHotels);
-
-  const [guestOpen, setGuestOpen] = useState(false);
 
   const orderedCityIds = useMemo(() => {
     const seen = new Set<string>();
@@ -203,52 +198,39 @@ export function HotelsGuestsSection({
   return (
     <SectionBlock
       number={4}
-      title="Hotels & Guests"
+      title="Hotels"
       id="section-hotels"
       icon="hotel"
       summary={summary}
     >
       <div className="flex flex-col gap-5">
-        <div>
-          <FieldLabel>Number of guests</FieldLabel>
-          <button
-            type="button"
-            onClick={() => setGuestOpen(true)}
-            className="flex w-full items-center justify-between rounded-xl border border-[#D9D2C7] bg-white px-4 py-3 text-left text-sm text-[#0B1F3A]"
-          >
-            <span>
-              {totalGuests} guest{totalGuests === 1 ? "" : "s"}
-              <span className="text-[#8A8278]">
-                {" "}
-                · {adults} adults, {children} children
-              </span>
-            </span>
-            <span className="text-[#C4A35A]">Edit</span>
-          </button>
-          <p className="mt-1.5 text-xs text-[#A39A8E]">
-            Applies to every city. Guidance: max {maxAdultsPerRoom} adults per
-            room.
-            {monthName ? (
-              <>
-                {" "}
-                Rates use{" "}
-                <span className="font-medium text-[#0B1F3A]">{monthName}</span>
-                {activeSeasonTier ? (
-                  <>
-                    {" "}
-                    ·{" "}
-                    <span className="font-medium text-[#0B1F3A]">
-                      {activeSeasonTier} season
-                    </span>
-                  </>
-                ) : null}{" "}
-                from your arrival date.
-              </>
-            ) : (
-              <> Set an arrival date in Step 1 for month-accurate rates.</>
-            )}
-          </p>
-        </div>
+        <p className="text-xs text-[#A39A8E]">
+          Party size from Step 1:{" "}
+          <span className="font-medium text-[#0B1F3A]">
+            {totalGuests} guest{totalGuests === 1 ? "" : "s"}
+          </span>{" "}
+          ({adults} adults, {children} children). Guidance: max{" "}
+          {maxAdultsPerRoom} adults per room.
+          {monthName ? (
+            <>
+              {" "}
+              Rates use{" "}
+              <span className="font-medium text-[#0B1F3A]">{monthName}</span>
+              {activeSeasonTier ? (
+                <>
+                  {" "}
+                  ·{" "}
+                  <span className="font-medium text-[#0B1F3A]">
+                    {activeSeasonTier} season
+                  </span>
+                </>
+              ) : null}{" "}
+              from your arrival date.
+            </>
+          ) : (
+            <> Set an arrival date in Step 1 for month-accurate rates.</>
+          )}
+        </p>
 
         {orderedCityIds.length === 0 ? (
           <p className="rounded-xl border border-dashed border-[#D9D2C7] bg-[#FBF8F2] p-4 text-sm text-[#8A8278]">
@@ -274,20 +256,6 @@ export function HotelsGuestsSection({
           </div>
         )}
       </div>
-
-      <BuilderPortalSheet
-        open={guestOpen}
-        onClose={() => setGuestOpen(false)}
-        title="Guests"
-      >
-        <GuestRow label="Adults" value={adults} onChange={setAdults} min={0} />
-        <GuestRow
-          label="Children"
-          value={children}
-          onChange={setChildren}
-          min={0}
-        />
-      </BuilderPortalSheet>
 
       <SectionContinue next={5} label="Continue to Tours" />
     </SectionBlock>
@@ -559,40 +527,5 @@ function BanIcon() {
         strokeLinecap="round"
       />
     </svg>
-  );
-}
-
-function GuestRow({
-  label,
-  value,
-  onChange,
-  min,
-}: {
-  label: string;
-  value: number;
-  onChange: (n: number) => void;
-  min: number;
-}) {
-  return (
-    <div className="flex items-center justify-between border-b border-[#EEE8DF] py-4">
-      <span className="text-[#0B1F3A]">{label}</span>
-      <div className="flex items-center gap-3">
-        <button
-          type="button"
-          onClick={() => onChange(Math.max(min, value - 1))}
-          className="flex h-9 w-9 items-center justify-center rounded-full border border-[#D9D2C7]"
-        >
-          −
-        </button>
-        <span className="w-6 text-center font-semibold">{value}</span>
-        <button
-          type="button"
-          onClick={() => onChange(value + 1)}
-          className="flex h-9 w-9 items-center justify-center rounded-full border border-[#D9D2C7]"
-        >
-          +
-        </button>
-      </div>
-    </div>
   );
 }

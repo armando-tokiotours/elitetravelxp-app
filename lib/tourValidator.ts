@@ -25,6 +25,14 @@ export function selectedTourHours(
   return tourIds.reduce((sum, id) => sum + tourDurationHours(byId[id]), 0);
 }
 
+/** Sum hours from date-bound SelectedTour rows (preferred). */
+export function selectedTourRowsHours(
+  rows: { duration_hours?: number }[] | undefined | null
+): number {
+  if (!rows?.length) return 0;
+  return rows.reduce((sum, t) => sum + tourDurationHours({ id: "", ...t }), 0);
+}
+
 export interface TourCapacityCheck {
   ok: boolean;
   capacityHours: number;
@@ -43,10 +51,17 @@ export function canAddTourToCity(opts: {
   selectedTourIds: string[];
   tourId: string;
   tours: TourHoursLike[];
+  /** When provided, used for hour totals instead of selectedTourIds lookup */
+  selectedRows?: { duration_hours?: number; tourId?: string }[];
 }): TourCapacityCheck {
   const capacityHours = cityTourCapacityHours(opts.nights);
-  const already = opts.selectedTourIds.includes(opts.tourId);
-  const usedHours = selectedTourHours(opts.selectedTourIds, opts.tours);
+  const already = opts.selectedRows
+    ? opts.selectedRows.some((r) => r.tourId === opts.tourId)
+    : opts.selectedTourIds.includes(opts.tourId);
+
+  const usedHours = opts.selectedRows
+    ? selectedTourRowsHours(opts.selectedRows)
+    : selectedTourHours(opts.selectedTourIds, opts.tours);
 
   if (already) {
     return {

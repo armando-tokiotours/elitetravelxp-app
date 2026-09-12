@@ -143,7 +143,11 @@ export function BuilderApp() {
                       <TripDurationSection
                         seasonTiers={config.seasonTiers}
                       />
-                      <ArrivalDepartureSection hubs={config.hubs} />
+                      <ArrivalDepartureSection
+                        hubs={config.hubs}
+                        vehicles={config.vehicles}
+                        airportTransfers={config.airportTransfers}
+                      />
                     <LocationsNightsSection
                       cities={config.cities}
                       hubs={config.hubs}
@@ -168,6 +172,8 @@ export function BuilderApp() {
                           false
                         )}
                         seasonalHighlights={config.seasonalHighlights}
+                        vehicles={config.vehicles}
+                        chauffeurRates={config.chauffeurRates}
                       />
                     </div>
                   </BuilderAccordionProvider>

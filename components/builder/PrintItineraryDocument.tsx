@@ -5,12 +5,12 @@ import Link from "next/link";
 import {
   fetchBuilderConfig,
   transferLocation,
-  tourPrice,
   type BuilderConfig,
   type PbHub,
   type PbTransfer,
 } from "@/lib/pocketbase/client";
 import { calculateBuilderQuote, formatUsd } from "@/lib/builder-pricing";
+import { countBillableChauffeurDays } from "@/lib/chauffeurSelections";
 import { calculateCityDateRanges } from "@/lib/dateCascade";
 import {
   formatDisplayDate,
@@ -184,7 +184,11 @@ export function PrintItineraryDocument() {
             />
             <Line
               label="Private chauffeur"
-              value={state.needDriver ? "Requested" : "Not requested"}
+              value={(() => {
+                const n = countBillableChauffeurDays(state.chauffeurSelections);
+                if (n > 0) return `${n} day(s)`;
+                return state.needDriver ? "Requested" : "Not requested";
+              })()}
             />
           </Block>
         </section>
@@ -255,27 +259,82 @@ export function PrintItineraryDocument() {
             <p className="mt-2 text-sm text-[#8A8278]">No tours selected yet.</p>
           ) : (
             <ul className="mt-3 space-y-2">
-              {state.selectedTourIds.map((id) => {
-                const tour = config?.tours.find((t) => t.id === id);
-                return (
-                  <li
-                    key={id}
-                    className="flex justify-between border-b border-[#EEE8DF] py-2 text-sm"
-                  >
-                    <span>
-                      {tour?.title ?? id}
-                      {tour ? (
+              {Object.entries(state.selectedTours ?? {}).flatMap(
+                ([cityId, rows]) =>
+                  rows.map((row) => (
+                    <li
+                      key={`${cityId}-${row.tourId}-${row.scheduledDate}`}
+                      className="flex justify-between border-b border-[#EEE8DF] py-2 text-sm"
+                    >
+                      <span>
+                        {row.title}
                         <span className="mt-0.5 block text-xs text-[#8A8278]">
-                          {cityName(tour.city_id)}
+                          {cityName(cityId)}
+                          {row.scheduledDate
+                            ? ` · ${row.scheduledDate}`
+                            : ""}
+                          {row.duration_hours
+                            ? ` · ${row.duration_hours}h`
+                            : ""}
                         </span>
-                      ) : null}
-                    </span>
-                    <span className="text-[#0B1F3A]">
-                      {tour ? formatUsd(tourPrice(tour)) : "—"}
-                    </span>
-                  </li>
-                );
-              })}
+                      </span>
+                      <span className="text-[#0B1F3A]">
+                        {row.price > 0 ? formatUsd(row.price) : "—"}
+                      </span>
+                    </li>
+                  ))
+              )}
+            </ul>
+          )}
+        </section>
+
+        <section className="mt-6">
+          <h3 className="font-display text-2xl text-[#0B1F3A]">
+            Private chauffeur
+          </h3>
+          {countBillableChauffeurDays(state.chauffeurSelections) === 0 ? (
+            <p className="mt-2 text-sm text-[#8A8278]">
+              No chauffeur days selected.
+            </p>
+          ) : (
+            <ul className="mt-3 space-y-2">
+              {Object.entries(state.chauffeurSelections ?? {}).flatMap(
+                ([cityId, byDate]) =>
+                  Object.entries(byDate)
+                    .filter(([, sel]) =>
+                      sel.mode === "full_day" ||
+                      (sel.mode === "by_tour" &&
+                        (sel.selectedTourIds?.length ?? 0) > 0)
+                    )
+                    .map(([date, sel]) => {
+                      const tourTitles =
+                        sel.mode === "by_tour"
+                          ? (sel.selectedTourIds ?? [])
+                              .map(
+                                (id) =>
+                                  config?.tours.find((t) => t.id === id)
+                                    ?.title ?? id
+                              )
+                              .join(", ")
+                          : null;
+                      return (
+                        <li
+                          key={`${cityId}-${date}`}
+                          className="border-b border-[#EEE8DF] py-2 text-sm"
+                        >
+                          <span className="font-medium text-[#0B1F3A]">
+                            {cityName(cityId)}
+                          </span>
+                          <span className="text-[#8A8278]"> · {date}</span>
+                          <span className="mt-0.5 block text-xs text-[#8A8278]">
+                            {sel.mode === "full_day"
+                              ? "Full day disposal"
+                              : `By tour: ${tourTitles || "—"}`}
+                          </span>
+                        </li>
+                      );
+                    })
+              )}
             </ul>
           )}
         </section>
