@@ -23,10 +23,9 @@ import { formatUsd } from "@/lib/builder-pricing";
 import type { SelectedTour } from "@/lib/selectedTours";
 import { toursOnDate } from "@/lib/selectedTours";
 import {
-  canAddTourToCity,
-  cityTourCapacityHours,
-  selectedTourRowsHours,
-  TOUR_HOURS_PER_NIGHT,
+  canAddTourOnDate,
+  MAX_TOUR_HOURS_PER_DAY,
+  TOUR_DAY_PACKED_MESSAGE,
 } from "@/lib/tourValidator";
 import {
   matchSeasonalHighlights,
@@ -198,7 +197,7 @@ export function ToursDriverSection({
 
       {!isEliteConcierge ? (
         <div className="mb-5 rounded-xl bg-[#F7F3EC] px-4 py-3 text-sm text-[#5C6570]">
-          About {TOUR_HOURS_PER_NIGHT}h of experiences recommended per night.{" "}
+          Maximum {MAX_TOUR_HOURS_PER_DAY} hours of activities allowed per day.{" "}
           {allowToursOnTravelDays
             ? `~${tourableDays} day${tourableDays === 1 ? "" : "s"} available.`
             : `~${tourableDays} available day${tourableDays === 1 ? "" : "s"} after ${travelDays} travel day${travelDays === 1 ? "" : "s"}.`}
@@ -226,18 +225,8 @@ export function ToursDriverSection({
                   if (!selectedTourIds.includes(id)) toggleTour(id);
                   return;
                 }
-                const nights = nightsByCity.get(m.cityId) ?? 0;
                 const cityRows = selectedToursMap[m.cityId] ?? [];
                 const citySelected = selectedToursByCity[m.cityId] ?? [];
-                const check = canAddTourToCity({
-                  cityName: cityNames[m.cityId] ?? "this city",
-                  nights,
-                  selectedTourIds: citySelected,
-                  selectedRows: cityRows,
-                  tourId: id,
-                  tours,
-                });
-                if (!check.ok) return;
                 const tour = tours.find((t) => t.id === id);
                 if (!tour) return;
                 const days = chauffeurDaysForCity(
@@ -247,6 +236,13 @@ export function ToursDriverSection({
                 );
                 const date = days[0]?.date;
                 if (!date) return;
+                const check = canAddTourOnDate({
+                  selectedRows: cityRows,
+                  scheduledDate: date,
+                  newTourDurationHours: Number(tour.duration_hours) || 0,
+                  tourId: id,
+                });
+                if (!check.ok) return;
                 if (!citySelected.includes(id)) {
                   addCityTour(m.cityId, {
                     tourId: tour.id,
@@ -283,9 +279,6 @@ export function ToursDriverSection({
               const driverDayCount = Object.values(citySelections).filter(
                 (sel) => isBillableChauffeurDay(sel)
               ).length;
-              const nights = nightsByCity.get(stop.cityId) ?? stop.nights;
-              const used = selectedTourRowsHours(cityRows);
-              const capacity = cityTourCapacityHours(nights);
               const dayOptions = chauffeurDaysForCity(
                 arrivalDate,
                 locations,
@@ -318,8 +311,6 @@ export function ToursDriverSection({
                   driverDayCount={driverDayCount}
                   selectedTours={cityRows}
                   dayOptions={dayOptions}
-                  usedHours={used}
-                  capacityHours={capacity}
                   onRemoveTour={(tourId) =>
                     removeCityTour(stop.cityId, tourId)
                   }
@@ -370,28 +361,27 @@ export function ToursDriverSection({
           if (!drawerCityId) return { ok: false };
           const cityRows = selectedToursMap[drawerCityId] ?? [];
           const citySelected = selectedToursByCity[drawerCityId] ?? [];
-          const check = canAddTourToCity({
-            cityName:
-              cityNames[drawerCityId] ??
-              cityMap[drawerCityId]?.name ??
-              "this city",
-            nights: drawerCityNights,
-            selectedTourIds: citySelected,
+          const duration_hours = Number(tour.duration_hours) || 0;
+          const check = canAddTourOnDate({
             selectedRows: cityRows,
+            scheduledDate,
+            newTourDurationHours: duration_hours,
             tourId: tour.id,
-            tours,
           });
           if (!check.ok) {
-            return { ok: false, message: check.message };
+            return { ok: false, message: check.message ?? TOUR_DAY_PACKED_MESSAGE };
           }
           const ok = addCityTour(drawerCityId, {
             tourId: tour.id,
             title: tour.title,
-            duration_hours: Number(tour.duration_hours) || 0,
+            duration_hours,
             scheduledDate,
             price: tourPrice(tour),
           });
-          return { ok };
+          return {
+            ok,
+            message: ok ? undefined : TOUR_DAY_PACKED_MESSAGE,
+          };
         }}
       />
     </SectionBlock>
@@ -407,8 +397,6 @@ function Step5CityAccordion({
   driverDayCount,
   selectedTours,
   dayOptions,
-  usedHours,
-  capacityHours,
   onRemoveTour,
   onBrowse,
   dailyRateLabel,
@@ -427,8 +415,6 @@ function Step5CityAccordion({
   driverDayCount: number;
   selectedTours: SelectedTour[];
   dayOptions: ReturnType<typeof chauffeurDaysForCity>;
-  usedHours: number;
-  capacityHours: number;
   onRemoveTour: (tourId: string) => void;
   onBrowse: () => void;
   dailyRateLabel: string | null;
@@ -501,7 +487,7 @@ function Step5CityAccordion({
                 Experiences
               </h4>
               <p className="text-[11px] text-[#A39A8E]">
-                {usedHours}/{capacityHours}h
+                Max {MAX_TOUR_HOURS_PER_DAY}h of activities per day
               </p>
             </div>
 

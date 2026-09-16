@@ -6,6 +6,7 @@ import { useEffect, useState, type ReactNode } from "react";
 
 const LINKS = [
   { href: "/builder", label: "Home / Builder" },
+  { href: "/discover", label: "Discover Experiences" },
   { href: "/builder/itinerary", label: "My Saved Itineraries" },
   { href: "/team-access", label: "Team Access (Admin)" },
 ] as const;

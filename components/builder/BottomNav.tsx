@@ -5,9 +5,10 @@ import { usePathname } from "next/navigation";
 
 const TABS = [
   { href: "/builder", label: "Builder", icon: BuilderIcon },
-  { href: "/builder/itinerary", label: "My Itinerary", icon: ItineraryIcon },
-  { href: "/builder/preview", label: "Preview Trip", icon: PreviewIcon },
-  { href: "/builder/export", label: "Save / Export", icon: ExportIcon },
+  { href: "/discover", label: "Discover", icon: DiscoverIcon },
+  { href: "/builder/itinerary", label: "Itinerary", icon: ItineraryIcon },
+  { href: "/builder/preview", label: "Preview", icon: PreviewIcon },
+  { href: "/builder/export", label: "Export", icon: ExportIcon },
 ] as const;
 
 export function BottomNav() {
@@ -15,7 +16,7 @@ export function BottomNav() {
 
   return (
     <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-[#E8E2D9] bg-[#FBF8F2]/95 backdrop-blur-md md:hidden">
-      <ul className="mx-auto flex max-w-lg items-stretch justify-around px-1 pb-[env(safe-area-inset-bottom)]">
+      <ul className="mx-auto flex max-w-lg items-stretch justify-around px-0.5 pb-[env(safe-area-inset-bottom)]">
         {TABS.map((tab) => {
           const active =
             tab.href === "/builder"
@@ -26,7 +27,7 @@ export function BottomNav() {
             <li key={tab.href} className="flex-1">
               <Link
                 href={tab.href}
-                className={`flex flex-col items-center gap-0.5 px-1 py-2.5 text-[0.65rem] ${
+                className={`flex flex-col items-center gap-0.5 px-0.5 py-2.5 text-[0.6rem] ${
                   active ? "text-[#0B1F3A]" : "text-[#9A9288]"
                 }`}
               >
@@ -51,6 +52,21 @@ function BuilderIcon({ active }: { active: boolean }) {
         stroke={active ? "#C4A35A" : "#9A9288"}
         strokeWidth="1.8"
         strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+function DiscoverIcon({ active }: { active: boolean }) {
+  const stroke = active ? "#C4A35A" : "#9A9288";
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+      <circle cx="12" cy="12" r="9" stroke={stroke} strokeWidth="1.8" />
+      <path
+        d="M14.5 9.5l-1.2 4.3-4.3 1.2 1.2-4.3 4.3-1.2z"
+        stroke={stroke}
+        strokeWidth="1.6"
+        strokeLinejoin="round"
       />
     </svg>
   );

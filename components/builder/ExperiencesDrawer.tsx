@@ -14,9 +14,12 @@ import { formatUsd } from "@/lib/builder-pricing";
 import type { ChauffeurDayOption } from "@/lib/dateCascade";
 import type { SelectedTour } from "@/lib/selectedTours";
 import {
-  cityTourCapacityHours,
-  selectedTourRowsHours,
+  getAvailableHours,
+  MAX_TOUR_HOURS_PER_DAY,
+  TOUR_DAY_PACKED_MESSAGE,
+  tourDurationHours,
 } from "@/lib/tourValidator";
+import { ScheduleTourDaySheet } from "./ScheduleTourDaySheet";
 
 export function ExperiencesDrawer({
   open,
@@ -68,8 +71,6 @@ export function ExperiencesDrawer({
     return () => window.clearTimeout(t);
   }, [toast]);
 
-  const capacity = cityTourCapacityHours(nights);
-  const used = selectedTourRowsHours(selectedTours);
   const selectedById = useMemo(
     () => Object.fromEntries(selectedTours.map((t) => [t.tourId, t])),
     [selectedTours]
@@ -114,8 +115,8 @@ export function ExperiencesDrawer({
                   {cityName}
                 </h3>
                 <p className="mt-1 text-xs text-[#8A8278]">
-                  {nights} night{nights === 1 ? "" : "s"} · {used}h / {capacity}
-                  h recommended
+                  {nights} night{nights === 1 ? "" : "s"} · Max{" "}
+                  {MAX_TOUR_HOURS_PER_DAY}h of activities per day
                 </p>
               </div>
               <button
@@ -169,7 +170,17 @@ export function ExperiencesDrawer({
                           return;
                         }
                         if (dayOptions.length === 1) {
-                          const result = onAddTour(tour, dayOptions[0].date);
+                          const day = dayOptions[0];
+                          const hours = tourDurationHours(tour);
+                          const available = getAvailableHours(
+                            selectedTours,
+                            day.date
+                          );
+                          if (hours > available) {
+                            setToast(TOUR_DAY_PACKED_MESSAGE);
+                            return;
+                          }
+                          const result = onAddTour(tour, day.date);
                           if (!result.ok && result.message) {
                             setToast(result.message);
                           }
@@ -183,70 +194,16 @@ export function ExperiencesDrawer({
               )}
             </div>
 
-            <AnimatePresence>
-              {pickingTour ? (
-                <motion.div
-                  className="absolute inset-0 z-30 flex items-end bg-black/40"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                >
-                  <button
-                    type="button"
-                    className="absolute inset-0"
-                    aria-label="Cancel day selection"
-                    onClick={() => setPickingTourId(null)}
-                  />
-                  <motion.div
-                    className="relative w-full rounded-t-3xl bg-white px-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-4 shadow-2xl"
-                    initial={{ y: "100%" }}
-                    animate={{ y: 0 }}
-                    exit={{ y: "100%" }}
-                    transition={{ type: "spring", damping: 28, stiffness: 320 }}
-                  >
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#C4A35A]">
-                      Schedule experience
-                    </p>
-                    <h4 className="mt-1 font-display text-xl text-[#0B1F3A]">
-                      {pickingTour.title}
-                    </h4>
-                    <p className="mt-1 text-sm text-[#8A8278]">
-                      Which day in {cityName} should this run?
-                    </p>
-                    <ul className="mt-4 max-h-[40dvh] space-y-2 overflow-y-auto">
-                      {dayOptions.map((day) => (
-                        <li key={day.date}>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const result = onAddTour(pickingTour, day.date);
-                              if (!result.ok && result.message) {
-                                setToast(result.message);
-                                return;
-                              }
-                              setPickingTourId(null);
-                            }}
-                            className="flex w-full items-center justify-between rounded-2xl border border-[#EEE8DF] bg-[#FBF8F2] px-4 py-3 text-left transition hover:border-[#C4A35A]/70 hover:bg-white"
-                          >
-                            <span className="text-sm font-medium text-[#0B1F3A]">
-                              {day.label}
-                            </span>
-                            <span className="text-xs text-[#C4A35A]">Select</span>
-                          </button>
-                        </li>
-                      ))}
-                    </ul>
-                    <button
-                      type="button"
-                      onClick={() => setPickingTourId(null)}
-                      className="mt-3 w-full rounded-full border border-[#D9D2C7] py-2.5 text-sm text-[#5C6570]"
-                    >
-                      Cancel
-                    </button>
-                  </motion.div>
-                </motion.div>
-              ) : null}
-            </AnimatePresence>
+            <ScheduleTourDaySheet
+              open={!!pickingTour}
+              tour={pickingTour}
+              cityName={cityName}
+              dayOptions={dayOptions}
+              selectedTours={selectedTours}
+              onClose={() => setPickingTourId(null)}
+              onSelectDay={(date) => onAddTour(pickingTour!, date)}
+              onToast={setToast}
+            />
           </motion.div>
         </div>
       ) : null}

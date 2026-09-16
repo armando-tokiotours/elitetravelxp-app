@@ -22,6 +22,7 @@ import {
   type SelectedTour,
   type SelectedToursByCity,
 } from "@/lib/selectedTours";
+import { canAddTourOnDate } from "@/lib/tourValidator";
 
 export type {
   ChauffeurSelections,
@@ -525,6 +526,14 @@ export const useBuilderStore = create<BuilderState & BuilderActions>()(
         if (!tour.scheduledDate) return false;
         const current = s.selectedTours[cityId] ?? [];
         const without = current.filter((t) => t.tourId !== tour.tourId);
+        const duration_hours = Number(tour.duration_hours) || 0;
+        const check = canAddTourOnDate({
+          selectedRows: without,
+          scheduledDate: tour.scheduledDate,
+          newTourDurationHours: duration_hours,
+          tourId: tour.tourId,
+        });
+        if (!check.ok) return false;
         const selectedTours = {
           ...s.selectedTours,
           [cityId]: [
@@ -532,9 +541,10 @@ export const useBuilderStore = create<BuilderState & BuilderActions>()(
             {
               tourId: tour.tourId,
               title: tour.title,
-              duration_hours: Number(tour.duration_hours) || 0,
+              duration_hours,
               scheduledDate: tour.scheduledDate,
               price: Number(tour.price) || 0,
+              ...(tour.customDuration ? { customDuration: true } : {}),
             },
           ],
         };

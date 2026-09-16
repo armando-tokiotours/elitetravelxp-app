@@ -116,6 +116,11 @@ export const COLLECTIONS: CollectionDef[] = [
         legacyKey: "price_per_person",
       },
       { key: "duration_hours", label: "Duration (hours)", type: "number" },
+      {
+        key: "is_customizable_duration",
+        label: "Tailor-made duration (guest can adjust hours)",
+        type: "bool",
+      },
       { key: "is_active", label: "Active", type: "bool" },
     ],
   },

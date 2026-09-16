@@ -343,6 +343,8 @@ export interface PbTour {
   base_price?: number;
   price_per_person?: number;
   duration_hours?: number;
+  /** Tailor-made: guest can override duration at booking time */
+  is_customizable_duration?: boolean;
   is_active?: boolean;
   collectionId?: string;
   /** @deprecated legacy */

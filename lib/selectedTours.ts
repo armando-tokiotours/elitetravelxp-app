@@ -3,10 +3,16 @@
 export interface SelectedTour {
   tourId: string;
   title: string;
+  /**
+   Effective duration on the itinerary. May differ from catalog when
+   `customDuration` is true (tailor-made experiences).
+   */
   duration_hours: number;
   /** YYYY-MM-DD the guest scheduled this experience */
   scheduledDate: string;
   price: number;
+  /** Guest-overridden duration (tailor-made); UI slider comes later */
+  customDuration?: boolean;
 }
 
 export type SelectedToursByCity = Record<string, SelectedTour[]>;
