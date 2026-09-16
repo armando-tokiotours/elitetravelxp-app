@@ -223,6 +223,7 @@ function TourMediaCard({
   scheduledLabel: string | null;
   onAdd: () => void;
 }) {
+  const [isExpanded, setIsExpanded] = useState(false);
   const mediaType = tourMediaType(tour);
   const filename = tourMediaFile(tour);
   const mediaUrl =
@@ -230,6 +231,16 @@ function TourMediaCard({
       ? pbFileUrl(tour.collectionId, tour.id, filename)
       : "";
   const hours = Number(tour.duration_hours) || 0;
+  const priceMin = tourPrice(tour);
+  const priceMax = priceMin > 0 ? Math.round(priceMin * 1.15) : 0;
+  const priceLabel =
+    priceMin > 0
+      ? priceMax > priceMin
+        ? `From ${formatUsd(priceMin)} – ${formatUsd(priceMax)}`
+        : `From ${formatUsd(priceMin)}`
+      : null;
+  const description = (tour.description ?? "").trim();
+  const showMoreToggle = description.length > 120;
 
   return (
     <article className="overflow-hidden rounded-2xl border border-[#EEE8DF] bg-white shadow-[0_4px_20px_rgba(11,31,58,0.06)]">
@@ -273,14 +284,31 @@ function TourMediaCard({
           <h4 className="font-display text-xl leading-snug text-[#0B1F3A]">
             {tour.title}
           </h4>
-          <span className="shrink-0 text-sm font-semibold text-[#0B1F3A]">
-            {formatUsd(tourPrice(tour))}
-          </span>
+          {priceLabel ? (
+            <span className="shrink-0 text-sm font-semibold text-[#0B1F3A]">
+              {priceLabel}
+            </span>
+          ) : null}
         </div>
-        {tour.description ? (
-          <p className="mt-2 line-clamp-3 text-sm leading-relaxed text-[#5C6570]">
-            {tour.description}
-          </p>
+        {description ? (
+          <div className="mt-2">
+            <p
+              className={`text-sm leading-relaxed text-[#5C6570] ${
+                isExpanded ? "" : "line-clamp-3"
+              }`}
+            >
+              {description}
+            </p>
+            {showMoreToggle ? (
+              <button
+                type="button"
+                onClick={() => setIsExpanded((v) => !v)}
+                className="mt-1 text-sm font-semibold text-[#0B1F3A] hover:text-[#C4A35A]"
+              >
+                {isExpanded ? "Less." : "More."}
+              </button>
+            ) : null}
+          </div>
         ) : null}
         {selected && scheduledLabel ? (
           <p className="mt-2 text-xs font-medium text-[#C4A35A]">

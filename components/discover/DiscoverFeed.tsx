@@ -145,10 +145,9 @@ export function DiscoverFeed() {
   };
 
   return (
-    <div className="relative min-h-[100dvh] bg-black text-white">
-      {/* Stories header */}
-      <header className="sticky top-0 z-40 border-b border-white/10 bg-black/90 backdrop-blur-md">
-        <div className="flex items-center justify-between px-4 pt-3">
+    <div className="builder-theme relative min-h-[100dvh] bg-[#0a0a0a] text-white">
+      <header className="sticky top-0 z-40 border-b border-white/10 bg-black/90 text-white backdrop-blur-md">
+        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 pt-3">
           <div>
             <p className="text-[0.6rem] font-semibold uppercase tracking-[0.28em] text-[#C4A35A]">
               Elite Travel
@@ -164,7 +163,7 @@ export function DiscoverFeed() {
         </div>
 
         <div
-          className="flex snap-x snap-mandatory gap-4 overflow-x-auto px-4 py-4 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          className="mx-auto flex max-w-6xl snap-x snap-mandatory gap-4 overflow-x-auto px-4 py-4 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
           role="tablist"
           aria-label="Cities"
         >
@@ -194,17 +193,16 @@ export function DiscoverFeed() {
         </div>
       ) : null}
 
-      {/* Reels feed */}
-      <div
-        className="h-[calc(100dvh-8.5rem)] snap-y snap-mandatory overflow-y-scroll pb-[4.5rem] md:pb-4"
+      <main
         key={selectedCityId ?? "none"}
+        className="mx-auto flex max-w-6xl flex-col overflow-y-auto px-0 pb-32 pt-2 md:grid md:grid-cols-2 md:gap-x-8 md:gap-y-0 md:px-4 lg:grid-cols-3 md:pb-12"
       >
         {loading ? (
-          <div className="flex h-full items-center justify-center text-sm text-white/50">
+          <p className="col-span-full py-16 text-center text-sm text-white/50">
             Loading experiences…
-          </div>
+          </p>
         ) : cityTours.length === 0 ? (
-          <div className="flex h-full flex-col items-center justify-center gap-2 px-8 text-center">
+          <div className="col-span-full flex flex-col items-center justify-center gap-2 py-16 text-center">
             <p className="font-display text-2xl text-white/90">{cityName}</p>
             <p className="text-sm text-white/50">
               No experiences published for this city yet.
@@ -214,16 +212,17 @@ export function DiscoverFeed() {
           cityTours.map((tour) => {
             const booked = selectedTours.some((t) => t.tourId === tour.id);
             return (
-              <TourReelCard
+              <DiscoverTourCard
                 key={tour.id}
                 tour={tour}
+                cityName={cityName}
                 booked={booked}
                 onAdd={() => handleAddClick(tour)}
               />
             );
           })
         )}
-      </div>
+      </main>
 
       <ScheduleTourDaySheet
         open={!!pickingTour}
@@ -233,9 +232,7 @@ export function DiscoverFeed() {
         selectedTours={selectedTours}
         onClose={() => setPickingTour(null)}
         onSelectDay={(date) =>
-          pickingTour
-            ? tryAddTour(pickingTour, date)
-            : { ok: false }
+          pickingTour ? tryAddTour(pickingTour, date) : { ok: false }
         }
         onToast={setToast}
       />
@@ -303,15 +300,18 @@ function CityStory({
   );
 }
 
-function TourReelCard({
+function DiscoverTourCard({
   tour,
+  cityName,
   booked,
   onAdd,
 }: {
   tour: PbTour;
+  cityName: string;
   booked: boolean;
   onAdd: () => void;
 }) {
+  const [isExpanded, setIsExpanded] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const mediaType = tourMediaType(tour);
   const filename = tourMediaFile(tour);
@@ -321,79 +321,128 @@ function TourReelCard({
       : "";
   const hours = tourDurationHours(tour);
   const price = tourPrice(tour);
+  const priceMin = price > 0 ? price : 0;
+  const priceMax = priceMin > 0 ? Math.round(priceMin * 1.15) : 0;
+  const description = (tour.description ?? "").trim();
+  const showMoreToggle = description.length > 90;
 
   useEffect(() => {
     const el = videoRef.current;
     if (!el) return;
     const io = new IntersectionObserver(
       ([entry]) => {
-        if (entry.isIntersecting && entry.intersectionRatio > 0.55) {
+        if (entry.isIntersecting && entry.intersectionRatio > 0.4) {
           void el.play().catch(() => {});
         } else {
           el.pause();
         }
       },
-      { threshold: [0.55] }
+      { threshold: [0.4] }
     );
     io.observe(el);
     return () => io.disconnect();
   }, [mediaUrl]);
 
+  const priceLabel =
+    priceMin > 0
+      ? priceMax > priceMin
+        ? `From ${formatUsd(priceMin)} – ${formatUsd(priceMax)}`
+        : `From ${formatUsd(priceMin)}`
+      : null;
+  const detailBits = [
+    hours > 0 ? `${hours} hours` : null,
+    priceLabel,
+  ].filter(Boolean);
+
   return (
-    <article className="relative h-full min-h-[calc(100dvh-8.5rem)] w-full snap-start snap-always overflow-hidden bg-[#0B1F3A]">
-      {mediaUrl && mediaType === "Video" ? (
-        <video
-          ref={videoRef}
-          key={mediaUrl}
-          src={mediaUrl}
-          autoPlay
-          muted
-          loop
-          playsInline
-          preload="metadata"
-          className="absolute inset-0 h-full w-full object-cover"
-        />
-      ) : mediaUrl ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={mediaUrl}
-          alt=""
-          className="absolute inset-0 h-full w-full object-cover"
-        />
-      ) : (
-        <div className="absolute inset-0 bg-gradient-to-br from-[#1a3355] to-[#0B1F3A]" />
-      )}
-
-      <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent" />
-
-      <div className="absolute inset-x-0 bottom-0 z-10 flex items-end justify-between gap-4 px-4 pb-6 pt-24">
-        <div className="min-w-0 flex-1">
-          <h2 className="font-display text-2xl font-bold leading-tight text-white drop-shadow sm:text-3xl">
+    <article className="mb-8 flex flex-col overflow-hidden rounded-t-2xl">
+      {/* White header */}
+      <div className="flex items-center justify-between gap-3 bg-white px-4 py-3 text-black">
+        <h2 className="min-w-0 truncate text-base leading-snug">
+          <span className="font-display text-xl font-black uppercase tracking-wide text-black sm:text-2xl">
+            {cityName},
+          </span>
+          <span className="ml-1.5 align-middle text-base font-normal text-gray-800">
             {tour.title}
-          </h2>
-          <p className="mt-2 text-sm font-medium text-white/90">
-            {hours > 0 ? `⏳ ${hours} hours` : null}
-            {hours > 0 && price > 0 ? " · " : null}
-            {price > 0 ? `🏷️ ${formatUsd(price)}` : null}
-          </p>
-          {tour.description ? (
-            <p className="mt-2 line-clamp-3 text-sm leading-relaxed text-white/75">
-              {tour.description}
-            </p>
-          ) : null}
-        </div>
+          </span>
+        </h2>
+        {hours > 0 ? (
+          <span className="shrink-0 text-sm font-medium text-gray-700">
+            {hours} hours
+          </span>
+        ) : null}
+      </div>
 
-        <button
-          type="button"
-          onClick={onAdd}
-          className={`pointer-events-auto shrink-0 rounded-full px-4 py-3 text-sm font-semibold shadow-lg transition ${
-            booked
-              ? "border border-[#C4A35A] bg-[#C4A35A]/20 text-[#E8D5A3]"
-              : "bg-[#C4A35A] text-[#0B1F3A] hover:bg-[#d4b56a]"
-          }`}
-        >
-          {booked ? "✓ Added" : "+ Add to Itinerary"}
-        </button>
+      {/* 1:1 media */}
+      <div className="relative aspect-square w-full bg-black">
+        {mediaUrl && mediaType === "Video" ? (
+          <video
+            ref={videoRef}
+            key={mediaUrl}
+            src={mediaUrl}
+            autoPlay
+            muted
+            loop
+            playsInline
+            preload="metadata"
+            className="absolute inset-0 h-full w-full object-cover"
+          />
+        ) : mediaUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={mediaUrl}
+            alt=""
+            className="absolute inset-0 h-full w-full object-cover"
+          />
+        ) : (
+          <div className="absolute inset-0 bg-gradient-to-br from-[#1a3355] to-[#0B1F3A]" />
+        )}
+      </div>
+
+      {/* Dark footer — merges with page */}
+      <div className="flex flex-col gap-1 bg-transparent px-4 py-3 text-white">
+        {detailBits.length > 0 ? (
+          <p className="text-xs text-gray-400">{detailBits.join(" · ")}</p>
+        ) : null}
+
+        <div className="flex items-start justify-between gap-4">
+          <div className="min-w-0 flex-1">
+            {description ? (
+              <>
+                <p
+                  className={`text-sm leading-relaxed text-white/90 ${
+                    isExpanded ? "" : "line-clamp-2"
+                  }`}
+                >
+                  {description}
+                </p>
+                {showMoreToggle ? (
+                  <button
+                    type="button"
+                    onClick={() => setIsExpanded((v) => !v)}
+                    className="mt-1 cursor-pointer text-sm text-gray-400 hover:text-white"
+                  >
+                    {isExpanded ? "Less." : "More."}
+                  </button>
+                ) : null}
+              </>
+            ) : (
+              <p className="text-sm text-gray-500">No description yet.</p>
+            )}
+          </div>
+
+          <button
+            type="button"
+            onClick={onAdd}
+            className={`shrink-0 rounded-full px-4 py-1.5 text-sm font-semibold transition ${
+              booked
+                ? "border border-[#C4A35A] bg-[#C4A35A]/15 text-[#E8D5A3]"
+                : "bg-[#0B1F3A] text-white hover:bg-[#143052]"
+            }`}
+          >
+            {booked ? "✓ Added" : "+ Add"}
+          </button>
+        </div>
       </div>
     </article>
   );
