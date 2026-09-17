@@ -3,16 +3,16 @@
 migrate((app) => {
   const tours = app.findCollectionByNameOrId("tours");
 
-  const has = (name) => {
+  // getByName returns null/undefined when missing (does not always throw).
+  const missing = (name) => {
     try {
-      tours.fields.getByName(name);
-      return true;
+      return !tours.fields.getByName(name);
     } catch (_) {
-      return false;
+      return true;
     }
   };
 
-  if (!has("is_customizable_duration")) {
+  if (missing("is_customizable_duration")) {
     tours.fields.add(
       new Field({
         type: "bool",

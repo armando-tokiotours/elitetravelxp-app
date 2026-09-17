@@ -2,6 +2,8 @@
 
 import type { ReactNode } from "react";
 import { AnimatePresence, motion } from "framer-motion";
+import { Lock } from "lucide-react";
+import { useBuilderStore } from "@/store/useBuilderStore";
 import { useBuilderAccordionOptional } from "./BuilderAccordion";
 
 const GOLD = "#C4A35A";
@@ -31,22 +33,41 @@ export function SectionBlock({
   summary?: string;
 }) {
   const accordion = useBuilderAccordionOptional();
-  const isOpen = accordion ? accordion.openSection === number : true;
+  const highestUnlockedStep = useBuilderStore((s) => s.highestUnlockedStep);
+  const locked = number > highestUnlockedStep;
+  const isOpen = accordion
+    ? !locked && accordion.openSection === number
+    : true;
 
   const onToggle = () => {
+    if (locked) {
+      accordion?.showToast?.(
+        "Complete the previous steps before unlocking this section."
+      );
+      return;
+    }
     if (accordion) accordion.toggleSection(number);
   };
 
   return (
     <section
       id={id}
-      className="overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-900 shadow-[0_2px_16px_rgba(0,0,0,0.45)]"
+      aria-disabled={locked || undefined}
+      className={`overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-900 shadow-[0_2px_16px_rgba(0,0,0,0.45)] ${
+        locked ? "opacity-50" : ""
+      }`}
     >
       <button
         type="button"
         onClick={onToggle}
         aria-expanded={isOpen}
-        className="flex w-full items-center gap-3 px-4 py-4 text-left transition hover:bg-zinc-800/60 sm:gap-3.5 sm:px-6 sm:py-5"
+        aria-disabled={locked}
+        disabled={locked}
+        className={`flex w-full items-center gap-3 px-4 py-4 text-left transition sm:gap-3.5 sm:px-6 sm:py-5 ${
+          locked
+            ? "cursor-not-allowed"
+            : "hover:bg-zinc-800/60"
+        }`}
       >
         <span
           className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-white shadow-[0_4px_12px_rgba(196,163,90,0.35)]"
@@ -60,35 +81,49 @@ export function SectionBlock({
           <h2 className="font-display text-xl tracking-tight text-white sm:text-[1.7rem]">
             <span className="text-[#C4A35A]">{number}.</span> {title}
           </h2>
-          {!isOpen && summary ? (
+          {!isOpen && !locked && summary ? (
             <p className="mt-0.5 truncate text-xs font-medium text-[#C4A35A] sm:text-[0.8rem]">
               {summary}
             </p>
           ) : null}
+          {locked ? (
+            <p className="mt-0.5 text-xs font-medium text-zinc-500">
+              Complete previous steps to unlock
+            </p>
+          ) : null}
         </div>
 
-        {!isOpen && summary ? (
+        {!isOpen && !locked && summary ? (
           <span className="mr-1 hidden max-w-[9rem] truncate rounded-full border border-zinc-700 bg-zinc-950 px-2.5 py-1 text-[0.65rem] font-medium text-zinc-300 sm:inline-block lg:max-w-[14rem]">
             {summary}
           </span>
         ) : null}
 
-        <motion.span
-          animate={{ rotate: isOpen ? 180 : 0 }}
-          transition={{ duration: 0.25 }}
-          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-zinc-700 bg-zinc-950 text-white"
-          aria-hidden
-        >
-          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-            <path
-              d="M3 5l4 4 4-4"
-              stroke="currentColor"
-              strokeWidth="1.8"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
-        </motion.span>
+        {locked ? (
+          <span
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-zinc-700 bg-zinc-950 text-zinc-400"
+            aria-hidden
+          >
+            <Lock className="h-3.5 w-3.5" />
+          </span>
+        ) : (
+          <motion.span
+            animate={{ rotate: isOpen ? 180 : 0 }}
+            transition={{ duration: 0.25 }}
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-zinc-700 bg-zinc-950 text-white"
+            aria-hidden
+          >
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+              <path
+                d="M3 5l4 4 4-4"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </motion.span>
+        )}
       </button>
 
       <AnimatePresence initial={false}>

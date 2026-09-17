@@ -1,8 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
+import { Ticket } from "lucide-react";
+import { ManageBookingModal } from "@/components/modals/ManageBookingModal";
 
 const LINKS = [
   { href: "/builder", label: "Home / Builder" },
@@ -33,7 +35,10 @@ export function AppShell({
   dark?: boolean;
 }) {
   const [open, setOpen] = useState(false);
+  const [manageOpen, setManageOpen] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
   const pathname = usePathname();
+  const router = useRouter();
 
   useEffect(() => {
     setOpen(false);
@@ -46,6 +51,12 @@ export function AppShell({
     };
   }, [open]);
 
+  useEffect(() => {
+    if (!toast) return;
+    const t = window.setTimeout(() => setToast(null), 3800);
+    return () => window.clearTimeout(t);
+  }, [toast]);
+
   const headerClass = transparentHeader
     ? dark
       ? "absolute inset-x-0 top-0 z-40 border-b border-white/10 bg-black/50 backdrop-blur-md"
@@ -54,15 +65,21 @@ export function AppShell({
       ? "sticky top-0 z-40 border-b border-zinc-800 bg-black/90 backdrop-blur-md"
       : "sticky top-0 z-40 border-b border-[#E8E2D9]/80 bg-[#FBF8F2]/95 backdrop-blur-md";
 
+  const manageBtnClass = dark
+    ? "inline-flex items-center gap-1.5 rounded-xl border border-zinc-700 bg-zinc-900 px-2.5 py-2 text-[0.65rem] font-semibold uppercase tracking-wider text-zinc-200 transition hover:border-[#C4A35A] hover:text-white sm:px-3"
+    : "inline-flex items-center gap-1.5 rounded-xl border border-[#D9D2C7] bg-white px-2.5 py-2 text-[0.65rem] font-semibold uppercase tracking-wider text-[#0B1F3A] transition hover:border-[#C4A35A] sm:px-3";
+
   return (
     <div
       className={`builder-theme relative min-h-screen ${
-        dark ? "bg-[#0a0a0a] text-white [color-scheme:dark]" : "bg-[#F5F0E8] text-[#0B1F3A]"
+        dark
+          ? "bg-[#0a0a0a] text-white [color-scheme:dark]"
+          : "bg-[#F5F0E8] text-[#0B1F3A]"
       }`}
     >
       <header className={headerClass}>
         <div
-          className={`mx-auto flex items-center gap-3 px-4 py-3 sm:px-6 ${
+          className={`mx-auto flex items-center gap-2 px-4 py-3 sm:gap-3 sm:px-6 ${
             heroMode ? "max-w-5xl" : "max-w-3xl"
           }`}
         >
@@ -70,6 +87,16 @@ export function AppShell({
             <>
               <BrandMark logoSrc={logoSrc} />
               <div className="min-w-0 flex-1" />
+              <button
+                type="button"
+                onClick={() => setManageOpen(true)}
+                className={manageBtnClass}
+                aria-label="Manage Booking"
+              >
+                <Ticket className="h-3.5 w-3.5 text-[#C4A35A]" />
+                <span className="hidden sm:inline">Manage Booking</span>
+                <span className="sm:hidden">Booking</span>
+              </button>
               <button
                 type="button"
                 aria-label="Open menu"
@@ -113,19 +140,29 @@ export function AppShell({
                   </h1>
                 ) : null}
               </div>
+              <button
+                type="button"
+                onClick={() => setManageOpen(true)}
+                className={manageBtnClass}
+                aria-label="Manage Booking"
+              >
+                <Ticket className="h-3.5 w-3.5 text-[#C4A35A]" />
+                <span className="hidden sm:inline">Manage Booking</span>
+                <span className="sm:hidden">Booking</span>
+              </button>
               {logoSrc ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
                   src={logoSrc}
                   alt="Elite Travel Experiences"
-                  className="h-9 w-auto max-w-[7rem] object-contain"
+                  className="hidden h-9 w-auto max-w-[7rem] object-contain sm:block"
                 />
               ) : (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
                   src="/brand/elite-travel-logo.png"
                   alt="Elite Travel Experiences"
-                  className="h-9 w-auto max-w-[7rem] object-contain"
+                  className="hidden h-9 w-auto max-w-[7rem] object-contain sm:block"
                 />
               )}
             </>
@@ -156,7 +193,9 @@ export function AppShell({
               <p className="text-[0.65rem] uppercase tracking-[0.3em] text-[#C4A35A]">
                 Menu
               </p>
-              <p className="mt-1 font-display text-xl">Elite Travel Experiences</p>
+              <p className="mt-1 font-display text-xl">
+                Elite Travel Experiences
+              </p>
             </div>
             <button
               type="button"
@@ -168,6 +207,16 @@ export function AppShell({
             </button>
           </div>
           <nav className="flex flex-1 flex-col gap-1 p-3">
+            <button
+              type="button"
+              onClick={() => {
+                setOpen(false);
+                setManageOpen(true);
+              }}
+              className="rounded-xl px-4 py-3.5 text-left text-sm tracking-wide text-white/85 transition hover:bg-white/8"
+            >
+              Manage Booking
+            </button>
             {LINKS.map((link) => {
               const active =
                 link.href === "/builder"
@@ -195,6 +244,26 @@ export function AppShell({
       </div>
 
       <div className={hideBottomPad ? "" : "pb-24 md:pb-8"}>{children}</div>
+
+      <ManageBookingModal
+        open={manageOpen}
+        onClose={() => setManageOpen(false)}
+        onSuccess={(ref) => {
+          setToast(`Itinerary ${ref} loaded successfully`);
+          if (!pathname.startsWith("/builder")) {
+            router.push("/builder");
+          }
+        }}
+      />
+
+      {toast ? (
+        <div
+          role="status"
+          className="fixed bottom-[7.5rem] left-1/2 z-[110] w-[min(92vw,28rem)] -translate-x-1/2 rounded-xl border border-[#C4A35A]/50 bg-[#1a1510] px-4 py-3 text-center text-sm text-[#E8D5A3] shadow-lg md:bottom-28"
+        >
+          {toast}
+        </div>
+      ) : null}
     </div>
   );
 }

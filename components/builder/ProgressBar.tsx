@@ -2,6 +2,11 @@
 
 import { useEffect, useState } from "react";
 import { useBuilderStore } from "@/store/useBuilderStore";
+import {
+  BUILDER_SECTION_IDS,
+  canOpenBuilderStep,
+  isBuilderStepComplete,
+} from "@/lib/builderSteps";
 import { useBuilderAccordionOptional } from "./BuilderAccordion";
 
 const SECTIONS = [
@@ -44,12 +49,15 @@ export function ProgressBar() {
 
 export function StickyProgressBar() {
   const accordion = useBuilderAccordionOptional();
+  const highestUnlockedStep = useBuilderStore((s) => s.highestUnlockedStep);
   const durationDays = useBuilderStore((s) => s.durationDays);
+  const arrivalDate = useBuilderStore((s) => s.arrivalDate);
   const arrivalTransferId = useBuilderStore((s) => s.arrivalTransferId);
   const departureTransferId = useBuilderStore((s) => s.departureTransferId);
   const adults = useBuilderStore((s) => s.adults);
   const children = useBuilderStore((s) => s.children);
   const locations = useBuilderStore((s) => s.locations);
+  const cityHotels = useBuilderStore((s) => s.cityHotels);
 
   const [visitedTours, setVisitedTours] = useState(false);
   const open = accordion?.openSection ?? null;
@@ -58,23 +66,34 @@ export function StickyProgressBar() {
     if (open === 5) setVisitedTours(true);
   }, [open]);
 
-  const nights = locations.reduce((n, l) => n + l.nights, 0);
+  const snapshot = {
+    arrivalDate,
+    durationDays,
+    adults,
+    children,
+    arrivalTransferId,
+    departureTransferId,
+    locations,
+    cityHotels,
+  };
 
-  const checks = [
-    durationDays > 0 && adults + children > 0,
-    !!arrivalTransferId && !!departureTransferId,
-    locations.length >= 1 && nights === durationDays,
-    locations.some((l) => l.nights > 0 && (!l.visitType || l.visitType === "stay")),
-    visitedTours,
-  ];
+  const statuses = SECTIONS.map((sec) => {
+    const locked = !canOpenBuilderStep(sec.number, highestUnlockedStep);
+    const done =
+      sec.number < (open ?? 1)
+        ? isBuilderStepComplete(sec.number, snapshot)
+        : sec.number === 5
+          ? visitedTours && !locked
+          : isBuilderStepComplete(sec.number, snapshot) &&
+            sec.number < highestUnlockedStep;
 
-  const statuses = SECTIONS.map((sec, i) => {
-    const done = checks[i];
-    let kind: "done" | "current" | "upcoming";
-    if (open === sec.number) kind = "current";
-    else if (done) kind = "done";
+    let kind: "done" | "current" | "upcoming" | "locked";
+    if (locked) kind = "locked";
+    else if (open === sec.number) kind = "current";
+    else if (done || sec.number < highestUnlockedStep) kind = "done";
     else kind = "upcoming";
-    return { ...sec, kind };
+
+    return { ...sec, kind, locked };
   });
 
   return (
@@ -92,18 +111,33 @@ export function StickyProgressBar() {
             >
               <button
                 type="button"
+                disabled={sec.locked}
                 onClick={() => {
-                  accordion?.openOnly(sec.number);
-                  document
-                    .getElementById(sec.href.slice(1))
-                    ?.scrollIntoView({ behavior: "smooth", block: "start" });
+                  if (sec.locked) {
+                    accordion?.showToast(
+                      "Complete the previous steps before unlocking this section."
+                    );
+                    return;
+                  }
+                  const opened = accordion?.tryOpenSection(sec.number);
+                  if (opened === false) return;
+                  const id = BUILDER_SECTION_IDS[sec.number];
+                  if (id) {
+                    document
+                      .getElementById(id)
+                      ?.scrollIntoView({ behavior: "smooth", block: "start" });
+                  }
                 }}
-                className="flex flex-col items-center gap-1.5 text-center"
+                className={`flex flex-col items-center gap-1.5 text-center ${
+                  sec.locked
+                    ? "pointer-events-none cursor-not-allowed opacity-40"
+                    : ""
+                }`}
               >
-                <Node kind={sec.kind} />
+                <Node kind={sec.kind === "locked" ? "upcoming" : sec.kind} />
                 <span
                   className={`max-w-[4.8rem] text-[0.58rem] leading-tight sm:max-w-none sm:text-[0.68rem] ${
-                    sec.kind === "upcoming"
+                    sec.kind === "upcoming" || sec.kind === "locked"
                       ? "text-zinc-500"
                       : "font-medium text-white"
                   }`}

@@ -6,6 +6,14 @@ import type {
   RoomType,
   TransitMode,
 } from "@/config/pricing-data";
+import {
+  generateTempPNR,
+  promoteTempToOfficial,
+  resolveOfficialPNR,
+  type BookingStatus,
+} from "@/utils/pnr";
+
+export type { BookingStatus };
 
 export interface RoomAllocation {
   type: RoomType;
@@ -54,6 +62,11 @@ export interface ItineraryState {
   clientName: string;
   clientEmail: string;
   clientNotes: string;
+
+  /** Draft TMP-… while building; locked JPN-… after request/deposit */
+  tempBookingRef: string;
+  confirmedBookingRef: string | null;
+  bookingStatus: BookingStatus;
 }
 
 export interface ItineraryActions {
@@ -85,6 +98,14 @@ export interface ItineraryActions {
   setClientName: (v: string) => void;
   setClientEmail: (v: string) => void;
   setClientNotes: (v: string) => void;
+
+  ensureTempBookingRef: () => string;
+  confirmBookingRef: (
+    ref: string,
+    status?: Exclude<BookingStatus, "draft">
+  ) => void;
+  displayBookingRef: () => string;
+  officialBookingRef: () => string;
 
   reset: () => void;
 }
@@ -119,10 +140,13 @@ const initialState: ItineraryState = {
   clientName: "",
   clientEmail: "",
   clientNotes: "",
+  tempBookingRef: generateTempPNR(),
+  confirmedBookingRef: null,
+  bookingStatus: "draft",
 };
 
 export const useItineraryStore = create<ItineraryState & ItineraryActions>(
-  (set) => ({
+  (set, get) => ({
     ...initialState,
 
     setDurationDays: (days) =>
@@ -213,7 +237,41 @@ export const useItineraryStore = create<ItineraryState & ItineraryActions>(
     setClientEmail: (v) => set({ clientEmail: v }),
     setClientNotes: (v) => set({ clientNotes: v }),
 
-    reset: () => set(initialState),
+    ensureTempBookingRef: () => {
+      const s = get();
+      if (s.tempBookingRef && /^TMP-[A-Z2-9]{6}$/i.test(s.tempBookingRef)) {
+        return s.tempBookingRef;
+      }
+      const next = generateTempPNR();
+      set({ tempBookingRef: next });
+      return next;
+    },
+
+    confirmBookingRef: (ref, status = "confirmed") => {
+      set({
+        confirmedBookingRef: promoteTempToOfficial(ref),
+        bookingStatus: status,
+      });
+    },
+
+    displayBookingRef: () => {
+      const s = get();
+      return s.confirmedBookingRef || s.tempBookingRef;
+    },
+
+    officialBookingRef: () => {
+      const s = get();
+      if (s.confirmedBookingRef) return s.confirmedBookingRef;
+      return resolveOfficialPNR(s.tempBookingRef);
+    },
+
+    reset: () =>
+      set({
+        ...initialState,
+        tempBookingRef: generateTempPNR(),
+        confirmedBookingRef: null,
+        bookingStatus: "draft",
+      }),
   })
 );
 

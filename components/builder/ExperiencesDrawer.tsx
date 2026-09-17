@@ -4,13 +4,6 @@ import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import type { PbTour } from "@/lib/pocketbase/client";
-import {
-  pbFileUrl,
-  tourMediaFile,
-  tourMediaType,
-  tourPrice,
-} from "@/lib/pocketbase/client";
-import { formatUsd } from "@/lib/builder-pricing";
 import type { ChauffeurDayOption } from "@/lib/dateCascade";
 import type { SelectedTour } from "@/lib/selectedTours";
 import {
@@ -20,6 +13,12 @@ import {
   tourDurationHours,
 } from "@/lib/tourValidator";
 import { ScheduleTourDaySheet } from "./ScheduleTourDaySheet";
+import { TourDetailPanel } from "./TourDetailPanel";
+
+function tourCategory(tour: PbTour): "tour" | "activity" {
+  const cat = String(tour.category || "tour").toLowerCase();
+  return cat === "activity" ? "activity" : "tour";
+}
 
 export function ExperiencesDrawer({
   open,
@@ -29,6 +28,7 @@ export function ExperiencesDrawer({
   tours,
   selectedTours,
   dayOptions,
+  guests,
   onAddTour,
   onRemoveTour,
 }: {
@@ -39,15 +39,21 @@ export function ExperiencesDrawer({
   tours: PbTour[];
   selectedTours: SelectedTour[];
   dayOptions: ChauffeurDayOption[];
+  guests: { adults: number; children: number };
   onAddTour: (
     tour: PbTour,
-    scheduledDate: string
+    scheduledDate: string,
+    selectedLanguage: string
   ) => { ok: boolean; message?: string };
   onRemoveTour: (tourId: string) => void;
 }) {
   const [mounted, setMounted] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [pickingTourId, setPickingTourId] = useState<string | null>(null);
+  const [pendingLanguage, setPendingLanguage] = useState("");
+  const [activeTab, setActiveTab] = useState<"tours" | "experiences">(
+    "tours"
+  );
 
   useEffect(() => {
     setMounted(true);
@@ -56,6 +62,8 @@ export function ExperiencesDrawer({
   useEffect(() => {
     if (!open) {
       setPickingTourId(null);
+      setPendingLanguage("");
+      setActiveTab("tours");
       return;
     }
     const prev = document.body.style.overflow;
@@ -75,6 +83,16 @@ export function ExperiencesDrawer({
     () => Object.fromEntries(selectedTours.map((t) => [t.tourId, t])),
     [selectedTours]
   );
+
+  const filteredTours = useMemo(() => {
+    return tours.filter((t) => {
+      const cat = tourCategory(t);
+      return activeTab === "experiences"
+        ? cat === "activity"
+        : cat === "tour";
+    });
+  }, [activeTab, tours]);
+
   const pickingTour = pickingTourId
     ? tours.find((t) => t.id === pickingTourId) ?? null
     : null;
@@ -106,26 +124,59 @@ export function ExperiencesDrawer({
             exit={{ y: "100%" }}
             transition={{ type: "spring", damping: 28, stiffness: 320 }}
           >
-            <div className="sticky top-0 z-20 flex shrink-0 items-start justify-between gap-3 border-b border-[#EEE8DF] bg-white px-4 pb-4 pt-6 sm:px-5">
-              <div className="min-w-0">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#C4A35A]">
-                  Experiences
-                </p>
-                <h3 className="font-display text-2xl text-[#0B1F3A]">
-                  {cityName}
-                </h3>
-                <p className="mt-1 text-xs text-[#8A8278]">
-                  {nights} night{nights === 1 ? "" : "s"} · Max{" "}
-                  {MAX_TOUR_HOURS_PER_DAY}h of activities per day
-                </p>
+            <div className="sticky top-0 z-20 shrink-0 border-b border-[#EEE8DF] bg-white px-4 pb-3 pt-6 sm:px-5">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#C4A35A]">
+                    Browse
+                  </p>
+                  <h3 className="font-display text-2xl text-[#0B1F3A]">
+                    {cityName}
+                  </h3>
+                  <p className="mt-1 text-xs text-[#8A8278]">
+                    {nights} night{nights === 1 ? "" : "s"} · Max{" "}
+                    {MAX_TOUR_HOURS_PER_DAY}h of activities per day
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="shrink-0 rounded-full bg-[#0B1F3A] px-4 py-1.5 text-sm text-white"
+                >
+                  Done
+                </button>
               </div>
-              <button
-                type="button"
-                onClick={onClose}
-                className="shrink-0 rounded-full bg-[#0B1F3A] px-4 py-1.5 text-sm text-white"
+
+              <div
+                role="tablist"
+                aria-label="Filter by category"
+                className="mt-4 grid grid-cols-2 gap-1 rounded-full border border-[#E5DFD4] bg-[#F7F3EB] p-1"
               >
-                Done
-              </button>
+                {(
+                  [
+                    ["tours", "Tours"],
+                    ["experiences", "Experiences"],
+                  ] as const
+                ).map(([id, label]) => {
+                  const selected = activeTab === id;
+                  return (
+                    <button
+                      key={id}
+                      type="button"
+                      role="tab"
+                      aria-selected={selected}
+                      onClick={() => setActiveTab(id)}
+                      className={`rounded-full py-2 text-sm font-semibold transition ${
+                        selected
+                          ? "bg-[#0B1F3A] text-white shadow-sm"
+                          : "text-[#5C6570] hover:text-[#0B1F3A]"
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
 
             {toast ? (
@@ -138,18 +189,22 @@ export function ExperiencesDrawer({
             ) : null}
 
             <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-4 py-4 pb-[max(7rem,env(safe-area-inset-bottom))]">
-              {tours.length === 0 ? (
+              {filteredTours.length === 0 ? (
                 <p className="py-12 text-center text-sm text-[#8A8278]">
-                  No experiences listed for {cityName} yet. Add tours in Team
-                  Access.
+                  {activeTab === "tours"
+                    ? `No tours listed for ${cityName} yet.`
+                    : `No experiences listed for ${cityName} yet.`}{" "}
+                  Add them in Team Access and set Category to{" "}
+                  {activeTab === "tours" ? "tour" : "activity"}.
                 </p>
               ) : (
-                tours.map((tour) => {
+                filteredTours.map((tour) => {
                   const booked = selectedById[tour.id];
                   return (
-                    <TourMediaCard
+                    <TourDetailPanel
                       key={tour.id}
                       tour={tour}
+                      guests={guests}
                       scheduledLabel={
                         booked?.scheduledDate
                           ? dayOptions.find(
@@ -157,10 +212,17 @@ export function ExperiencesDrawer({
                             )?.label ?? booked.scheduledDate
                           : null
                       }
+                      bookedLanguage={booked?.selectedLanguage || null}
                       selected={Boolean(booked)}
-                      onAdd={() => {
+                      onAdd={(lang) => {
                         if (booked) {
                           onRemoveTour(tour.id);
+                          return;
+                        }
+                        if (!lang) {
+                          setToast(
+                            "Select a preferred language before adding this experience."
+                          );
                           return;
                         }
                         if (dayOptions.length === 0) {
@@ -180,12 +242,13 @@ export function ExperiencesDrawer({
                             setToast(TOUR_DAY_PACKED_MESSAGE);
                             return;
                           }
-                          const result = onAddTour(tour, day.date);
+                          const result = onAddTour(tour, day.date, lang);
                           if (!result.ok && result.message) {
                             setToast(result.message);
                           }
                           return;
                         }
+                        setPendingLanguage(lang);
                         setPickingTourId(tour.id);
                       }}
                     />
@@ -195,13 +258,18 @@ export function ExperiencesDrawer({
             </div>
 
             <ScheduleTourDaySheet
-              open={!!pickingTour}
+              open={!!pickingTour && !!pendingLanguage}
               tour={pickingTour}
               cityName={cityName}
               dayOptions={dayOptions}
               selectedTours={selectedTours}
-              onClose={() => setPickingTourId(null)}
-              onSelectDay={(date) => onAddTour(pickingTour!, date)}
+              onClose={() => {
+                setPickingTourId(null);
+                setPendingLanguage("");
+              }}
+              onSelectDay={(date) =>
+                onAddTour(pickingTour!, date, pendingLanguage)
+              }
               onToast={setToast}
             />
           </motion.div>
@@ -209,138 +277,5 @@ export function ExperiencesDrawer({
       ) : null}
     </AnimatePresence>,
     document.body
-  );
-}
-
-function TourMediaCard({
-  tour,
-  selected,
-  scheduledLabel,
-  onAdd,
-}: {
-  tour: PbTour;
-  selected: boolean;
-  scheduledLabel: string | null;
-  onAdd: () => void;
-}) {
-  const [isExpanded, setIsExpanded] = useState(false);
-  const mediaType = tourMediaType(tour);
-  const filename = tourMediaFile(tour);
-  const mediaUrl =
-    filename && tour.collectionId
-      ? pbFileUrl(tour.collectionId, tour.id, filename)
-      : "";
-  const hours = Number(tour.duration_hours) || 0;
-  const priceMin = tourPrice(tour);
-  const priceMax = priceMin > 0 ? Math.round(priceMin * 1.15) : 0;
-  const priceLabel =
-    priceMin > 0
-      ? priceMax > priceMin
-        ? `From ${formatUsd(priceMin)} – ${formatUsd(priceMax)}`
-        : `From ${formatUsd(priceMin)}`
-      : null;
-  const description = (tour.description ?? "").trim();
-  const showMoreToggle = description.length > 120;
-
-  return (
-    <article className="overflow-hidden rounded-2xl border border-[#EEE8DF] bg-white shadow-[0_4px_20px_rgba(11,31,58,0.06)]">
-      <div className="relative aspect-[4/5] max-h-[50dvh] w-full bg-[#0B1F3A]">
-        {mediaUrl && mediaType === "Video" ? (
-          <video
-            key={mediaUrl}
-            src={mediaUrl}
-            autoPlay
-            muted
-            loop
-            playsInline
-            disablePictureInPicture
-            preload="auto"
-            className="h-full w-full object-cover"
-          />
-        ) : mediaUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={mediaUrl}
-            alt=""
-            className="h-full w-full object-cover"
-          />
-        ) : (
-          <div className="flex h-full items-end bg-gradient-to-br from-[#1a3355] to-[#0B1F3A] p-5">
-            <span className="font-display text-2xl text-white/90">
-              {tour.title}
-            </span>
-          </div>
-        )}
-        {hours > 0 ? (
-          <span className="absolute bottom-3 left-3 inline-flex items-center gap-1.5 rounded-full bg-black/45 px-2.5 py-1 text-xs font-medium text-white backdrop-blur-sm">
-            <ClockIcon />
-            {hours}h
-          </span>
-        ) : null}
-      </div>
-
-      <div className="px-4 py-4">
-        <div className="flex items-start justify-between gap-3">
-          <h4 className="font-display text-xl leading-snug text-[#0B1F3A]">
-            {tour.title}
-          </h4>
-          {priceLabel ? (
-            <span className="shrink-0 text-sm font-semibold text-[#0B1F3A]">
-              {priceLabel}
-            </span>
-          ) : null}
-        </div>
-        {description ? (
-          <div className="mt-2">
-            <p
-              className={`text-sm leading-relaxed text-[#5C6570] ${
-                isExpanded ? "" : "line-clamp-3"
-              }`}
-            >
-              {description}
-            </p>
-            {showMoreToggle ? (
-              <button
-                type="button"
-                onClick={() => setIsExpanded((v) => !v)}
-                className="mt-1 text-sm font-semibold text-[#0B1F3A] hover:text-[#C4A35A]"
-              >
-                {isExpanded ? "Less." : "More."}
-              </button>
-            ) : null}
-          </div>
-        ) : null}
-        {selected && scheduledLabel ? (
-          <p className="mt-2 text-xs font-medium text-[#C4A35A]">
-            Scheduled · {scheduledLabel}
-          </p>
-        ) : null}
-        <button
-          type="button"
-          onClick={onAdd}
-          className={`mt-4 w-full rounded-full py-3 text-sm font-semibold transition ${
-            selected
-              ? "border border-[#C4A35A] bg-[#FBF6EA] text-[#0B1F3A]"
-              : "bg-[#0B1F3A] text-white hover:bg-[#143052]"
-          }`}
-        >
-          {selected ? "✓ Remove from itinerary" : "+ Add to Itinerary"}
-        </button>
-      </div>
-    </article>
-  );
-}
-
-function ClockIcon() {
-  return (
-    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden>
-      <circle cx="6" cy="6" r="5" stroke="currentColor" strokeWidth="1.3" />
-      <path
-        d="M6 3.2V6l1.8 1.2"
-        stroke="currentColor"
-        strokeWidth="1.3"
-        strokeLinecap="round"
-      />
-    </svg>
   );
 }

@@ -24,6 +24,8 @@ import { AppShell } from "@/components/layout/AppShell";
 import { SiteBrandingPanel } from "@/components/team/SiteBrandingPanel";
 import { HotelRatesUploader } from "@/components/team/HotelRatesUploader";
 import { SeasonalityPanel } from "@/components/team/SeasonalityPanel";
+import { ToursCsvSync } from "@/components/team/ToursCsvSync";
+import { formatTourTierSummary } from "@/lib/tourPricing";
 
 type PbClient = PocketBase;
 
@@ -280,12 +282,13 @@ function rowSubtitle(def: CollectionDef, row: Record<string, unknown>): string {
     return bits.join(" · ") || "—";
   }
   if (def.id === "tours") {
-    const price = row.price_per_person ?? row.price;
+    const tier = formatTourTierSummary(row as never);
     const hrs = row.duration_hours;
-    return [
-      price != null ? `€${price}/person` : null,
-      hrs != null ? `${hrs}h` : null,
-    ]
+    const cat =
+      String(row.category || "tour").toLowerCase() === "activity"
+        ? "Activity"
+        : "Tour";
+    return [cat, tier || null, hrs != null ? `${hrs}h` : null]
       .filter(Boolean)
       .join(" · ");
   }
@@ -503,19 +506,40 @@ function SourceOfTruthPanel({ getClient }: { getClient: () => PbClient }) {
       </aside>
 
       <section className="rounded-2xl border border-[#E8E2D9] bg-white p-4 sm:p-5">
-        <div className="mb-4 flex items-center justify-between gap-3">
-          <h2 className="font-display text-2xl">{def.label}</h2>
-          <button
-            type="button"
-            onClick={() => {
-              setCreating(true);
-              setEditing(null);
-            }}
-            className="rounded-full bg-[#C4A35A] px-4 py-2 text-sm font-semibold text-[#0B1F3A]"
-          >
-            + Add
-          </button>
-        </div>
+        {category === "tours" ? (
+          <ToursCsvSync
+            title={def.label}
+            getClient={getClient}
+            cities={cities}
+            onSynced={() => void load()}
+            trailing={
+              <button
+                type="button"
+                onClick={() => {
+                  setCreating(true);
+                  setEditing(null);
+                }}
+                className="rounded-full bg-[#C4A35A] px-4 py-2 text-sm font-semibold text-[#0B1F3A]"
+              >
+                + Add
+              </button>
+            }
+          />
+        ) : (
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <h2 className="font-display text-2xl">{def.label}</h2>
+            <button
+              type="button"
+              onClick={() => {
+                setCreating(true);
+                setEditing(null);
+              }}
+              className="rounded-full bg-[#C4A35A] px-4 py-2 text-sm font-semibold text-[#0B1F3A]"
+            >
+              + Add
+            </button>
+          </div>
+        )}
 
         {error ? (
           <div className="mb-3 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
@@ -714,18 +738,73 @@ function RecordEditModal({
       if ((v == null || v === "") && f.legacyKey) {
         v = initial?.[f.legacyKey];
       }
-      // Tours: base_price may only exist on legacy `price`
+      // Tours: seed tiered prices from legacy single price when empty
       if (
         (v == null || v === "") &&
         def.id === "tours" &&
-        f.key === "base_price"
+        (f.key === "price_1_pax" ||
+          f.key === "price_2_pax" ||
+          f.key === "price_3_pax" ||
+          f.key === "price_4_pax" ||
+          f.key === "price_extra_pax")
       ) {
-        v = initial?.price;
+        const unit = Number(
+          initial?.base_price ??
+            initial?.price_per_person ??
+            initial?.price ??
+            0
+        );
+        if (unit > 0) {
+          const mult =
+            f.key === "price_1_pax"
+              ? 1
+              : f.key === "price_2_pax"
+                ? 2
+                : f.key === "price_3_pax"
+                  ? 3
+                  : f.key === "price_4_pax"
+                    ? 4
+                    : 1;
+          v = String(unit * mult);
+        }
       }
       if (f.type === "bool") {
         base[f.key] = v === false || v === "false" ? "false" : "true";
+      } else if (f.type === "multiselect") {
+        if (Array.isArray(v)) {
+          base[f.key] = JSON.stringify(
+            v.map((x) => String(x).trim()).filter(Boolean)
+          );
+        } else if (typeof v === "string" && v.trim()) {
+          try {
+            const parsed = JSON.parse(v);
+            base[f.key] = Array.isArray(parsed)
+              ? JSON.stringify(parsed)
+              : JSON.stringify(
+                  v
+                    .split(",")
+                    .map((x) => x.trim())
+                    .filter(Boolean)
+                );
+          } catch {
+            base[f.key] = JSON.stringify(
+              v
+                .split(",")
+                .map((x) => x.trim())
+                .filter(Boolean)
+            );
+          }
+        } else {
+          base[f.key] = "[]";
+        }
       } else if (f.key === "base_price_modifier" && (v == null || v === "")) {
         base[f.key] = "1";
+      } else if (
+        def.id === "tours" &&
+        f.key === "category" &&
+        (v == null || v === "")
+      ) {
+        base[f.key] = "tour";
       } else if (f.key === "type" && (v == null || v === "")) {
         base[f.key] =
           def.id === "hubs" ? "Airport" : "Both";
@@ -863,6 +942,27 @@ function RecordEditModal({
         const val = form[f.key] ?? "";
         if (f.type === "bool") {
           fd.append(f.key, val === "true" ? "true" : "false");
+        } else if (f.type === "multiselect") {
+          let selected: string[] = [];
+          try {
+            const parsed = JSON.parse(val || "[]");
+            if (Array.isArray(parsed)) {
+              selected = parsed.map((x) => String(x).trim()).filter(Boolean);
+            }
+          } catch {
+            selected = val
+              .split(",")
+              .map((x) => x.trim())
+              .filter(Boolean);
+          }
+          if (selected.length === 0) {
+            // Clear multi-select
+            fd.append(f.key, "");
+          } else {
+            for (const opt of selected) {
+              fd.append(f.key, opt);
+            }
+          }
         } else if (f.type === "number") {
           if (val !== "") {
             fd.append(f.key, val);
@@ -887,13 +987,12 @@ function RecordEditModal({
         fd.set("max_pax", form.max_passengers);
       }
 
-      // Tours: required legacy `price` is not on the form — sync from base_price
+      // Tours: keep legacy `price` / `price_per_person` in sync for old readers
       if (def.id === "tours") {
-        const price = (form.base_price || form.price_per_person || "").trim();
-        if (price !== "") {
-          fd.set("base_price", price);
-          fd.set("price_per_person", price);
-          fd.set("price", price);
+        const p1 = (form.price_1_pax || "").trim();
+        if (p1 !== "") {
+          fd.set("price", p1);
+          fd.set("price_per_person", p1);
         }
       }
 
@@ -1015,12 +1114,59 @@ function RecordEditModal({
               );
             }
 
+            const TIER_KEYS = [
+              "price_1_pax",
+              "price_2_pax",
+              "price_3_pax",
+              "price_4_pax",
+              "price_extra_pax",
+            ] as const;
+
+            if (
+              TIER_KEYS.includes(f.key as (typeof TIER_KEYS)[number]) &&
+              f.key !== "price_1_pax"
+            ) {
+              return null;
+            }
+
+            if (f.key === "price_1_pax") {
+              const tierFields = def.fields.filter((x) =>
+                TIER_KEYS.includes(x.key as (typeof TIER_KEYS)[number])
+              );
+              return (
+                <div key="tiered-pricing" className="sm:col-span-2">
+                  <p className="mb-2 text-xs uppercase tracking-wider text-[#8A8278]">
+                    Tiered pricing (€)
+                  </p>
+                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
+                    {tierFields.map((tf) => (
+                      <div key={tf.key}>
+                        <label className="mb-1 block text-[10px] font-medium uppercase tracking-wider text-[#8A8278]">
+                          {tf.label}
+                          {tf.required ? " *" : ""}
+                        </label>
+                        <input
+                          type="number"
+                          step="any"
+                          min={0}
+                          value={form[tf.key] ?? ""}
+                          onChange={(e) => set(tf.key, e.target.value)}
+                          className="w-full rounded-xl border border-[#D9D2C7] bg-white px-2.5 py-2 text-sm"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            }
+
             const span =
               f.type === "textarea" ||
               f.type === "city" ||
               f.type === "hub" ||
               f.type === "vehicle" ||
-              f.type === "tour"
+              f.type === "tour" ||
+              f.type === "multiselect"
                 ? "sm:col-span-2"
                 : "";
 
@@ -1054,6 +1200,32 @@ function RecordEditModal({
                       </button>
                     ))}
                   </div>
+                ) : f.type === "select" && f.key === "category" ? (
+                  <div className="inline-flex rounded-full border border-[#D9D2C7] bg-white p-1">
+                    {(f.options || ["tour", "activity"]).map((o) => {
+                      const label =
+                        o === "activity"
+                          ? "Activity"
+                          : o === "tour"
+                            ? "Tour"
+                            : o.charAt(0).toUpperCase() + o.slice(1);
+                      const current = form[f.key] || "tour";
+                      return (
+                        <button
+                          key={o}
+                          type="button"
+                          onClick={() => set(f.key, o)}
+                          className={`rounded-full px-4 py-1.5 text-sm font-medium transition ${
+                            current === o
+                              ? "bg-[#0B1F3A] text-white"
+                              : "text-[#5C6570] hover:text-[#0B1F3A]"
+                          }`}
+                        >
+                          {label}
+                        </button>
+                      );
+                    })}
+                  </div>
                 ) : f.type === "select" ? (
                   <select
                     value={form[f.key] ?? ""}
@@ -1063,10 +1235,44 @@ function RecordEditModal({
                     <option value="">Select…</option>
                     {(f.options || []).map((o) => (
                       <option key={o} value={o}>
-                        {o}
+                        {o.charAt(0).toUpperCase() + o.slice(1)}
                       </option>
                     ))}
                   </select>
+                ) : f.type === "multiselect" ? (
+                  <div className="flex flex-wrap gap-2">
+                    {(f.options || []).map((o) => {
+                      let selected: string[] = [];
+                      try {
+                        const parsed = JSON.parse(form[f.key] || "[]");
+                        if (Array.isArray(parsed)) {
+                          selected = parsed.map((x) => String(x));
+                        }
+                      } catch {
+                        selected = [];
+                      }
+                      const on = selected.includes(o);
+                      return (
+                        <button
+                          key={o}
+                          type="button"
+                          onClick={() => {
+                            const next = on
+                              ? selected.filter((x) => x !== o)
+                              : [...selected, o];
+                            set(f.key, JSON.stringify(next));
+                          }}
+                          className={`rounded-full border px-3 py-1.5 text-sm transition ${
+                            on
+                              ? "border-[#0B1F3A] bg-[#0B1F3A] text-white"
+                              : "border-[#D9D2C7] bg-white text-[#5C6570] hover:border-[#0B1F3A]/40"
+                          }`}
+                        >
+                          {o}
+                        </button>
+                      );
+                    })}
+                  </div>
                 ) : f.type === "city" ? (
                   <select
                     value={form[f.key] ?? ""}

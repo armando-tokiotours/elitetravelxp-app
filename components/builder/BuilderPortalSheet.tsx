@@ -56,14 +56,14 @@ export function BuilderPortalSheet({
         onClick={onClose}
       />
       <div
-        className={`relative z-[1] max-h-[min(90vh,40rem)] w-full overflow-y-auto rounded-t-3xl bg-white p-6 pb-32 shadow-xl sm:rounded-3xl sm:pb-8 ${maxWidthClass}`}
+        className={`relative z-[1] max-h-[min(90vh,40rem)] w-full overflow-y-auto rounded-t-3xl bg-zinc-900 p-6 pb-32 shadow-xl sm:rounded-3xl sm:pb-8 ${maxWidthClass}`}
       >
         <div className="mb-5 flex items-center justify-between gap-3">
-          <h3 className="font-display text-2xl text-[#0B1F3A]">{title}</h3>
+          <h3 className="font-display text-2xl text-white">{title}</h3>
           <button
             type="button"
             onClick={onClose}
-            className="shrink-0 rounded-full bg-[#0B1F3A] px-4 py-1.5 text-sm text-white"
+            className="shrink-0 rounded-full bg-[#0B1F3A] px-4 py-1.5 text-sm font-semibold text-white"
           >
             Done
           </button>

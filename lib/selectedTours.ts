@@ -10,12 +10,29 @@ export interface SelectedTour {
   duration_hours: number;
   /** YYYY-MM-DD the guest scheduled this experience */
   scheduledDate: string;
+  /** Guest-chosen guided language code (e.g. EN, NL) */
+  selectedLanguage: string;
   price: number;
+  /** @deprecated catalog languages snapshot — prefer selectedLanguage */
+  languages?: string[];
   /** Guest-overridden duration (tailor-made); UI slider comes later */
   customDuration?: boolean;
 }
 
 export type SelectedToursByCity = Record<string, SelectedTour[]>;
+
+/** Day 1 → Day 2 → … ; undated last. Stable title tie-break. */
+export function sortSelectedToursChronologically(
+  rows: SelectedTour[] | undefined | null
+): SelectedTour[] {
+  if (!rows?.length) return [];
+  return [...rows].sort((a, b) => {
+    const da = a.scheduledDate || "9999-99-99";
+    const db = b.scheduledDate || "9999-99-99";
+    if (da !== db) return da.localeCompare(db);
+    return (a.title || "").localeCompare(b.title || "");
+  });
+}
 
 export function selectedTourIdsFromMap(
   map: SelectedToursByCity | undefined | null
@@ -84,10 +101,11 @@ export function migrateLegacySelectedTours(
         title: meta?.title ?? tourId,
         duration_hours: Number(meta?.duration_hours) || 0,
         scheduledDate: meta?.scheduledDate ?? "",
+        selectedLanguage: meta?.selectedLanguage ?? "",
         price: Number(meta?.price) || 0,
       });
     }
-    if (rows.length) out[cityId] = rows;
+    if (rows.length) out[cityId] = sortSelectedToursChronologically(rows);
   }
   return out;
 }

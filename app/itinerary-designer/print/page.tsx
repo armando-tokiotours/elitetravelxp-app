@@ -1,11 +1,11 @@
 import type { Metadata } from "next";
-import { PrintItineraryDocument } from "@/components/builder/PrintItineraryDocument";
+import PrintPageClient from "./PrintPageClient";
 
 export const metadata: Metadata = {
   title: "Print Itinerary",
 };
 
-/** Alias route requested for print/PDF export. */
+/** Alias route — Print / Save PDF emails the itinerary via Resend. */
 export default function ItineraryDesignerPrintPage() {
-  return <PrintItineraryDocument />;
+  return <PrintPageClient />;
 }

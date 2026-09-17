@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import {
   BedDouble,
@@ -7,9 +8,11 @@ import {
   Car,
   CircleDot,
   MapPin,
+  Pencil,
   PlaneLanding,
   PlaneTakeoff,
   Route,
+  Sparkles,
   Ticket,
   TrainFront,
   Users,
@@ -23,9 +26,21 @@ import {
 import { formatCityDateSingle } from "@/lib/dateCascade";
 import {
   formatDisplayDate,
+  normalizeCityHotelPref,
+  useBuilderStore,
+  type CityTransitType,
   type LocationStop,
   type BuilderState,
 } from "@/store/useBuilderStore";
+import { formatHotelRoomsSummary } from "@/lib/hotelCalculator";
+import { sortSelectedToursChronologically } from "@/lib/selectedTours";
+import { travelPaceLabel } from "@/lib/travelPace";
+import { BookingRefBadge } from "@/components/builder/BookingRefBadge";
+import { type TransitTicketType } from "@/lib/transitTickets";
+import {
+  InterCityTransitModal,
+  type InterCityTransitLeg,
+} from "@/components/builder/modals/InterCityTransitModal";
 
 export function TravelDossierView({
   state,
@@ -44,13 +59,27 @@ export function TravelDossierView({
   arrivalHub: PbHub | PbTransfer | null;
   departureHub: PbHub | PbTransfer | null;
 }) {
+  const setLocationTransitChoice = useBuilderStore(
+    (s) => s.setLocationTransitChoice
+  );
+  const setArrivalTransitChoice = useBuilderStore(
+    (s) => s.setArrivalTransitChoice
+  );
+  const [transitLeg, setTransitLeg] = useState<InterCityTransitLeg | null>(
+    null
+  );
+
   const cityName = (id: string) =>
     config?.cities.find((c) => c.id === id)?.name ?? id;
 
-  const bookingRef = (() => {
-    const y = state.arrivalDate?.slice(0, 4) || "2026";
-    return `JPN-${y}`;
-  })();
+  const firstLoc = state.locations.find(
+    (l) => l.visitType === "stay" || !l.visitType
+  );
+  const lastLoc = [...state.locations]
+    .reverse()
+    .find((l) => l.visitType === "stay" || !l.visitType);
+  const firstCityLabel = firstLoc ? cityName(firstLoc.cityId) : null;
+  const lastCityLabel = lastLoc ? cityName(lastLoc.cityId) : null;
 
   const routeParts: string[] = [];
   if (arrivalHub) routeParts.push(hubShort(arrivalHub));
@@ -69,6 +98,34 @@ export function TravelDossierView({
     ? "Dates TBD"
     : `${formatDisplayDate(state.arrivalDate)} – ${formatDisplayDate(departureIso)} (${days} Day${days === 1 ? "" : "s"})`;
 
+  const paceLabel = travelPaceLabel(state.travelPace);
+  const experienceLabel =
+    state.experienceService === "concierge" || state.isEliteConcierge
+      ? "Elite Concierge"
+      : state.experienceService === "tailored"
+        ? "Tailored Experiences"
+        : null;
+
+  const arrivalHubLabel = hubFull(arrivalHub) || "Arrival hub";
+  const departureHubLabel = hubFull(departureHub) || "Departure hub";
+  const totalGuests = Math.max(1, state.adults + state.children);
+
+  const openLeg = (leg: InterCityTransitLeg) => setTransitLeg(leg);
+
+  const saveLeg = (choice: {
+    mode: CityTransitType;
+    needsTicket: boolean;
+    ticketType: TransitTicketType;
+    ticketPricePerPax: number;
+  }) => {
+    if (!transitLeg) return;
+    if (transitLeg.storeKey === "__arrival__") {
+      setArrivalTransitChoice(choice);
+    } else {
+      setLocationTransitChoice(transitLeg.storeKey, choice);
+    }
+  };
+
   return (
     <div className="space-y-0">
       <section className="overflow-hidden rounded-2xl bg-[#0B1F3A] text-white shadow-[0_12px_40px_rgba(11,31,58,0.25)]">
@@ -81,14 +138,11 @@ export function TravelDossierView({
               Elite Travel Experiences
             </p>
           </div>
-          <div className="rounded-lg border border-dashed border-[#C4A35A]/50 px-3 py-1.5 text-right">
-            <p className="text-[0.55rem] uppercase tracking-[0.2em] text-[#C4A35A]/80">
-              Booking Ref
-            </p>
-            <p className="font-mono text-sm font-semibold text-[#C4A35A]">
-              {bookingRef}
-            </p>
-          </div>
+          <BookingRefBadge
+            tempBookingRef={state.tempBookingRef}
+            confirmedBookingRef={state.confirmedBookingRef}
+            bookingStatus={state.bookingStatus}
+          />
         </div>
 
         <div className="grid gap-4 px-5 py-5 sm:grid-cols-3">
@@ -112,7 +166,44 @@ export function TravelDossierView({
             }
           />
         </div>
+
+        {paceLabel || experienceLabel ? (
+          <div className="flex flex-wrap gap-2 border-t border-dashed border-white/15 px-5 py-3">
+            {paceLabel ? (
+              <span className="rounded-full border border-white/20 bg-white/5 px-2.5 py-1 text-[11px] text-white/85">
+                {paceLabel} pace
+              </span>
+            ) : null}
+            {experienceLabel ? (
+              <span className="inline-flex items-center gap-1 rounded-full border border-[#C4A35A]/45 bg-[#C4A35A]/10 px-2.5 py-1 text-[11px] text-[#E8D5A3]">
+                <Sparkles className="h-3 w-3" aria-hidden />
+                {experienceLabel}
+              </span>
+            ) : null}
+          </div>
+        ) : null}
       </section>
+
+      {(state.experienceService === "concierge" ||
+        state.isEliteConcierge) && (
+        <>
+          <TimelineSpine />
+          <TicketCard accent="gold">
+            <div className="flex items-start gap-2">
+              <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-[#C4A35A]" />
+              <div>
+                <h2 className="text-[0.7rem] font-semibold uppercase tracking-[0.28em] text-[#0B1F3A]">
+                  Elite Concierge
+                </h2>
+                <p className="mt-2 text-sm text-[#5C6570]">
+                  Day-by-day itinerary design included — dining, access, and
+                  private drivers coordinated by your specialist.
+                </p>
+              </div>
+            </div>
+          </TicketCard>
+        </>
+      )}
 
       <TimelineSpine />
 
@@ -127,27 +218,105 @@ export function TravelDossierView({
             </span>
           </h2>
         </div>
-        <p className="mt-3 text-sm text-[#5C6570]">
-          Landing at{" "}
-          <span className="font-semibold text-[#0B1F3A]">
-            {hubFull(arrivalHub) || "Arrival hub TBD"}
-          </span>
+        <p className="mt-3 text-base font-semibold text-[#0B1F3A]">
+          Landing at {arrivalHubLabel || "Arrival hub TBD"}
         </p>
-        {state.airportPickup ? (
-          <ServiceStrip>
-            <Car className="mt-0.5 h-4 w-4 shrink-0 text-[#C4A35A]" />
-            <div>
-              <p className="text-sm font-semibold text-[#0B1F3A]">
-                VIP Airport Pickup Included
-              </p>
-              {fleetLabel ? (
-                <p className="text-xs text-[#8A8278]">{fleetLabel}</p>
-              ) : null}
-            </div>
-          </ServiceStrip>
+        {firstCityLabel ? (
+          <p className="mt-1 text-sm text-[#5C6570]">
+            Transfer to First Destination:{" "}
+            <span className="font-semibold text-[#0B1F3A]">
+              {firstCityLabel}
+            </span>
+          </p>
         ) : null}
+
+        {state.airportPickup ? (
+          <button
+            type="button"
+            onClick={() =>
+              firstLoc
+                ? openLeg({
+                    fromLabel: hubShort(arrivalHub) || arrivalHubLabel,
+                    toLabel: firstCityLabel || "Hotel",
+                    mode: "private",
+                    storeKey: "__arrival__",
+                    toCityId: firstLoc.cityId,
+                    needsTicket: false,
+                    ticketType: "none",
+                    ticketPricePerPax: 0,
+                  })
+                : undefined
+            }
+            className="mt-3 w-full text-left"
+          >
+            <ServiceStrip>
+              <Car className="mt-0.5 h-4 w-4 shrink-0 text-[#C4A35A]" />
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold text-[#0B1F3A]">
+                  VIP Airport Pickup
+                  {firstCityLabel ? ` to ${firstCityLabel} Hotel` : ""}
+                </p>
+                {fleetLabel ? (
+                  <p className="text-xs text-[#8A8278]">{fleetLabel}</p>
+                ) : (
+                  <p className="text-xs text-[#8A8278]">
+                    Private chauffeur from terminal to hotel
+                  </p>
+                )}
+              </div>
+              <Pencil className="h-3.5 w-3.5 shrink-0 text-[#C4A35A]/70" />
+            </ServiceStrip>
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={() =>
+              firstLoc
+                ? openLeg({
+                    fromLabel: hubShort(arrivalHub) || arrivalHubLabel,
+                    toLabel: firstCityLabel || "Hotel",
+                    mode: state.arrivalTransitType ?? "public",
+                    storeKey: "__arrival__",
+                    toCityId: firstLoc.cityId,
+                    needsTicket: state.arrivalNeedsTicket,
+                    ticketType: state.arrivalTicketType,
+                    ticketPricePerPax: state.arrivalTicketPricePerPax,
+                  })
+                : undefined
+            }
+            className="mt-3 w-full text-left"
+          >
+            <ServiceStrip>
+              {(state.arrivalTransitType ?? "public") === "private" ? (
+                <Car className="mt-0.5 h-4 w-4 shrink-0 text-[#C4A35A]" />
+              ) : (
+                <TrainFront className="mt-0.5 h-4 w-4 shrink-0 text-[#C4A35A]" />
+              )}
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold text-[#0B1F3A]">
+                  {(state.arrivalTransitType ?? "public") === "private"
+                    ? `Private Chauffeur${firstCityLabel ? ` to ${firstCityLabel} Hotel` : ""}`
+                    : `Airport Express Rail${firstCityLabel ? ` to ${firstCityLabel}` : ""}`}
+                </p>
+                <p className="text-xs text-[#8A8278]">
+                  {(state.arrivalTransitType ?? "public") === "public" &&
+                  state.arrivalNeedsTicket &&
+                  (state.arrivalTicketPricePerPax ?? 0) > 0
+                    ? `Tickets pre-booked · Est. €${Math.round(
+                        (state.arrivalTicketPricePerPax ?? 0) * totalGuests
+                      )}`
+                    : (state.arrivalTransitType ?? "public") === "public"
+                      ? "Self-purchase tickets on site"
+                      : fleetLabel || "Door-to-door transfer"}
+                </p>
+              </div>
+              <Pencil className="h-3.5 w-3.5 shrink-0 text-[#C4A35A]/70" />
+            </ServiceStrip>
+          </button>
+        )}
       </TicketCard>
 
+      {/* City cards + inter-city connectors only (no airport↔city pills) */}
       {state.locations.length === 0 ? (
         <>
           <TimelineSpine />
@@ -165,23 +334,27 @@ export function TravelDossierView({
           </TicketCard>
         </>
       ) : (
-        state.locations.map((loc, i) => (
-          <LocationSegment
-            key={loc.key}
-            loc={loc}
-            index={i}
-            next={state.locations[i + 1]}
-            cityLabel={cityName(loc.cityId)}
-            nextCityLabel={
-              state.locations[i + 1]
-                ? cityName(state.locations[i + 1].cityId)
-                : ""
-            }
-            dateLabel={dateRanges[i]?.label ?? ""}
-            config={config}
-            state={state}
-          />
-        ))
+        state.locations.map((loc, i) => {
+          const nextStay = state.locations
+            .slice(i + 1)
+            .find((l) => l.visitType === "stay" || !l.visitType);
+          const isStay = loc.visitType === "stay" || !loc.visitType;
+          return (
+            <LocationSegment
+              key={loc.key}
+              loc={loc}
+              index={i}
+              next={isStay ? nextStay : undefined}
+              cityLabel={cityName(loc.cityId)}
+              nextCityLabel={nextStay ? cityName(nextStay.cityId) : ""}
+              dateLabel={dateRanges[i]?.label ?? ""}
+              config={config}
+              state={state}
+              onOpenTransit={(leg) => openLeg(leg)}
+              totalGuests={totalGuests}
+            />
+          );
+        })
       )}
 
       <TimelineSpine />
@@ -197,26 +370,112 @@ export function TravelDossierView({
             </span>
           </h2>
         </div>
-        {state.airportDropoff ? (
-          <ServiceStrip>
-            <Car className="mt-0.5 h-4 w-4 shrink-0 text-[#C4A35A]" />
-            <div>
-              <p className="text-sm font-semibold text-[#0B1F3A]">
-                VIP Airport Drop-off Included
-              </p>
-              {fleetLabel ? (
-                <p className="text-xs text-[#8A8278]">{fleetLabel}</p>
-              ) : null}
-            </div>
-          </ServiceStrip>
-        ) : null}
-        <p className="mt-3 text-sm text-[#5C6570]">
-          Departing from{" "}
-          <span className="font-semibold text-[#0B1F3A]">
-            {hubFull(departureHub) || "Departure hub TBD"}
-          </span>
+        <p className="mt-3 text-base font-semibold text-[#0B1F3A]">
+          Departing from {departureHubLabel || "Departure hub TBD"}
         </p>
+        {lastCityLabel ? (
+          <p className="mt-1 text-sm text-[#5C6570]">
+            Transfer from Last Destination:{" "}
+            <span className="font-semibold text-[#0B1F3A]">
+              {lastCityLabel}
+            </span>
+          </p>
+        ) : null}
+
+        {state.airportDropoff ? (
+          <button
+            type="button"
+            onClick={() =>
+              lastLoc
+                ? openLeg({
+                    fromLabel: lastCityLabel || "Hotel",
+                    toLabel: departureHubLabel,
+                    mode: "private",
+                    storeKey: lastLoc.key,
+                    fromCityId: lastLoc.cityId,
+                    toIsHub: true,
+                    needsTicket: false,
+                    ticketType: "none",
+                    ticketPricePerPax: 0,
+                  })
+                : undefined
+            }
+            className="mt-3 w-full text-left"
+          >
+            <ServiceStrip>
+              <Car className="mt-0.5 h-4 w-4 shrink-0 text-[#C4A35A]" />
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold text-[#0B1F3A]">
+                  VIP Airport Drop-off
+                  {lastCityLabel ? ` from ${lastCityLabel} Hotel` : ""}
+                </p>
+                {fleetLabel ? (
+                  <p className="text-xs text-[#8A8278]">{fleetLabel}</p>
+                ) : (
+                  <p className="text-xs text-[#8A8278]">
+                    Private chauffeur from hotel to terminal
+                  </p>
+                )}
+              </div>
+              <Pencil className="h-3.5 w-3.5 shrink-0 text-[#C4A35A]/70" />
+            </ServiceStrip>
+          </button>
+        ) : lastLoc ? (
+          <button
+            type="button"
+            onClick={() =>
+              openLeg({
+                fromLabel: lastCityLabel || "Hotel",
+                toLabel: departureHubLabel,
+                mode: lastLoc.transitType,
+                storeKey: lastLoc.key,
+                fromCityId: lastLoc.cityId,
+                toIsHub: true,
+                needsTicket: lastLoc.needsTicket,
+                ticketType: lastLoc.ticketType,
+                ticketPricePerPax: lastLoc.ticketPricePerPax,
+              })
+            }
+            className="mt-3 w-full text-left"
+          >
+            <ServiceStrip>
+              {lastLoc.transitType === "private" ? (
+                <Car className="mt-0.5 h-4 w-4 shrink-0 text-[#C4A35A]" />
+              ) : (
+                <TrainFront className="mt-0.5 h-4 w-4 shrink-0 text-[#C4A35A]" />
+              )}
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold text-[#0B1F3A]">
+                  {lastLoc.transitType === "private"
+                    ? `Private Chauffeur${lastCityLabel ? ` from ${lastCityLabel} Hotel` : ""}`
+                    : `Airport Express Rail${lastCityLabel ? ` from ${lastCityLabel}` : ""}`}
+                </p>
+                <p className="text-xs text-[#8A8278]">
+                  {lastLoc.transitType === "public" &&
+                  lastLoc.needsTicket &&
+                  (lastLoc.ticketPricePerPax ?? 0) > 0
+                    ? `Tickets pre-booked · Est. €${Math.round(
+                        (lastLoc.ticketPricePerPax ?? 0) * totalGuests
+                      )}`
+                    : lastLoc.transitType === "public"
+                      ? "Self-purchase tickets on site"
+                      : fleetLabel || "Door-to-door transfer"}
+                </p>
+              </div>
+              <Pencil className="h-3.5 w-3.5 shrink-0 text-[#C4A35A]/70" />
+            </ServiceStrip>
+          </button>
+        ) : null}
       </TicketCard>
+
+      <InterCityTransitModal
+        open={transitLeg != null}
+        leg={transitLeg}
+        config={config}
+        totalGuests={totalGuests}
+        onClose={() => setTransitLeg(null)}
+        onSave={saveLeg}
+      />
     </div>
   );
 }
@@ -230,6 +489,8 @@ function LocationSegment({
   dateLabel,
   config,
   state,
+  onOpenTransit,
+  totalGuests,
 }: {
   loc: LocationStop;
   index: number;
@@ -239,11 +500,15 @@ function LocationSegment({
   dateLabel: string;
   config: BuilderConfig | null;
   state: BuilderState;
+  onOpenTransit: (leg: InterCityTransitLeg) => void;
+  totalGuests: number;
 }) {
   const isWaypoint =
     loc.visitType === "arrival" || loc.visitType === "departure";
   const hotelPref = state.cityHotels[loc.cityId];
-  const tours = state.selectedTours[loc.cityId] ?? [];
+  const tours = sortSelectedToursChronologically(
+    state.selectedTours[loc.cityId] ?? []
+  );
   const chauffeurByDate = state.chauffeurSelections[loc.cityId] ?? {};
 
   const chauffeurLines = Object.entries(chauffeurByDate)
@@ -253,7 +518,7 @@ function LocationSegment({
       const dayNum = tripDayIndex(state.arrivalDate, date);
       const modeLabel =
         sel.mode === "full_day"
-          ? "Full Day"
+          ? "Private Chauffeur"
           : sel.mode === "by_tour"
             ? "By Tour"
             : "—";
@@ -308,8 +573,27 @@ function LocationSegment({
                     : `${state.hotelTier === "5-star" ? "5" : "4"}-Star Hotel Tier`}
                 </span>
                 {" · "}
-                {state.roomCount}×{" "}
-                {hotelPref?.roomType ?? state.roomType} Room
+                {hotelPref
+                  ? (() => {
+                      const n = normalizeCityHotelPref(
+                        hotelPref,
+                        loc.cityId,
+                        state.roomCount
+                      );
+                      return (
+                        formatHotelRoomsSummary(
+                          n.rooms,
+                          n.standardOccupancy
+                        ) || `${state.roomCount}× Room`
+                      );
+                    })()
+                  : `${state.roomCount}× ${state.roomType} Room`}
+                {hotelPref ? (
+                  <span className="text-[#8A8278]">
+                    {" "}
+                    · {hotelPref.breakfast ? "Breakfast" : "No breakfast"}
+                  </span>
+                ) : null}
               </p>
             </div>
           ) : null}
@@ -331,6 +615,12 @@ function LocationSegment({
                       </span>
                       {hours ? (
                         <span className="text-[#8A8278]">, {hours}h</span>
+                      ) : null}
+                      {row.selectedLanguage ? (
+                        <span className="text-[#8A8278]">
+                          {" "}
+                          · {row.selectedLanguage}
+                        </span>
                       ) : null}
                       {row.scheduledDate ? (
                         <span className="mt-0.5 block text-xs text-[#8A8278]">
@@ -362,22 +652,101 @@ function LocationSegment({
       )}
 
       {next ? (
-        <>
-          <TimelineSpine />
-          <div className="flex justify-center py-0.5">
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-dashed border-[#0B1F3A]/25 bg-white px-3 py-1.5 text-xs font-semibold text-[#0B1F3A] shadow-sm">
-              {loc.transitType === "private" ? (
-                <Car className="h-3.5 w-3.5 text-[#C4A35A]" />
-              ) : (
-                <TrainFront className="h-3.5 w-3.5 text-[#C4A35A]" />
-              )}
-              {loc.transitType === "private"
-                ? `Private Car to ${nextCityLabel}`
-                : `Bullet Train (Shinkansen) to ${nextCityLabel}`}
-            </span>
-          </div>
-        </>
+        <TransitConnectorPill
+          mode={loc.transitType}
+          toLabel={nextCityLabel}
+          fromLabel={cityLabel}
+          needsTicket={loc.needsTicket}
+          ticketPricePerPax={loc.ticketPricePerPax}
+          ticketType={loc.ticketType}
+          totalGuests={totalGuests}
+          onClick={() =>
+            onOpenTransit({
+              fromLabel: cityLabel,
+              toLabel: nextCityLabel,
+              mode: loc.transitType,
+              storeKey: loc.key,
+              fromCityId: loc.cityId,
+              toCityId: next.cityId,
+              needsTicket: loc.needsTicket,
+              ticketType: loc.ticketType,
+              ticketPricePerPax: loc.ticketPricePerPax,
+            })
+          }
+        />
       ) : null}
+    </>
+  );
+}
+
+function TransitConnectorPill({
+  mode,
+  toLabel,
+  fromLabel,
+  toIsHub,
+  needsTicket,
+  ticketPricePerPax,
+  ticketType,
+  totalGuests,
+  onClick,
+}: {
+  mode: CityTransitType;
+  toLabel: string;
+  fromLabel: string;
+  toIsHub?: boolean;
+  needsTicket?: boolean;
+  ticketPricePerPax?: number;
+  ticketType?: string;
+  totalGuests?: number;
+  onClick: () => void;
+}) {
+  const privateLabel = toIsHub
+    ? `Private Chauffeur from ${fromLabel} to ${toLabel}`
+    : `Private Chauffeur to ${toLabel}`;
+  const publicLabel = toIsHub
+    ? `Express Rail from ${fromLabel} to ${toLabel}`
+    : `Bullet Train (Shinkansen) to ${toLabel}`;
+
+  const ticketNote =
+    mode === "public" && needsTicket && (ticketPricePerPax ?? 0) > 0
+      ? `Tickets pre-booked · Est. €${Math.round(
+          (ticketPricePerPax ?? 0) * Math.max(1, totalGuests ?? 1)
+        )}`
+      : mode === "public" && needsTicket === false
+        ? "Self-purchase tickets"
+        : null;
+
+  return (
+    <>
+      <TimelineSpine />
+      <div className="flex justify-center py-0.5">
+        <button
+          type="button"
+          onClick={onClick}
+          className="group my-2 inline-flex cursor-pointer flex-col items-center gap-1 rounded-full border border-zinc-200 bg-white px-4 py-2 text-xs font-semibold text-zinc-800 shadow-sm transition-all hover:border-[#C4A35A] hover:shadow-md"
+          aria-label={`Change transit from ${fromLabel} to ${toLabel}`}
+        >
+          <span className="inline-flex items-center gap-2">
+            {mode === "private" ? (
+              <Car className="h-3.5 w-3.5 text-[#C4A35A]" />
+            ) : (
+              <TrainFront className="h-3.5 w-3.5 text-[#C4A35A]" />
+            )}
+            {mode === "private" ? privateLabel : publicLabel}
+            <Pencil className="h-3 w-3 text-zinc-400 opacity-0 transition group-hover:opacity-100" />
+          </span>
+          {ticketNote ? (
+            <span className="text-[10px] font-medium text-amber-700">
+              {ticketNote}
+              {ticketType && ticketType !== "none"
+                ? ticketType === "ic_card"
+                  ? " · IC card"
+                  : " · Shinkansen"
+                : ""}
+            </span>
+          ) : null}
+        </button>
+      </div>
     </>
   );
 }
@@ -459,7 +828,8 @@ function hubFull(h: PbHub | PbTransfer | null): string {
   return transferLocation(h);
 }
 
-function hubShort(h: PbHub | PbTransfer): string {
+function hubShort(h: PbHub | PbTransfer | null): string {
+  if (!h) return "";
   const full = hubFull(h);
   const code = full.match(/\(([A-Z]{3})\)/)?.[1];
   if (code) return code;

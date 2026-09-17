@@ -1,19 +1,18 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   cityPhoto,
   fetchBuilderConfig,
   pbFileUrl,
-  tourMediaFile,
   tourMediaType,
+  tourPhoto,
   tourPrice,
   type BuilderConfig,
   type PbCity,
   type PbTour,
 } from "@/lib/pocketbase/client";
-import { formatUsd } from "@/lib/builder-pricing";
 import { chauffeurDaysForCity } from "@/lib/dateCascade";
 import {
   canAddTourOnDate,
@@ -24,12 +23,19 @@ import {
 import { useBuilderStore } from "@/store/useBuilderStore";
 import { BottomNav } from "@/components/builder/BottomNav";
 import { ScheduleTourDaySheet } from "@/components/builder/ScheduleTourDaySheet";
+import { TourDetailModal } from "@/components/builder/TourDetailModal";
+import { Play } from "lucide-react";
+
+type ProfileTab = "tours" | "experiences" | "info";
 
 export function DiscoverFeed() {
   const [config, setConfig] = useState<BuilderConfig | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedCityId, setSelectedCityId] = useState<string | null>(null);
+  const [profileTab, setProfileTab] = useState<ProfileTab>("tours");
+  const [modalSlide, setModalSlide] = useState<number | null>(null);
   const [pickingTour, setPickingTour] = useState<PbTour | null>(null);
+  const [pendingLanguage, setPendingLanguage] = useState("");
   const [toast, setToast] = useState<string | null>(null);
 
   const locations = useBuilderStore((s) => s.locations);
@@ -38,6 +44,12 @@ export function DiscoverFeed() {
   const addCityTour = useBuilderStore((s) => s.addCityTour);
   const removeCityTour = useBuilderStore((s) => s.removeCityTour);
   const isEliteConcierge = useBuilderStore((s) => s.isEliteConcierge);
+  const adults = useBuilderStore((s) => s.adults);
+  const children = useBuilderStore((s) => s.children);
+  const guests = useMemo(
+    () => ({ adults, children }),
+    [adults, children]
+  );
 
   useEffect(() => {
     useBuilderStore.persist.rehydrate();
@@ -57,6 +69,15 @@ export function DiscoverFeed() {
     return () => window.clearTimeout(t);
   }, [toast]);
 
+  useEffect(() => {
+    setProfileTab("tours");
+    setModalSlide(null);
+  }, [selectedCityId]);
+
+  useEffect(() => {
+    setModalSlide(null);
+  }, [profileTab]);
+
   const cities = useMemo(
     () => (config?.cities ?? []).filter((c) => c.is_active !== false),
     [config]
@@ -69,6 +90,24 @@ export function DiscoverFeed() {
     );
   }, [config, selectedCityId]);
 
+  /** Guided tours vs activities for Discover tabs */
+  const tourItems = useMemo(
+    () =>
+      cityTours.filter((t) => {
+        const cat = String(t.category || "tour").toLowerCase();
+        return cat !== "activity";
+      }),
+    [cityTours]
+  );
+  const experienceTours = useMemo(
+    () =>
+      cityTours.filter((t) => {
+        const cat = String(t.category || "").toLowerCase();
+        return cat === "activity";
+      }),
+    [cityTours]
+  );
+
   const selectedCity = cities.find((c) => c.id === selectedCityId);
   const cityName = selectedCity?.name ?? "City";
   const selectedTours = selectedCityId
@@ -78,9 +117,18 @@ export function DiscoverFeed() {
     ? chauffeurDaysForCity(arrivalDate, locations, selectedCityId)
     : [];
 
+  const gridTours =
+    profileTab === "experiences" ? experienceTours : tourItems;
+
   const tryAddTour = useCallback(
-    (tour: PbTour, scheduledDate: string) => {
+    (tour: PbTour, scheduledDate: string, selectedLanguage: string) => {
       if (!selectedCityId) return { ok: false as const };
+      if (!selectedLanguage.trim()) {
+        return {
+          ok: false as const,
+          message: "Select a preferred language before adding this experience.",
+        };
+      }
       if (isEliteConcierge) {
         return {
           ok: false as const,
@@ -105,7 +153,9 @@ export function DiscoverFeed() {
         title: tour.title,
         duration_hours: tourDurationHours(tour),
         scheduledDate,
-        price: tourPrice(tour),
+        selectedLanguage: selectedLanguage.trim(),
+        price: tourPrice(tour, guests),
+        ...(tour.languages?.length ? { languages: tour.languages } : {}),
       });
       if (ok) setToast(`Added · ${tour.title}`);
       return {
@@ -113,14 +163,18 @@ export function DiscoverFeed() {
         message: ok ? undefined : TOUR_DAY_PACKED_MESSAGE,
       };
     },
-    [addCityTour, isEliteConcierge, selectedCityId, selectedTours]
+    [addCityTour, guests, isEliteConcierge, selectedCityId, selectedTours]
   );
 
-  const handleAddClick = (tour: PbTour) => {
+  const handleAddFromModal = (tour: PbTour, selectedLanguage: string) => {
     const booked = selectedTours.find((t) => t.tourId === tour.id);
     if (booked) {
       if (selectedCityId) removeCityTour(selectedCityId, tour.id);
       setToast("Removed from itinerary");
+      return;
+    }
+    if (!selectedLanguage.trim()) {
+      setToast("Select a preferred language before adding this experience.");
       return;
     }
     if (!arrivalDate || dayOptions.length === 0) {
@@ -137,17 +191,35 @@ export function DiscoverFeed() {
         setToast(TOUR_DAY_PACKED_MESSAGE);
         return;
       }
-      const result = tryAddTour(tour, day.date);
+      const result = tryAddTour(tour, day.date, selectedLanguage);
       if (!result.ok && result.message) setToast(result.message);
       return;
     }
+    setPendingLanguage(selectedLanguage);
+    setModalSlide(null);
     setPickingTour(tour);
   };
 
+  const cityImg = selectedCity
+    ? (() => {
+        const filename = cityPhoto(selectedCity);
+        return filename && selectedCity.collectionId
+          ? pbFileUrl(
+              selectedCity.collectionId,
+              selectedCity.id,
+              filename,
+              "200x200"
+            )
+          : "";
+      })()
+    : "";
+
+  const cityBio = (selectedCity?.description ?? "").trim();
+
   return (
-    <div className="builder-theme relative min-h-[100dvh] bg-[#0a0a0a] text-white">
-      <header className="sticky top-0 z-40 border-b border-white/10 bg-black/90 text-white backdrop-blur-md">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 pt-3">
+    <div className="builder-theme relative min-h-[100dvh] bg-black text-white">
+      <header className="sticky top-0 z-40 border-b border-zinc-800 bg-black/95 text-white backdrop-blur-md">
+        <div className="mx-auto flex max-w-lg items-center justify-between px-4 py-3">
           <div>
             <p className="text-[0.6rem] font-semibold uppercase tracking-[0.28em] text-[#C4A35A]">
               Elite Travel
@@ -161,28 +233,28 @@ export function DiscoverFeed() {
             Builder
           </Link>
         </div>
-
-        <div
-          className="mx-auto flex max-w-6xl snap-x snap-mandatory gap-4 overflow-x-auto px-4 py-4 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-          role="tablist"
-          aria-label="Cities"
-        >
-          {loading ? (
-            <p className="text-sm text-white/50">Loading cities…</p>
-          ) : cities.length === 0 ? (
-            <p className="text-sm text-white/50">No cities yet.</p>
-          ) : (
-            cities.map((city) => (
-              <CityStory
-                key={city.id}
-                city={city}
-                active={city.id === selectedCityId}
-                onSelect={() => setSelectedCityId(city.id)}
-              />
-            ))
-          )}
-        </div>
       </header>
+
+      <div
+        className="mx-auto flex max-w-lg snap-x snap-mandatory gap-4 overflow-x-auto border-b border-zinc-800 bg-black px-4 py-4 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        role="tablist"
+        aria-label="Cities"
+      >
+        {loading ? (
+          <p className="text-sm text-white/50">Loading cities…</p>
+        ) : cities.length === 0 ? (
+          <p className="text-sm text-white/50">No cities yet.</p>
+        ) : (
+          cities.map((city) => (
+            <CityStory
+              key={city.id}
+              city={city}
+              active={city.id === selectedCityId}
+              onSelect={() => setSelectedCityId(city.id)}
+            />
+          ))
+        )}
+      </div>
 
       {toast ? (
         <div
@@ -193,46 +265,157 @@ export function DiscoverFeed() {
         </div>
       ) : null}
 
-      <main
-        key={selectedCityId ?? "none"}
-        className="mx-auto flex max-w-6xl flex-col overflow-y-auto px-0 pb-32 pt-2 md:grid md:grid-cols-2 md:gap-x-8 md:gap-y-0 md:px-4 lg:grid-cols-3 md:pb-12"
-      >
-        {loading ? (
-          <p className="col-span-full py-16 text-center text-sm text-white/50">
-            Loading experiences…
+      <main className="mx-auto max-w-lg bg-black pb-32 md:pb-12">
+        {loading || !selectedCity ? (
+          <p className="py-16 text-center text-sm text-zinc-500">
+            {loading ? "Loading…" : "Select a city"}
           </p>
-        ) : cityTours.length === 0 ? (
-          <div className="col-span-full flex flex-col items-center justify-center gap-2 py-16 text-center">
-            <p className="font-display text-2xl text-white/90">{cityName}</p>
-            <p className="text-sm text-white/50">
-              No experiences published for this city yet.
-            </p>
-          </div>
         ) : (
-          cityTours.map((tour) => {
-            const booked = selectedTours.some((t) => t.tourId === tour.id);
-            return (
-              <DiscoverTourCard
-                key={tour.id}
-                tour={tour}
-                cityName={cityName}
-                booked={booked}
-                onAdd={() => handleAddClick(tour)}
-              />
-            );
-          })
+          <>
+            {/* Profile header */}
+            <div className="flex items-center gap-6 p-4 text-white">
+              {cityImg ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={cityImg}
+                  alt=""
+                  className="h-20 w-20 shrink-0 rounded-full border border-zinc-700 object-cover"
+                />
+              ) : (
+                <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-full border border-zinc-700 bg-zinc-900 font-display text-2xl text-[#C4A35A]">
+                  {cityName.slice(0, 1)}
+                </div>
+              )}
+              <div className="min-w-0 flex-1">
+                <h2 className="truncate text-2xl font-bold">{cityName}</h2>
+                <div className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-sm">
+                  <span>
+                    <span className="font-semibold text-white">
+                      {tourItems.length}
+                    </span>{" "}
+                    <span className="text-zinc-400">Tours</span>
+                  </span>
+                  <span>
+                    <span className="font-semibold text-white">
+                      {experienceTours.length}
+                    </span>{" "}
+                    <span className="text-zinc-400">Experiences</span>
+                  </span>
+                </div>
+                {cityBio ? (
+                  <p className="mt-2 line-clamp-2 text-sm text-zinc-400">
+                    {cityBio}
+                  </p>
+                ) : null}
+              </div>
+            </div>
+
+            {/* Tabs */}
+            <div className="sticky top-0 z-30 flex justify-around border-b border-t border-zinc-800 bg-black py-3">
+              {(
+                [
+                  { id: "tours" as const, label: "Tours" },
+                  { id: "experiences" as const, label: "Experiences" },
+                  { id: "info" as const, label: "Extra Info" },
+                ] as const
+              ).map((tab) => {
+                const active = profileTab === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => setProfileTab(tab.id)}
+                    className={`relative px-2 pb-2 text-xs font-semibold uppercase tracking-wider ${
+                      active ? "text-white" : "text-zinc-500"
+                    }`}
+                  >
+                    {tab.label}
+                    {active ? (
+                      <span className="absolute inset-x-0 -bottom-[13px] h-0.5 bg-white" />
+                    ) : null}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Tab panels */}
+            {profileTab === "info" ? (
+              <div className="space-y-3 px-4 py-6 text-sm text-zinc-300">
+                <h3 className="text-base font-semibold text-white">
+                  About {cityName}
+                </h3>
+                {cityBio ? (
+                  <p className="whitespace-pre-wrap leading-relaxed text-zinc-400">
+                    {cityBio}
+                  </p>
+                ) : (
+                  <p className="text-zinc-500">
+                    No extra info published for this city yet.
+                  </p>
+                )}
+                <p className="text-xs text-zinc-500">
+                  {tourItems.length} tour{tourItems.length === 1 ? "" : "s"} ·{" "}
+                  {experienceTours.length} experience
+                  {experienceTours.length === 1 ? "" : "s"}
+                </p>
+              </div>
+            ) : gridTours.length === 0 ? (
+              <p className="col-span-3 px-4 py-10 text-center text-sm text-zinc-500">
+                No {profileTab === "experiences" ? "experiences" : "tours"}{" "}
+                available for this city yet.
+              </p>
+            ) : (
+              <div className="grid grid-cols-3 gap-1 pb-32">
+                {gridTours.map((tour, index) => (
+                  <TourThumb
+                    key={tour.id}
+                    tour={tour}
+                    booked={selectedTours.some((t) => t.tourId === tour.id)}
+                    onClick={() => setModalSlide(index)}
+                  />
+                ))}
+              </div>
+            )}
+          </>
         )}
       </main>
 
+      <TourDetailModal
+        open={modalSlide !== null && gridTours.length > 0}
+        tours={gridTours}
+        initialSlide={modalSlide ?? 0}
+        guests={guests}
+        isTourSelected={(id) => selectedTours.some((t) => t.tourId === id)}
+        scheduledLabelFor={(id) => {
+          const row = selectedTours.find((t) => t.tourId === id);
+          if (!row?.scheduledDate) return null;
+          return (
+            dayOptions.find((d) => d.date === row.scheduledDate)?.label ??
+            row.scheduledDate
+          );
+        }}
+        bookedLanguageFor={(id) => {
+          const row = selectedTours.find((t) => t.tourId === id);
+          return row?.selectedLanguage || null;
+        }}
+        onClose={() => setModalSlide(null)}
+        onAdd={(tour, lang) => handleAddFromModal(tour, lang)}
+      />
+
       <ScheduleTourDaySheet
-        open={!!pickingTour}
+        open={!!pickingTour && !!pendingLanguage}
         tour={pickingTour}
         cityName={cityName}
         dayOptions={dayOptions}
         selectedTours={selectedTours}
-        onClose={() => setPickingTour(null)}
+        onClose={() => {
+          setPickingTour(null);
+          setPendingLanguage("");
+        }}
         onSelectDay={(date) =>
-          pickingTour ? tryAddTour(pickingTour, date) : { ok: false }
+          pickingTour
+            ? tryAddTour(pickingTour, date, pendingLanguage)
+            : { ok: false }
         }
         onToast={setToast}
       />
@@ -241,6 +424,69 @@ export function DiscoverFeed() {
         <BottomNav />
       </div>
     </div>
+  );
+}
+
+function TourThumb({
+  tour,
+  booked,
+  onClick,
+}: {
+  tour: PbTour;
+  booked: boolean;
+  onClick: () => void;
+}) {
+  const isVideo = tourMediaType(tour) === "Video";
+  const thumbFile = tourPhoto(tour);
+  const mediaFile = tour.media_file || tour.cover_photo || tour.image || "";
+  const thumbUrl =
+    thumbFile && tour.collectionId
+      ? pbFileUrl(tour.collectionId, tour.id, thumbFile, "300x300")
+      : mediaFile && tour.collectionId && !isVideo
+        ? pbFileUrl(tour.collectionId, tour.id, mediaFile, "300x300")
+        : "";
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={tour.title}
+      className="group relative aspect-square cursor-pointer bg-zinc-900"
+    >
+      {thumbUrl ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={thumbUrl}
+          alt=""
+          className="h-full w-full object-cover transition group-hover:opacity-90"
+        />
+      ) : isVideo && mediaFile && tour.collectionId ? (
+        <video
+          src={pbFileUrl(tour.collectionId, tour.id, mediaFile)}
+          muted
+          playsInline
+          preload="metadata"
+          className="h-full w-full object-cover"
+        />
+      ) : (
+        <div className="flex h-full w-full items-end bg-gradient-to-br from-[#1a3355] to-[#0B1F3A] p-2">
+          <span className="line-clamp-3 text-left text-[10px] font-medium text-white/90">
+            {tour.title}
+          </span>
+        </div>
+      )}
+      <span className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-0 transition group-hover:opacity-100" />
+      {isVideo ? (
+        <span className="absolute right-1.5 top-1.5 text-white drop-shadow-md">
+          <Play className="h-3.5 w-3.5 fill-white" aria-hidden />
+        </span>
+      ) : null}
+      {booked ? (
+        <span className="absolute bottom-1 left-1 rounded bg-black/60 px-1 text-[9px] font-semibold text-[#E8D5A3]">
+          Added
+        </span>
+      ) : null}
+    </button>
   );
 }
 
@@ -297,153 +543,5 @@ function CityStory({
         {city.name}
       </span>
     </button>
-  );
-}
-
-function DiscoverTourCard({
-  tour,
-  cityName,
-  booked,
-  onAdd,
-}: {
-  tour: PbTour;
-  cityName: string;
-  booked: boolean;
-  onAdd: () => void;
-}) {
-  const [isExpanded, setIsExpanded] = useState(false);
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const mediaType = tourMediaType(tour);
-  const filename = tourMediaFile(tour);
-  const mediaUrl =
-    filename && tour.collectionId
-      ? pbFileUrl(tour.collectionId, tour.id, filename)
-      : "";
-  const hours = tourDurationHours(tour);
-  const price = tourPrice(tour);
-  const priceMin = price > 0 ? price : 0;
-  const priceMax = priceMin > 0 ? Math.round(priceMin * 1.15) : 0;
-  const description = (tour.description ?? "").trim();
-  const showMoreToggle = description.length > 90;
-
-  useEffect(() => {
-    const el = videoRef.current;
-    if (!el) return;
-    const io = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting && entry.intersectionRatio > 0.4) {
-          void el.play().catch(() => {});
-        } else {
-          el.pause();
-        }
-      },
-      { threshold: [0.4] }
-    );
-    io.observe(el);
-    return () => io.disconnect();
-  }, [mediaUrl]);
-
-  const priceLabel =
-    priceMin > 0
-      ? priceMax > priceMin
-        ? `From ${formatUsd(priceMin)} – ${formatUsd(priceMax)}`
-        : `From ${formatUsd(priceMin)}`
-      : null;
-  const detailBits = [
-    hours > 0 ? `${hours} hours` : null,
-    priceLabel,
-  ].filter(Boolean);
-
-  return (
-    <article className="mb-8 flex flex-col overflow-hidden rounded-t-2xl">
-      {/* White header */}
-      <div className="flex items-center justify-between gap-3 bg-white px-4 py-3 text-black">
-        <h2 className="min-w-0 truncate text-base leading-snug">
-          <span className="font-display text-xl font-black uppercase tracking-wide text-black sm:text-2xl">
-            {cityName},
-          </span>
-          <span className="ml-1.5 align-middle text-base font-normal text-gray-800">
-            {tour.title}
-          </span>
-        </h2>
-        {hours > 0 ? (
-          <span className="shrink-0 text-sm font-medium text-gray-700">
-            {hours} hours
-          </span>
-        ) : null}
-      </div>
-
-      {/* 1:1 media */}
-      <div className="relative aspect-square w-full bg-black">
-        {mediaUrl && mediaType === "Video" ? (
-          <video
-            ref={videoRef}
-            key={mediaUrl}
-            src={mediaUrl}
-            autoPlay
-            muted
-            loop
-            playsInline
-            preload="metadata"
-            className="absolute inset-0 h-full w-full object-cover"
-          />
-        ) : mediaUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={mediaUrl}
-            alt=""
-            className="absolute inset-0 h-full w-full object-cover"
-          />
-        ) : (
-          <div className="absolute inset-0 bg-gradient-to-br from-[#1a3355] to-[#0B1F3A]" />
-        )}
-      </div>
-
-      {/* Dark footer — merges with page */}
-      <div className="flex flex-col gap-1 bg-transparent px-4 py-3 text-white">
-        {detailBits.length > 0 ? (
-          <p className="text-xs text-gray-400">{detailBits.join(" · ")}</p>
-        ) : null}
-
-        <div className="flex items-start justify-between gap-4">
-          <div className="min-w-0 flex-1">
-            {description ? (
-              <>
-                <p
-                  className={`text-sm leading-relaxed text-white/90 ${
-                    isExpanded ? "" : "line-clamp-2"
-                  }`}
-                >
-                  {description}
-                </p>
-                {showMoreToggle ? (
-                  <button
-                    type="button"
-                    onClick={() => setIsExpanded((v) => !v)}
-                    className="mt-1 cursor-pointer text-sm text-gray-400 hover:text-white"
-                  >
-                    {isExpanded ? "Less." : "More."}
-                  </button>
-                ) : null}
-              </>
-            ) : (
-              <p className="text-sm text-gray-500">No description yet.</p>
-            )}
-          </div>
-
-          <button
-            type="button"
-            onClick={onAdd}
-            className={`shrink-0 rounded-full px-4 py-1.5 text-sm font-semibold transition ${
-              booked
-                ? "border border-[#C4A35A] bg-[#C4A35A]/15 text-[#E8D5A3]"
-                : "bg-[#0B1F3A] text-white hover:bg-[#143052]"
-            }`}
-          >
-            {booked ? "✓ Added" : "+ Add"}
-          </button>
-        </div>
-      </div>
-    </article>
   );
 }

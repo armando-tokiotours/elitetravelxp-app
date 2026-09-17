@@ -1,40 +1,41 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useEffect, useState } from "react";
-import { AnimatePresence, motion } from "framer-motion";
+import { Pencil } from "lucide-react";
 import type { PbSeasonTier } from "@/lib/pocketbase/client";
 import { resolveSeasonInsight } from "@/lib/seasonality";
-import { useBuilderStore } from "@/store/useBuilderStore";
-import { ChoicePill, FieldLabel, SectionBlock } from "./ui";
+import {
+  formatDisplayDate,
+  useBuilderStore,
+} from "@/store/useBuilderStore";
+import { travelPaceLabel } from "@/lib/travelPace";
+import { SectionBlock } from "./ui";
 import { SectionContinue } from "./SectionContinue";
-import { formatDisplayDate } from "@/store/useBuilderStore";
+import { useLazyModalMount } from "./modals/useLazyModalMount";
 
-const PRESETS = [10, 14, 21] as const;
+const DurationEditorModal = dynamic(
+  () =>
+    import("./modals/DurationEditorModal").then((m) => ({
+      default: m.DurationEditorModal,
+    })),
+  { ssr: false }
+);
 
 export function TripDurationSection({
   seasonTiers = [],
 }: {
   seasonTiers?: PbSeasonTier[];
 }) {
+  const [isDurationModalOpen, setIsDurationModalOpen] = useState(false);
+  const modalMounted = useLazyModalMount(isDurationModalOpen);
+
   const durationDays = useBuilderStore((s) => s.durationDays);
-  const durationCustom = useBuilderStore((s) => s.durationCustom);
   const arrivalDate = useBuilderStore((s) => s.arrivalDate);
-  const activeSeasonTier = useBuilderStore((s) => s.activeSeasonTier);
-  const activeSeasonNote = useBuilderStore((s) => s.activeSeasonNote);
   const adults = useBuilderStore((s) => s.adults);
   const children = useBuilderStore((s) => s.children);
-  const setDurationDays = useBuilderStore((s) => s.setDurationDays);
-  const setDurationCustom = useBuilderStore((s) => s.setDurationCustom);
-  const setArrivalDate = useBuilderStore((s) => s.setArrivalDate);
+  const travelPace = useBuilderStore((s) => s.travelPace);
   const setActiveSeason = useBuilderStore((s) => s.setActiveSeason);
-  const setAdults = useBuilderStore((s) => s.setAdults);
-  const setChildren = useBuilderStore((s) => s.setChildren);
-
-  const [customDraft, setCustomDraft] = useState(String(durationDays));
-
-  useEffect(() => {
-    if (durationCustom) setCustomDraft(String(durationDays));
-  }, [durationCustom, durationDays]);
 
   useEffect(() => {
     const insight = resolveSeasonInsight(seasonTiers, arrivalDate);
@@ -48,32 +49,18 @@ export function TripDurationSection({
     });
   }, [arrivalDate, seasonTiers, setActiveSeason]);
 
-  const selectPreset = (days: number) => {
-    setDurationCustom(false);
-    setDurationDays(days);
-  };
+  const totalGuests = adults + children;
+  const paceLabel = travelPaceLabel(travelPace);
 
-  const selectCustom = () => {
-    setDurationCustom(true);
-    const n = Math.max(1, durationDays || 1);
-    setDurationDays(n);
-    setCustomDraft(String(n));
-  };
+  const hasBasics = durationDays > 0 && Boolean(arrivalDate);
+  const row1 = hasBasics
+    ? `${durationDays} Days · Arriving ${formatDisplayDate(arrivalDate)}`
+    : "Set duration and date";
+  const row2 = `${totalGuests} Guest${totalGuests === 1 ? "" : "s"}${
+    paceLabel ? ` · ${paceLabel} Pace` : ""
+  }`;
 
-  const applyCustom = (raw: string) => {
-    setCustomDraft(raw);
-    const parsed = Number.parseInt(raw, 10);
-    if (Number.isFinite(parsed) && parsed >= 1) {
-      setDurationDays(parsed);
-    }
-  };
-
-  const commitCustom = () => {
-    const parsed = Number.parseInt(customDraft, 10);
-    const next = Number.isFinite(parsed) && parsed >= 1 ? parsed : 1;
-    setDurationDays(next);
-    setCustomDraft(String(next));
-  };
+  const openEditor = () => setIsDurationModalOpen(true);
 
   return (
     <SectionBlock
@@ -83,172 +70,43 @@ export function TripDurationSection({
       icon="calendar"
       summary={`${durationDays} day${durationDays === 1 ? "" : "s"}${
         arrivalDate ? ` · ${formatDisplayDate(arrivalDate)}` : ""
-      } · ${adults + children} guest${adults + children === 1 ? "" : "s"}`}
+      } · ${totalGuests} guest${totalGuests === 1 ? "" : "s"}${
+        paceLabel ? ` · ${paceLabel}` : ""
+      }`}
     >
-      <div className="flex flex-wrap gap-2">
-        {PRESETS.map((days) => (
-          <ChoicePill
-            key={days}
-            size="sm"
-            active={!durationCustom && durationDays === days}
-            onClick={() => selectPreset(days)}
-          >
-            {days} days
-          </ChoicePill>
-        ))}
-        <ChoicePill size="sm" active={durationCustom} onClick={selectCustom}>
-          Custom
-        </ChoicePill>
-      </div>
-
-      {durationCustom ? (
-        <div className="mt-4 rounded-xl border border-zinc-800 bg-zinc-950 p-4">
-          <FieldLabel>Enter days</FieldLabel>
-          <div className="mt-1 flex items-center gap-3">
-            <input
-              type="number"
-              min={1}
-              step={1}
-              inputMode="numeric"
-              value={customDraft}
-              onChange={(e) => applyCustom(e.target.value)}
-              onBlur={commitCustom}
-              placeholder="e.g. 1, 2, 3, 7"
-              className="w-36 rounded-xl border border-zinc-700 bg-zinc-900 px-3 py-2.5 text-sm text-white outline-none focus:border-[#C4A35A]"
-            />
-            <span className="text-sm text-zinc-400">
-              Minimum 1 day · Step 4 nights must total{" "}
-              <strong className="text-white">
-                {Math.max(1, durationDays)}
-              </strong>
-            </span>
-          </div>
+      <button
+        type="button"
+        onClick={openEditor}
+        className="w-full cursor-pointer rounded-2xl border border-zinc-800 bg-zinc-900 p-5 text-left transition-all hover:bg-zinc-800/80"
+      >
+        <div className="flex items-start justify-between gap-3">
+          <h3 className="text-sm font-semibold uppercase tracking-wider text-zinc-400">
+            Trip Details
+          </h3>
+          <Pencil className="h-4 w-4 shrink-0 text-zinc-500" aria-hidden />
         </div>
-      ) : null}
+        <p className="mt-3 text-lg font-medium text-white">{row1}</p>
+        <p className="mt-1 text-sm text-zinc-400">{row2}</p>
+      </button>
 
-      <div className="mt-5">
-        <FieldLabel>Arrival date</FieldLabel>
-        <input
-          type="date"
-          value={arrivalDate ?? ""}
-          onChange={(e) => setArrivalDate(e.target.value || null)}
-          className="mt-1 w-full max-w-xs rounded-xl border border-zinc-700 bg-zinc-900 px-3 py-2.5 text-sm text-white outline-none focus:border-[#C4A35A]"
-        />
-        <p className="mt-1.5 text-xs text-zinc-400">
-          Used for seasonality, hotel rates, concierge notes, and departure
-          date.
-        </p>
-
-        <AnimatePresence mode="wait">
-          {activeSeasonTier && activeSeasonNote ? (
-            <motion.div
-              key={`${activeSeasonTier}-${activeSeasonNote.note.slice(0, 24)}`}
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -6 }}
-              transition={{ duration: 0.28 }}
-              className="mt-3 rounded-2xl border border-[#E5D4A8] bg-zinc-950 px-4 py-3 text-sm text-white"
-            >
-              <p className="flex flex-wrap items-center gap-x-2 gap-y-1 font-semibold">
-                <SeasonLeafIcon />
-                <span>{activeSeasonTier} Season</span>
-                {activeSeasonNote.crowds ? (
-                  <span className="font-normal text-zinc-400">
-                    · {activeSeasonNote.crowds}
-                  </span>
-                ) : null}
-              </p>
-              {activeSeasonNote.note ? (
-                <p className="mt-1.5 text-zinc-400 leading-relaxed">
-                  {activeSeasonNote.note}
-                </p>
-              ) : null}
-            </motion.div>
-          ) : null}
-        </AnimatePresence>
-      </div>
-
-      <div className="mt-6">
-        <FieldLabel>Guests</FieldLabel>
-        <div className="mt-2 overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-900">
-          <GuestStepper
-            label="Adults"
-            value={adults}
-            onChange={setAdults}
-            min={1}
-          />
-          <GuestStepper
-            label="Children"
-            value={children}
-            onChange={setChildren}
-            min={0}
-          />
-        </div>
-        <p className="mt-1.5 text-xs text-zinc-400">
-          Used for airport transfers, vehicles, and hotel room guidance.
-        </p>
-      </div>
+      <button
+        type="button"
+        onClick={openEditor}
+        className="mt-3 flex w-full items-center justify-center gap-2 rounded-full border border-[#C4A35A]/50 bg-zinc-950 py-2.5 text-sm font-semibold text-white transition hover:border-[#C4A35A] hover:bg-[#0B1F3A]"
+      >
+        <Pencil className="h-3.5 w-3.5" aria-hidden />
+        Edit Trip Details
+      </button>
 
       <SectionContinue next={2} label="Continue to Arrival" />
+
+      {modalMounted ? (
+        <DurationEditorModal
+          open={isDurationModalOpen}
+          onClose={() => setIsDurationModalOpen(false)}
+          seasonTiers={seasonTiers}
+        />
+      ) : null}
     </SectionBlock>
-  );
-}
-
-function GuestStepper({
-  label,
-  value,
-  onChange,
-  min,
-}: {
-  label: string;
-  value: number;
-  onChange: (n: number) => void;
-  min: number;
-}) {
-  return (
-    <div className="flex items-center justify-between border-b border-zinc-800 px-4 py-3.5 last:border-b-0">
-      <span className="text-sm font-medium text-white">{label}</span>
-      <div className="flex items-center gap-3">
-        <button
-          type="button"
-          aria-label={`Decrease ${label}`}
-          onClick={() => onChange(Math.max(min, value - 1))}
-          className="flex h-9 w-9 items-center justify-center rounded-full border border-zinc-700 text-white transition hover:bg-zinc-950"
-        >
-          −
-        </button>
-        <span className="w-6 text-center text-sm font-semibold text-white">
-          {value}
-        </span>
-        <button
-          type="button"
-          aria-label={`Increase ${label}`}
-          onClick={() => onChange(value + 1)}
-          className="flex h-9 w-9 items-center justify-center rounded-full border border-zinc-700 text-white transition hover:bg-zinc-950"
-        >
-          +
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function SeasonLeafIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
-      <path
-        d="M12 3c4 2 7 6 7 10a7 7 0 11-14 0c0-4 3-8 7-10z"
-        stroke="#C4A35A"
-        strokeWidth="1.6"
-        fill="#C4A35A"
-        fillOpacity="0.25"
-      />
-      <path
-        d="M12 7v10"
-        stroke="#C4A35A"
-        strokeWidth="1.4"
-        strokeLinecap="round"
-      />
-    </svg>
   );
 }

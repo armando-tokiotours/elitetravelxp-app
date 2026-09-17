@@ -8,11 +8,21 @@ import {
 import { calculateBuilderQuote, formatUsd } from "@/lib/builder-pricing";
 import { useBuilderStore } from "@/store/useBuilderStore";
 import { BottomNav } from "@/components/builder/BottomNav";
+import {
+  PrintRequestModal,
+  type PrintRequestResult,
+} from "@/components/checkout/PrintRequestModal";
+import { RetrieveItineraryModal } from "@/components/checkout/RetrieveItineraryModal";
 
 export default function ExportPage() {
   const state = useBuilderStore();
   const [config, setConfig] = useState<BuilderConfig | null>(null);
   const [copied, setCopied] = useState(false);
+  const [printOpen, setPrintOpen] = useState(false);
+  const [retrieveOpen, setRetrieveOpen] = useState(false);
+  const [printResult, setPrintResult] = useState<PrintRequestResult | null>(
+    null
+  );
 
   useEffect(() => {
     useBuilderStore.persist.rehydrate();
@@ -44,8 +54,6 @@ export default function ExportPage() {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const handlePrint = () => window.print();
-
   return (
     <div className="builder-theme min-h-screen bg-[#F5F0E8] pb-28 text-[#0B1F3A]">
       <header className="border-b border-[#E8E2D9] bg-[#FBF8F2] px-4 py-5">
@@ -57,8 +65,8 @@ export default function ExportPage() {
 
       <main className="mx-auto max-w-3xl space-y-4 px-4 py-6">
         <p className="text-sm text-[#5C6570]">
-          Your selections are saved automatically in this browser. Export a
-          print-ready summary or copy the JSON payload for your concierge team.
+          Your selections are saved automatically in this browser. Email a PDF
+          with a booking PNR, or copy the JSON payload for your concierge team.
         </p>
 
         {quote ? (
@@ -75,10 +83,17 @@ export default function ExportPage() {
         <div className="flex flex-col gap-3 sm:flex-row">
           <button
             type="button"
-            onClick={handlePrint}
+            onClick={() => setPrintOpen(true)}
             className="flex-1 rounded-full bg-[#0B1F3A] py-3 text-sm font-semibold text-white"
           >
-            Print / Save PDF
+            Send / Save PDF
+          </button>
+          <button
+            type="button"
+            onClick={() => setRetrieveOpen(true)}
+            className="flex-1 rounded-full border border-[#0B1F3A] py-3 text-sm font-semibold"
+          >
+            Retrieve by PNR
           </button>
           <button
             type="button"
@@ -93,6 +108,38 @@ export default function ExportPage() {
           {payload}
         </pre>
       </main>
+
+      <PrintRequestModal
+        isOpen={printOpen}
+        onClose={() => setPrintOpen(false)}
+        onSuccess={setPrintResult}
+      />
+      <RetrieveItineraryModal
+        isOpen={retrieveOpen}
+        onClose={() => setRetrieveOpen(false)}
+      />
+
+      {printResult ? (
+        <div className="fixed inset-0 z-[80] flex items-end justify-center bg-black/45 p-4 sm:items-center">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
+            <p className="text-[0.65rem] font-semibold uppercase tracking-[0.3em] text-[#C4A35A]">
+              Itinerary saved
+            </p>
+            <h2 className="mt-2 font-display text-2xl text-[#0B1F3A]">
+              PNR {printResult.bookingRef}
+            </h2>
+            <p className="mt-2 text-sm text-[#5C6570]">{printResult.message}</p>
+            <button
+              type="button"
+              onClick={() => setPrintResult(null)}
+              className="mt-5 w-full rounded-full bg-[#0B1F3A] py-2.5 text-sm font-semibold text-white"
+            >
+              Done
+            </button>
+          </div>
+        </div>
+      ) : null}
+
       <BottomNav />
     </div>
   );

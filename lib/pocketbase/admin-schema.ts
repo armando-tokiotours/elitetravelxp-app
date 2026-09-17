@@ -21,6 +21,7 @@ export type FieldType =
   | "number"
   | "bool"
   | "select"
+  | "multiselect"
   | "city"
   | "hub"
   | "vehicle"
@@ -86,8 +87,21 @@ export const COLLECTIONS: CollectionDef[] = [
     fileFields: ["cover_photo", "media_file"],
     fields: [
       { key: "city_id", label: "City", type: "city", required: true },
+      {
+        key: "category",
+        label: "Category",
+        type: "select",
+        required: true,
+        options: ["tour", "activity"],
+      },
       { key: "title", label: "Title", type: "text", required: true },
       { key: "description", label: "Description", type: "textarea" },
+      { key: "route", label: "Route", type: "textarea" },
+      {
+        key: "inclusions_exclusions",
+        label: "Inclusions & Exclusions",
+        type: "textarea",
+      },
       {
         key: "media_type",
         label: "Media type",
@@ -108,14 +122,38 @@ export const COLLECTIONS: CollectionDef[] = [
         legacyKey: "image",
       },
       {
-        key: "base_price",
-        label: "Base price (€)",
+        key: "price_1_pax",
+        label: "1 Pax (€)",
         type: "number",
         required: true,
-        // Saved as base_price + price_per_person + required legacy `price`
-        legacyKey: "price_per_person",
+      },
+      { key: "price_2_pax", label: "2 Pax (€)", type: "number", required: true },
+      { key: "price_3_pax", label: "3 Pax (€)", type: "number", required: true },
+      { key: "price_4_pax", label: "4 Pax (€)", type: "number", required: true },
+      {
+        key: "price_extra_pax",
+        label: "Extra Pax 5+ (€)",
+        type: "number",
+        required: true,
       },
       { key: "duration_hours", label: "Duration (hours)", type: "number" },
+      {
+        key: "languages",
+        label: "Languages",
+        type: "multiselect",
+        options: [
+          "English",
+          "Dutch",
+          "Spanish",
+          "French",
+          "German",
+          "Italian",
+          "Japanese",
+          "Portuguese",
+          "Chinese",
+          "Korean",
+        ],
+      },
       {
         key: "is_customizable_duration",
         label: "Tailor-made duration (guest can adjust hours)",
@@ -488,7 +526,11 @@ export const COLLECTIONS: CollectionDef[] = [
           "airport_pickup",
           "airport_dropoff",
           "private_chauffeur",
+          "hotel_rooms",
           "elite_concierge",
+          "guide_explainer",
+          "daily_transport_explainer",
+          "public_transport",
         ],
       },
       { key: "title", label: "Title", type: "text", required: true },

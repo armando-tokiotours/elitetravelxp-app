@@ -1,4 +1,8 @@
 import PocketBase, { BaseAuthStore } from "pocketbase";
+import {
+  calculateTourPrice,
+  type TourPriceGuests,
+} from "@/lib/tourPricing";
 
 export function getPbBaseUrl(): string {
   // Prefer explicit env (set in .env.local for local, Docker build args for VPS).
@@ -92,8 +96,11 @@ export function tourMediaType(tour: PbTour): "Image" | "Video" {
   return "Image";
 }
 
-export function tourPrice(tour: PbTour): number {
-  return Number(tour.base_price ?? tour.price_per_person ?? tour.price ?? 0);
+export function tourPrice(
+  tour: PbTour,
+  guests: TourPriceGuests | number = 2
+): number {
+  return calculateTourPrice(guests, tour);
 }
 
 export function transferLocation(t: PbTransfer): string {
@@ -337,19 +344,40 @@ export interface PbTour {
   city_id: string;
   title: string;
   description?: string;
+  /** `tour` = Tours tab · `activity` = Experiences tab */
+  category?: "tour" | "activity" | string;
+  /** Suggested itinerary / stops */
+  route?: string;
+  /** What’s included and excluded */
+  inclusions_exclusions?: string;
   cover_photo?: string;
   media_type?: "Image" | "Video";
   media_file?: string;
-  base_price?: number;
-  price_per_person?: number;
+  /** Group rate for 1 passenger */
+  price_1_pax?: number;
+  /** Group rate for 2 passengers */
+  price_2_pax?: number;
+  /** Group rate for 3 passengers */
+  price_3_pax?: number;
+  /** Group rate for 4 passengers */
+  price_4_pax?: number;
+  /** Flat add-on per guest beyond 4 */
+  price_extra_pax?: number;
   duration_hours?: number;
+  /** Guided languages offered for this experience */
+  languages?: string[];
   /** Tailor-made: guest can override duration at booking time */
   is_customizable_duration?: boolean;
   is_active?: boolean;
   collectionId?: string;
   /** @deprecated legacy */
   image?: string;
+  /** @deprecated legacy single price — prefer tiered price_*_pax */
   price?: number;
+  /** @deprecated legacy per-person */
+  price_per_person?: number;
+  /** @deprecated removed — prefer tiered price_*_pax */
+  base_price?: number;
   expand?: { city_id?: PbCity };
 }
 

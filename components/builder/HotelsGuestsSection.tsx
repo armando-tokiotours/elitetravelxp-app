@@ -1,17 +1,46 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useEffect, useMemo, useState } from "react";
-import type { PbAccommodation, PbCity } from "@/lib/pocketbase/client";
+import {
+  BedDouble,
+  CheckCircle2,
+  ChevronRight,
+  Pencil,
+} from "lucide-react";
+import {
+  cityPhoto,
+  pbFileUrl,
+  type PbAccommodation,
+  type PbCity,
+} from "@/lib/pocketbase/client";
+import { isBuilderStepComplete } from "@/lib/builderSteps";
 import {
   useBuilderStore,
+  normalizeCityHotelPref,
   type CityHotelPref,
-  type HotelRoomType,
-  type HotelStarRating,
 } from "@/store/useBuilderStore";
-import { FieldLabel, SectionBlock } from "./ui";
+import {
+  calculateRoomRequirements,
+  formatHotelRoomsSummary,
+  getHotelAllocationStatus,
+  suggestedHotelRooms,
+  totalHotelRooms,
+} from "@/lib/hotelCalculator";
+import { SectionBlock } from "./ui";
 import { SectionContinue } from "./SectionContinue";
+import { useLazyModalMount } from "./modals/useLazyModalMount";
 
-const ROOM_TYPES: HotelRoomType[] = ["Standard", "Twin", "Superior"];
+const HotelsEditorModal = dynamic(
+  () =>
+    import("./modals/HotelsEditorModal").then((m) => ({
+      default: m.HotelsEditorModal,
+    })),
+  { ssr: false }
+);
+
+const LUXURY_PREVIEW_FALLBACK = "/photo/11007.jpg";
+
 const MONTHS = [
   "January",
   "February",
@@ -35,113 +64,14 @@ function monthNameFromIso(iso: string | null): string | null {
   return MONTHS[month - 1];
 }
 
-function normalizeStar(raw: unknown): string {
-  const s = String(raw || "").toLowerCase();
-  if (s.includes("3")) return "3-star";
-  if (s.includes("4")) return "4-star";
-  if (s.includes("5")) return "5-star";
-  return "";
-}
-
-function normalizeRoom(raw: unknown): string {
-  const s = String(raw || "").trim().toLowerCase();
-  if (s === "twin") return "Twin";
-  if (s === "superior") return "Superior";
-  if (s === "standard") return "Standard";
-  return String(raw || "").trim();
-}
-
-function normalizeBreakfast(raw: unknown): "Included" | "Not Included" | "" {
-  const s = String(raw || "").toLowerCase();
-  if (!s) return "";
-  if (s.includes("not") || s === "false" || s === "0") return "Not Included";
-  if (s.includes("include") || s === "true" || s === "1" || s === "yes")
-    return "Included";
-  return "";
-}
-
-function pricePair(a: PbAccommodation): { min: number; max: number } | null {
-  const min = Number(a.price_min ?? a.min_price_per_night ?? a.min_price);
-  const max = Number(a.price_max ?? a.max_price_per_night ?? a.max_price);
-  if (!Number.isFinite(min) || !Number.isFinite(max) || min <= 0 || max <= 0) {
-    return null;
-  }
-  return { min, max };
-}
-
-/** Score accommodations so UI prefs map 1:1 to the Excel/PB matrix rows. */
-function findMatrixRate(
-  rows: PbAccommodation[],
-  opts: {
-    cityId: string;
-    starRating: HotelStarRating;
-    roomType: HotelRoomType;
-    breakfast: boolean;
-    monthName: string | null;
-    seasonTier: "Low" | "Mid" | "High" | null;
-  }
-): { min: number; max: number; monthMatched: boolean; tierMatched: boolean } | null {
-  const starStr = `${opts.starRating}-star`;
-  const breakfastStr = opts.breakfast ? "Included" : "Not Included";
-  const roomStr = opts.roomType;
-
-  let best: {
-    score: number;
-    prices: { min: number; max: number };
-    monthMatched: boolean;
-    tierMatched: boolean;
-  } | null = null;
-
-  for (const a of rows) {
-    if (!a.city_id || a.city_id !== opts.cityId) continue;
-
-    const aStar = normalizeStar(a.star_rating || a.tier);
-    if (aStar !== starStr) continue;
-
-    const aRoom = normalizeRoom(a.room_type);
-    if (aRoom !== roomStr) continue;
-
-    const aBf = normalizeBreakfast(a.breakfast);
-    if (aBf && aBf !== breakfastStr) continue;
-
-    const aSeason = String(a.season_tier || "").trim();
-    // When a global season tier is active, prefer / require matching hotel rows
-    if (opts.seasonTier && aSeason && aSeason !== opts.seasonTier) continue;
-
-    const prices = pricePair(a);
-    if (!prices) continue;
-
-    let score = 10;
-    const monthMatched = !!(opts.monthName && a.month === opts.monthName);
-    const tierMatched = !!(opts.seasonTier && aSeason === opts.seasonTier);
-
-    if (opts.monthName && a.month) {
-      if (a.month !== opts.monthName) continue;
-      score += 5;
-    }
-    if (tierMatched) score += 4;
-    if (aBf === breakfastStr) score += 2;
-
-    if (!best || score > best.score) {
-      best = { score, prices, monthMatched, tierMatched };
-    }
-  }
-
-  // Fallbacks: drop season, then month, if no exact matrix hit
-  if (!best && opts.seasonTier) {
-    return findMatrixRate(rows, { ...opts, seasonTier: null });
-  }
-  if (!best && opts.monthName) {
-    return findMatrixRate(rows, { ...opts, monthName: null });
-  }
-
-  if (!best) return null;
-  return {
-    min: best.prices.min,
-    max: best.prices.max,
-    monthMatched: best.monthMatched,
-    tierMatched: best.tierMatched,
-  };
+function cityPreviewUrl(city: PbCity | undefined): string {
+  if (!city) return LUXURY_PREVIEW_FALLBACK;
+  const filename = cityPhoto(city);
+  if (!filename) return LUXURY_PREVIEW_FALLBACK;
+  return (
+    pbFileUrl(city.collectionId, city.id, filename, "200x200") ||
+    LUXURY_PREVIEW_FALLBACK
+  );
 }
 
 export function HotelsGuestsSection({
@@ -153,20 +83,26 @@ export function HotelsGuestsSection({
   cities: PbCity[];
   maxAdultsPerRoom?: number;
 }) {
+  const [isHotelModalOpen, setIsHotelModalOpen] = useState(false);
+  const modalMounted = useLazyModalMount(isHotelModalOpen);
+
   const locations = useBuilderStore((s) => s.locations);
   const cityHotels = useBuilderStore((s) => s.cityHotels);
   const adults = useBuilderStore((s) => s.adults);
   const children = useBuilderStore((s) => s.children);
   const arrivalDate = useBuilderStore((s) => s.arrivalDate);
+  const durationDays = useBuilderStore((s) => s.durationDays);
+  const arrivalTransferId = useBuilderStore((s) => s.arrivalTransferId);
+  const departureTransferId = useBuilderStore((s) => s.departureTransferId);
   const activeSeasonTier = useBuilderStore((s) => s.activeSeasonTier);
   const setCityHotel = useBuilderStore((s) => s.setCityHotel);
   const ensureCityHotels = useBuilderStore((s) => s.ensureCityHotels);
+  const setRoomCount = useBuilderStore((s) => s.setRoomCount);
 
   const orderedCityIds = useMemo(() => {
     const seen = new Set<string>();
     const ids: string[] = [];
     for (const loc of locations) {
-      // Arrival/departure waypoints are 0-night — no hotel stop
       if (loc.visitType && loc.visitType !== "stay") continue;
       if (loc.nights <= 0) continue;
       if (!seen.has(loc.cityId)) {
@@ -181,19 +117,102 @@ export function HotelsGuestsSection({
     if (orderedCityIds.length) ensureCityHotels(orderedCityIds);
   }, [orderedCityIds, ensureCityHotels]);
 
-  const cityName = (id: string) =>
-    cities.find((c) => c.id === id)?.name || "City";
+  const cityById = (id: string) => cities.find((c) => c.id === id);
+  const cityName = (id: string) => cityById(id)?.name || "City";
 
   const totalGuests = adults + children;
+  const roomCapacity = Math.max(
+    1,
+    Math.min(2, Number(maxAdultsPerRoom) || 2)
+  );
+  const roomReq = useMemo(
+    () => calculateRoomRequirements(totalGuests, roomCapacity),
+    [totalGuests, roomCapacity]
+  );
+
+  useEffect(() => {
+    if (!orderedCityIds.length || totalGuests <= 0) return;
+    const suggested = suggestedHotelRooms(totalGuests, roomCapacity);
+    for (const id of orderedCityIds) {
+      const pref = normalizeCityHotelPref(
+        cityHotels[id] || { cityId: id },
+        id,
+        roomReq?.roomsNeeded ?? 1
+      );
+      if (totalHotelRooms(pref.rooms) === 0) {
+        setCityHotel(id, { rooms: suggested });
+      }
+    }
+    const first = cityHotels[orderedCityIds[0]];
+    const count = first ? totalHotelRooms(first.rooms) : roomReq?.roomsNeeded;
+    if (count && count > 0) setRoomCount(count);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [totalGuests, roomCapacity, orderedCityIds.join("|")]);
+
   const hotelCities = orderedCityIds.filter(
     (id) => cityHotels[id]?.needsHotel !== false
   );
+
+  const hotelsComplete = isBuilderStepComplete(4, {
+    arrivalDate,
+    durationDays,
+    adults,
+    children,
+    arrivalTransferId,
+    departureTransferId,
+    locations,
+    cityHotels,
+  });
+
+  const overallAllocation = useMemo(() => {
+    if (hotelCities.length === 0) {
+      return {
+        remaining: totalGuests,
+        covered: false,
+        label: "No hotel stops",
+      };
+    }
+    let worstRemaining = 0;
+    let allCovered = true;
+    for (const id of hotelCities) {
+      const pref = normalizeCityHotelPref(
+        cityHotels[id] || { cityId: id },
+        id
+      );
+      const status = getHotelAllocationStatus(
+        pref.rooms,
+        totalGuests,
+        pref.standardOccupancy
+      );
+      if (status.remainingGuests > worstRemaining) {
+        worstRemaining = status.remainingGuests;
+      }
+      if (status.remainingGuests > 0 || status.tone !== "ok") {
+        allCovered = false;
+      }
+    }
+    return {
+      remaining: worstRemaining,
+      covered: allCovered && totalGuests > 0,
+      label: allCovered
+        ? `All ${totalGuests} guests accommodated`
+        : `${worstRemaining} of ${totalGuests} guests unassigned`,
+    };
+  }, [cityHotels, hotelCities, totalGuests]);
+
   const summary =
     orderedCityIds.length === 0
       ? "Add locations first"
-      : `${totalGuests} guest${totalGuests === 1 ? "" : "s"} · ${hotelCities.length} hotel stop${hotelCities.length === 1 ? "" : "s"}`;
+      : [
+          `${totalGuests} guest${totalGuests === 1 ? "" : "s"}`,
+          roomReq ? roomReq.breakdownText : null,
+          `${hotelCities.length} hotel stop${hotelCities.length === 1 ? "" : "s"}`,
+        ]
+          .filter(Boolean)
+          .join(" · ");
 
   const monthName = monthNameFromIso(arrivalDate);
+  const openEditor = () => setIsHotelModalOpen(true);
 
   return (
     <SectionBlock
@@ -203,329 +222,162 @@ export function HotelsGuestsSection({
       icon="hotel"
       summary={summary}
     >
-      <div className="flex flex-col gap-5">
-        <p className="text-xs text-zinc-500">
-          Party size from Step 1:{" "}
-          <span className="font-medium text-white">
-            {totalGuests} guest{totalGuests === 1 ? "" : "s"}
-          </span>{" "}
-          ({adults} adults, {children} children). Guidance: max{" "}
-          {maxAdultsPerRoom} adults per room.
-          {monthName ? (
-            <>
-              {" "}
-              Rates use{" "}
-              <span className="font-medium text-white">{monthName}</span>
-              {activeSeasonTier ? (
-                <>
-                  {" "}
-                  ·{" "}
-                  <span className="font-medium text-white">
-                    {activeSeasonTier} season
-                  </span>
-                </>
-              ) : null}{" "}
-              from your arrival date.
-            </>
-          ) : (
-            <> Set an arrival date in Step 1 for month-accurate rates.</>
-          )}
-        </p>
+      <HotelsSummaryWidget
+        orderedCityIds={orderedCityIds}
+        cityById={cityById}
+        cityName={cityName}
+        cityHotels={cityHotels}
+        totalGuests={totalGuests}
+        overallAllocation={overallAllocation}
+        onClick={openEditor}
+      />
 
-        {orderedCityIds.length === 0 ? (
-          <p className="rounded-xl border border-dashed border-zinc-700 bg-zinc-950 p-4 text-sm text-zinc-400">
-            Choose cities in Step 3 (Locations &amp; Nights) to configure hotels
-            per stop.
-          </p>
-        ) : (
-          <div className="flex flex-col gap-3">
-            {orderedCityIds.map((cityId) => (
-              <CityHotelCard
-                key={cityId}
-                cityId={cityId}
-                cityName={cityName(cityId)}
-                pref={cityHotels[cityId]}
-                monthName={monthName}
-                seasonTier={activeSeasonTier}
-                accommodations={accommodations.filter(
-                  (a) => a.city_id === cityId
-                )}
-                onChange={(patch) => setCityHotel(cityId, patch)}
-              />
-            ))}
-          </div>
-        )}
-      </div>
+      <button
+        type="button"
+        onClick={openEditor}
+        disabled={orderedCityIds.length === 0}
+        className="mt-3 flex w-full items-center justify-center gap-2 rounded-full border border-[#C4A35A]/50 bg-zinc-950 py-2.5 text-sm font-semibold text-white transition hover:border-[#C4A35A] hover:bg-[#0B1F3A] disabled:cursor-not-allowed disabled:opacity-40"
+      >
+        <Pencil className="h-3.5 w-3.5" aria-hidden />
+        {orderedCityIds.length === 0
+          ? "Add cities in Step 3 first"
+          : "Edit Hotels"}
+      </button>
 
       <SectionContinue next={5} label="Continue to Tours" />
+
+      {modalMounted ? (
+      <HotelsEditorModal
+        open={isHotelModalOpen}
+        onClose={() => setIsHotelModalOpen(false)}
+        orderedCityIds={orderedCityIds}
+        cityById={cityById}
+        cityName={cityName}
+        cityHotels={cityHotels}
+        accommodations={accommodations}
+        monthName={monthName}
+        seasonTier={activeSeasonTier}
+        totalGuests={totalGuests}
+        adults={adults}
+        children={children}
+        roomReq={roomReq}
+        hotelsComplete={hotelsComplete}
+        overallAllocation={overallAllocation}
+        onChange={(cityId, patch) => setCityHotel(cityId, patch)}
+      />
+      ) : null}
+
     </SectionBlock>
   );
 }
 
-function coerceStarRating(raw: unknown): HotelStarRating {
-  const n = Number(raw);
-  if (n === 3 || n === 4 || n === 5) return n;
-  const fromStr = normalizeStar(raw);
-  if (fromStr === "3-star") return 3;
-  if (fromStr === "5-star") return 5;
-  return 4;
-}
-
-function CityHotelCard({
-  cityId,
+function HotelsSummaryWidget({
+  orderedCityIds,
+  cityById,
   cityName,
-  pref,
-  monthName,
-  seasonTier,
-  accommodations,
-  onChange,
-}: {
-  cityId: string;
-  cityName: string;
-  pref?: CityHotelPref;
-  monthName: string | null;
-  seasonTier: "Low" | "Mid" | "High" | null;
-  accommodations: PbAccommodation[];
-  onChange: (patch: Partial<CityHotelPref>) => void;
-}) {
-  const needsHotel = pref?.needsHotel ?? true;
-  const starRating = coerceStarRating(pref?.starRating);
-  const roomType: HotelRoomType =
-    pref?.roomType === "Twin" || pref?.roomType === "Superior"
-      ? pref.roomType
-      : "Standard";
-  const breakfast = pref?.breakfast ?? true;
-
-  const [matrixRate, setMatrixRate] = useState<{
-    min: number;
-    max: number;
-    monthMatched: boolean;
-    tierMatched: boolean;
-  } | null>(null);
-
-  useEffect(() => {
-    if (!needsHotel) {
-      setMatrixRate(null);
-      return;
-    }
-    const hit = findMatrixRate(accommodations, {
-      cityId,
-      starRating,
-      roomType,
-      breakfast,
-      monthName,
-      seasonTier,
-    });
-    setMatrixRate(hit);
-  }, [
-    accommodations,
-    breakfast,
-    cityId,
-    monthName,
-    needsHotel,
-    roomType,
-    seasonTier,
-    starRating,
-  ]);
-
-  const rateHint = matrixRate
-    ? `€${matrixRate.min}–€${matrixRate.max}/night`
-    : null;
-
-  return (
-    <div className="overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-900">
-      <div className="flex items-center justify-between gap-3 px-4 py-3.5">
-        <h3 className="font-display text-xl text-white">{cityName}</h3>
-        <label className="flex cursor-pointer items-center gap-2.5 text-xs text-zinc-400">
-          <span className="hidden sm:inline">
-            Need a hotel in {cityName}?
-          </span>
-          <span className="sm:hidden">Hotel?</span>
-          <button
-            type="button"
-            role="switch"
-            aria-checked={needsHotel}
-            onClick={() => onChange({ needsHotel: !needsHotel })}
-            className={`relative h-7 w-12 shrink-0 rounded-full transition ${
-              needsHotel ? "bg-[#C4A35A]" : "bg-zinc-700"
-            }`}
-          >
-            <span
-              className={`absolute top-0.5 h-6 w-6 rounded-full bg-zinc-900 shadow transition ${
-                needsHotel ? "left-[1.35rem]" : "left-0.5"
-              }`}
-            />
-          </button>
-        </label>
-      </div>
-
-      {needsHotel ? (
-        <div className="space-y-5 border-t border-zinc-800 px-4 py-4">
-          <div>
-            <FieldLabel>Star rating</FieldLabel>
-            <div className="mt-1 flex items-center gap-1.5">
-              {([3, 4, 5] as HotelStarRating[]).map((n) => (
-                <button
-                  key={n}
-                  type="button"
-                  aria-label={`${n}-star`}
-                  aria-pressed={starRating === n}
-                  onClick={() => onChange({ starRating: n })}
-                  className="p-0.5 transition"
-                >
-                  <StarIcon filled={starRating >= n} />
-                </button>
-              ))}
-              <span className="ml-2 text-sm font-medium text-white">
-                {starRating}-star
-              </span>
-            </div>
-          </div>
-
-          <div>
-            <FieldLabel>Room type</FieldLabel>
-            <div className="mt-1 flex flex-wrap gap-2">
-              {ROOM_TYPES.map((t) => (
-                <button
-                  key={t}
-                  type="button"
-                  onClick={() => onChange({ roomType: t })}
-                  className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
-                    roomType === t
-                      ? "bg-[#0B1F3A] text-white"
-                      : "border border-zinc-700 bg-zinc-950 text-white"
-                  }`}
-                >
-                  {t}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div>
-            <FieldLabel>Breakfast</FieldLabel>
-            <div className="mt-1 grid grid-cols-2 gap-2.5">
-              <BreakfastButton
-                active={breakfast}
-                onClick={() => onChange({ breakfast: true })}
-                label="With Breakfast"
-                icon="coffee"
-              />
-              <BreakfastButton
-                active={!breakfast}
-                onClick={() => onChange({ breakfast: false })}
-                label="No Breakfast"
-                icon="ban"
-              />
-            </div>
-          </div>
-
-          {rateHint ? (
-            <p className="text-xs text-zinc-400">
-              Matrix rate hint
-              {monthName || seasonTier ? (
-                <>
-                  {" "}
-                  (
-                  {[
-                    monthName,
-                    seasonTier ? `${seasonTier} season` : null,
-                    matrixRate?.monthMatched || matrixRate?.tierMatched
-                      ? null
-                      : "nearest",
-                  ]
-                    .filter(Boolean)
-                    .join(" · ")}
-                  )
-                </>
-              ) : null}
-              :{" "}
-              <span className="font-semibold text-white">{rateHint}</span>
-            </p>
-          ) : (
-            <p className="text-xs text-[#B8B0A4]">
-              No matrix rate for {starRating}-star · {roomType} ·{" "}
-              {breakfast ? "Included" : "Not Included"}
-              {monthName ? ` · ${monthName}` : ""}
-              {seasonTier ? ` · ${seasonTier}` : ""}. Try another combo or set
-              arrival date.
-            </p>
-          )}
-        </div>
-      ) : null}
-    </div>
-  );
-}
-
-function BreakfastButton({
-  active,
+  cityHotels,
+  totalGuests,
+  overallAllocation,
   onClick,
-  label,
-  icon,
 }: {
-  active: boolean;
+  orderedCityIds: string[];
+  cityById: (id: string) => PbCity | undefined;
+  cityName: (id: string) => string;
+  cityHotels: Record<string, CityHotelPref>;
+  totalGuests: number;
+  overallAllocation: {
+    remaining: number;
+    covered: boolean;
+    label: string;
+  };
   onClick: () => void;
-  label: string;
-  icon: "coffee" | "ban";
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className={`flex flex-col items-center gap-2 rounded-2xl border px-3 py-4 text-center transition ${
-        active
-          ? "border-[#0B1F3A] bg-[#0B1F3A] text-white"
-          : "border-zinc-800 bg-zinc-950 text-white hover:border-[#C4A35A]"
-      }`}
+      disabled={orderedCityIds.length === 0}
+      className="group w-full rounded-[1.35rem] border border-zinc-800 bg-[#1C1C1E] p-4 text-left transition hover:border-[#C4A35A]/45 hover:bg-[#222226] disabled:cursor-not-allowed disabled:opacity-60 sm:p-5"
     >
-      {icon === "coffee" ? <CoffeeIcon /> : <BanIcon />}
-      <span className="text-xs font-semibold sm:text-sm">{label}</span>
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-zinc-500">
+            Luxury hotels
+          </p>
+          <p className="mt-1 font-display text-xl text-white sm:text-2xl">
+            {orderedCityIds.length === 0
+              ? "No hotel stops yet"
+              : `${orderedCityIds.length} cit${orderedCityIds.length === 1 ? "y" : "ies"}`}
+          </p>
+        </div>
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-amber-500/15 text-amber-400">
+          <BedDouble className="h-4 w-4" aria-hidden />
+        </span>
+      </div>
+
+      {orderedCityIds.length > 0 ? (
+        <ul className="mt-4 space-y-2">
+          {orderedCityIds.map((id) => {
+            const pref = normalizeCityHotelPref(
+              cityHotels[id] || { cityId: id },
+              id
+            );
+            const mix = formatHotelRoomsSummary(
+              pref.rooms,
+              pref.standardOccupancy
+            );
+            const preview = cityPreviewUrl(cityById(id));
+            return (
+              <li
+                key={id}
+                className="flex items-center gap-3 rounded-xl border border-zinc-800 bg-zinc-950/80 px-3 py-2"
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={preview}
+                  alt=""
+                  className="h-10 w-10 shrink-0 rounded-lg object-cover"
+                />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm font-medium text-white">
+                    {cityName(id)}
+                  </span>
+                  <span className="block truncate text-[11px] text-zinc-500">
+                    {pref.needsHotel
+                      ? `${pref.starRating}★ · ${mix || "No rooms"} · ${
+                          pref.breakfast ? "Breakfast" : "No breakfast"
+                        }`
+                      : "Hotel not needed"}
+                  </span>
+                </span>
+              </li>
+            );
+          })}
+        </ul>
+      ) : (
+        <p className="mt-3 text-sm text-zinc-500">
+          Choose stay cities in Step 3, then configure rooms and breakfast here.
+        </p>
+      )}
+
+      <div className="mt-4 flex items-end justify-between gap-3 border-t border-zinc-800/80 pt-3">
+        <p
+          className={`inline-flex items-center gap-1.5 text-xs font-medium ${
+            overallAllocation.covered ? "text-emerald-400" : "text-amber-400"
+          }`}
+        >
+          {overallAllocation.covered ? (
+            <CheckCircle2 className="h-3.5 w-3.5 shrink-0" aria-hidden />
+          ) : null}
+          {orderedCityIds.length === 0
+            ? `${totalGuests} guests · awaiting cities`
+            : overallAllocation.label}
+        </p>
+        <ChevronRight
+          className="h-4 w-4 shrink-0 text-zinc-600 transition group-hover:text-[#C4A35A]"
+          aria-hidden
+        />
+      </div>
     </button>
-  );
-}
-
-function StarIcon({ filled }: { filled: boolean }) {
-  return (
-    <svg width="28" height="28" viewBox="0 0 24 24" aria-hidden>
-      <path
-        d="M12 3.2l2.4 4.9 5.4.8-3.9 3.8.9 5.4L12 15.6 7.2 18.1l.9-5.4L4.2 8.9l5.4-.8L12 3.2z"
-        fill={filled ? "#D4AF37" : "none"}
-        stroke={filled ? "#D4AF37" : "#D9D2C7"}
-        strokeWidth="1.4"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
-function CoffeeIcon() {
-  return (
-    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" aria-hidden>
-      <path
-        d="M5 9h11v5a4 4 0 01-4 4H9a4 4 0 01-4-4V9z"
-        stroke="currentColor"
-        strokeWidth="1.6"
-      />
-      <path
-        d="M16 10h2a2.5 2.5 0 010 5h-2M8 4v2M11 3v3M14 4v2M4 19h13"
-        stroke="currentColor"
-        strokeWidth="1.6"
-        strokeLinecap="round"
-      />
-    </svg>
-  );
-}
-
-function BanIcon() {
-  return (
-    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" aria-hidden>
-      <circle cx="12" cy="12" r="8" stroke="currentColor" strokeWidth="1.6" />
-      <path
-        d="M7 17L17 7"
-        stroke="currentColor"
-        strokeWidth="1.6"
-        strokeLinecap="round"
-      />
-    </svg>
   );
 }

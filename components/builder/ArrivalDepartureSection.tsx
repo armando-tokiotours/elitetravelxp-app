@@ -1,23 +1,38 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
+import dynamic from "next/dynamic";
+import { useEffect, useMemo, useState } from "react";
+import {
+  ChevronRight,
+  PlaneLanding,
+  PlaneTakeoff,
+  Ship,
+} from "lucide-react";
 import type { PbAirportTransfer, PbHub, PbVehicle } from "@/lib/pocketbase/client";
 import {
   useBuilderStore,
   type HubTravelMode,
 } from "@/store/useBuilderStore";
-import {
-  ChoicePill,
-  FieldLabel,
-  PillToggle,
-  SectionBlock,
-  SelectField,
-} from "./ui";
 import { SectionContinue } from "./SectionContinue";
-import { ExplainerTriggerButton } from "./ExplainerTriggerButton";
+import { SectionBlock } from "./ui";
+import { useLazyModalMount } from "./modals/useLazyModalMount";
+
+const HubConfigModal = dynamic(
+  () =>
+    import("./modals/HubConfigModal").then((m) => ({
+      default: m.HubConfigModal,
+    })),
+  { ssr: false }
+);
 
 function hubTypeForMode(mode: HubTravelMode): PbHub["type"] {
   return mode === "cruise" ? "Cruise Terminal" : "Airport";
+}
+
+function hubDisplayName(hubs: PbHub[], id: string | null): string {
+  const name = hubs.find((h) => h.id === id)?.name;
+  if (!name) return "Tap to configure";
+  return name.replace(/\s*\([^)]*\)\s*$/, "");
 }
 
 export function ArrivalDepartureSection({
@@ -29,6 +44,12 @@ export function ArrivalDepartureSection({
   vehicles?: PbVehicle[];
   airportTransfers?: PbAirportTransfer[];
 }) {
+  const [activeModal, setActiveModal] = useState<
+    "arrival" | "departure" | null
+  >(null);
+  const arrivalModalMounted = useLazyModalMount(activeModal === "arrival");
+  const departureModalMounted = useLazyModalMount(activeModal === "departure");
+
   const arrivalTransferId = useBuilderStore((s) => s.arrivalTransferId);
   const departureTransferId = useBuilderStore((s) => s.departureTransferId);
   const arrivalMode = useBuilderStore((s) => s.arrivalMode);
@@ -53,7 +74,6 @@ export function ArrivalDepartureSection({
     [hubs, departureMode]
   );
 
-  // If selected hub doesn't match mode filter, clear it
   useEffect(() => {
     if (
       arrivalTransferId &&
@@ -72,20 +92,13 @@ export function ArrivalDepartureSection({
     }
   }, [departureHubs, departureTransferId, setDepartureTransferId]);
 
-  const pickupLabel =
-    arrivalMode === "cruise" ? "Port pickup?" : "Airport pickup?";
-  const dropoffLabel =
-    departureMode === "cruise" ? "Port drop off?" : "Airport drop off?";
-
-  const arriveName =
-    hubs
-      .find((h) => h.id === arrivalTransferId)
-      ?.name.replace(/\s*\([^)]*\)\s*$/, "") || "—";
-  const departName =
-    hubs
-      .find((h) => h.id === departureTransferId)
-      ?.name.replace(/\s*\([^)]*\)\s*$/, "") || "—";
-  const summary = `${arriveName} → ${departName} · Pickup: ${airportPickup ? "Yes" : "No"}`;
+  const arriveName = hubDisplayName(hubs, arrivalTransferId);
+  const departName = hubDisplayName(hubs, departureTransferId);
+  const summary = `${
+    arrivalTransferId ? arriveName : "—"
+  } → ${departureTransferId ? departName : "—"} · Pickup: ${
+    airportPickup ? "Yes" : "No"
+  }`;
 
   return (
     <SectionBlock
@@ -95,121 +108,152 @@ export function ArrivalDepartureSection({
       icon="plane"
       summary={summary}
     >
-      <div className="grid gap-6 sm:grid-cols-2">
-        <HubPicker
-          label="Arriving at"
+      <div className="grid grid-cols-2 gap-3 sm:gap-4">
+        <HubSummaryCard
+          kind="arrival"
+          title="Arrival"
+          hubName={arriveName}
+          configured={Boolean(arrivalTransferId)}
           mode={arrivalMode}
-          onModeChange={setArrivalMode}
-          value={arrivalTransferId ?? ""}
-          onChange={(v) => setArrivalTransferId(v || null)}
-          hubs={arrivalHubs}
-          placeholder={
-            arrivalMode === "cruise"
-              ? "Select cruise port"
-              : "Select arrival airport"
-          }
+          vipEnabled={airportPickup}
+          onClick={() => setActiveModal("arrival")}
         />
-        <HubPicker
-          label="Departing at"
+        <HubSummaryCard
+          kind="departure"
+          title="Departure"
+          hubName={departName}
+          configured={Boolean(departureTransferId)}
           mode={departureMode}
-          onModeChange={setDepartureMode}
-          value={departureTransferId ?? ""}
-          onChange={(v) => setDepartureTransferId(v || null)}
-          hubs={departureHubs}
-          placeholder={
-            departureMode === "cruise"
-              ? "Select cruise port"
-              : "Select departure airport"
-          }
+          vipEnabled={airportDropoff}
+          onClick={() => setActiveModal("departure")}
         />
       </div>
 
-      <div className="mt-5">
-        <div className="grid grid-cols-2 gap-3 md:gap-6">
-          <div>
-            <label className="mb-1 block text-[10px] font-medium uppercase tracking-[0.12em] text-zinc-400 sm:text-xs sm:tracking-[0.14em]">
-              {pickupLabel}
-            </label>
-            <PillToggle
-              value={airportPickup}
-              onChange={setAirportPickup}
-              size="xs"
-            />
-          </div>
-          <div>
-            <label className="mb-1 block text-[10px] font-medium uppercase tracking-[0.12em] text-zinc-400 sm:text-xs sm:tracking-[0.14em]">
-              {dropoffLabel}
-            </label>
-            <PillToggle
-              value={airportDropoff}
-              onChange={setAirportDropoff}
-              size="xs"
-            />
-          </div>
-        </div>
-        <div className="mt-3.5">
-          <ExplainerTriggerButton
-            featureKey="airport_transfers"
-            title="The VIP Airport Arrival"
-            contextId={arrivalTransferId}
-            arrivalHubId={arrivalTransferId}
-            departureHubId={departureTransferId}
-            hubs={hubs}
-            vehicles={vehicles}
-            airportTransfers={airportTransfers}
-          />
-        </div>
-      </div>
+      {arrivalModalMounted ? (
+      <HubConfigModal
+        open={activeModal === "arrival"}
+        kind="arrival"
+        onClose={() => setActiveModal(null)}
+        mode={arrivalMode}
+        onModeChange={setArrivalMode}
+        hubId={arrivalTransferId}
+        onHubChange={setArrivalTransferId}
+        hubs={arrivalHubs}
+        vipEnabled={airportPickup}
+        onVipChange={setAirportPickup}
+        allHubs={hubs}
+        vehicles={vehicles}
+        airportTransfers={airportTransfers}
+        arrivalHubId={arrivalTransferId}
+        departureHubId={departureTransferId}
+      />
+      ) : null}
+
+      {departureModalMounted ? (
+      <HubConfigModal
+        open={activeModal === "departure"}
+        kind="departure"
+        onClose={() => setActiveModal(null)}
+        mode={departureMode}
+        onModeChange={setDepartureMode}
+        hubId={departureTransferId}
+        onHubChange={setDepartureTransferId}
+        hubs={departureHubs}
+        vipEnabled={airportDropoff}
+        onVipChange={setAirportDropoff}
+        allHubs={hubs}
+        vehicles={vehicles}
+        airportTransfers={airportTransfers}
+        arrivalHubId={arrivalTransferId}
+        departureHubId={departureTransferId}
+      />
+      ) : null}
 
       <SectionContinue next={3} label="Continue to Locations" />
     </SectionBlock>
   );
 }
 
-function HubPicker({
-  label,
+function HubSummaryCard({
+  kind,
+  title,
+  hubName,
+  configured,
   mode,
-  onModeChange,
-  value,
-  onChange,
-  hubs,
-  placeholder,
+  vipEnabled,
+  onClick,
 }: {
-  label: string;
+  kind: "arrival" | "departure";
+  title: string;
+  hubName: string;
+  configured: boolean;
   mode: HubTravelMode;
-  onModeChange: (m: HubTravelMode) => void;
-  value: string;
-  onChange: (v: string) => void;
-  hubs: PbHub[];
-  placeholder: string;
+  vipEnabled: boolean;
+  onClick: () => void;
 }) {
+  const modeLabel = mode === "cruise" ? "Cruise" : "Flight";
+  const vipLabel =
+    kind === "arrival"
+      ? vipEnabled
+        ? "VIP pickup"
+        : "No pickup"
+      : vipEnabled
+        ? "VIP drop-off"
+        : "No drop-off";
+
   return (
-    <div>
-      <FieldLabel>{label}</FieldLabel>
-      <div className="mb-2.5 flex flex-wrap gap-2">
-        <ChoicePill
-          active={mode === "airport"}
-          onClick={() => onModeChange("airport")}
+    <button
+      type="button"
+      onClick={onClick}
+      className="group flex min-h-[9.5rem] flex-col rounded-[1.35rem] border border-zinc-800 bg-[#1C1C1E] p-4 text-left transition hover:border-[#C4A35A]/45 hover:bg-[#222226] sm:min-h-[10.5rem] sm:p-5"
+    >
+      <div className="flex items-start justify-between gap-2">
+        <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-zinc-500">
+          {title}
+        </p>
+        <span
+          className={`flex h-8 w-8 items-center justify-center rounded-full ${
+            kind === "arrival"
+              ? "bg-emerald-500/15"
+              : "bg-sky-500/15"
+          }`}
+          aria-hidden
         >
-          ✈️ Flight
-        </ChoicePill>
-        <ChoicePill
-          active={mode === "cruise"}
-          onClick={() => onModeChange("cruise")}
-        >
-          🚢 Cruise Port
-        </ChoicePill>
+          {kind === "arrival" ? (
+            mode === "cruise" ? (
+              <Ship size={20} className="text-emerald-400" />
+            ) : (
+              <PlaneLanding size={20} className="text-emerald-400" />
+            )
+          ) : mode === "cruise" ? (
+            <Ship size={20} className="text-sky-400" />
+          ) : (
+            <PlaneTakeoff size={20} className="text-sky-400" />
+          )}
+        </span>
       </div>
-      <SelectField
-        value={value}
-        onChange={onChange}
-        options={hubs.map((h) => ({ value: h.id, label: h.name }))}
-        placeholder={
-          hubs.length === 0
-            ? "No hubs available — add in Team Access"
-            : placeholder
-        }
-      />
-    </div>
+
+      <p
+        className={`mt-3 line-clamp-2 font-display text-xl leading-snug text-white sm:text-2xl ${
+          configured ? "" : "text-zinc-500"
+        }`}
+      >
+        {hubName}
+      </p>
+
+      <div className="mt-auto flex items-end justify-between gap-2 pt-4">
+        <div className="min-w-0">
+          <p className="truncate text-xs text-zinc-400">
+            {modeLabel}
+            <span className="text-zinc-600"> · </span>
+            {vipLabel}
+          </p>
+        </div>
+        <ChevronRight
+          className="h-4 w-4 shrink-0 text-zinc-600 transition group-hover:text-[#C4A35A]"
+          aria-hidden
+        />
+      </div>
+    </button>
   );
 }
