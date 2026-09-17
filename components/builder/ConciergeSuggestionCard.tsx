@@ -39,13 +39,13 @@ export function ConciergeSuggestionCard({
           <p className="text-[0.65rem] font-semibold uppercase tracking-[0.18em] text-[#C4A35A]">
             ✨ {badge}
           </p>
-          <p className="mt-0.5 font-medium text-[#0B1F3A]">{h.title}</p>
-          <p className="mt-1 text-xs leading-relaxed text-[#5C6570]">
+          <p className="mt-0.5 font-medium text-white">{h.title}</p>
+          <p className="mt-1 text-xs leading-relaxed text-zinc-400">
             {h.description
               ? h.description
               : `During your stay (${match.stayLabel}), this experience is in season.`}
             {h.description ? (
-              <span className="mt-1 block text-[#8A8278]">
+              <span className="mt-1 block text-zinc-400">
                 During your stay ({match.stayLabel}).
               </span>
             ) : null}
@@ -55,7 +55,7 @@ export function ConciergeSuggestionCard({
               type="button"
               disabled={tourAlreadyAdded}
               onClick={() => onAddTour(tourId)}
-              className="mt-2 rounded-full border border-[#0B1F3A] bg-white px-3 py-1.5 text-xs font-semibold text-[#0B1F3A] transition hover:bg-[#0B1F3A] hover:text-white disabled:cursor-default disabled:border-[#C4A35A] disabled:bg-[#F3EBD9] disabled:text-[#8A6B20]"
+              className="mt-2 rounded-full border border-zinc-600 bg-zinc-900 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-[#0B1F3A] hover:text-white disabled:cursor-default disabled:border-[#C4A35A]/50 disabled:bg-zinc-950 disabled:text-[#E8D5A3]"
             >
               {tourAlreadyAdded
                 ? "Recommended tour added"

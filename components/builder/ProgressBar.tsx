@@ -78,12 +78,12 @@ export function StickyProgressBar() {
   });
 
   return (
-    <div className="sticky top-0 z-40 -mx-4 border-b border-gray-200/50 bg-[#FDFBF7] px-4 py-4 shadow-sm sm:-mx-6 sm:px-6">
+    <div className="sticky top-0 z-40 -mx-4 border-b border-zinc-800 bg-[#111111]/95 px-4 py-4 backdrop-blur-md sm:-mx-6 sm:px-6">
       <nav aria-label="Trip builder progress">
         <ol className="relative flex items-start justify-between gap-1">
           <span
             aria-hidden
-            className="absolute left-[10%] right-[10%] top-[14px] h-[2px] bg-[#E5DCCF]"
+            className="absolute left-[10%] right-[10%] top-[14px] h-[2px] bg-zinc-800"
           />
           {statuses.map((sec) => (
             <li
@@ -104,8 +104,8 @@ export function StickyProgressBar() {
                 <span
                   className={`max-w-[4.8rem] text-[0.58rem] leading-tight sm:max-w-none sm:text-[0.68rem] ${
                     sec.kind === "upcoming"
-                      ? "text-[#B8B0A4]"
-                      : "font-medium text-[#0B1F3A]"
+                      ? "text-zinc-500"
+                      : "font-medium text-white"
                   }`}
                 >
                   {sec.label}
@@ -123,7 +123,7 @@ function Node({ kind }: { kind: "done" | "current" | "upcoming" }) {
   if (kind === "done") {
     return (
       <span
-        className="flex h-7 w-7 items-center justify-center rounded-full bg-[#0B1F3A] shadow-sm"
+        className="flex h-7 w-7 items-center justify-center rounded-full bg-[#0B1F3A] shadow-sm ring-1 ring-[#C4A35A]/40"
         aria-label="Completed"
       >
         <svg
@@ -147,7 +147,7 @@ function Node({ kind }: { kind: "done" | "current" | "upcoming" }) {
   if (kind === "current") {
     return (
       <span
-        className="flex h-7 w-7 items-center justify-center rounded-full bg-[#0B1F3A] shadow-sm"
+        className="flex h-7 w-7 items-center justify-center rounded-full bg-[#0B1F3A] shadow-sm ring-1 ring-[#C4A35A]/50"
         aria-label="Current step"
       >
         <span className="h-2 w-2 rounded-full bg-white" />
@@ -156,10 +156,10 @@ function Node({ kind }: { kind: "done" | "current" | "upcoming" }) {
   }
   return (
     <span
-      className="flex h-7 w-7 items-center justify-center rounded-full border-2 border-[#C4A35A] bg-[#FBF8F2]"
+      className="flex h-7 w-7 items-center justify-center rounded-full border-2 border-zinc-700 bg-zinc-900"
       aria-label="Upcoming step"
     >
-      <span className="h-1.5 w-1.5 rounded-full bg-[#E8E2D9]" />
+      <span className="h-1.5 w-1.5 rounded-full bg-zinc-500" />
     </span>
   );
 }

@@ -20,6 +20,8 @@ export function AppShell({
   /** Builder hero layout: logo left, hamburger right, no page title in header */
   heroMode = false,
   transparentHeader = false,
+  /** Luxury dark chrome (builder / discover-aligned) */
+  dark = false,
 }: {
   children: ReactNode;
   title?: string;
@@ -28,6 +30,7 @@ export function AppShell({
   logoSrc?: string;
   heroMode?: boolean;
   transparentHeader?: boolean;
+  dark?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
@@ -44,11 +47,19 @@ export function AppShell({
   }, [open]);
 
   const headerClass = transparentHeader
-    ? "absolute inset-x-0 top-0 z-40 border-b border-white/10 bg-[#FBF8F2]/88 backdrop-blur-md"
-    : "sticky top-0 z-40 border-b border-[#E8E2D9]/80 bg-[#FBF8F2]/95 backdrop-blur-md";
+    ? dark
+      ? "absolute inset-x-0 top-0 z-40 border-b border-white/10 bg-black/50 backdrop-blur-md"
+      : "absolute inset-x-0 top-0 z-40 border-b border-white/10 bg-[#FBF8F2]/88 backdrop-blur-md"
+    : dark
+      ? "sticky top-0 z-40 border-b border-zinc-800 bg-black/90 backdrop-blur-md"
+      : "sticky top-0 z-40 border-b border-[#E8E2D9]/80 bg-[#FBF8F2]/95 backdrop-blur-md";
 
   return (
-    <div className="builder-theme relative min-h-screen bg-[#F5F0E8] text-[#0B1F3A]">
+    <div
+      className={`builder-theme relative min-h-screen ${
+        dark ? "bg-[#0a0a0a] text-white [color-scheme:dark]" : "bg-[#F5F0E8] text-[#0B1F3A]"
+      }`}
+    >
       <header className={headerClass}>
         <div
           className={`mx-auto flex items-center gap-3 px-4 py-3 sm:px-6 ${
@@ -64,7 +75,11 @@ export function AppShell({
                 aria-label="Open menu"
                 aria-expanded={open}
                 onClick={() => setOpen(true)}
-                className="flex h-10 w-10 items-center justify-center rounded-xl border border-[#D9D2C7] bg-white text-[#0B1F3A] transition hover:border-[#C4A35A]"
+                className={`flex h-10 w-10 items-center justify-center rounded-xl transition ${
+                  dark
+                    ? "border border-zinc-700 bg-zinc-900 text-white hover:border-[#C4A35A]"
+                    : "border border-[#D9D2C7] bg-white text-[#0B1F3A] hover:border-[#C4A35A]"
+                }`}
               >
                 <HamburgerIcon />
               </button>
@@ -76,7 +91,11 @@ export function AppShell({
                 aria-label="Open menu"
                 aria-expanded={open}
                 onClick={() => setOpen(true)}
-                className="flex h-10 w-10 items-center justify-center rounded-xl border border-[#D9D2C7] bg-white text-[#0B1F3A] transition hover:border-[#C4A35A]"
+                className={`flex h-10 w-10 items-center justify-center rounded-xl transition ${
+                  dark
+                    ? "border border-zinc-700 bg-zinc-900 text-white hover:border-[#C4A35A]"
+                    : "border border-[#D9D2C7] bg-white text-[#0B1F3A] hover:border-[#C4A35A]"
+                }`}
               >
                 <HamburgerIcon />
               </button>
@@ -85,7 +104,11 @@ export function AppShell({
                   {subtitle ?? "Elite Travel Experiences"}
                 </p>
                 {title ? (
-                  <h1 className="truncate font-display text-xl text-[#0B1F3A] sm:text-2xl">
+                  <h1
+                    className={`truncate font-display text-xl sm:text-2xl ${
+                      dark ? "text-white" : "text-[#0B1F3A]"
+                    }`}
+                  >
                     {title}
                   </h1>
                 ) : null}

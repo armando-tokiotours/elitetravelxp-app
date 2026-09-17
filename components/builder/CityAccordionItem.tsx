@@ -66,7 +66,7 @@ export function CityAccordionItem({
       value={loc}
       dragListener={false}
       dragControls={controls}
-      className="overflow-hidden rounded-2xl border border-[#EEE8DF] bg-white shadow-[0_2px_12px_rgba(11,31,58,0.04)]"
+      className="overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-900 shadow-[0_2px_12px_rgba(11,31,58,0.04)]"
     >
       {expanded ? (
         <div>
@@ -108,9 +108,9 @@ export function CityAccordionItem({
           <div className="px-4 pb-4 pt-3">
             <div className="flex items-start justify-between gap-3">
               <div className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-0.5">
-                <h3 className="font-display text-2xl text-[#0B1F3A]">{name}</h3>
+                <h3 className="font-display text-2xl text-white">{name}</h3>
                 {dateLabel ? (
-                  <p className="shrink-0 text-sm capitalize text-[#8A8278]">
+                  <p className="shrink-0 text-sm capitalize text-zinc-400">
                     {dateLabel.toLowerCase()}
                   </p>
                 ) : null}
@@ -118,17 +118,17 @@ export function CityAccordionItem({
               {isStay ? (
                 <NightStepper value={loc.nights} onChange={onNights} />
               ) : (
-                <span className="shrink-0 rounded-full bg-[#F3EBD9] px-3 py-1.5 text-xs font-semibold capitalize text-[#8A6B2A]">
+                <span className="shrink-0 rounded-full border border-zinc-700 bg-zinc-950 px-3 py-1.5 text-xs font-semibold capitalize text-[#C4A35A]">
                   {visitType} · 0 nights
                 </span>
               )}
             </div>
 
             <div className="mt-3">
-              <p className="mb-1.5 text-[11px] uppercase tracking-wider text-[#A39A8E]">
+              <p className="mb-1.5 text-[11px] uppercase tracking-wider text-zinc-500">
                 Visit type
               </p>
-              <div className="inline-flex flex-wrap rounded-full border border-[#D9D2C7] bg-[#F7F3EC] p-0.5">
+              <div className="inline-flex flex-wrap rounded-full border border-zinc-700 bg-zinc-950 p-0.5">
                 {allowedVisitTypes.map((value) => (
                   <VisitPill
                     key={value}
@@ -148,18 +148,18 @@ export function CityAccordionItem({
 
             <div className="mt-4 flex flex-wrap items-end justify-between gap-3">
               <div>
-                <p className="text-[11px] uppercase tracking-wider text-[#A39A8E]">
+                <p className="text-[11px] uppercase tracking-wider text-zinc-500">
                   From
                 </p>
-                <p className="text-sm font-medium text-[#0B1F3A]">{fromLabel}</p>
+                <p className="text-sm font-medium text-white">{fromLabel}</p>
               </div>
 
               {!isLast ? (
                 <div className="text-right">
-                  <p className="mb-1.5 text-[11px] uppercase tracking-wider text-[#A39A8E]">
+                  <p className="mb-1.5 text-[11px] uppercase tracking-wider text-zinc-500">
                     Travel to next
                   </p>
-                  <div className="inline-flex rounded-full border border-[#D9D2C7] bg-[#F7F3EC] p-0.5">
+                  <div className="inline-flex rounded-full border border-zinc-700 bg-zinc-950 p-0.5">
                     <TransitPill
                       active={transit === "public"}
                       onClick={() => onTransit("public")}
@@ -208,10 +208,10 @@ export function CityAccordionItem({
                 className="h-12 w-20 shrink-0 rounded-lg object-cover"
               />
             ) : (
-              <div className="h-12 w-20 shrink-0 rounded-lg bg-[#E8E2D9]" />
+              <div className="h-12 w-20 shrink-0 rounded-lg bg-zinc-800" />
             )}
             <span className="min-w-0 flex-1">
-              <span className="block truncate font-medium text-[#0B1F3A]">
+              <span className="block truncate font-medium text-white">
                 {name}
               </span>
               <span className="text-xs text-[#C4A35A]">
@@ -223,7 +223,7 @@ export function CityAccordionItem({
               </span>
             </span>
             {dateLabel ? (
-              <span className="shrink-0 text-xs text-[#8A8278]">
+              <span className="shrink-0 text-xs text-zinc-400">
                 <span className="mr-0.5 text-[#C4A35A]">›</span>
                 {dateLabel.toLowerCase()}
               </span>
@@ -253,8 +253,8 @@ function VisitPill({
       onClick={onClick}
       className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
         active
-          ? "bg-[#0B1F3A] text-white"
-          : "text-[#5C6570] hover:text-[#0B1F3A]"
+          ? "bg-[#0B1F3A] text-white ring-1 ring-[#C4A35A]/50"
+          : "text-zinc-400 hover:bg-zinc-800 hover:text-white"
       }`}
     >
       {label}
@@ -279,13 +279,13 @@ function TransitPill({
       onClick={onClick}
       className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
         active
-          ? "bg-[#0B1F3A] text-white"
-          : "text-[#5C6570] hover:text-[#0B1F3A]"
+          ? "bg-[#0B1F3A] text-white ring-1 ring-[#C4A35A]/50"
+          : "text-zinc-400 hover:bg-zinc-800 hover:text-white"
       }`}
     >
       {label}
       <span
-        className={`ml-1 font-normal ${active ? "text-white/70" : "text-[#A39A8E]"}`}
+        className={`ml-1 font-normal ${active ? "text-white/70" : "text-zinc-500"}`}
       >
         ({hint})
       </span>
@@ -306,22 +306,22 @@ function NightStepper({
         type="button"
         aria-label="Fewer nights"
         onClick={() => onChange(Math.max(1, value - 1))}
-        className="flex h-7 w-7 items-center justify-center rounded-full border border-[#D9D2C7] bg-[#F7F3EC] text-[#0B1F3A]"
+        className="flex h-7 w-7 items-center justify-center rounded-full border border-zinc-700 bg-zinc-950 text-white"
       >
         −
       </button>
-      <span className="min-w-[1.25rem] text-center text-sm font-semibold text-[#0B1F3A]">
+      <span className="min-w-[1.25rem] text-center text-sm font-semibold text-white">
         {value}
       </span>
       <button
         type="button"
         aria-label="More nights"
         onClick={() => onChange(value + 1)}
-        className="flex h-7 w-7 items-center justify-center rounded-full border border-[#D9D2C7] bg-[#F7F3EC] text-[#0B1F3A]"
+        className="flex h-7 w-7 items-center justify-center rounded-full border border-zinc-700 bg-zinc-950 text-white"
       >
         +
       </button>
-      <span className="ml-0.5 text-xs text-[#8A8278]">nights</span>
+      <span className="ml-0.5 text-xs text-zinc-400">nights</span>
     </div>
   );
 }
@@ -359,7 +359,7 @@ function RemoveButton({ onClick }: { onClick: () => void }) {
       type="button"
       aria-label="Remove location"
       onClick={onClick}
-      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[#8A8278] hover:bg-[#F7F3EC] hover:text-[#8A3B2A]"
+      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-zinc-400 hover:bg-zinc-950 hover:text-[#8A3B2A]"
     >
       ×
     </button>

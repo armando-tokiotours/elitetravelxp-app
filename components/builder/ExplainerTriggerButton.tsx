@@ -104,7 +104,7 @@ export function ExplainerTriggerButton({
 
         <span className="relative z-10 flex w-full items-center gap-3 md:gap-4">
           <span
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white text-[#0B1F3A] shadow md:h-10 md:w-10"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-zinc-900 text-white shadow md:h-10 md:w-10"
             aria-hidden
           >
             <span className="ml-0.5 text-sm font-bold md:text-base">▶</span>

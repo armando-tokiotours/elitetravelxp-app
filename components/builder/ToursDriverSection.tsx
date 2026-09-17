@@ -165,17 +165,17 @@ export function ToursDriverSection({
       <div
         className={`mb-5 overflow-hidden rounded-2xl border px-4 py-4 sm:px-5 ${
           isEliteConcierge
-            ? "border-[#C4A35A] bg-[#FBF6EA]"
-            : "border-[#C4A35A]/45 bg-gradient-to-br from-[#FBF6EA] to-white"
+            ? "border-[#C4A35A] bg-zinc-950"
+            : "border-[#C4A35A]/50 bg-gradient-to-br from-zinc-950 to-zinc-900"
         }`}
       >
         <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#C4A35A]">
           Premium
         </p>
-        <h3 className="mt-1 font-display text-xl text-[#0B1F3A] sm:text-2xl">
+        <h3 className="mt-1 font-display text-xl text-white sm:text-2xl">
           ✨ Elite Concierge Day-by-Day Design
         </h3>
-        <p className="mt-2 text-sm leading-relaxed text-[#5C6570]">
+        <p className="mt-2 text-sm leading-relaxed text-zinc-400">
           Skip the individual planning. Have a dedicated luxury concierge curate
           your entire day-by-day itinerary, including exclusive dining
           reservations, hidden sights, and private drivers for your entire trip.
@@ -186,7 +186,7 @@ export function ToursDriverSection({
           className={`mt-4 w-full rounded-full py-3 text-sm font-semibold transition sm:w-auto sm:px-6 ${
             isEliteConcierge
               ? "bg-[#0B1F3A] text-white"
-              : "border border-[#C4A35A] bg-white text-[#0B1F3A] hover:bg-[#0B1F3A] hover:text-white"
+              : "border border-[#C4A35A] bg-zinc-900 text-white hover:bg-[#0B1F3A] hover:text-white"
           }`}
         >
           {isEliteConcierge
@@ -196,14 +196,14 @@ export function ToursDriverSection({
       </div>
 
       {!isEliteConcierge ? (
-        <div className="mb-5 rounded-xl bg-[#F7F3EC] px-4 py-3 text-sm text-[#5C6570]">
+        <div className="mb-5 rounded-xl bg-zinc-950 px-4 py-3 text-sm text-zinc-400">
           Maximum {MAX_TOUR_HOURS_PER_DAY} hours of activities allowed per day.{" "}
           {allowToursOnTravelDays
             ? `~${tourableDays} day${tourableDays === 1 ? "" : "s"} available.`
             : `~${tourableDays} available day${tourableDays === 1 ? "" : "s"} after ${travelDays} travel day${travelDays === 1 ? "" : "s"}.`}
         </div>
       ) : (
-        <p className="mb-5 rounded-xl border border-[#C4A35A]/30 bg-[#FBF6EA] px-4 py-3 text-sm text-[#6B5420]">
+        <p className="mb-5 rounded-xl border border-[#C4A35A]/40 bg-zinc-950 px-4 py-3 text-sm text-[#E8D5A3]">
           Individual city browsing is paused while Elite Concierge is selected.
           Your concierge will design the full day-by-day plan.
         </p>
@@ -261,7 +261,7 @@ export function ToursDriverSection({
       <div className="mb-2">
         <FieldLabel>Your cities</FieldLabel>
         {stayStops.length === 0 ? (
-          <p className="rounded-xl border border-dashed border-[#D9D2C7] bg-[#FBF8F2] p-4 text-sm text-[#8A8278]">
+          <p className="rounded-xl border border-dashed border-zinc-700 bg-zinc-950 p-4 text-sm text-zinc-400">
             Add stay cities in Step 3 to browse experiences and book a private
             chauffeur by day.
           </p>
@@ -440,7 +440,7 @@ function Step5CityAccordion({
     dayOptions.find((d) => d.date === iso)?.label ?? iso;
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-[#EEE8DF] bg-white shadow-[0_2px_12px_rgba(11,31,58,0.04)]">
+    <div className="overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-900 shadow-[0_2px_12px_rgba(11,31,58,0.04)]">
       <button
         type="button"
         onClick={onToggle}
@@ -462,10 +462,10 @@ function Step5CityAccordion({
           </div>
         )}
         <span className="min-w-0 flex-1">
-          <span className="block truncate font-medium text-[#0B1F3A]">
+          <span className="block truncate font-medium text-white">
             {cityName}
           </span>
-          <span className="block truncate text-xs text-[#8A8278]">
+          <span className="block truncate text-xs text-zinc-400">
             {summaryBits}
           </span>
         </span>
@@ -480,23 +480,23 @@ function Step5CityAccordion({
       </button>
 
       {expanded ? (
-        <div className="space-y-5 border-t border-[#EEE8DF] px-4 py-4">
+        <div className="space-y-5 border-t border-zinc-800 px-4 py-4">
           <section>
             <div className="mb-2 flex items-baseline justify-between gap-2">
               <h4 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#C4A35A]">
                 Experiences
               </h4>
-              <p className="text-[11px] text-[#A39A8E]">
+              <p className="text-[11px] text-zinc-500">
                 Max {MAX_TOUR_HOURS_PER_DAY}h of activities per day
               </p>
             </div>
 
             {selectedTours.length === 0 ? (
-              <p className="mb-3 text-sm text-[#8A8278]">
+              <p className="mb-3 text-sm text-zinc-400">
                 No experiences selected yet for {cityName}.
               </p>
             ) : (
-              <ul className="mb-3 divide-y divide-[#F0EAE1] rounded-xl border border-[#EEE8DF] bg-[#FBF8F2]">
+              <ul className="mb-3 divide-y divide-zinc-800 rounded-xl border border-zinc-800 bg-zinc-950">
                 {selectedTours.map((tour) => {
                   const hours = Number(tour.duration_hours) || 0;
                   return (
@@ -505,10 +505,10 @@ function Step5CityAccordion({
                       className="flex items-start justify-between gap-3 px-3 py-2.5"
                     >
                       <div className="min-w-0">
-                        <p className="truncate text-sm font-medium text-[#0B1F3A]">
+                        <p className="truncate text-sm font-medium text-white">
                           {tour.title}
                         </p>
-                        <p className="mt-0.5 text-[11px] text-[#8A8278]">
+                        <p className="mt-0.5 text-[11px] text-zinc-400">
                           {tour.scheduledDate
                             ? dateLabel(tour.scheduledDate)
                             : "Date not set"}
@@ -520,7 +520,7 @@ function Step5CityAccordion({
                         type="button"
                         aria-label={`Remove ${tour.title}`}
                         onClick={() => onRemoveTour(tour.tourId)}
-                        className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[#8A8278] hover:bg-white hover:text-[#8A3B2A]"
+                        className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-zinc-400 hover:bg-zinc-900 hover:text-[#8A3B2A]"
                       >
                         ×
                       </button>
@@ -533,7 +533,7 @@ function Step5CityAccordion({
             <button
               type="button"
               onClick={onBrowse}
-              className="flex w-full items-center justify-center gap-2 rounded-full border border-[#0B1F3A] bg-white py-2.5 text-sm font-semibold text-[#0B1F3A] transition hover:bg-[#0B1F3A] hover:text-white"
+              className="flex w-full items-center justify-center gap-2 rounded-full border border-[#C4A35A]/50 bg-zinc-950 py-2.5 text-sm font-semibold text-white transition hover:border-[#C4A35A] hover:bg-[#0B1F3A]"
             >
               <span
                 className="flex h-5 w-5 items-center justify-center rounded-full bg-[#0B1F3A] text-[9px] text-white"
@@ -550,15 +550,15 @@ function Step5CityAccordion({
               <h4 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#C4A35A]">
                 Private Driver &amp; Vehicle
               </h4>
-              <p className="mt-1 text-sm text-[#5C6570]">
+              <p className="mt-1 text-sm text-zinc-400">
                 {dailyRateLabel ? (
                   <>
                     Daily rate:{" "}
-                    <span className="font-semibold text-[#0B1F3A]">
+                    <span className="font-semibold text-white">
                       {dailyRateLabel}
                     </span>
                     {fleetLabel ? (
-                      <span className="text-[#8A8278]">
+                      <span className="text-zinc-400">
                         {" "}
                         (Includes {fleetLabel})
                       </span>
@@ -579,11 +579,11 @@ function Step5CityAccordion({
             </div>
 
             {arrivalDateMissing ? (
-              <p className="rounded-xl bg-[#F7F3EC] px-3 py-2.5 text-sm text-[#8A8278]">
+              <p className="rounded-xl bg-zinc-950 px-3 py-2.5 text-sm text-zinc-400">
                 Set your arrival date in Step 1 to choose chauffeur days.
               </p>
             ) : dayOptions.length === 0 ? (
-              <p className="rounded-xl bg-[#F7F3EC] px-3 py-2.5 text-sm text-[#8A8278]">
+              <p className="rounded-xl bg-zinc-950 px-3 py-2.5 text-sm text-zinc-400">
                 No stay nights found for this city.
               </p>
             ) : (
@@ -595,13 +595,13 @@ function Step5CityAccordion({
                   return (
                     <li
                       key={day.date}
-                      className="rounded-xl border border-[#EEE8DF] bg-[#FBF8F2] px-3 py-3"
+                      className="rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-3"
                     >
                       <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between">
-                        <p className="text-sm font-medium text-[#0B1F3A]">
+                        <p className="text-sm font-medium text-white">
                           {day.label}
                         </p>
-                        <div className="inline-flex rounded-full border border-[#D9D2C7] bg-white p-0.5">
+                        <div className="inline-flex rounded-full border border-zinc-700 bg-zinc-900 p-0.5">
                           {(
                             [
                               ["none", "Off"],
@@ -616,7 +616,7 @@ function Step5CityAccordion({
                               className={`rounded-full px-2.5 py-1 text-[11px] font-semibold transition sm:px-3 ${
                                 mode === value
                                   ? "bg-[#0B1F3A] text-white"
-                                  : "text-[#5C6570] hover:text-[#0B1F3A]"
+                                  : "text-zinc-400 hover:text-white"
                               }`}
                             >
                               {label}
@@ -627,26 +627,26 @@ function Step5CityAccordion({
 
                       {mode === "by_tour" ? (
                         toursThatDay.length === 0 ? (
-                          <p className="mt-2 text-[11px] text-[#8A8278]">
+                          <p className="mt-2 text-[11px] text-zinc-400">
                             No experiences scheduled on this day yet. Add one
                             and pick this date in Browse Experiences.
                           </p>
                         ) : (
-                          <ul className="mt-2 space-y-1.5 border-t border-[#EEE8DF] pt-2">
+                          <ul className="mt-2 space-y-1.5 border-t border-zinc-800 pt-2">
                             {toursThatDay.map((tour) => {
                               const checked = (
                                 sel?.selectedTourIds ?? []
                               ).includes(tour.tourId);
                               return (
                                 <li key={tour.tourId}>
-                                  <label className="flex cursor-pointer items-center gap-2.5 text-sm text-[#0B1F3A]">
+                                  <label className="flex cursor-pointer items-center gap-2.5 text-sm text-white">
                                     <input
                                       type="checkbox"
                                       checked={checked}
                                       onChange={() =>
                                         onToggleDayTour(day.date, tour.tourId)
                                       }
-                                      className="h-4 w-4 rounded border-[#D9D2C7] text-[#0B1F3A] focus:ring-[#C4A35A]"
+                                      className="h-4 w-4 rounded border-zinc-700 text-white focus:ring-[#C4A35A]"
                                     />
                                     <span className="min-w-0 truncate">
                                       {tour.title}
@@ -663,7 +663,7 @@ function Step5CityAccordion({
                       ) : null}
 
                       {mode === "full_day" ? (
-                        <p className="mt-2 text-[11px] text-[#8A8278]">
+                        <p className="mt-2 text-[11px] text-zinc-400">
                           Full-day disposal — covers transfers and experiences
                           that day.
                         </p>

@@ -107,34 +107,35 @@ export function BuilderApp() {
     <AppShell
       heroMode
       transparentHeader
+      dark
       logoSrc={logoSrc || undefined}
       hideBottomPad
     >
       <div className="relative">
         <BuilderHero branding={config?.branding ?? null} />
 
-        {/* Full-width cream shell — masks fixed parallax leaking past card margins */}
-        <div className="relative z-20 w-full bg-[#F5F0E8]">
+        {/* Full-width dark shell — masks fixed parallax leaking past card margins */}
+        <div className="relative z-20 w-full bg-[#0a0a0a]">
           <div className="-mt-14 px-3 pb-8 sm:-mt-16 sm:px-4">
-            <div className="mx-auto max-w-3xl rounded-t-3xl border border-[#E8E2D9] border-b-0 bg-[#FBF8F2] shadow-[0_-8px_40px_rgba(11,31,58,0.12)]">
-              <div className="overflow-hidden rounded-t-3xl border-b border-[#E8E2D9] px-5 py-5 sm:px-6">
+            <div className="mx-auto max-w-3xl rounded-t-3xl border border-zinc-800 border-b-0 bg-[#111111] shadow-[0_-8px_40px_rgba(0,0,0,0.55)]">
+              <div className="overflow-hidden rounded-t-3xl border-b border-zinc-800 px-5 py-5 sm:px-6">
                 <p className="text-[0.65rem] font-semibold uppercase tracking-[0.3em] text-[#C4A35A]">
                   Your Trip Builder
                 </p>
-                <h2 className="mt-1 font-display text-2xl text-[#0B1F3A] sm:text-3xl">
+                <h2 className="mt-1 font-display text-2xl text-white sm:text-3xl">
                   Design your Japan journey
                 </h2>
               </div>
 
               <div className="px-4 pb-40 pt-0 sm:px-6">
                 {loading ? (
-                  <p className="rounded-2xl bg-white/70 p-8 text-center text-sm text-[#8A8278]">
+                  <p className="rounded-2xl border border-zinc-800 bg-zinc-900/70 p-8 text-center text-sm text-zinc-400">
                     Loading your trip builder…
                   </p>
                 ) : error ? (
-                  <div className="rounded-2xl border border-red-200 bg-white p-6 text-sm text-red-700">
+                  <div className="rounded-2xl border border-red-900/60 bg-zinc-900 p-6 text-sm text-red-300">
                     <p className="font-semibold">PocketBase unavailable</p>
-                    <p className="mt-2 text-[#5C6570]">{error}</p>
+                    <p className="mt-2 text-zinc-400">{error}</p>
                   </div>
                 ) : config ? (
                   <BuilderAccordionProvider defaultOpen={1}>
@@ -188,7 +189,7 @@ export function BuilderApp() {
           <div className="mx-auto max-w-3xl">
             <Link
               href="/builder/itinerary"
-              className="no-print flex w-full flex-col items-center rounded-2xl bg-[#0B1F3A] px-6 py-4 text-center shadow-[0_12px_40px_rgba(11,31,58,0.35)] transition hover:bg-[#143052]"
+              className="no-print flex w-full flex-col items-center rounded-2xl border border-[#C4A35A]/40 bg-[#0B1F3A] px-6 py-4 text-center shadow-[0_12px_40px_rgba(0,0,0,0.55)] transition hover:bg-[#143052]"
             >
               <span className="text-base font-semibold tracking-wide text-white">
                 ✨ VIEW / PRINT ITINERARY

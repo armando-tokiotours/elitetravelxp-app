@@ -154,7 +154,7 @@ export function LocationsNightsSection({
       summary={summary}
     >
       {!arrivalDate ? (
-        <p className="mb-3 rounded-xl bg-[#F7F3EC] px-3 py-2 text-xs text-[#8A8278]">
+        <p className="mb-3 rounded-xl bg-zinc-950 px-3 py-2 text-xs text-zinc-400">
           Set an arrival date in Step 1 to unlock seasonal concierge suggestions.
         </p>
       ) : null}
@@ -162,7 +162,7 @@ export function LocationsNightsSection({
       {routeToast ? (
         <div
           role="status"
-          className="mb-3 rounded-xl border border-[#C4A35A]/50 bg-[#F7EFD9] px-3.5 py-2.5 text-sm text-[#6B5420]"
+          className="mb-3 rounded-xl border border-[#C4A35A]/50 bg-zinc-950 px-3.5 py-2.5 text-sm text-[#E8D5A3]"
         >
           {routeToast}
         </div>
@@ -173,11 +173,11 @@ export function LocationsNightsSection({
           key={w.type}
           className={`mb-3 rounded-xl px-3.5 py-3 text-sm ${
             w.type === "inefficient"
-              ? "border border-[#C4A35A]/35 bg-[#FBF6EA] text-[#5C4A1F]"
-              : "border border-[#C4A35A]/50 bg-[#F7EFD9] text-[#6B5420]"
+              ? "border border-[#C4A35A]/35 bg-zinc-950 text-zinc-300"
+              : "border border-[#C4A35A]/50 bg-zinc-950 text-[#E8D5A3]"
           }`}
         >
-          <p className="font-semibold text-[#0B1F3A]">
+          <p className="font-semibold text-white">
             {w.type === "inefficient" ? "💡 " : "⚠️ "}
             {w.title}
           </p>
@@ -186,7 +186,7 @@ export function LocationsNightsSection({
       ))}
 
       {locations.length === 0 ? (
-        <p className="mb-4 text-sm text-[#8A8278]">
+        <p className="mb-4 text-sm text-zinc-400">
           Add cities to shape your route. Drag to reorder travel order. The same
           city can appear more than once (e.g. round-trip), but not consecutively.
         </p>
@@ -236,7 +236,7 @@ export function LocationsNightsSection({
         type="button"
         onClick={() => setPickerOpen(true)}
         disabled={cities.length === 0}
-        className="mb-5 w-full rounded-full border border-dashed border-[#C4A35A] bg-[#FBF8F2] py-3 text-sm font-semibold text-[#0B1F3A] transition hover:bg-[#F3EBD9] disabled:opacity-40"
+        className="mb-5 w-full rounded-full border border-dashed border-[#C4A35A] bg-zinc-950 py-3 text-sm font-semibold text-white transition hover:bg-zinc-800 disabled:opacity-40"
       >
         + Add Location
       </button>
@@ -244,8 +244,8 @@ export function LocationsNightsSection({
       <div
         className={`mb-5 rounded-xl px-4 py-3 text-sm ${
           matches
-            ? "bg-[#EAF3EA] text-[#1F5C3A]"
-            : "bg-[#F8EDE8] text-[#8A3B2A]"
+            ? "border border-emerald-800/60 bg-emerald-950/40 text-emerald-200"
+            : "border border-red-900/50 bg-red-950/30 text-red-200"
         }`}
       >
         Total nights: {totalNights}{" "}
@@ -260,7 +260,7 @@ export function LocationsNightsSection({
         title="Add Location"
       >
         {lastCityId ? (
-          <p className="mb-3 text-xs text-[#8A8278]">
+          <p className="mb-3 text-xs text-zinc-400">
             You can add a city again later for a round-trip, but not immediately
             after itself.
           </p>
@@ -288,8 +288,8 @@ export function LocationsNightsSection({
                   }}
                   className={`flex w-full items-center gap-3 rounded-xl border px-3 py-2.5 text-left transition ${
                     disabled
-                      ? "cursor-not-allowed border-[#EEE8DF] bg-[#F7F3EC] opacity-50"
-                      : "border-[#EEE8DF] hover:border-[#C4A35A]"
+                      ? "cursor-not-allowed border-zinc-800 bg-zinc-950 opacity-50"
+                      : "border-zinc-800 hover:border-[#C4A35A]"
                   }`}
                 >
                   {img ? (
@@ -303,11 +303,11 @@ export function LocationsNightsSection({
                     <div className="h-11 w-11 rounded-lg bg-[#E8E2D9]" />
                   )}
                   <span className="min-w-0 flex-1">
-                    <span className="block font-medium text-[#0B1F3A]">
+                    <span className="block font-medium text-white">
                       {city.name}
                     </span>
                     {disabled ? (
-                      <span className="text-xs text-[#8A8278]">
+                      <span className="text-xs text-zinc-400">
                         Already last in your route
                       </span>
                     ) : null}

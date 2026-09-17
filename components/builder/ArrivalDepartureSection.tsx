@@ -127,7 +127,7 @@ export function ArrivalDepartureSection({
       <div className="mt-5">
         <div className="grid grid-cols-2 gap-3 md:gap-6">
           <div>
-            <label className="mb-1 block text-[10px] font-medium uppercase tracking-[0.12em] text-[#8A8278] sm:text-xs sm:tracking-[0.14em]">
+            <label className="mb-1 block text-[10px] font-medium uppercase tracking-[0.12em] text-zinc-400 sm:text-xs sm:tracking-[0.14em]">
               {pickupLabel}
             </label>
             <PillToggle
@@ -137,7 +137,7 @@ export function ArrivalDepartureSection({
             />
           </div>
           <div>
-            <label className="mb-1 block text-[10px] font-medium uppercase tracking-[0.12em] text-[#8A8278] sm:text-xs sm:tracking-[0.14em]">
+            <label className="mb-1 block text-[10px] font-medium uppercase tracking-[0.12em] text-zinc-400 sm:text-xs sm:tracking-[0.14em]">
               {dropoffLabel}
             </label>
             <PillToggle

@@ -40,13 +40,13 @@ export function SectionBlock({
   return (
     <section
       id={id}
-      className="overflow-hidden rounded-2xl border border-[#E8E2D9] bg-white/90 shadow-[0_2px_12px_rgba(11,31,58,0.04)]"
+      className="overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-900 shadow-[0_2px_16px_rgba(0,0,0,0.45)]"
     >
       <button
         type="button"
         onClick={onToggle}
         aria-expanded={isOpen}
-        className="flex w-full items-center gap-3 px-4 py-4 text-left transition hover:bg-[#FBF8F2]/80 sm:gap-3.5 sm:px-6 sm:py-5"
+        className="flex w-full items-center gap-3 px-4 py-4 text-left transition hover:bg-zinc-800/60 sm:gap-3.5 sm:px-6 sm:py-5"
       >
         <span
           className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-white shadow-[0_4px_12px_rgba(196,163,90,0.35)]"
@@ -57,7 +57,7 @@ export function SectionBlock({
         </span>
 
         <div className="min-w-0 flex-1">
-          <h2 className="font-display text-xl tracking-tight text-[#0B1F3A] sm:text-[1.7rem]">
+          <h2 className="font-display text-xl tracking-tight text-white sm:text-[1.7rem]">
             <span className="text-[#C4A35A]">{number}.</span> {title}
           </h2>
           {!isOpen && summary ? (
@@ -68,7 +68,7 @@ export function SectionBlock({
         </div>
 
         {!isOpen && summary ? (
-          <span className="mr-1 hidden max-w-[9rem] truncate rounded-full border border-[#E8DCC3] bg-[#FBF6EA] px-2.5 py-1 text-[0.65rem] font-medium text-[#8A6B20] sm:inline-block lg:max-w-[14rem]">
+          <span className="mr-1 hidden max-w-[9rem] truncate rounded-full border border-zinc-700 bg-zinc-950 px-2.5 py-1 text-[0.65rem] font-medium text-zinc-300 sm:inline-block lg:max-w-[14rem]">
             {summary}
           </span>
         ) : null}
@@ -76,7 +76,7 @@ export function SectionBlock({
         <motion.span
           animate={{ rotate: isOpen ? 180 : 0 }}
           transition={{ duration: 0.25 }}
-          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-[#E8E2D9] bg-[#FBF8F2] text-[#0B1F3A]"
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-zinc-700 bg-zinc-950 text-white"
           aria-hidden
         >
           <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
@@ -101,7 +101,7 @@ export function SectionBlock({
             transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
             className="overflow-hidden"
           >
-            <div className="border-t border-[#F0EBE3] px-4 pb-5 pt-4 sm:px-6 sm:pb-6">
+            <div className="border-t border-zinc-800 px-4 pb-5 pt-4 sm:px-6 sm:pb-6">
               {children}
             </div>
           </motion.div>
@@ -201,8 +201,8 @@ export function ChoicePill({
       onClick={onClick}
       className={`relative inline-flex items-center justify-center rounded-full font-semibold tracking-wide transition ${sizing} ${
         active
-          ? "bg-[#0B1F3A] text-white shadow-md"
-          : "border border-[#D4C9B5] bg-[#FBF8F2] text-[#0B1F3A] hover:border-[#C4A35A]"
+          ? "border border-[#C4A35A] bg-[#0B1F3A] text-white shadow-md"
+          : "border border-zinc-700 bg-zinc-800 text-zinc-300 hover:bg-zinc-700"
       } ${className}`}
     >
       {children}
@@ -254,7 +254,7 @@ export function PillToggle({
 
 export function FieldLabel({ children }: { children: ReactNode }) {
   return (
-    <label className="mb-1.5 block text-xs font-medium uppercase tracking-[0.14em] text-[#8A8278]">
+    <label className="mb-1.5 block text-xs font-medium uppercase tracking-[0.14em] text-zinc-400">
       {children}
     </label>
   );
@@ -278,7 +278,7 @@ export function SelectField({
       id={id}
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      className="w-full appearance-none rounded-xl border border-[#D9D2C7] bg-white px-4 py-3 text-sm text-[#0B1F3A] outline-none transition focus:border-[#C4A35A] focus:ring-2 focus:ring-[#C4A35A]/25"
+      className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-950 px-4 py-3 text-sm text-white outline-none transition focus:border-[#C4A35A] focus:ring-2 focus:ring-[#C4A35A]/25"
     >
       <option value="">{placeholder}</option>
       {options.map((o) => (
@@ -298,23 +298,23 @@ export function NightCounter({
   onChange: (n: number) => void;
 }) {
   return (
-    <div className="inline-flex items-center gap-2 rounded-full border border-[#D9D2C7] bg-[#F7F3EC] px-2 py-1">
+    <div className="inline-flex items-center gap-2 rounded-full border border-zinc-700 bg-zinc-950 px-2 py-1">
       <button
         type="button"
         aria-label="Fewer nights"
         onClick={() => onChange(Math.max(1, value - 1))}
-        className="flex h-7 w-7 items-center justify-center rounded-full text-[#0B1F3A] hover:bg-white"
+        className="flex h-7 w-7 items-center justify-center rounded-full text-white hover:bg-zinc-800"
       >
         −
       </button>
-      <span className="min-w-[4.5rem] text-center text-sm font-medium text-[#0B1F3A]">
+      <span className="min-w-[4.5rem] text-center text-sm font-medium text-white">
         {value} night{value === 1 ? "" : "s"}
       </span>
       <button
         type="button"
         aria-label="More nights"
         onClick={() => onChange(value + 1)}
-        className="flex h-7 w-7 items-center justify-center rounded-full text-[#0B1F3A] hover:bg-white"
+        className="flex h-7 w-7 items-center justify-center rounded-full text-white hover:bg-zinc-800"
       >
         +
       </button>

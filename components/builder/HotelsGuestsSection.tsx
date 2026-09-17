@@ -204,9 +204,9 @@ export function HotelsGuestsSection({
       summary={summary}
     >
       <div className="flex flex-col gap-5">
-        <p className="text-xs text-[#A39A8E]">
+        <p className="text-xs text-zinc-500">
           Party size from Step 1:{" "}
-          <span className="font-medium text-[#0B1F3A]">
+          <span className="font-medium text-white">
             {totalGuests} guest{totalGuests === 1 ? "" : "s"}
           </span>{" "}
           ({adults} adults, {children} children). Guidance: max{" "}
@@ -215,12 +215,12 @@ export function HotelsGuestsSection({
             <>
               {" "}
               Rates use{" "}
-              <span className="font-medium text-[#0B1F3A]">{monthName}</span>
+              <span className="font-medium text-white">{monthName}</span>
               {activeSeasonTier ? (
                 <>
                   {" "}
                   ·{" "}
-                  <span className="font-medium text-[#0B1F3A]">
+                  <span className="font-medium text-white">
                     {activeSeasonTier} season
                   </span>
                 </>
@@ -233,7 +233,7 @@ export function HotelsGuestsSection({
         </p>
 
         {orderedCityIds.length === 0 ? (
-          <p className="rounded-xl border border-dashed border-[#D9D2C7] bg-[#FBF8F2] p-4 text-sm text-[#8A8278]">
+          <p className="rounded-xl border border-dashed border-zinc-700 bg-zinc-950 p-4 text-sm text-zinc-400">
             Choose cities in Step 3 (Locations &amp; Nights) to configure hotels
             per stop.
           </p>
@@ -333,10 +333,10 @@ function CityHotelCard({
     : null;
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-[#E8E2D9] bg-white">
+    <div className="overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-900">
       <div className="flex items-center justify-between gap-3 px-4 py-3.5">
-        <h3 className="font-display text-xl text-[#0B1F3A]">{cityName}</h3>
-        <label className="flex cursor-pointer items-center gap-2.5 text-xs text-[#5C6570]">
+        <h3 className="font-display text-xl text-white">{cityName}</h3>
+        <label className="flex cursor-pointer items-center gap-2.5 text-xs text-zinc-400">
           <span className="hidden sm:inline">
             Need a hotel in {cityName}?
           </span>
@@ -347,11 +347,11 @@ function CityHotelCard({
             aria-checked={needsHotel}
             onClick={() => onChange({ needsHotel: !needsHotel })}
             className={`relative h-7 w-12 shrink-0 rounded-full transition ${
-              needsHotel ? "bg-[#0B1F3A]" : "bg-[#D9D2C7]"
+              needsHotel ? "bg-[#C4A35A]" : "bg-zinc-700"
             }`}
           >
             <span
-              className={`absolute top-0.5 h-6 w-6 rounded-full bg-white shadow transition ${
+              className={`absolute top-0.5 h-6 w-6 rounded-full bg-zinc-900 shadow transition ${
                 needsHotel ? "left-[1.35rem]" : "left-0.5"
               }`}
             />
@@ -360,7 +360,7 @@ function CityHotelCard({
       </div>
 
       {needsHotel ? (
-        <div className="space-y-5 border-t border-[#EEE8DF] px-4 py-4">
+        <div className="space-y-5 border-t border-zinc-800 px-4 py-4">
           <div>
             <FieldLabel>Star rating</FieldLabel>
             <div className="mt-1 flex items-center gap-1.5">
@@ -376,7 +376,7 @@ function CityHotelCard({
                   <StarIcon filled={starRating >= n} />
                 </button>
               ))}
-              <span className="ml-2 text-sm font-medium text-[#0B1F3A]">
+              <span className="ml-2 text-sm font-medium text-white">
                 {starRating}-star
               </span>
             </div>
@@ -393,7 +393,7 @@ function CityHotelCard({
                   className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
                     roomType === t
                       ? "bg-[#0B1F3A] text-white"
-                      : "border border-[#D4C9B5] bg-[#FBF8F2] text-[#0B1F3A]"
+                      : "border border-zinc-700 bg-zinc-950 text-white"
                   }`}
                 >
                   {t}
@@ -421,7 +421,7 @@ function CityHotelCard({
           </div>
 
           {rateHint ? (
-            <p className="text-xs text-[#8A8278]">
+            <p className="text-xs text-zinc-400">
               Matrix rate hint
               {monthName || seasonTier ? (
                 <>
@@ -440,7 +440,7 @@ function CityHotelCard({
                 </>
               ) : null}
               :{" "}
-              <span className="font-semibold text-[#0B1F3A]">{rateHint}</span>
+              <span className="font-semibold text-white">{rateHint}</span>
             </p>
           ) : (
             <p className="text-xs text-[#B8B0A4]">
@@ -475,7 +475,7 @@ function BreakfastButton({
       className={`flex flex-col items-center gap-2 rounded-2xl border px-3 py-4 text-center transition ${
         active
           ? "border-[#0B1F3A] bg-[#0B1F3A] text-white"
-          : "border-[#E8E2D9] bg-[#FBF8F2] text-[#0B1F3A] hover:border-[#C4A35A]"
+          : "border-zinc-800 bg-zinc-950 text-white hover:border-[#C4A35A]"
       }`}
     >
       {icon === "coffee" ? <CoffeeIcon /> : <BanIcon />}

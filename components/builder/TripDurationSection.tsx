@@ -102,7 +102,7 @@ export function TripDurationSection({
       </div>
 
       {durationCustom ? (
-        <div className="mt-4 rounded-xl border border-[#E8E2D9] bg-[#FBF8F2] p-4">
+        <div className="mt-4 rounded-xl border border-zinc-800 bg-zinc-950 p-4">
           <FieldLabel>Enter days</FieldLabel>
           <div className="mt-1 flex items-center gap-3">
             <input
@@ -114,11 +114,11 @@ export function TripDurationSection({
               onChange={(e) => applyCustom(e.target.value)}
               onBlur={commitCustom}
               placeholder="e.g. 1, 2, 3, 7"
-              className="w-36 rounded-xl border border-[#D9D2C7] bg-white px-3 py-2.5 text-sm text-[#0B1F3A] outline-none focus:border-[#C4A35A]"
+              className="w-36 rounded-xl border border-zinc-700 bg-zinc-900 px-3 py-2.5 text-sm text-white outline-none focus:border-[#C4A35A]"
             />
-            <span className="text-sm text-[#8A8278]">
+            <span className="text-sm text-zinc-400">
               Minimum 1 day · Step 4 nights must total{" "}
-              <strong className="text-[#0B1F3A]">
+              <strong className="text-white">
                 {Math.max(1, durationDays)}
               </strong>
             </span>
@@ -132,9 +132,9 @@ export function TripDurationSection({
           type="date"
           value={arrivalDate ?? ""}
           onChange={(e) => setArrivalDate(e.target.value || null)}
-          className="mt-1 w-full max-w-xs rounded-xl border border-[#D9D2C7] bg-white px-3 py-2.5 text-sm text-[#0B1F3A] outline-none focus:border-[#C4A35A]"
+          className="mt-1 w-full max-w-xs rounded-xl border border-zinc-700 bg-zinc-900 px-3 py-2.5 text-sm text-white outline-none focus:border-[#C4A35A]"
         />
-        <p className="mt-1.5 text-xs text-[#8A8278]">
+        <p className="mt-1.5 text-xs text-zinc-400">
           Used for seasonality, hotel rates, concierge notes, and departure
           date.
         </p>
@@ -147,19 +147,19 @@ export function TripDurationSection({
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -6 }}
               transition={{ duration: 0.28 }}
-              className="mt-3 rounded-2xl border border-[#E5D4A8] bg-[#FBF6EA] px-4 py-3 text-sm text-[#0B1F3A]"
+              className="mt-3 rounded-2xl border border-[#E5D4A8] bg-zinc-950 px-4 py-3 text-sm text-white"
             >
               <p className="flex flex-wrap items-center gap-x-2 gap-y-1 font-semibold">
                 <SeasonLeafIcon />
                 <span>{activeSeasonTier} Season</span>
                 {activeSeasonNote.crowds ? (
-                  <span className="font-normal text-[#5C6570]">
+                  <span className="font-normal text-zinc-400">
                     · {activeSeasonNote.crowds}
                   </span>
                 ) : null}
               </p>
               {activeSeasonNote.note ? (
-                <p className="mt-1.5 text-[#3D4A5C] leading-relaxed">
+                <p className="mt-1.5 text-zinc-400 leading-relaxed">
                   {activeSeasonNote.note}
                 </p>
               ) : null}
@@ -170,7 +170,7 @@ export function TripDurationSection({
 
       <div className="mt-6">
         <FieldLabel>Guests</FieldLabel>
-        <div className="mt-2 overflow-hidden rounded-2xl border border-[#E8E2D9] bg-white">
+        <div className="mt-2 overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-900">
           <GuestStepper
             label="Adults"
             value={adults}
@@ -184,7 +184,7 @@ export function TripDurationSection({
             min={0}
           />
         </div>
-        <p className="mt-1.5 text-xs text-[#8A8278]">
+        <p className="mt-1.5 text-xs text-zinc-400">
           Used for airport transfers, vehicles, and hotel room guidance.
         </p>
       </div>
@@ -206,25 +206,25 @@ function GuestStepper({
   min: number;
 }) {
   return (
-    <div className="flex items-center justify-between border-b border-[#EEE8DF] px-4 py-3.5 last:border-b-0">
-      <span className="text-sm font-medium text-[#0B1F3A]">{label}</span>
+    <div className="flex items-center justify-between border-b border-zinc-800 px-4 py-3.5 last:border-b-0">
+      <span className="text-sm font-medium text-white">{label}</span>
       <div className="flex items-center gap-3">
         <button
           type="button"
           aria-label={`Decrease ${label}`}
           onClick={() => onChange(Math.max(min, value - 1))}
-          className="flex h-9 w-9 items-center justify-center rounded-full border border-[#D9D2C7] text-[#0B1F3A] transition hover:bg-[#FBF8F2]"
+          className="flex h-9 w-9 items-center justify-center rounded-full border border-zinc-700 text-white transition hover:bg-zinc-950"
         >
           −
         </button>
-        <span className="w-6 text-center text-sm font-semibold text-[#0B1F3A]">
+        <span className="w-6 text-center text-sm font-semibold text-white">
           {value}
         </span>
         <button
           type="button"
           aria-label={`Increase ${label}`}
           onClick={() => onChange(value + 1)}
-          className="flex h-9 w-9 items-center justify-center rounded-full border border-[#D9D2C7] text-[#0B1F3A] transition hover:bg-[#FBF8F2]"
+          className="flex h-9 w-9 items-center justify-center rounded-full border border-zinc-700 text-white transition hover:bg-zinc-950"
         >
           +
         </button>
@@ -245,7 +245,7 @@ function SeasonLeafIcon() {
       />
       <path
         d="M12 7v10"
-        stroke="#0B1F3A"
+        stroke="#C4A35A"
         strokeWidth="1.4"
         strokeLinecap="round"
       />
