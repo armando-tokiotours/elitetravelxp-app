@@ -1,4 +1,4 @@
-/** Elite Concierge design deposit (€) — 100% credited toward final trip balance on booking. */
+/** Elite Concierge design deposit (€). Fully credited toward final trip balance on booking. */
 export const ELITE_CONCIERGE_FEE = 50;
 
 export const ELITE_CONCIERGE_FEE_LABEL =

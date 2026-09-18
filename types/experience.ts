@@ -21,6 +21,11 @@ export type ExperienceAccessType =
   | "vip_event"
   | "time_sensitive";
 
+export type ExperienceCrowdTag =
+  | "hidden_gem"
+  | "classic_highlight"
+  | "balanced_mix";
+
 export type ExperienceCategory = "tour" | "activity";
 
 export type ExperienceCitySlug = "tokyo" | "kamakura" | "kyoto" | "osaka";
@@ -34,6 +39,7 @@ export interface TourOrExperience {
   paceTag: ExperiencePaceTag;
   isNiche: boolean;
   accessType?: ExperienceAccessType;
+  crowdTag?: ExperienceCrowdTag;
   description: string;
   route?: string;
 }
@@ -51,6 +57,7 @@ export interface Experience {
   isNiche?: boolean;
   category?: ExperienceCategory;
   accessType?: ExperienceAccessType;
+  crowdTag?: ExperienceCrowdTag;
   description: string;
   image: string;
 }
@@ -158,6 +165,11 @@ const ACCESS_SET = new Set<string>([
   "vip_event",
   "time_sensitive",
 ]);
+const CROWD_SET = new Set<string>([
+  "hidden_gem",
+  "classic_highlight",
+  "balanced_mix",
+]);
 
 export function normalizeVibeTags(raw: unknown): ExperienceVibeTag[] {
   if (!Array.isArray(raw)) return [];
@@ -179,6 +191,24 @@ export function normalizeAccessType(raw: unknown): ExperienceAccessType | null {
     .toLowerCase()
     .trim();
   return ACCESS_SET.has(v) ? (v as ExperienceAccessType) : null;
+}
+
+export function normalizeCrowdTag(raw: unknown): ExperienceCrowdTag | null {
+  const v = String(raw ?? "")
+    .toLowerCase()
+    .trim()
+    .replace(/[\s-]+/g, "_");
+  if (!v) return null;
+  if (v === "hidden_gems" || v === "hiddengem" || v === "niche") {
+    return "hidden_gem";
+  }
+  if (v === "classic" || v === "classic_landmarks" || v === "landmark") {
+    return "classic_highlight";
+  }
+  if (v === "balanced" || v === "mix" || v === "open_explorer") {
+    return "balanced_mix";
+  }
+  return CROWD_SET.has(v) ? (v as ExperienceCrowdTag) : null;
 }
 
 export function normalizeCategory(raw: unknown): ExperienceCategory {
@@ -284,12 +314,14 @@ export function resolveTourTags(tour: {
   pace_tag?: string | ExperiencePaceTag;
   is_niche?: boolean;
   access_type?: string | ExperienceAccessType;
+  crowd_tag?: string | ExperienceCrowdTag;
 }): {
   category: ExperienceCategory;
   vibeTags: ExperienceVibeTag[];
   paceTag: ExperiencePaceTag;
   isNiche: boolean;
   accessType: ExperienceAccessType;
+  crowdTag: ExperienceCrowdTag | null;
 } {
   const category = normalizeCategory(tour.category);
   const explicit = normalizeVibeTags(tour.vibe_tags);
@@ -319,11 +351,14 @@ export function resolveTourTags(tour: {
     normalizeAccessType(tour.access_type) ??
     (category === "tour" ? "guided_route" : "direct_ticket");
 
+  const crowdTag = normalizeCrowdTag(tour.crowd_tag);
+
   return {
     category,
     vibeTags,
     paceTag,
     isNiche: Boolean(tour.is_niche),
     accessType,
+    crowdTag,
   };
 }

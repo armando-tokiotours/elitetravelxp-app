@@ -331,7 +331,7 @@ function SelectionSummaryWidget({
         </p>
       ) : experienceService === "concierge" ? (
         <p className="mt-3 text-sm text-zinc-400">
-          €50 design deposit selected — 100% credited toward your final trip
+          €50 design deposit selected. 100% credited toward your final trip
           balance when you book. Your concierge will design the full day-by-day
           plan.
         </p>

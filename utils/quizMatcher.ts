@@ -36,6 +36,7 @@ type MatchableTour = {
   is_active?: boolean;
   city_id?: string;
   access_type?: string;
+  crowd_tag?: string;
 };
 
 function primaryVibeHits(
@@ -91,6 +92,7 @@ function scoreExperienceAgainstQuiz(
       pace_tag: item.paceTag,
       is_niche: item.isNiche,
       access_type: item.accessType,
+      crowd_tag: item.crowdTag,
     },
     answers
   );
@@ -142,6 +144,7 @@ export function scoreTourAgainstQuiz(
     if (category === "tour") score += 6;
     if (hits >= 2 || tags.vibeTags.includes("multi_vibe")) score += 4;
     if (access === "guided_route") score += 2;
+    if (tags.crowdTag === "balanced_mix") score += 3;
   } else {
     if (category === "activity") score += 6;
     if (hits === 1 && tags.vibeTags.filter((v) => v !== "multi_vibe").length <= 1)
@@ -149,9 +152,12 @@ export function scoreTourAgainstQuiz(
     if (access === "direct_ticket" || access === "time_sensitive") score += 2;
     if (
       answers.allowNiche &&
-      (access === "vip_event" || tags.isNiche)
+      (access === "vip_event" || tags.isNiche || tags.crowdTag === "hidden_gem")
     ) {
       score += 3;
+    }
+    if (!answers.allowNiche && tags.crowdTag === "classic_highlight") {
+      score += 2;
     }
   }
 

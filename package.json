@@ -12,6 +12,8 @@
     "pb:seed": "node scripts/seed-pocketbase.mjs",
     "pb:pull": "bash scripts/pb-pull-from-vps.sh",
     "pb:push": "bash scripts/pb-push-to-vps.sh",
+    "media:optimize": "node scripts/optimize-existing-media.mjs",
+    "media:optimize:pb": "node scripts/optimize-existing-media.mjs --pb",
     "seed:excel": "node scripts/seed-from-excel.mjs",
     "seed": "node scripts/seed-from-excel.mjs"
   },
@@ -25,6 +27,7 @@
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "resend": "^6.28.1",
+    "sharp": "^0.35.4",
     "xlsx": "^0.18.5",
     "zustand": "^5.0.15"
   },
@@ -35,6 +38,7 @@
     "@types/pdfkit": "^0.17.6",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/sharp": "^0.31.1",
     "eslint": "^9",
     "eslint-config-next": "16.3.4",
     "tailwindcss": "^4",

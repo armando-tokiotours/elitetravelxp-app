@@ -15,7 +15,7 @@ export function CityThumb({
   city,
   name,
   alt = "",
-  thumb = "400x300",
+  thumb = "120x120",
   className = "h-full w-full object-cover",
 }: {
   city?: PbCity | null;
@@ -27,6 +27,7 @@ export function CityThumb({
   const candidates = cityImageCandidates(city, {
     name: name || city?.name,
     thumb,
+    variant: thumb.includes("120") || thumb.includes("100") ? "thumb" : "card",
   });
   const [index, setIndex] = useState(0);
   const src = candidates[Math.min(index, candidates.length - 1)] || CITY_PLACEHOLDER;
@@ -40,6 +41,8 @@ export function CityThumb({
     <img
       src={src}
       alt={alt}
+      width={120}
+      height={120}
       loading="lazy"
       decoding="async"
       className={className}

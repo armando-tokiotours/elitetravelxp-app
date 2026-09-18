@@ -359,6 +359,8 @@ export interface PbTour {
    * guided_route (tours) | direct_ticket | vip_event | time_sensitive
    */
   access_type?: string;
+  /** hidden_gem | classic_highlight | balanced_mix */
+  crowd_tag?: string;
   /** Suggested itinerary / stops */
   route?: string;
   /** What’s included and excluded */

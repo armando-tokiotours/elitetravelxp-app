@@ -120,6 +120,13 @@ export const COLLECTIONS: CollectionDef[] = [
         hint: "Activities: Ticket / VIP / Time-sensitive. Tours default to guided route.",
       },
       {
+        key: "crowd_tag",
+        label: "Crowd / highlight style",
+        type: "select",
+        options: ["hidden_gem", "classic_highlight", "balanced_mix"],
+        hint: "Maps to the Experience Profiler crowd answer.",
+      },
+      {
         key: "pace_tag",
         label: "Pace / intensity",
         type: "select",

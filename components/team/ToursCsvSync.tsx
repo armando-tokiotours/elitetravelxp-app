@@ -9,15 +9,21 @@ import { normalizeTourLanguages } from "@/lib/tourLanguages";
 
 type PbClient = PocketBase;
 
+/** Exact export column order — profiler tags included for round-trip sync. */
 const CSV_HEADERS = [
   "id",
   "city_id",
   "city",
-  "category",
+  "category", // tour | activity
   "title",
   "description",
   "route",
   "inclusions_exclusions",
+  "vibe_tags", // e.g. culture;foodie
+  "pace_tag", // e.g. relaxed
+  "access_type", // e.g. guided_route | direct_ticket
+  "crowd_tag", // e.g. hidden_gem | classic_highlight
+  "is_niche", // true | false
   "price_1_pax",
   "price_2_pax",
   "price_3_pax",
@@ -83,6 +89,51 @@ function languagesFromCsv(raw: string): string[] {
     .filter(Boolean);
 }
 
+function tagsToCsv(raw: unknown): string {
+  if (Array.isArray(raw)) {
+    return raw
+      .map((x) => String(x).trim())
+      .filter(Boolean)
+      .join(";");
+  }
+  if (typeof raw === "string" && raw.trim()) {
+    return raw
+      .split(/[|;,]/)
+      .map((s) => s.trim())
+      .filter(Boolean)
+      .join(";");
+  }
+  return "";
+}
+
+function tagsFromCsv(raw: string): string[] {
+  if (!raw.trim()) return [];
+  return raw
+    .split(/[|;,]/)
+    .map((s) => s.trim().toLowerCase())
+    .filter(Boolean);
+}
+
+const VIBE_ALLOWED = new Set([
+  "culture",
+  "foodie",
+  "modern",
+  "nature",
+  "multi_vibe",
+]);
+const PACE_ALLOWED = new Set(["relaxed", "standard", "active"]);
+const ACCESS_ALLOWED = new Set([
+  "guided_route",
+  "direct_ticket",
+  "vip_event",
+  "time_sensitive",
+]);
+const CROWD_ALLOWED = new Set([
+  "hidden_gem",
+  "classic_highlight",
+  "balanced_mix",
+]);
+
 function normalizeCategory(raw: string): "tour" | "activity" {
   const s = raw.trim().toLowerCase();
   if (
@@ -95,6 +146,52 @@ function normalizeCategory(raw: string): "tour" | "activity" {
     return "activity";
   }
   return "tour";
+}
+
+function normalizePaceTag(raw: string): string | undefined {
+  const s = raw.trim().toLowerCase();
+  if (!s) return undefined;
+  if (s === "balanced" || s === "moderate") return "standard";
+  return PACE_ALLOWED.has(s) ? s : undefined;
+}
+
+function normalizeAccessType(
+  raw: string,
+  category: "tour" | "activity"
+): string {
+  const s = raw.trim().toLowerCase();
+  if (ACCESS_ALLOWED.has(s)) return s;
+  return category === "tour" ? "guided_route" : "direct_ticket";
+}
+
+function normalizeCrowdTag(raw: string): string | undefined {
+  const s = raw.trim().toLowerCase().replace(/[\s-]+/g, "_");
+  if (!s) return undefined;
+  if (
+    s === "hidden_gem" ||
+    s === "hidden_gems" ||
+    s === "hiddengem" ||
+    s === "niche"
+  ) {
+    return "hidden_gem";
+  }
+  if (
+    s === "classic_highlight" ||
+    s === "classic" ||
+    s === "classic_landmarks" ||
+    s === "landmark"
+  ) {
+    return "classic_highlight";
+  }
+  if (
+    s === "balanced_mix" ||
+    s === "balanced" ||
+    s === "mix" ||
+    s === "open_explorer"
+  ) {
+    return "balanced_mix";
+  }
+  return CROWD_ALLOWED.has(s) ? s : undefined;
 }
 
 export function ToursCsvSync({
@@ -140,15 +237,24 @@ export function ToursCsvSync({
       const tours = await pb.collection("tours").getFullList({ sort: "title" });
       const rows: CsvRow[] = tours.map((t) => {
         const r = t as Record<string, unknown>;
+        const category = normalizeCategory(String(r.category ?? "tour"));
         return {
           id: String(r.id ?? ""),
           city_id: String(r.city_id ?? ""),
           city: cityName(String(r.city_id ?? "")),
-          category: normalizeCategory(String(r.category ?? "tour")),
+          category,
           title: String(r.title ?? ""),
           description: String(r.description ?? ""),
           route: String(r.route ?? ""),
           inclusions_exclusions: String(r.inclusions_exclusions ?? ""),
+          vibe_tags: tagsToCsv(r.vibe_tags),
+          pace_tag: String(r.pace_tag ?? ""),
+          access_type: String(
+            r.access_type ??
+              (category === "tour" ? "guided_route" : "direct_ticket")
+          ),
+          crowd_tag: String(r.crowd_tag ?? ""),
+          is_niche: r.is_niche === true,
           price_1_pax: Number(r.price_1_pax) || "",
           price_2_pax: Number(r.price_2_pax) || "",
           price_3_pax: Number(r.price_3_pax) || "",
@@ -162,7 +268,7 @@ export function ToursCsvSync({
         };
       });
       downloadCsv(rows, "tours_export.csv");
-      setMsg(`Downloaded ${rows.length} tour(s).`);
+      setMsg(`Downloaded ${rows.length} tour(s) with full schema columns.`);
     } catch (e) {
       setErr(formatPbError(e));
     } finally {
@@ -187,15 +293,6 @@ export function ToursCsvSync({
 
         const existing = await pb.collection("tours").getFullList();
         const byId = new Map(existing.map((t) => [String(t.id), t]));
-        const byTitleCity = new Map(
-          existing.map((t) => {
-            const r = t as Record<string, unknown>;
-            const key = `${String(r.title ?? "")
-              .trim()
-              .toLowerCase()}::${String(r.city_id ?? "")}`;
-            return [key, t] as const;
-          })
-        );
 
         let updated = 0;
         let added = 0;
@@ -210,14 +307,29 @@ export function ToursCsvSync({
           const city_id = resolveCityId(cityIdRaw, cityLabel);
           if (!city_id) {
             throw new Error(
-              `Missing city for tour "${title}" — set city_id or city name.`
+              `Missing city for tour "${title}". Set city_id or city name.`
             );
           }
+
+          const category = normalizeCategory(cell(row, "category", "type"));
+          const vibeTags = tagsFromCsv(
+            cell(row, "vibe_tags", "vibetags", "vibes")
+          ).filter((t) => VIBE_ALLOWED.has(t));
+          const paceTag = normalizePaceTag(
+            cell(row, "pace_tag", "pace", "intensity")
+          );
+          const accessType = normalizeAccessType(
+            cell(row, "access_type", "accesstype", "access"),
+            category
+          );
+          const crowdTag = normalizeCrowdTag(
+            cell(row, "crowd_tag", "crowd", "crowdstyle")
+          );
 
           const payload: Record<string, unknown> = {
             city_id,
             title,
-            category: normalizeCategory(cell(row, "category", "type")),
+            category,
             description: cell(row, "description"),
             route: cell(row, "route"),
             inclusions_exclusions: cell(
@@ -226,6 +338,9 @@ export function ToursCsvSync({
               "inclusions",
               "includes"
             ),
+            vibe_tags: vibeTags,
+            access_type: accessType,
+            is_niche: boolish(cell(row, "is_niche", "niche", "vip"), false),
             duration_hours: num(row, "duration_hours", "duration") ?? 0,
             languages: languagesFromCsv(cell(row, "languages")),
             is_customizable_duration: boolish(
@@ -235,40 +350,39 @@ export function ToursCsvSync({
             is_active: boolish(cell(row, "is_active", "active"), true),
           };
 
-          const p1 = num(row, "price_1_pax", "price1");
+          if (paceTag) payload.pace_tag = paceTag;
+          if (crowdTag) payload.crowd_tag = crowdTag;
+
+          const p1 = num(row, "price_1_pax", "price1", "price");
           const p2 = num(row, "price_2_pax", "price2");
           const p3 = num(row, "price_3_pax", "price3");
           const p4 = num(row, "price_4_pax", "price4");
           const px = num(row, "price_extra_pax", "price_extra", "extra_pax");
-          if (p1 != null) payload.price_1_pax = p1;
+          if (p1 != null) {
+            payload.price_1_pax = p1;
+            payload.price = p1;
+            payload.price_per_person = p1;
+          }
           if (p2 != null) payload.price_2_pax = p2;
           if (p3 != null) payload.price_3_pax = p3;
           if (p4 != null) payload.price_4_pax = p4;
           if (px != null) payload.price_extra_pax = px;
-          if (p1 != null) {
-            payload.price = p1;
-            payload.price_per_person = p1;
-          }
 
           const mediaType = cell(row, "media_type");
           if (mediaType === "Image" || mediaType === "Video") {
             payload.media_type = mediaType;
           }
 
-          const titleKey = `${title.trim().toLowerCase()}::${city_id}`;
-          const match =
-            (csvId && byId.get(csvId)) || byTitleCity.get(titleKey) || null;
-
-          if (match) {
-            await pb.collection("tours").update(String(match.id), payload);
+          // id present + exists in PB → update; empty/missing/unknown id → create
+          const existingRow = csvId ? byId.get(csvId) : undefined;
+          if (existingRow) {
+            await pb.collection("tours").update(csvId, payload);
             updated += 1;
-            byId.set(String(match.id), match);
-            byTitleCity.set(titleKey, match);
+            byId.set(csvId, existingRow);
           } else {
             const created = await pb.collection("tours").create(payload);
             added += 1;
             byId.set(String(created.id), created);
-            byTitleCity.set(titleKey, created);
           }
         }
 

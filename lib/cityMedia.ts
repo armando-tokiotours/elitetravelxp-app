@@ -1,5 +1,6 @@
 import type { PbCity } from "@/lib/pocketbase/client";
 import { cityPhoto, pbFileUrl } from "@/lib/pocketbase/client";
+import { PB_THUMBS } from "@/lib/mediaThumbs";
 
 /** Ultimate fallback when PocketBase + static city assets fail. */
 export const CITY_PLACEHOLDER = "/images/placeholder-city.webp";
@@ -26,18 +27,25 @@ export function cityPbImageUrl(
 }
 
 /**
- * Ordered image candidates: PB → static /images/cities/{slug}.webp → placeholder.
+ * Ordered image candidates: PB thumb → static optimized webp → placeholder.
+ * Prefers `-thumb.webp` / `-card.webp` variants from the batch optimizer.
  */
 export function cityImageCandidates(
   city: PbCity | null | undefined,
-  opts?: { name?: string; thumb?: string }
+  opts?: { name?: string; thumb?: string; variant?: "thumb" | "card" | "hero" }
 ): string[] {
   const name = opts?.name || city?.name || "";
   const slug = citySlugFromName(name);
+  const variant = opts?.variant ?? "thumb";
+  const thumb = opts?.thumb ?? PB_THUMBS.pill;
   const list: string[] = [];
-  const pb = cityPbImageUrl(city, opts?.thumb);
+  const pb = cityPbImageUrl(city, thumb);
   if (pb) list.push(pb);
-  if (slug) list.push(`/images/cities/${slug}.webp`);
+  if (slug) {
+    list.push(`/images/cities/${slug}-${variant}.webp`);
+    list.push(`/images/cities/${slug}.webp`);
+  }
+  list.push(`/images/placeholder-city-${variant}.webp`);
   list.push(CITY_PLACEHOLDER);
   return Array.from(new Set(list));
 }

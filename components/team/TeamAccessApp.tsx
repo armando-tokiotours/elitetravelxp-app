@@ -26,6 +26,7 @@ import { HotelRatesUploader } from "@/components/team/HotelRatesUploader";
 import { SeasonalityPanel } from "@/components/team/SeasonalityPanel";
 import { ToursCsvSync } from "@/components/team/ToursCsvSync";
 import { formatTourTierSummary } from "@/lib/tourPricing";
+import { optimizeFileForUpload } from "@/lib/optimizeUploadClient";
 
 type PbClient = PocketBase;
 
@@ -284,11 +285,23 @@ function rowSubtitle(def: CollectionDef, row: Record<string, unknown>): string {
   if (def.id === "tours") {
     const tier = formatTourTierSummary(row as never);
     const hrs = row.duration_hours;
-    const cat =
-      String(row.category || "tour").toLowerCase() === "activity"
-        ? "Activity"
-        : "Tour";
-    return [cat, tier || null, hrs != null ? `${hrs}h` : null]
+    const isActivity =
+      String(row.category || "tour").toLowerCase() === "activity";
+    const cat = isActivity ? "Activity" : "Tour";
+    const vibes = Array.isArray(row.vibe_tags)
+      ? (row.vibe_tags as unknown[])
+          .map((v) => String(v))
+          .filter(Boolean)
+          .join("+")
+      : "";
+    const crowd = row.crowd_tag ? String(row.crowd_tag).replace(/_/g, " ") : "";
+    return [
+      cat,
+      vibes || null,
+      crowd || null,
+      tier || null,
+      hrs != null ? `${hrs}h` : null,
+    ]
       .filter(Boolean)
       .join(" · ");
   }
@@ -386,6 +399,27 @@ function SourceOfTruthPanel({ getClient }: { getClient: () => PbClient }) {
   const [debug, setDebug] = useState<string | null>(null);
   const [editing, setEditing] = useState<Record<string, unknown> | null>(null);
   const [creating, setCreating] = useState(false);
+  const [tourCategoryFilter, setTourCategoryFilter] = useState<
+    "all" | "tour" | "activity"
+  >("all");
+
+  const tourRows = category === "tours" ? rows : [];
+  const toursOnlyCount = tourRows.filter(
+    (r) => String(r.category || "tour").toLowerCase() !== "activity"
+  ).length;
+  const activitiesOnlyCount = tourRows.filter(
+    (r) => String(r.category || "tour").toLowerCase() === "activity"
+  ).length;
+  const displayedRows =
+    category === "tours" && tourCategoryFilter !== "all"
+      ? rows.filter((r) => {
+          const cat =
+            String(r.category || "tour").toLowerCase() === "activity"
+              ? "activity"
+              : "tour";
+          return cat === tourCategoryFilter;
+        })
+      : rows;
 
   const load = async () => {
     setLoading(true);
@@ -493,6 +527,7 @@ function SourceOfTruthPanel({ getClient }: { getClient: () => PbClient }) {
               setCategory(c.id);
               setEditing(null);
               setCreating(false);
+              setTourCategoryFilter("all");
             }}
             className={`rounded-xl px-4 py-2.5 text-left text-sm font-medium ${
               category === c.id
@@ -541,6 +576,43 @@ function SourceOfTruthPanel({ getClient }: { getClient: () => PbClient }) {
           </div>
         )}
 
+        {category === "tours" ? (
+          <div className="mb-4 inline-flex w-fit flex-wrap items-center gap-1 rounded-xl border border-[#E8E2D9] bg-[#F7F3EB] p-1.5">
+            {(
+              [
+                {
+                  id: "all" as const,
+                  label: `All (${tourRows.length})`,
+                },
+                {
+                  id: "tour" as const,
+                  label: `🗺️ Guided Tours (${toursOnlyCount})`,
+                },
+                {
+                  id: "activity" as const,
+                  label: `🎟️ Activities & Experiences (${activitiesOnlyCount})`,
+                },
+              ] as const
+            ).map((tab) => {
+              const on = tourCategoryFilter === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setTourCategoryFilter(tab.id)}
+                  className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
+                    on
+                      ? "bg-[#0B1F3A] text-white shadow-sm"
+                      : "text-[#5C6570] hover:bg-white hover:text-[#0B1F3A]"
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              );
+            })}
+          </div>
+        ) : null}
+
         {error ? (
           <div className="mb-3 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
             <p className="font-medium">{error}</p>
@@ -558,8 +630,12 @@ function SourceOfTruthPanel({ getClient }: { getClient: () => PbClient }) {
 
         {loading ? (
           <p className="text-sm text-[#8A8278]">Loading…</p>
-        ) : rows.length === 0 ? (
-          <p className="text-sm text-[#8A8278]">No records yet. Click + Add.</p>
+        ) : displayedRows.length === 0 ? (
+          <p className="text-sm text-[#8A8278]">
+            {category === "tours" && tourCategoryFilter !== "all"
+              ? "No records in this filter. Try All or another tab."
+              : "No records yet. Click + Add."}
+          </p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[640px] text-left text-sm">
@@ -573,7 +649,7 @@ function SourceOfTruthPanel({ getClient }: { getClient: () => PbClient }) {
                 </tr>
               </thead>
               <tbody>
-                {rows.map((row) => {
+                {displayedRows.map((row) => {
                   const filename = rowPhotoFilename(def, row);
                   const thumb =
                     filename && row.id
@@ -978,8 +1054,9 @@ function RecordEditModal({
         if (f.type === "file") {
           const file = files[f.key];
           if (file) {
-            fd.append(f.key, file);
-            if (f.legacyKey) fd.append(f.legacyKey, file);
+            const optimized = await optimizeFileForUpload(file);
+            fd.append(f.key, optimized);
+            if (f.legacyKey) fd.append(f.legacyKey, optimized);
           }
           continue;
         }

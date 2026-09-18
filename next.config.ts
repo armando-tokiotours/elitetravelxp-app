@@ -2,7 +2,7 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   output: "standalone",
-  serverExternalPackages: ["pdfkit", "nodemailer", "resend"],
+  serverExternalPackages: ["pdfkit", "nodemailer", "resend", "sharp"],
   images: {
     formats: ["image/avif", "image/webp"],
     remotePatterns: [

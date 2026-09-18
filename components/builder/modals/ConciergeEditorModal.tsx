@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
-import { ArrowLeft, Check, Info, Sparkles } from "lucide-react";
+import { ArrowLeft, Check, Sparkles } from "lucide-react";
 import { ELITE_CONCIERGE_FEE } from "@/lib/eliteConcierge";
 import { useBuilderStore } from "@/store/useBuilderStore";
 import { RefundPolicyModal } from "@/components/modals/RefundPolicyModal";
@@ -21,6 +21,7 @@ export function ConciergeEditorModal({
 
   const [mounted, setMounted] = useState(false);
   const [isPolicyModalOpen, setIsPolicyModalOpen] = useState(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
     setMounted(true);
@@ -39,6 +40,19 @@ export function ConciergeEditorModal({
       document.body.style.overflow = "";
     };
   }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    const el = videoRef.current;
+    if (!el) return;
+    el.muted = true;
+    const play = el.play();
+    if (play && typeof play.catch === "function") {
+      play.catch(() => {
+        /* autoplay may be blocked until gesture; muted usually succeeds */
+      });
+    }
+  }, [open]);
 
   if (!mounted) return null;
 
@@ -88,48 +102,52 @@ export function ConciergeEditorModal({
 
             <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4 pb-12">
               {/* Target: 1080p · ~1.5Mbps · mp4 · <5MB (see lib/mediaStandards.ts) */}
-              <div className="relative mb-4 aspect-video w-full overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-950 shadow-xl">
+              <div className="relative mb-1 aspect-video w-full overflow-hidden rounded-2xl border border-zinc-800/80 bg-zinc-950 shadow-2xl">
                 <video
-                  className="h-full w-full object-cover"
-                  muted
+                  ref={videoRef}
+                  src="/videos/elite-concierge-preview.mp4"
+                  autoPlay
                   loop
+                  muted
                   playsInline
-                  controls
-                  preload="metadata"
+                  preload="auto"
                   poster="/images/concierge-poster.webp"
-                >
-                  <source
-                    src="/videos/elite-concierge-preview.mp4"
-                    type="video/mp4"
-                  />
-                </video>
+                  aria-label="Elite Concierge preview"
+                  className="pointer-events-none h-full w-full object-cover"
+                />
               </div>
 
-              <div className="overflow-hidden rounded-2xl border border-[#C4A35A]/45 bg-gradient-to-br from-zinc-950 to-zinc-900">
-                <div className="flex items-start gap-3 border-b border-zinc-800/80 px-4 py-4">
-                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#C4A35A]/15 text-[#C4A35A]">
-                    <Sparkles className="h-5 w-5" aria-hidden />
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#C4A35A]">
-                      Premium
-                    </p>
-                    <h4 className="mt-1 font-display text-xl text-white">
-                      Day-by-Day Design
-                    </h4>
-                    <p className="mt-2 text-2xl font-bold text-amber-400">
-                      €{ELITE_CONCIERGE_FEE} Design Deposit
-                    </p>
-                  </div>
+              <div className="px-0.5">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#C4A35A]">
+                  Premium
+                </p>
+                <h4 className="mt-1 font-display text-xl text-white sm:text-2xl">
+                  Day-by-Day Design
+                </h4>
+                <p className="mt-1.5 text-sm text-zinc-500">
+                  Design deposit €{ELITE_CONCIERGE_FEE}
+                </p>
+              </div>
+
+              {/* Card 1: Inclusions */}
+              <div className="overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-900/80">
+                <div className="flex items-center gap-2 border-b border-zinc-800 px-4 py-3">
+                  <Sparkles
+                    className="h-4 w-4 shrink-0 text-[#C4A35A]"
+                    aria-hidden
+                  />
+                  <h5 className="text-sm font-semibold text-white">
+                    What&apos;s included
+                  </h5>
                 </div>
                 <div className="space-y-3 px-4 py-4 text-sm leading-relaxed text-zinc-400">
                   <p>
                     Skip individual planning. A dedicated luxury concierge
-                    curates your entire day-by-day itinerary — exclusive dining
-                    reservations, hidden sights, and private drivers for the
-                    full trip.
+                    curates your entire day-by-day itinerary: exclusive dining
+                    reservations, hidden sights, and private drivers for the full
+                    trip.
                   </p>
-                  <ul className="space-y-2 text-zinc-300">
+                  <ul className="space-y-2.5 text-zinc-300">
                     <li className="flex gap-2">
                       <Check
                         className="mt-0.5 h-4 w-4 shrink-0 text-[#C4A35A]"
@@ -152,32 +170,42 @@ export function ConciergeEditorModal({
                       Private drivers coordinated across your route
                     </li>
                   </ul>
-
-                  <div className="mt-3 mb-2 flex items-center gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-200">
-                    <Info
-                      className="h-4 w-4 shrink-0 text-amber-400"
-                      aria-hidden
-                    />
-                    <p>
-                      Note: 100% of this €{ELITE_CONCIERGE_FEE} fee is applied as
-                      a direct discount toward your final trip balance when you
-                      confirm your booking.
-                    </p>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={() => setIsPolicyModalOpen(true)}
-                    className="mt-2 text-xs text-zinc-400 underline transition-colors hover:text-amber-400"
-                  >
-                    Refund & Cancellation Policies
-                  </button>
-
                   <p className="rounded-xl border border-zinc-700/80 bg-zinc-950/60 px-3 py-2.5 text-xs text-zinc-500">
                     Selecting Elite Concierge replaces any individually chosen
                     city experiences with the concierge design package.
                   </p>
                 </div>
+              </div>
+
+              {/* Card 2: 100% Credit Offer */}
+              <div className="overflow-hidden rounded-2xl border border-[#C4A35A]/35 bg-gradient-to-br from-zinc-950 to-zinc-900">
+                <div className="border-b border-[#C4A35A]/20 px-4 py-3">
+                  <h5 className="text-sm font-semibold text-[#C4A35A]">
+                    100% credit toward your trip
+                  </h5>
+                </div>
+                <div className="space-y-2 px-4 py-4 text-sm leading-relaxed text-zinc-300">
+                  <p>
+                    The €{ELITE_CONCIERGE_FEE} design deposit is fully applied as
+                    a credit toward your final trip balance when you confirm your
+                    booking. You are not paying an extra fee on top of your
+                    itinerary.
+                  </p>
+                  <p className="text-xs text-zinc-500">
+                    Think of it as a commitment deposit that rolls into your
+                    invoice, not a sunk cost.
+                  </p>
+                </div>
+              </div>
+
+              <div className="pt-1 text-center">
+                <button
+                  type="button"
+                  onClick={() => setIsPolicyModalOpen(true)}
+                  className="text-xs text-zinc-500 underline decoration-zinc-700 underline-offset-4 transition-colors hover:text-zinc-300 hover:decoration-zinc-400"
+                >
+                  Cancellation &amp; Refunds
+                </button>
               </div>
             </div>
 
@@ -191,7 +219,7 @@ export function ConciergeEditorModal({
                 className="w-full rounded-full bg-[#0B1F3A] py-3 text-sm font-semibold text-white transition hover:bg-[#143052]"
               >
                 {selected
-                  ? "✓ Elite Concierge Selected — Done"
+                  ? "Elite Concierge selected · Done"
                   : `Select Elite Concierge · €${ELITE_CONCIERGE_FEE}`}
               </button>
               {selected ? (

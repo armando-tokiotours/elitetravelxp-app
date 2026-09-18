@@ -154,7 +154,7 @@ export function DiscoverFeed() {
         return {
           ok: false as const,
           message:
-            "Elite Concierge is on — individual tours are managed by your concierge.",
+            "Elite Concierge is on. Individual tours are managed by your concierge.",
         };
       }
       const check = canAddTourOnDate({
@@ -266,12 +266,13 @@ export function DiscoverFeed() {
         ) : cities.length === 0 ? (
           <p className="text-sm text-white/50">No cities yet.</p>
         ) : (
-          cities.map((city) => (
+          cities.map((city, i) => (
             <CityStory
               key={city.id}
               city={city}
               active={city.id === selectedCityId}
               onSelect={() => setSelectedCityId(city.id)}
+              eager={i < 4}
             />
           ))
         )}
@@ -481,9 +482,9 @@ function TourThumb({
   const mediaFile = tour.media_file || tour.cover_photo || tour.image || "";
   const thumbUrl =
     thumbFile && tour.collectionId
-      ? pbFileUrl(tour.collectionId, tour.id, thumbFile, "300x300")
+      ? pbFileUrl(tour.collectionId, tour.id, thumbFile, "600x400")
       : mediaFile && tour.collectionId && !isVideo
-        ? pbFileUrl(tour.collectionId, tour.id, mediaFile, "300x300")
+        ? pbFileUrl(tour.collectionId, tour.id, mediaFile, "600x400")
         : "";
 
   return (
@@ -564,15 +565,18 @@ function CityStory({
   city,
   active,
   onSelect,
+  eager = false,
 }: {
   city: PbCity;
   active: boolean;
   onSelect: () => void;
+  /** First few pills load eagerly so the strip paints fast */
+  eager?: boolean;
 }) {
   const filename = cityPhoto(city);
   const src =
     filename && city.collectionId
-      ? pbFileUrl(city.collectionId, city.id, filename, "200x200")
+      ? pbFileUrl(city.collectionId, city.id, filename, "120x120")
       : "";
 
   return (
@@ -596,8 +600,11 @@ function CityStory({
             <img
               src={src}
               alt=""
-              loading="lazy"
+              width={64}
+              height={64}
+              loading={eager ? "eager" : "lazy"}
               decoding="async"
+              fetchPriority={eager ? "high" : "auto"}
               className="h-16 w-16 rounded-full object-cover"
             />
           ) : (
