@@ -32,6 +32,10 @@ services:
     container_name: elite-pocketbase
     restart: unless-stopped
     env_file: .env
+    environment:
+      # Used by backend/docker-entrypoint.sh on every container start
+      PB_ADMIN_EMAIL: ${PB_ADMIN_EMAIL:-admin@travelexperiencesgroup.com}
+      PB_ADMIN_PASSWORD: ${PB_ADMIN_PASSWORD:-EliteTravelAdmin2026!}
     volumes:
       - pb_data:/pb/pb_data
       - ./backend/pb_migrations:/pb/pb_migrations:ro

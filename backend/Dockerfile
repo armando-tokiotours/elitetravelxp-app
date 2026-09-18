@@ -13,7 +13,11 @@ RUN apk add --no-cache ca-certificates unzip curl \
 WORKDIR /pb
 
 COPY pb_migrations ./pb_migrations
+COPY docker-entrypoint.sh ./docker-entrypoint.sh
+RUN chmod +x ./docker-entrypoint.sh
 
 EXPOSE 8090
 
-CMD ["./pocketbase", "serve", "--http=0.0.0.0:8090"]
+# Upserts PB_ADMIN_EMAIL / PB_ADMIN_PASSWORD on every start (idempotent),
+# then serves. Critical after pb:push volume restores.
+ENTRYPOINT ["./docker-entrypoint.sh"]

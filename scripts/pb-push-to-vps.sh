@@ -42,5 +42,19 @@ rsync -az --delete \
 echo "→ Restarting VPS PocketBase…"
 ssh "$REMOTE_HOST" 'docker start elite-pocketbase >/dev/null'
 
+echo "→ Syncing PocketBase superuser from VPS .env…"
+# pb_data restore can wipe/_desync the admin account; upsert from compose env.
+ssh "$REMOTE_HOST" 'cd /root/elitetravelxp-app && \
+  EMAIL=$(grep -E "^PB_ADMIN_EMAIL=" .env | head -1 | cut -d= -f2- | tr -d "\"'\''"); \
+  PASS=$(grep -E "^PB_ADMIN_PASSWORD=" .env | head -1 | cut -d= -f2- | tr -d "\"'\''"); \
+  for i in 1 2 3 4 5 6; do
+    if docker exec elite-pocketbase ./pocketbase superuser upsert "$EMAIL" "$PASS"; then
+      exit 0
+    fi
+    sleep 2
+  done
+  echo "⚠ superuser upsert failed after retries" >&2
+  exit 1'
+
 echo "✓ VPS PocketBase data now matches local (including photos)."
 echo "  Verify: https://travelexperiencesgroup.com/team-access"

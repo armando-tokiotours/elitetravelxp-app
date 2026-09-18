@@ -2,11 +2,27 @@
 
 export type RevolutCheckoutMode = "sandbox" | "prod";
 
-/** Accepts REVOLUT_MERCHANT_SECRET_KEY (preferred) or legacy REVOLUT_SECRET_KEY. */
+/** Strip accidental quotes from .env values (Docker/dotenv pitfall). */
+function envVal(key: string): string | undefined {
+  const raw = process.env[key]?.trim();
+  if (!raw) return undefined;
+  if (
+    (raw.startsWith('"') && raw.endsWith('"')) ||
+    (raw.startsWith("'") && raw.endsWith("'"))
+  ) {
+    return raw.slice(1, -1).trim() || undefined;
+  }
+  return raw;
+}
+
+/**
+ * Accepts REVOLUT_MERCHANT_SECRET_KEY (preferred) or legacy REVOLUT_SECRET_KEY.
+ * No hardcoded fake key — a placeholder would still fail Revolut auth.
+ */
 export function getRevolutMerchantSecret(): string {
   return (
-    process.env.REVOLUT_MERCHANT_SECRET_KEY?.trim() ||
-    process.env.REVOLUT_SECRET_KEY?.trim() ||
+    envVal("REVOLUT_MERCHANT_SECRET_KEY") ||
+    envVal("REVOLUT_SECRET_KEY") ||
     ""
   );
 }
@@ -16,9 +32,7 @@ export function getRevolutMerchantSecret(): string {
  * Revolut embed SDK uses "prod" for both live and prod aliases.
  */
 export function getRevolutMode(): RevolutCheckoutMode {
-  const raw = (process.env.NEXT_PUBLIC_REVOLUT_MODE || "sandbox")
-    .trim()
-    .toLowerCase();
+  const raw = (envVal("NEXT_PUBLIC_REVOLUT_MODE") || "sandbox").toLowerCase();
   return raw === "live" || raw === "prod" ? "prod" : "sandbox";
 }
 

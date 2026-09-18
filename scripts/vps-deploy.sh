@@ -15,11 +15,22 @@ fi
 set -a; source .env; set +a
 
 echo "→ Building & starting containers…"
-docker compose up -d --build
+# Prefer VPS compose (Hostinger nginx already owns :80/:443) when present
+if [[ -f docker-compose.vps.yml ]]; then
+  docker compose -f docker-compose.vps.yml up -d --build
+else
+  docker compose up -d --build
+fi
 
 echo "→ Ensuring PocketBase superuser…"
-docker compose exec -T pocketbase \
-  ./pocketbase superuser upsert "${PB_ADMIN_EMAIL}" "${PB_ADMIN_PASSWORD}" || true
+# Entrypoint also upserts on start; this is a belt-and-suspenders retry.
+for i in 1 2 3 4 5 6; do
+  if docker exec elite-pocketbase \
+    ./pocketbase superuser upsert "${PB_ADMIN_EMAIL}" "${PB_ADMIN_PASSWORD}"; then
+    break
+  fi
+  sleep 2
+done
 
 echo "→ Requesting Let's Encrypt certificate (requires DNS A record → this VPS)…"
 # Temporary HTTP-only nginx so ACME can succeed before certs exist

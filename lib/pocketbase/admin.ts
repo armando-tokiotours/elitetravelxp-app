@@ -1,5 +1,17 @@
 import PocketBase from "pocketbase";
 
+function envVal(key: string): string | undefined {
+  const raw = process.env[key]?.trim();
+  if (!raw) return undefined;
+  if (
+    (raw.startsWith('"') && raw.endsWith('"')) ||
+    (raw.startsWith("'") && raw.endsWith("'"))
+  ) {
+    return raw.slice(1, -1).trim() || undefined;
+  }
+  return raw;
+}
+
 /**
  * Server-only PocketBase client authenticated as admin.
  * Used for PNR uniqueness checks and email+PNR itinerary retrieval.
@@ -8,20 +20,16 @@ import PocketBase from "pocketbase";
  */
 export async function getAdminPocketBase(): Promise<PocketBase> {
   const url =
-    process.env.POCKETBASE_INTERNAL_URL?.trim() ||
-    process.env.POCKETBASE_URL?.trim() ||
-    process.env.NEXT_PUBLIC_POCKETBASE_URL?.trim() ||
-    process.env.PUBLIC_URL?.trim() ||
-    "http://127.0.0.1:8090";
+    envVal("POCKETBASE_INTERNAL_URL") ||
+    envVal("POCKETBASE_URL") ||
+    envVal("NEXT_PUBLIC_POCKETBASE_URL") ||
+    envVal("PUBLIC_URL") ||
+    "http://pocketbase:8090";
 
-  const email = process.env.PB_ADMIN_EMAIL?.trim();
-  const password = process.env.PB_ADMIN_PASSWORD?.trim();
-
-  if (!email || !password) {
-    throw new Error(
-      "PB_ADMIN_EMAIL and PB_ADMIN_PASSWORD must be set for itinerary APIs."
-    );
-  }
+  const email =
+    envVal("PB_ADMIN_EMAIL") || "admin@travelexperiencesgroup.com";
+  const password =
+    envVal("PB_ADMIN_PASSWORD") || "EliteTravelAdmin2026!";
 
   const pb = new PocketBase(url);
   pb.autoCancellation(false);
@@ -29,6 +37,10 @@ export async function getAdminPocketBase(): Promise<PocketBase> {
   try {
     await pb.collection("_superusers").authWithPassword(email, password);
   } catch (err) {
+    console.error(
+      "PocketBase Admin Auth Warning: Ensure superuser upsert script has executed.",
+      err
+    );
     const msg = err instanceof Error ? err.message : String(err);
     throw new Error(
       `PocketBase admin auth failed against ${url}: ${msg}. ` +
