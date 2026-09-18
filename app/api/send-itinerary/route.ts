@@ -45,7 +45,7 @@ export async function POST(req: Request) {
   // Mode A: direct email dispatch with client-supplied PDF
   try {
     const apiKey = resolveResendApiKey();
-    if (!process.env.RESEND_API_KEY?.trim() && !apiKey) {
+    if (!apiKey || !apiKey.startsWith("re_")) {
       return NextResponse.json(
         { error: "Resend API Key missing on server environment." },
         { status: 401 }
@@ -85,12 +85,14 @@ export async function POST(req: Request) {
       id: result.id,
     });
   } catch (err: unknown) {
-    console.error("Email Dispatch Error:", err);
+    console.error("Server Email Dispatch Failure:", err);
     if (err instanceof MailDispatchError) {
+      console.error("Resend API Error:", err.message);
       return NextResponse.json({ error: err.message }, { status: err.status });
     }
     const message =
       err instanceof Error ? err.message : "Failed to send email";
+    console.error("Resend API Error:", message);
     const status = /auth|api key|unauthorized|forbidden/i.test(message)
       ? 401
       : 500;

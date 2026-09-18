@@ -7,7 +7,7 @@ import {
 } from "@/utils/pnr";
 import { getAdminPocketBase } from "@/lib/pocketbase/admin";
 import { buildItineraryPdf } from "@/lib/itineraryPdf";
-import { sendItineraryEmail } from "@/lib/email";
+import { sendItineraryEmail, resolveResendApiKey } from "@/lib/email";
 import type { BuilderState } from "@/store/useBuilderStore";
 import type { QuoteResult } from "@/lib/builder-pricing";
 
@@ -179,7 +179,7 @@ export async function handleSendItinerary(
     }
 
     // Resend configured but delivery failed → surface to the PDF button UI
-    const mailConfigured = Boolean(process.env.RESEND_API_KEY?.trim());
+    const mailConfigured = Boolean(resolveResendApiKey());
     if (!mailSent && mailConfigured) {
       return NextResponse.json(
         {

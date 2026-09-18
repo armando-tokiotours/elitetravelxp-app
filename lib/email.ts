@@ -20,7 +20,10 @@ export function envVal(key: string): string | undefined {
   return raw;
 }
 
-/** Require RESEND_API_KEY in the server environment (never hardcode keys). */
+/**
+ * Resolve RESEND_API_KEY from the server environment (quote-stripped).
+ * Never hardcode secrets in source — set RESEND_API_KEY on the VPS .env.
+ */
 export function resolveResendApiKey(): string | undefined {
   return envVal("RESEND_API_KEY");
 }
@@ -44,27 +47,22 @@ export async function sendItineraryEmail({
   pdfBuffer,
   customerName = "Valued Guest",
 }: SendItineraryParams) {
-  const apiKey = resolveResendApiKey();
-  if (!process.env.RESEND_API_KEY?.trim() && !apiKey) {
+  // Prefer RESEND_API_KEY from environment (quote-stripped via resolveResendApiKey)
+  const RESEND_KEY = resolveResendApiKey();
+  if (!RESEND_KEY) {
     throw new MailDispatchError(
       "Resend API Key missing on server environment.",
       401
     );
   }
-  if (!apiKey) {
-    throw new MailDispatchError(
-      "Resend API Key missing on server environment.",
-      401
-    );
-  }
-  if (!apiKey.startsWith("re_")) {
+  if (!RESEND_KEY.startsWith("re_")) {
     throw new MailDispatchError(
       "RESEND_API_KEY looks invalid (expected to start with re_). Check VPS .env quoting.",
       401
     );
   }
 
-  const resend = new Resend(apiKey);
+  const resend = new Resend(RESEND_KEY);
   const businessEmail =
     envVal("BUSINESS_CONCIERGE_EMAIL") || "armando@tokiotours.nl";
 

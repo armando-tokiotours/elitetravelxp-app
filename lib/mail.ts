@@ -1,5 +1,6 @@
 import { Resend } from "resend";
 import nodemailer from "nodemailer";
+import { resolveResendApiKey } from "@/lib/email";
 
 export type SendMailAttachment = {
   filename: string;
@@ -78,7 +79,7 @@ export async function sendTransactionalMail(
   const from = mailFrom();
   const to = Array.isArray(input.to) ? input.to : [input.to];
   const bcc = resolveBccForRecipients(to, input.bcc);
-  const resendKey = envVal("RESEND_API_KEY");
+  const resendKey = resolveResendApiKey();
 
   if (resendKey) {
     const resend = new Resend(resendKey);
