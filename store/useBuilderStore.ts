@@ -28,6 +28,8 @@ import {
   BUILDER_STEP_COUNT,
   clampHighestUnlockedStep,
 } from "@/lib/builderSteps";
+import type { ExperienceProfile } from "@/lib/experienceProfiler";
+import { coerceExperienceProfile } from "@/lib/experienceProfiler";
 import {
   generateTempPNR,
   isValidBookingPNR,
@@ -46,7 +48,7 @@ export type {
 } from "@/lib/chauffeurSelections";
 export type { SelectedTour, SelectedToursByCity } from "@/lib/selectedTours";
 
-export type CityTransitType = "public" | "private";
+export type CityTransitType = "unset" | "self" | "public" | "private";
 export type CityVisitType = "stay" | "arrival" | "departure";
 export type TransitTicketType = "ic_card" | "shinkansen_reserved" | "none";
 
@@ -67,14 +69,22 @@ export interface LocationStop {
   ticketPricePerPax?: number;
 }
 
+export function coerceTransitType(
+  value: unknown
+): CityTransitType {
+  if (value === "private") return "private";
+  if (value === "public") return "public";
+  if (value === "self") return "self";
+  return "unset";
+}
+
 function normalizeLocation(
   l: Partial<LocationStop> & { cityId: string; key: string },
   index = 0,
   length = 1
 ): LocationStop {
   const visitType = coerceVisitTypeForPosition(l.visitType, index, length);
-  const transitType: CityTransitType =
-    l.transitType === "private" ? "private" : "public";
+  const transitType = coerceTransitType(l.transitType);
   const nights =
     visitType === "stay"
       ? Math.max(1, Math.min(90, Math.round(Number(l.nights) || 1)))
@@ -206,6 +216,8 @@ export interface BuilderState {
   highestUnlockedStep: number;
   /** Preferred itinerary intensity */
   travelPace: TravelPace;
+  /** Non-AI Experience Profiler quiz result (activity matcher) */
+  experienceProfile: ExperienceProfile | null;
   /** Resolved from season_tiers for the chosen arrival date */
   activeSeasonTier: SeasonTierName | null;
   activeSeasonNote: ActiveSeasonNote | null;
@@ -297,6 +309,7 @@ export interface BuilderActions {
     note: ActiveSeasonNote | null
   ) => void;
   setTravelPace: (pace: TravelPace) => void;
+  setExperienceProfile: (profile: ExperienceProfile | null) => void;
   /** Unlock up to `step` after Continue validation (never decreases). */
   unlockBuilderStep: (step: number) => void;
   /** Clamp unlock after earlier steps become incomplete. */
@@ -339,7 +352,7 @@ const initialState: BuilderState = {
   departureTransferId: null,
   airportPickup: true,
   airportDropoff: true,
-  needHotels: true,
+  needHotels: false,
   hotelTier: "5-star",
   roomCount: 1,
   roomType: "King",
@@ -348,10 +361,10 @@ const initialState: BuilderState = {
   locations: [],
   cityHotels: {},
   transitModeId: null,
-  arrivalTransitType: "public",
-  arrivalNeedsTicket: true,
-  arrivalTicketType: "ic_card",
-  arrivalTicketPricePerPax: 28,
+  arrivalTransitType: "unset",
+  arrivalNeedsTicket: false,
+  arrivalTicketType: "none",
+  arrivalTicketPricePerPax: 0,
   selectedTours: {},
   selectedTourIds: [],
   selectedToursByCity: {},
@@ -362,9 +375,10 @@ const initialState: BuilderState = {
   needDriver: false,
   highestUnlockedStep: 1,
   travelPace: null,
+  experienceProfile: null,
   activeSeasonTier: null,
   activeSeasonNote: null,
-  tempBookingRef: generateTempPNR(),
+  tempBookingRef: "",
   confirmedBookingRef: null,
   bookingStatus: "draft",
 };
@@ -412,6 +426,7 @@ const BUILDER_PERSIST_KEYS = [
   "needDriver",
   "highestUnlockedStep",
   "travelPace",
+  "experienceProfile",
   "tempBookingRef",
   "confirmedBookingRef",
   "bookingStatus",
@@ -540,14 +555,17 @@ export function mergePersistedBuilderState(
     )
       ? (p.travelPace as "fast" | "moderate" | "relaxed")
       : current.travelPace,
-    arrivalTransitType:
-      p.arrivalTransitType === "private" ? "private" : "public",
+    experienceProfile: (() => {
+      const coerced = coerceExperienceProfile(p.experienceProfile);
+      return coerced ?? current.experienceProfile;
+    })(),
+    arrivalTransitType: coerceTransitType(p.arrivalTransitType),
     arrivalNeedsTicket:
-      p.arrivalTransitType === "private"
-        ? false
-        : p.arrivalNeedsTicket != null
+      coerceTransitType(p.arrivalTransitType) === "public"
+        ? p.arrivalNeedsTicket != null
           ? Boolean(p.arrivalNeedsTicket)
-          : current.arrivalNeedsTicket,
+          : current.arrivalNeedsTicket
+        : false,
     arrivalTicketType:
       p.arrivalTicketType === "ic_card" ||
       p.arrivalTicketType === "shinkansen_reserved" ||
@@ -565,7 +583,7 @@ export function mergePersistedBuilderState(
     tempBookingRef:
       typeof p.tempBookingRef === "string" && p.tempBookingRef
         ? normalizeBookingPNR(p.tempBookingRef)
-        : current.tempBookingRef || generateTempPNR(),
+        : current.tempBookingRef || "",
     confirmedBookingRef: (() => {
       const raw = p.confirmedBookingRef;
       if (typeof raw === "string" && raw.trim()) {
@@ -653,9 +671,9 @@ export function formatDisplayDate(iso: string | null | undefined): string {
 function defaultCityHotel(cityId: string): CityHotelPref {
   return {
     cityId,
-    needsHotel: true,
+    needsHotel: false,
     starRating: 4,
-    rooms: { standard: 0, twin: 1, superior: 0 },
+    rooms: { standard: 0, twin: 0, superior: 0 },
     standardOccupancy: 2,
     breakfast: true,
   };
@@ -772,10 +790,10 @@ export const useBuilderStore = create<BuilderState & BuilderActions>()(
                 cityId,
                 nights: 1,
                 visitType: "stay",
-                transitType: "public",
-                needsTicket: true,
-                ticketType: "shinkansen_reserved",
-                ticketPricePerPax: 115,
+                transitType: "unset",
+                needsTicket: false,
+                ticketType: "none",
+                ticketPricePerPax: 0,
               },
               s.locations.length,
               s.locations.length + 1
@@ -852,41 +870,43 @@ export const useBuilderStore = create<BuilderState & BuilderActions>()(
             l.key === key
               ? {
                   ...l,
-                  transitType,
-                  ...(transitType === "private"
-                    ? {
+                  transitType: coerceTransitType(transitType),
+                  ...(transitType === "public"
+                    ? {}
+                    : {
                         needsTicket: false,
                         ticketType: "none" as const,
                         ticketPricePerPax: 0,
-                      }
-                    : {}),
+                      }),
                 }
               : l
           ),
         })),
 
       setArrivalTransitType: (transitType) =>
-        set((s) => ({
-          arrivalTransitType:
-            transitType === "private" ? "private" : "public",
-          ...(transitType === "private"
-            ? {
-                arrivalNeedsTicket: false,
-                arrivalTicketType: "none" as const,
-                arrivalTicketPricePerPax: 0,
-              }
-            : {}),
-        })),
+        set(() => {
+          const mode = coerceTransitType(transitType);
+          return {
+            arrivalTransitType: mode,
+            ...(mode === "public"
+              ? {}
+              : {
+                  arrivalNeedsTicket: false,
+                  arrivalTicketType: "none" as const,
+                  arrivalTicketPricePerPax: 0,
+                }),
+          };
+        }),
 
       setLocationTransitChoice: (key, choice) =>
         set((s) => ({
           locations: s.locations.map((l) => {
             if (l.key !== key) return l;
-            const mode = choice.mode === "private" ? "private" : "public";
-            if (mode === "private") {
+            const mode = coerceTransitType(choice.mode);
+            if (mode !== "public") {
               return {
                 ...l,
-                transitType: "private" as const,
+                transitType: mode,
                 needsTicket: false,
                 ticketType: "none" as const,
                 ticketPricePerPax: 0,
@@ -913,10 +933,10 @@ export const useBuilderStore = create<BuilderState & BuilderActions>()(
 
       setArrivalTransitChoice: (choice) =>
         set(() => {
-          const mode = choice.mode === "private" ? "private" : "public";
-          if (mode === "private") {
+          const mode = coerceTransitType(choice.mode);
+          if (mode !== "public") {
             return {
-              arrivalTransitType: "private" as const,
+              arrivalTransitType: mode,
               arrivalNeedsTicket: false,
               arrivalTicketType: "none" as const,
               arrivalTicketPricePerPax: 0,
@@ -1187,6 +1207,9 @@ export const useBuilderStore = create<BuilderState & BuilderActions>()(
               : null,
         }),
 
+      setExperienceProfile: (profile) =>
+        set({ experienceProfile: profile }),
+
       unlockBuilderStep: (step) =>
         set((s) => {
           const next = Math.max(
@@ -1270,11 +1293,9 @@ export const useBuilderStore = create<BuilderState & BuilderActions>()(
       displayBookingRef: () => {
         const s = get();
         if (s.bookingStatus === "draft") {
-          return s.tempBookingRef || generateTempPNR();
+          return s.tempBookingRef || "";
         }
-        return (
-          s.confirmedBookingRef || s.tempBookingRef || generateTempPNR()
-        );
+        return s.confirmedBookingRef || s.tempBookingRef || "";
       },
 
       officialBookingRef: () => {
@@ -1282,7 +1303,7 @@ export const useBuilderStore = create<BuilderState & BuilderActions>()(
         if (s.confirmedBookingRef && s.bookingStatus !== "draft") {
           return s.confirmedBookingRef;
         }
-        return resolveOfficialPNR(s.tempBookingRef);
+        return resolveOfficialPNR(s.tempBookingRef || generateTempPNR());
       },
 
       totalGuests: () => {

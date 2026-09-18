@@ -346,6 +346,19 @@ export interface PbTour {
   description?: string;
   /** `tour` = Tours tab · `activity` = Experiences tab */
   category?: "tour" | "activity" | string;
+  /**
+   * Matcher vibes: tours may have several; activities usually 1 primary.
+   * culture | foodie | modern | nature | multi_vibe
+   */
+  vibe_tags?: string[];
+  /** relaxed | standard | active */
+  pace_tag?: string;
+  /** VIP / niche — only recommended when quiz allows niche */
+  is_niche?: boolean;
+  /**
+   * guided_route (tours) | direct_ticket | vip_event | time_sensitive
+   */
+  access_type?: string;
   /** Suggested itinerary / stops */
   route?: string;
   /** What’s included and excluded */
@@ -560,9 +573,9 @@ export const DEFAULT_APP_SETTINGS: {
   },
   {
     key: "elite_concierge_fee",
-    value: "2800",
+    value: "50",
     description:
-      "Flat USD estimate for the Elite Concierge day-by-day design package.",
+      "Flat € design deposit for Elite Concierge (100% credited toward final trip balance on booking).",
   },
 ];
 

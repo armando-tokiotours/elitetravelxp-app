@@ -216,7 +216,7 @@ export function BuilderApp() {
 
         {/* Sticky CTA — estimate from Step 4; print CTA from Step 5 */}
         {state.highestUnlockedStep >= 4 ? (
-          <div className="no-print sticky-action-bar fixed inset-x-0 bottom-[3.75rem] z-30 px-4 pb-2 md:bottom-6">
+          <div className="no-print sticky-action-bar fixed inset-x-0 bottom-[calc(3.75rem+env(safe-area-inset-bottom))] z-30 px-4 pb-2 md:bottom-6">
             <div className="mx-auto max-w-3xl">
               {state.highestUnlockedStep >= 5 ? (
                 <Link

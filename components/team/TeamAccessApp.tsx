@@ -805,6 +805,14 @@ function RecordEditModal({
         (v == null || v === "")
       ) {
         base[f.key] = "tour";
+      } else if (
+        def.id === "tours" &&
+        f.key === "access_type" &&
+        (v == null || v === "")
+      ) {
+        const cat = String(initial?.category || base.category || "tour")
+          .toLowerCase();
+        base[f.key] = cat === "activity" ? "direct_ticket" : "guided_route";
       } else if (f.key === "type" && (v == null || v === "")) {
         base[f.key] =
           def.id === "hubs" ? "Airport" : "Both";
@@ -876,6 +884,42 @@ function RecordEditModal({
 
   const set = (key: string, value: string) =>
     setForm((f) => ({ ...f, [key]: value }));
+
+  const tourCategory =
+    def.id === "tours"
+      ? String(form.category || "tour").toLowerCase() === "activity"
+        ? "activity"
+        : "tour"
+      : null;
+
+  const setTourCategory = (next: "tour" | "activity") => {
+    setForm((f) => {
+      const nextForm: Record<string, string> = { ...f, category: next };
+      if (next === "activity") {
+        try {
+          const parsed = JSON.parse(f.vibe_tags || "[]");
+          if (Array.isArray(parsed) && parsed.length > 1) {
+            const primary = parsed.find(
+              (x) => String(x) !== "multi_vibe"
+            );
+            nextForm.vibe_tags = JSON.stringify(
+              primary != null ? [String(primary)] : [String(parsed[0])]
+            );
+          }
+        } catch {
+          /* keep */
+        }
+        if (!f.access_type || f.access_type === "guided_route") {
+          nextForm.access_type = "direct_ticket";
+        }
+      } else {
+        if (!f.access_type || f.access_type === "direct_ticket") {
+          nextForm.access_type = "guided_route";
+        }
+      }
+      return nextForm;
+    });
+  };
 
   const existingPhotoUrl = (fKey: string, legacy?: string) => {
     if (!initial?.id) return "";
@@ -989,6 +1033,32 @@ function RecordEditModal({
 
       // Tours: keep legacy `price` / `price_per_person` in sync for old readers
       if (def.id === "tours") {
+        const cat =
+          String(form.category || "tour").toLowerCase() === "activity"
+            ? "activity"
+            : "tour";
+        fd.set(
+          "access_type",
+          cat === "tour"
+            ? "guided_route"
+            : form.access_type || "direct_ticket"
+        );
+        // Enforce vibe limits on save
+        try {
+          const parsed = JSON.parse(form.vibe_tags || "[]");
+          if (Array.isArray(parsed)) {
+            let tags = parsed.map((x) => String(x).trim()).filter(Boolean);
+            if (cat === "activity") {
+              tags = tags.filter((t) => t !== "multi_vibe").slice(0, 1);
+            } else {
+              tags = tags.slice(0, 4);
+            }
+            fd.delete("vibe_tags");
+            for (const t of tags) fd.append("vibe_tags", t);
+          }
+        } catch {
+          /* keep form appends */
+        }
         const p1 = (form.price_1_pax || "").trim();
         if (p1 !== "") {
           fd.set("price", p1);
@@ -1160,6 +1230,40 @@ function RecordEditModal({
               );
             }
 
+            if (
+              def.id === "tours" &&
+              f.key === "access_type" &&
+              tourCategory === "tour"
+            ) {
+              // Tours always use guided_route — hide the activity-only flags.
+              return null;
+            }
+
+            const vibeMaxSelect =
+              def.id === "tours" && f.key === "vibe_tags"
+                ? tourCategory === "activity"
+                  ? 1
+                  : f.maxSelect ?? 4
+                : f.maxSelect;
+
+            const fieldLabel =
+              def.id === "tours" && f.key === "vibe_tags"
+                ? tourCategory === "activity"
+                  ? "Primary vibe tag (pick 1)"
+                  : "Vibe tags (multi-select)"
+                : f.label;
+
+            const fieldHint =
+              def.id === "tours" && f.key === "vibe_tags"
+                ? tourCategory === "activity"
+                  ? "Hyper-focused matching — one core category only."
+                  : "Tours combine multiple sights and neighborhoods into a guided route."
+                : def.id === "tours" && f.key === "category"
+                  ? "Tour = guided multi-stop day · Activity = ticket / VIP / single experience"
+                  : def.id === "tours" && f.key === "access_type"
+                    ? "Ticket / Admission · Time-Sensitive Event · VIP Exclusive"
+                    : f.hint;
+
             const span =
               f.type === "textarea" ||
               f.type === "city" ||
@@ -1173,9 +1277,14 @@ function RecordEditModal({
             return (
               <div key={f.key} className={span}>
                 <label className="mb-1 block text-xs uppercase tracking-wider text-[#8A8278]">
-                  {f.label}
+                  {fieldLabel}
                   {f.required ? " *" : ""}
                 </label>
+                {fieldHint ? (
+                  <p className="mb-2 text-[11px] leading-snug text-[#8A8278]">
+                    {fieldHint}
+                  </p>
+                ) : null}
                 {f.type === "textarea" ? (
                   <textarea
                     rows={3}
@@ -1205,7 +1314,7 @@ function RecordEditModal({
                     {(f.options || ["tour", "activity"]).map((o) => {
                       const label =
                         o === "activity"
-                          ? "Activity"
+                          ? "Activity / Experience"
                           : o === "tour"
                             ? "Tour"
                             : o.charAt(0).toUpperCase() + o.slice(1);
@@ -1214,7 +1323,11 @@ function RecordEditModal({
                         <button
                           key={o}
                           type="button"
-                          onClick={() => set(f.key, o)}
+                          onClick={() =>
+                            setTourCategory(
+                              o === "activity" ? "activity" : "tour"
+                            )
+                          }
                           className={`rounded-full px-4 py-1.5 text-sm font-medium transition ${
                             current === o
                               ? "bg-[#0B1F3A] text-white"
@@ -1225,6 +1338,33 @@ function RecordEditModal({
                         </button>
                       );
                     })}
+                  </div>
+                ) : f.type === "select" && f.key === "access_type" ? (
+                  <div className="flex flex-wrap gap-2">
+                    {(f.options || [])
+                      .filter((o) => o !== "guided_route")
+                      .map((o) => {
+                        const labels: Record<string, string> = {
+                          direct_ticket: "Ticket / Admission",
+                          vip_event: "VIP Exclusive",
+                          time_sensitive: "Time-Sensitive Event",
+                        };
+                        const on = (form[f.key] || "") === o;
+                        return (
+                          <button
+                            key={o}
+                            type="button"
+                            onClick={() => set(f.key, o)}
+                            className={`rounded-full border px-3 py-1.5 text-sm transition ${
+                              on
+                                ? "border-[#0B1F3A] bg-[#0B1F3A] text-white"
+                                : "border-[#D9D2C7] bg-white text-[#5C6570] hover:border-[#0B1F3A]/40"
+                            }`}
+                          >
+                            {labels[o] ?? o}
+                          </button>
+                        );
+                      })}
                   </div>
                 ) : f.type === "select" ? (
                   <select
@@ -1241,7 +1381,18 @@ function RecordEditModal({
                   </select>
                 ) : f.type === "multiselect" ? (
                   <div className="flex flex-wrap gap-2">
-                    {(f.options || []).map((o) => {
+                    {(f.options || [])
+                      .filter((o) => {
+                        if (
+                          def.id === "tours" &&
+                          f.key === "vibe_tags" &&
+                          tourCategory === "activity"
+                        ) {
+                          return o !== "multi_vibe";
+                        }
+                        return true;
+                      })
+                      .map((o) => {
                       let selected: string[] = [];
                       try {
                         const parsed = JSON.parse(form[f.key] || "[]");
@@ -1252,14 +1403,29 @@ function RecordEditModal({
                         selected = [];
                       }
                       const on = selected.includes(o);
+                      const optionLabel =
+                        o === "multi_vibe"
+                          ? "Multi-Vibe / Full Day Mix"
+                          : o;
                       return (
                         <button
                           key={o}
                           type="button"
                           onClick={() => {
-                            const next = on
-                              ? selected.filter((x) => x !== o)
-                              : [...selected, o];
+                            let next: string[];
+                            if (on) {
+                              next = selected.filter((x) => x !== o);
+                            } else if (
+                              vibeMaxSelect != null &&
+                              selected.length >= vibeMaxSelect
+                            ) {
+                              next =
+                                vibeMaxSelect === 1
+                                  ? [o]
+                                  : [...selected.slice(0, vibeMaxSelect - 1), o];
+                            } else {
+                              next = [...selected, o];
+                            }
                             set(f.key, JSON.stringify(next));
                           }}
                           className={`rounded-full border px-3 py-1.5 text-sm transition ${
@@ -1268,7 +1434,7 @@ function RecordEditModal({
                               : "border-[#D9D2C7] bg-white text-[#5C6570] hover:border-[#0B1F3A]/40"
                           }`}
                         >
-                          {o}
+                          {optionLabel}
                         </button>
                       );
                     })}

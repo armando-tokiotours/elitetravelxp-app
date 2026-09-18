@@ -67,7 +67,7 @@ function hotelNeedsAndRooms(
 } {
   const raw = cityHotels[cityId];
   return {
-    needsHotel: raw?.needsHotel ?? true,
+    needsHotel: raw?.needsHotel ?? false,
     rooms: raw?.rooms ?? { standard: 0, twin: 0, superior: 0 },
     standardOccupancy: Number(raw?.standardOccupancy) === 1 ? 1 : 2,
   };

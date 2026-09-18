@@ -22,6 +22,10 @@ import {
 } from "@/store/useBuilderStore";
 import { SectionBlock } from "./ui";
 import { ExplainerTriggerButton } from "./ExplainerTriggerButton";
+import { ActivityMatcherBanner } from "./ActivityMatcherBanner";
+import { ExperienceProfilerModal } from "@/components/quiz/ExperienceProfilerModal";
+import { ActivityMatchReelModal } from "@/components/modals/ActivityMatchReelModal";
+import { buildTripMatchReelSlides } from "@/lib/matchReel";
 import { useLazyModalMount } from "./modals/useLazyModalMount";
 
 const ConciergeEditorModal = dynamic(
@@ -60,6 +64,8 @@ export function ToursDriverSection({
   const [activeModal, setActiveModal] = useState<
     "concierge" | "tailored" | null
   >(null);
+  const [quizOpen, setQuizOpen] = useState(false);
+  const [reelOpen, setReelOpen] = useState(false);
   const conciergeMounted = useLazyModalMount(activeModal === "concierge");
   const tailoredMounted = useLazyModalMount(activeModal === "tailored");
 
@@ -67,9 +73,31 @@ export function ToursDriverSection({
   const selectedTourIds = useBuilderStore((s) => s.selectedTourIds);
   const selectedToursMap = useBuilderStore((s) => s.selectedTours);
   const chauffeurSelections = useBuilderStore((s) => s.chauffeurSelections);
+  const experienceProfile = useBuilderStore((s) => s.experienceProfile);
+  const locations = useBuilderStore((s) => s.locations);
 
   const chauffeurDayCount = countBillableChauffeurDays(chauffeurSelections);
   const tourCount = selectedTourIds.length;
+
+  const reelSlides = useMemo(
+    () =>
+      buildTripMatchReelSlides({
+        tours,
+        cityNames,
+        selectedTourIds,
+        profile: experienceProfile,
+        stayCityIds: locations
+          .filter(
+            (l) =>
+              l.visitType !== "arrival" &&
+              l.visitType !== "departure" &&
+              l.nights > 0
+          )
+          .map((l) => l.cityId),
+        limit: 10,
+      }),
+    [tours, cityNames, selectedTourIds, experienceProfile, locations]
+  );
 
   const summary =
     experienceService === "concierge"
@@ -105,6 +133,13 @@ export function ToursDriverSection({
       icon="tour"
       summary={summary}
     >
+      <div className="mb-4">
+        <ActivityMatcherBanner
+          onOpenQuiz={() => setQuizOpen(true)}
+          onWatch={() => setReelOpen(true)}
+        />
+      </div>
+
       <div className="mb-4 grid grid-cols-2 gap-3">
         <PathwayCard
           kind="concierge"
@@ -165,6 +200,17 @@ export function ToursDriverSection({
           chauffeurRates={chauffeurRates}
         />
       ) : null}
+
+      <ExperienceProfilerModal
+        open={quizOpen}
+        onClose={() => setQuizOpen(false)}
+      />
+      <ActivityMatchReelModal
+        open={reelOpen}
+        onClose={() => setReelOpen(false)}
+        slides={reelSlides}
+        experienceProfile={experienceProfile}
+      />
     </SectionBlock>
   );
 }
@@ -285,8 +331,9 @@ function SelectionSummaryWidget({
         </p>
       ) : experienceService === "concierge" ? (
         <p className="mt-3 text-sm text-zinc-400">
-          Package selected — your concierge will design the full day-by-day plan
-          for your itinerary.
+          €50 design deposit selected — 100% credited toward your final trip
+          balance when you book. Your concierge will design the full day-by-day
+          plan.
         </p>
       ) : (
         <div className="mt-3 space-y-2">

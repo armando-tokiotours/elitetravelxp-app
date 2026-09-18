@@ -2,15 +2,16 @@
 
 import { Reorder, useDragControls } from "framer-motion";
 import type { PbCity } from "@/lib/pocketbase/client";
-import { cityPhoto, pbFileUrl } from "@/lib/pocketbase/client";
 import type { SeasonalMatch } from "@/lib/seasonalMatcher";
 import type {
   CityTransitType,
   CityVisitType,
   LocationStop,
 } from "@/store/useBuilderStore";
+import { coerceTransitType } from "@/store/useBuilderStore";
 import { allowedVisitTypesForIndex } from "@/lib/locationRules";
 import { ConciergeSuggestionCard } from "./ConciergeSuggestionCard";
+import { CityThumb } from "./CityThumb";
 
 export function CityAccordionItem({
   loc,
@@ -46,14 +47,8 @@ export function CityAccordionItem({
   onAddTour: (tourId: string) => void;
 }) {
   const controls = useDragControls();
-  const filename = city ? cityPhoto(city) : "";
-  const img =
-    filename && city
-      ? pbFileUrl(city.collectionId, city.id, filename, "800x400")
-      : "";
   const name = city?.name ?? "City";
-  const transit: CityTransitType =
-    loc.transitType === "private" ? "private" : "public";
+  const transit: CityTransitType = coerceTransitType(loc.transitType);
   const allowedVisitTypes = allowedVisitTypesForIndex(index, totalLocations);
   const visitType: CityVisitType = allowedVisitTypes.includes(loc.visitType)
     ? loc.visitType
@@ -85,35 +80,36 @@ export function CityAccordionItem({
             <button
               type="button"
               onClick={onToggle}
-              className="block w-full"
+              className="relative block h-36 w-full overflow-hidden sm:h-40"
               aria-label={`Collapse ${name}`}
             >
-              {img ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={img}
-                  alt=""
-                  className="h-36 w-full object-cover sm:h-40"
-                />
-              ) : (
-                <div className="flex h-36 w-full items-end bg-gradient-to-br from-[#1a3355] to-[#0B1F3A] px-4 pb-3 sm:h-40">
-                  <span className="font-display text-2xl text-white/90">
-                    {name}
-                  </span>
-                </div>
-              )}
+              <CityThumb
+                city={city}
+                name={name}
+                alt={name}
+                thumb="800x400"
+                className="h-full w-full object-cover"
+              />
+              <span className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent px-4 pb-3 pt-8">
+                <span className="font-display text-2xl text-white">{name}</span>
+              </span>
             </button>
           </div>
 
           <div className="px-4 pb-4 pt-3">
-            <div className="flex items-start justify-between gap-3">
-              <div className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-0.5">
-                <h3 className="font-display text-2xl text-white">{name}</h3>
+            <div className="flex w-full flex-col gap-1 overflow-hidden sm:flex-row sm:items-start sm:justify-between sm:gap-3">
+              <div className="flex min-w-0 flex-col gap-1 overflow-hidden">
+                <h3 className="break-words text-sm font-semibold leading-tight text-white sm:font-display sm:text-2xl sm:font-normal">
+                  {name}
+                </h3>
                 {dateLabel ? (
-                  <p className="shrink-0 text-sm capitalize text-zinc-400">
+                  <p className="text-sm capitalize leading-tight text-zinc-400">
                     {dateLabel.toLowerCase()}
                   </p>
                 ) : null}
+                <p className="text-[11px] text-zinc-500">
+                  Nights in this city only — hotels are set in Step 4.
+                </p>
               </div>
               {isStay ? (
                 <NightStepper value={loc.nights} onChange={onNights} />
@@ -136,7 +132,7 @@ export function CityAccordionItem({
                     onClick={() => onVisitType(value)}
                     label={
                       value === "stay"
-                        ? "Stay"
+                        ? "City nights"
                         : value === "arrival"
                           ? "Arrival"
                           : "Departure"
@@ -147,11 +143,13 @@ export function CityAccordionItem({
             </div>
 
             <div className="mt-4 flex flex-wrap items-end justify-between gap-3">
-              <div>
+              <div className="min-w-0 flex-1 overflow-hidden">
                 <p className="text-[11px] uppercase tracking-wider text-zinc-500">
                   From
                 </p>
-                <p className="text-sm font-medium text-white">{fromLabel}</p>
+                <p className="break-words text-sm font-medium leading-tight text-white">
+                  {fromLabel}
+                </p>
               </div>
 
               {!isLast ? (
@@ -159,7 +157,18 @@ export function CityAccordionItem({
                   <p className="mb-1.5 text-[11px] uppercase tracking-wider text-zinc-500">
                     Travel to next
                   </p>
-                  <div className="inline-flex rounded-full border border-zinc-700 bg-zinc-950 p-0.5">
+                  {transit === "unset" ? (
+                    <p className="mb-1.5 text-[10px] font-medium text-amber-400">
+                      ⚠️ Not configured
+                    </p>
+                  ) : null}
+                  <div className="inline-flex flex-wrap justify-end rounded-full border border-zinc-700 bg-zinc-950 p-0.5">
+                    <TransitPill
+                      active={transit === "self"}
+                      onClick={() => onTransit("self")}
+                      label="Self"
+                      hint="€0"
+                    />
                     <TransitPill
                       active={transit === "public"}
                       onClick={() => onTransit("public")}
@@ -200,18 +209,17 @@ export function CityAccordionItem({
             onClick={onToggle}
             className="flex min-w-0 flex-1 items-center gap-3 py-2.5 pr-2 text-left"
           >
-            {img ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={img}
+            <span className="relative h-12 w-20 shrink-0 overflow-hidden rounded-lg">
+              <CityThumb
+                city={city}
+                name={name}
                 alt=""
-                className="h-12 w-20 shrink-0 rounded-lg object-cover"
+                thumb="200x200"
+                className="h-full w-full object-cover"
               />
-            ) : (
-              <div className="h-12 w-20 shrink-0 rounded-lg bg-zinc-800" />
-            )}
-            <span className="min-w-0 flex-1">
-              <span className="block truncate font-medium text-white">
+            </span>
+            <span className="min-w-0 flex-1 overflow-hidden">
+              <span className="block break-words text-sm font-semibold leading-tight text-white">
                 {name}
               </span>
               <span className="text-xs text-[#C4A35A]">

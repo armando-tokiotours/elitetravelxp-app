@@ -243,7 +243,15 @@ export function AppShell({
         </aside>
       </div>
 
-      <div className={hideBottomPad ? "" : "pb-24 md:pb-8"}>{children}</div>
+      <div
+        className={
+          hideBottomPad
+            ? ""
+            : "pb-[calc(6rem+env(safe-area-inset-bottom))] md:pb-8"
+        }
+      >
+        {children}
+      </div>
 
       <ManageBookingModal
         open={manageOpen}
@@ -275,6 +283,8 @@ function BrandMark({ logoSrc }: { logoSrc?: string }) {
     <img
       src={src}
       alt="Elite Travel Experiences"
+      loading="eager"
+      decoding="async"
       className="h-11 w-auto max-w-[9.5rem] object-contain sm:h-12"
     />
   );

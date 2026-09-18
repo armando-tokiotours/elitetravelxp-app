@@ -9,7 +9,7 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
-import { ChevronDown, ChevronUp, X } from "lucide-react";
+import { ArrowLeft, ChevronDown, ChevronUp, X } from "lucide-react";
 import type { PbTour } from "@/lib/pocketbase/client";
 import { TourDetailPanel } from "./TourDetailPanel";
 
@@ -27,6 +27,7 @@ export function TourDetailModal({
   isTourSelected,
   scheduledLabelFor,
   bookedLanguageFor,
+  backLabel = "Back to Discover",
 }: {
   open: boolean;
   tours: PbTour[];
@@ -37,6 +38,8 @@ export function TourDetailModal({
   isTourSelected?: (tourId: string) => boolean;
   scheduledLabelFor?: (tourId: string) => string | null;
   bookedLanguageFor?: (tourId: string) => string | null;
+  /** Left chrome label (Discover default). */
+  backLabel?: string;
 }) {
   const [mounted, setMounted] = useState(false);
   const trackRef = useRef<HTMLDivElement>(null);
@@ -68,6 +71,15 @@ export function TourDetailModal({
       document.body.style.overflow = prev;
     };
   }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, onClose]);
 
   // Jump to the clicked thumbnail when the modal opens
   useLayoutEffect(() => {
@@ -123,22 +135,32 @@ export function TourDetailModal({
           <motion.button
             type="button"
             aria-label="Close backdrop"
-            className="absolute inset-0 cursor-default bg-black/80"
+            className="absolute inset-0 cursor-default bg-black/80 backdrop-blur-sm"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
           />
 
-          {/* Fixed chrome */}
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close"
-            className="absolute right-3 top-[max(0.75rem,env(safe-area-inset-top))] z-20 flex h-10 w-10 items-center justify-center rounded-full bg-black/60 text-white backdrop-blur-sm sm:right-5 sm:top-5"
-          >
-            <X className="h-5 w-5" />
-          </button>
+          {/* Sticky top chrome — Back + Close */}
+          <div className="pointer-events-none absolute left-3 right-3 top-[max(0.75rem,env(safe-area-inset-top))] z-30 flex items-center justify-between">
+            <button
+              type="button"
+              onClick={onClose}
+              className="pointer-events-auto flex items-center gap-1.5 rounded-full border border-white/20 bg-black/60 px-3 py-1.5 text-xs font-medium text-white shadow-lg backdrop-blur-md transition-all hover:bg-black/80 active:scale-95"
+            >
+              <ArrowLeft className="h-4 w-4 text-amber-400" aria-hidden />
+              <span>{backLabel}</span>
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Close"
+              className="pointer-events-auto rounded-full border border-white/20 bg-black/60 p-2 text-white shadow-lg backdrop-blur-md transition-all hover:bg-black/80 active:scale-95"
+            >
+              <X className="h-4 w-4 text-zinc-300" aria-hidden />
+            </button>
+          </div>
 
           {tours.length > 1 ? (
             <>
@@ -147,7 +169,7 @@ export function TourDetailModal({
                 aria-label="Previous tour"
                 disabled={activeSlide <= 0}
                 onClick={() => scrollBySlide(-1)}
-                className="absolute left-1/2 top-[max(3.5rem,calc(env(safe-area-inset-top)+2.5rem))] z-20 hidden h-10 w-10 -translate-x-1/2 items-center justify-center rounded-full bg-black/55 text-white backdrop-blur-sm disabled:opacity-30 md:flex"
+                className="absolute left-1/2 top-[max(4.5rem,calc(env(safe-area-inset-top)+3.5rem))] z-20 hidden h-10 w-10 -translate-x-1/2 items-center justify-center rounded-full bg-black/55 text-white backdrop-blur-sm disabled:opacity-30 md:flex"
               >
                 <ChevronUp className="h-5 w-5" />
               </button>
@@ -176,7 +198,7 @@ export function TourDetailModal({
               {tours.map((tour, index) => (
                 <div
                   key={tour.id}
-                  className="flex h-[100dvh] min-h-[100dvh] w-full shrink-0 snap-center flex-col justify-center px-4 py-6 pt-14 pb-16"
+                  className="flex h-[100dvh] min-h-[100dvh] w-full shrink-0 snap-center flex-col justify-center px-4 py-6 pb-16 pt-16"
                 >
                   <TourDetailPanel
                     tour={tour}

@@ -31,6 +31,12 @@ import { sortSelectedToursChronologically } from "@/lib/selectedTours";
 import { travelPaceLabel } from "@/lib/travelPace";
 import { BookingRefBadge } from "@/components/builder/BookingRefBadge";
 import { ticketTypeLabel } from "@/lib/transitTickets";
+import { buildCityMap, getCityName } from "@/lib/cityLabels";
+import {
+  ELITE_CONCIERGE_CREDIT_LABEL,
+  ELITE_CONCIERGE_FEE,
+  ELITE_CONCIERGE_FEE_LABEL,
+} from "@/lib/eliteConcierge";
 
 /** Formal luxury quotation / print document from persisted builder state. */
 export function PrintItineraryDocument({
@@ -65,8 +71,11 @@ export function PrintItineraryDocument({
     [config, state]
   );
 
-  const cityName = (id: string) =>
-    config?.cities.find((c) => c.id === id)?.name ?? id;
+  const cityMap = useMemo(
+    () => buildCityMap(config?.cities),
+    [config?.cities]
+  );
+  const cityName = (id: string) => getCityName(id, cityMap);
 
   const arrival =
     config?.hubs.find((h) => h.id === state.arrivalTransferId) ||
@@ -258,14 +267,17 @@ export function PrintItineraryDocument({
                       state.roomCount
                     )
                   : null;
-                if (pref && !pref.needsHotel) {
+                const wantsHotel = pref
+                  ? pref.needsHotel
+                  : Boolean(state.needHotels);
+                if (!wantsHotel) {
                   return (
                     <DetailRow
                       key={loc.key}
                       left={`${cityName(loc.cityId)} (${loc.nights} Night${
                         loc.nights === 1 ? "" : "s"
                       })`}
-                      right="Hotel not needed"
+                      right="Accommodation Self-Arranged (No Hotel Required)"
                     />
                   );
                 }
@@ -309,10 +321,20 @@ export function PrintItineraryDocument({
           <InvoiceCard title="Route, tours & daily transport">
             {state.experienceService === "concierge" ||
             state.isEliteConcierge ? (
-              <DetailRow
-                left="Elite Concierge day-by-day design"
-                right="Package"
-              />
+              <>
+                <DetailRow
+                  left={ELITE_CONCIERGE_FEE_LABEL}
+                  right={formatUsd(
+                    breakdown?.conciergeFee || ELITE_CONCIERGE_FEE
+                  )}
+                />
+                {(breakdown?.conciergeCredit ?? 0) > 0 ? (
+                  <DetailRow
+                    left={ELITE_CONCIERGE_CREDIT_LABEL}
+                    right={`−${formatUsd(breakdown!.conciergeCredit)}`}
+                  />
+                ) : null}
+              </>
             ) : null}
 
             {state.locations.length === 0 ? (
@@ -433,9 +455,13 @@ function CityExperienceBlock({
 
   const transitIn =
     prev && index > 0
-      ? prev.transitType === "private"
-        ? `Private Car to ${cityLabel}`
-        : `Bullet Train (Shinkansen) to ${cityLabel}`
+      ? prev.transitType === "unset"
+        ? `Transfer not configured to ${cityLabel}`
+        : prev.transitType === "self"
+          ? `Self-Arranged / On Your Own to ${cityLabel}`
+          : prev.transitType === "private"
+            ? `Private Car to ${cityLabel}`
+            : `Bullet Train (Shinkansen) to ${cityLabel}`
       : null;
 
   const ticketLine =
@@ -556,10 +582,12 @@ function InvoiceCard({
 
 function DetailRow({ left, right }: { left: string; right: string }) {
   return (
-    <div className="flex justify-between gap-4 border-b border-[#F0EBE3] py-2 text-sm last:border-b-0">
-      <span className="min-w-0 text-[#5C6570]">{left}</span>
+    <div className="flex w-full flex-col gap-1 overflow-hidden border-b border-[#F0EBE3] py-2 text-sm last:border-b-0 sm:flex-row sm:justify-between sm:gap-4">
+      <span className="min-w-0 break-words leading-tight text-[#5C6570]">
+        {left}
+      </span>
       {right ? (
-        <span className="shrink-0 text-right font-medium text-[#0B1F3A]">
+        <span className="break-words text-left font-medium leading-tight text-[#0B1F3A] sm:shrink-0 sm:text-right">
           {right}
         </span>
       ) : null}

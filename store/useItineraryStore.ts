@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { persist } from "zustand/middleware";
 import type {
   CityId,
   HotelTier,
@@ -23,6 +24,14 @@ export interface RoomAllocation {
 export interface CityNights {
   cityId: CityId;
   nights: number;
+}
+
+/** Persisted Experience Profiler result (global across Builder / Discover). */
+export interface UserTravelProfile {
+  vibe: "culture" | "foodie" | "modern" | "nature";
+  pace: "relaxed" | "standard" | "active";
+  crowdStyle: "hidden_gems" | "classic" | "balanced";
+  isCompleted: boolean;
 }
 
 export interface ItineraryState {
@@ -54,6 +63,14 @@ export interface ItineraryState {
   // Module 8
   selectedTours: string[];
   privateChauffeur: boolean;
+  /** Elite Concierge pathway (legacy itinerary store) */
+  hasEliteConcierge: boolean;
+  /** Design deposit (€) — credited 100% toward final trip on booking */
+  eliteConciergeFee: number;
+  /** Non-AI Experience Profiler tag e.g. foodie_relaxed */
+  userProfileTag: string | null;
+  /** Full travel-style profile from Match Quiz */
+  userProfile: UserTravelProfile | null;
 
   // Module 9
   transitMode: TransitMode;
@@ -92,6 +109,10 @@ export interface ItineraryActions {
 
   toggleTour: (tourId: string) => void;
   setPrivateChauffeur: (v: boolean) => void;
+  setHasEliteConcierge: (v: boolean) => void;
+  setUserProfileTag: (tag: string | null) => void;
+  setUserProfile: (profile: UserTravelProfile | null) => void;
+  clearUserProfile: () => void;
 
   setTransitMode: (mode: TransitMode) => void;
 
@@ -126,7 +147,7 @@ const initialState: ItineraryState = {
   departureHub: "haneda",
   pickupTransfer: true,
   dropoffTransfer: true,
-  needHotels: true,
+  needHotels: false,
   hotelTier: "5-star",
   rooms: defaultRooms,
   cityNights: [
@@ -136,143 +157,201 @@ const initialState: ItineraryState = {
   ],
   selectedTours: [],
   privateChauffeur: false,
+  hasEliteConcierge: false,
+  eliteConciergeFee: 50,
+  userProfileTag: null,
+  userProfile: null,
   transitMode: "shinkansen",
   clientName: "",
   clientEmail: "",
   clientNotes: "",
-  tempBookingRef: generateTempPNR(),
+  tempBookingRef: "",
   confirmedBookingRef: null,
   bookingStatus: "draft",
 };
 
-export const useItineraryStore = create<ItineraryState & ItineraryActions>(
-  (set, get) => ({
-    ...initialState,
+function coerceUserProfile(raw: unknown): UserTravelProfile | null {
+  if (!raw || typeof raw !== "object") return null;
+  const p = raw as Partial<UserTravelProfile>;
+  if (
+    !p.vibe ||
+    !["culture", "foodie", "modern", "nature"].includes(p.vibe) ||
+    !p.pace ||
+    !["relaxed", "standard", "active"].includes(p.pace) ||
+    !p.crowdStyle ||
+    !["hidden_gems", "classic", "balanced"].includes(p.crowdStyle)
+  ) {
+    return null;
+  }
+  return {
+    vibe: p.vibe,
+    pace: p.pace,
+    crowdStyle: p.crowdStyle,
+    isCompleted: Boolean(p.isCompleted ?? true),
+  };
+}
 
-    setDurationDays: (days) =>
-      set({ durationDays: Math.max(1, Math.min(60, days)) }),
+export const useItineraryStore = create<ItineraryState & ItineraryActions>()(
+  persist(
+    (set, get) => ({
+      ...initialState,
 
-    setCustomDuration: (enabled, days) =>
-      set((s) => ({
-        isCustomDuration: enabled,
-        durationDays: enabled
-          ? days ?? s.durationDays
-          : [10, 14, 21].includes(s.durationDays)
-            ? s.durationDays
-            : 10,
-      })),
+      setDurationDays: (days) =>
+        set({ durationDays: Math.max(1, Math.min(60, days)) }),
 
-    setTotalGuests: (n) =>
-      set((s) => {
-        const total = Math.max(1, n);
-        const adults = Math.min(s.adults, total);
-        const children = Math.max(0, total - adults);
-        return { totalGuests: total, adults, children };
-      }),
+      setCustomDuration: (enabled, days) =>
+        set((s) => ({
+          isCustomDuration: enabled,
+          durationDays: enabled
+            ? days ?? s.durationDays
+            : [10, 14, 21].includes(s.durationDays)
+              ? s.durationDays
+              : 10,
+        })),
 
-    setAdults: (n) =>
-      set((s) => {
-        const adults = Math.max(0, Math.min(n, s.totalGuests));
-        return { adults, children: s.totalGuests - adults };
-      }),
+      setTotalGuests: (n) =>
+        set((s) => {
+          const total = Math.max(1, n);
+          const adults = Math.min(s.adults, total);
+          const children = Math.max(0, total - adults);
+          return { totalGuests: total, adults, children };
+        }),
 
-    setChildren: (n) =>
-      set((s) => {
-        const children = Math.max(0, Math.min(n, s.totalGuests));
-        return { children, adults: s.totalGuests - children };
-      }),
+      setAdults: (n) =>
+        set((s) => {
+          const adults = Math.max(0, Math.min(n, s.totalGuests));
+          return { adults, children: s.totalGuests - adults };
+        }),
 
-    setArrivalHub: (hub) => set({ arrivalHub: hub }),
-    setDepartureHub: (hub) => set({ departureHub: hub }),
+      setChildren: (n) =>
+        set((s) => {
+          const children = Math.max(0, Math.min(n, s.totalGuests));
+          return { children, adults: s.totalGuests - children };
+        }),
 
-    setPickupTransfer: (v) => set({ pickupTransfer: v }),
-    setDropoffTransfer: (v) => set({ dropoffTransfer: v }),
+      setArrivalHub: (hub) => set({ arrivalHub: hub }),
+      setDepartureHub: (hub) => set({ departureHub: hub }),
 
-    setNeedHotels: (v) => set({ needHotels: v }),
-    setHotelTier: (tier) => set({ hotelTier: tier }),
+      setPickupTransfer: (v) => set({ pickupTransfer: v }),
+      setDropoffTransfer: (v) => set({ dropoffTransfer: v }),
 
-    setRoomCount: (type, count) =>
-      set((s) => ({
-        rooms: s.rooms.map((r) =>
-          r.type === type ? { ...r, count: Math.max(0, count) } : r
-        ),
-      })),
+      setNeedHotels: (v) => set({ needHotels: v }),
+      setHotelTier: (tier) => set({ hotelTier: tier }),
 
-    toggleCity: (cityId) =>
-      set((s) => {
-        const exists = s.cityNights.some((c) => c.cityId === cityId);
-        if (exists) {
+      setRoomCount: (type, count) =>
+        set((s) => ({
+          rooms: s.rooms.map((r) =>
+            r.type === type ? { ...r, count: Math.max(0, count) } : r
+          ),
+        })),
+
+      toggleCity: (cityId) =>
+        set((s) => {
+          const exists = s.cityNights.some((c) => c.cityId === cityId);
+          if (exists) {
+            return {
+              cityNights: s.cityNights.filter((c) => c.cityId !== cityId),
+              selectedTours: s.selectedTours.filter(
+                (id) => !id.startsWith(cityId) && !id.includes(cityId)
+              ),
+            };
+          }
           return {
-            cityNights: s.cityNights.filter((c) => c.cityId !== cityId),
-            selectedTours: s.selectedTours.filter(
-              (id) => !id.startsWith(cityId) && !id.includes(cityId)
-            ),
+            cityNights: [...s.cityNights, { cityId, nights: 1 }],
           };
+        }),
+
+      setCityNights: (cityId, nights) =>
+        set((s) => ({
+          cityNights: s.cityNights.map((c) =>
+            c.cityId === cityId
+              ? { ...c, nights: Math.max(0, Math.min(30, nights)) }
+              : c
+          ),
+        })),
+
+      toggleTour: (tourId) =>
+        set((s) => ({
+          selectedTours: s.selectedTours.includes(tourId)
+            ? s.selectedTours.filter((id) => id !== tourId)
+            : [...s.selectedTours, tourId],
+        })),
+
+      setPrivateChauffeur: (v) => set({ privateChauffeur: v }),
+      setHasEliteConcierge: (v) => set({ hasEliteConcierge: v }),
+      setUserProfileTag: (tag) => set({ userProfileTag: tag }),
+      setUserProfile: (profile) =>
+        set({
+          userProfile: profile,
+          userProfileTag: profile
+            ? `${
+                profile.vibe === "culture" ? "cultural" : profile.vibe
+              }_${profile.pace}`
+            : null,
+        }),
+      clearUserProfile: () =>
+        set({ userProfile: null, userProfileTag: null }),
+      setTransitMode: (mode) => set({ transitMode: mode }),
+
+      setClientName: (v) => set({ clientName: v }),
+      setClientEmail: (v) => set({ clientEmail: v }),
+      setClientNotes: (v) => set({ clientNotes: v }),
+
+      ensureTempBookingRef: () => {
+        const s = get();
+        if (s.tempBookingRef && /^TMP-[A-Z2-9]{6}$/i.test(s.tempBookingRef)) {
+          return s.tempBookingRef;
         }
+        const next = generateTempPNR();
+        set({ tempBookingRef: next });
+        return next;
+      },
+
+      confirmBookingRef: (ref, status = "confirmed") => {
+        set({
+          confirmedBookingRef: promoteTempToOfficial(ref),
+          bookingStatus: status,
+        });
+      },
+
+      displayBookingRef: () => {
+        const s = get();
+        return s.confirmedBookingRef || s.tempBookingRef;
+      },
+
+      officialBookingRef: () => {
+        const s = get();
+        if (s.confirmedBookingRef) return s.confirmedBookingRef;
+        return resolveOfficialPNR(s.tempBookingRef);
+      },
+
+      reset: () =>
+        set({
+          ...initialState,
+          tempBookingRef: generateTempPNR(),
+          confirmedBookingRef: null,
+          bookingStatus: "draft",
+        }),
+    }),
+    {
+      name: "travelxp-itinerary-profile",
+      partialize: (s) => ({
+        userProfile: s.userProfile,
+        userProfileTag: s.userProfileTag,
+      }),
+      merge: (persisted, current) => {
+        const p = (persisted ?? {}) as Partial<ItineraryState>;
         return {
-          cityNights: [...s.cityNights, { cityId, nights: 1 }],
+          ...current,
+          userProfile: coerceUserProfile(p.userProfile) ?? current.userProfile,
+          userProfileTag:
+            typeof p.userProfileTag === "string" || p.userProfileTag === null
+              ? p.userProfileTag
+              : current.userProfileTag,
         };
-      }),
-
-    setCityNights: (cityId, nights) =>
-      set((s) => ({
-        cityNights: s.cityNights.map((c) =>
-          c.cityId === cityId
-            ? { ...c, nights: Math.max(0, Math.min(30, nights)) }
-            : c
-        ),
-      })),
-
-    toggleTour: (tourId) =>
-      set((s) => ({
-        selectedTours: s.selectedTours.includes(tourId)
-          ? s.selectedTours.filter((id) => id !== tourId)
-          : [...s.selectedTours, tourId],
-      })),
-
-    setPrivateChauffeur: (v) => set({ privateChauffeur: v }),
-    setTransitMode: (mode) => set({ transitMode: mode }),
-
-    setClientName: (v) => set({ clientName: v }),
-    setClientEmail: (v) => set({ clientEmail: v }),
-    setClientNotes: (v) => set({ clientNotes: v }),
-
-    ensureTempBookingRef: () => {
-      const s = get();
-      if (s.tempBookingRef && /^TMP-[A-Z2-9]{6}$/i.test(s.tempBookingRef)) {
-        return s.tempBookingRef;
-      }
-      const next = generateTempPNR();
-      set({ tempBookingRef: next });
-      return next;
-    },
-
-    confirmBookingRef: (ref, status = "confirmed") => {
-      set({
-        confirmedBookingRef: promoteTempToOfficial(ref),
-        bookingStatus: status,
-      });
-    },
-
-    displayBookingRef: () => {
-      const s = get();
-      return s.confirmedBookingRef || s.tempBookingRef;
-    },
-
-    officialBookingRef: () => {
-      const s = get();
-      if (s.confirmedBookingRef) return s.confirmedBookingRef;
-      return resolveOfficialPNR(s.tempBookingRef);
-    },
-
-    reset: () =>
-      set({
-        ...initialState,
-        tempBookingRef: generateTempPNR(),
-        confirmedBookingRef: null,
-        bookingStatus: "draft",
-      }),
-  })
+      },
+    }
+  )
 );
 
 /** Selectors / derived helpers */

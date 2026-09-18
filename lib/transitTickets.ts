@@ -59,9 +59,10 @@ export function buildTransitTicketChoice(
   needsTicket: boolean,
   kind: TransitTicketKind
 ): TransitLegTicketChoice {
-  if (mode !== "public" || !needsTicket) {
+  const resolved = mode === "unset" ? "self" : mode;
+  if (resolved !== "public" || !needsTicket) {
     return {
-      mode,
+      mode: resolved === "public" ? "public" : resolved,
       needsTicket: false,
       ticketType: "none",
       ticketPricePerPax: 0,

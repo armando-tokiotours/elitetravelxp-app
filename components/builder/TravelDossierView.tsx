@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import {
   BedDouble,
@@ -23,6 +23,7 @@ import {
   type PbHub,
   type PbTransfer,
 } from "@/lib/pocketbase/client";
+import { buildCityMap, getCityName } from "@/lib/cityLabels";
 import { formatCityDateSingle } from "@/lib/dateCascade";
 import {
   formatDisplayDate,
@@ -69,8 +70,11 @@ export function TravelDossierView({
     null
   );
 
-  const cityName = (id: string) =>
-    config?.cities.find((c) => c.id === id)?.name ?? id;
+  const cityMap = useMemo(
+    () => buildCityMap(config?.cities),
+    [config?.cities]
+  );
+  const cityName = (id: string) => getCityName(id, cityMap);
 
   const firstLoc = state.locations.find(
     (l) => l.visitType === "stay" || !l.visitType
@@ -127,14 +131,14 @@ export function TravelDossierView({
   };
 
   return (
-    <div className="space-y-0">
+    <div className="w-full space-y-0 overflow-hidden px-0">
       <section className="overflow-hidden rounded-2xl bg-[#0B1F3A] text-white shadow-[0_12px_40px_rgba(11,31,58,0.25)]">
-        <div className="flex items-start justify-between gap-3 border-b border-dashed border-white/20 px-5 py-4">
-          <div>
+        <div className="flex flex-col gap-3 border-b border-dashed border-white/20 px-4 py-4 sm:flex-row sm:items-start sm:justify-between sm:gap-3 sm:px-5">
+          <div className="min-w-0 flex-1 overflow-hidden">
             <p className="text-[0.65rem] font-semibold uppercase tracking-[0.35em] text-[#C4A35A]">
               Booking Summary
             </p>
-            <p className="mt-1 font-display text-xl text-white">
+            <p className="mt-1 font-display text-lg leading-tight text-white sm:text-xl">
               Elite Travel Experiences
             </p>
           </div>
@@ -195,9 +199,14 @@ export function TravelDossierView({
                 <h2 className="text-[0.7rem] font-semibold uppercase tracking-[0.28em] text-[#0B1F3A]">
                   Elite Concierge
                 </h2>
+                <p className="mt-2 text-sm font-semibold text-amber-700">
+                  €50 Design Deposit
+                </p>
                 <p className="mt-2 text-sm text-[#5C6570]">
                   Day-by-day itinerary design included — dining, access, and
-                  private drivers coordinated by your specialist.
+                  private drivers coordinated by your specialist. 100% of the
+                  €50 fee is credited toward your final trip balance when you
+                  book.
                 </p>
               </div>
             </div>
@@ -275,7 +284,7 @@ export function TravelDossierView({
                 ? openLeg({
                     fromLabel: hubShort(arrivalHub) || arrivalHubLabel,
                     toLabel: firstCityLabel || "Hotel",
-                    mode: state.arrivalTransitType ?? "public",
+                    mode: state.arrivalTransitType ?? "unset",
                     storeKey: "__arrival__",
                     toCityId: firstLoc.cityId,
                     needsTicket: state.arrivalNeedsTicket,
@@ -287,27 +296,37 @@ export function TravelDossierView({
             className="mt-3 w-full text-left"
           >
             <ServiceStrip>
-              {(state.arrivalTransitType ?? "public") === "private" ? (
+              {(state.arrivalTransitType ?? "unset") === "private" ? (
                 <Car className="mt-0.5 h-4 w-4 shrink-0 text-[#C4A35A]" />
-              ) : (
+              ) : (state.arrivalTransitType ?? "unset") === "public" ? (
                 <TrainFront className="mt-0.5 h-4 w-4 shrink-0 text-[#C4A35A]" />
+              ) : (
+                <CircleDot className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
               )}
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-semibold text-[#0B1F3A]">
-                  {(state.arrivalTransitType ?? "public") === "private"
-                    ? `Private Chauffeur${firstCityLabel ? ` to ${firstCityLabel} Hotel` : ""}`
-                    : `Airport Express Rail${firstCityLabel ? ` to ${firstCityLabel}` : ""}`}
+                  {(state.arrivalTransitType ?? "unset") === "unset"
+                    ? "⚠️ Transfer Not Configured — Tap to Set Up"
+                    : (state.arrivalTransitType ?? "unset") === "self"
+                      ? `Self-Arranged / On Your Own${firstCityLabel ? ` to ${firstCityLabel}` : ""}`
+                      : (state.arrivalTransitType ?? "unset") === "private"
+                        ? `Private Chauffeur${firstCityLabel ? ` to ${firstCityLabel} Hotel` : ""}`
+                        : `Airport Express Rail${firstCityLabel ? ` to ${firstCityLabel}` : ""}`}
                 </p>
                 <p className="text-xs text-[#8A8278]">
-                  {(state.arrivalTransitType ?? "public") === "public" &&
+                  {(state.arrivalTransitType ?? "unset") === "public" &&
                   state.arrivalNeedsTicket &&
                   (state.arrivalTicketPricePerPax ?? 0) > 0
                     ? `Tickets pre-booked · Est. €${Math.round(
                         (state.arrivalTicketPricePerPax ?? 0) * totalGuests
                       )}`
-                    : (state.arrivalTransitType ?? "public") === "public"
+                    : (state.arrivalTransitType ?? "unset") === "public"
                       ? "Self-purchase tickets on site"
-                      : fleetLabel || "Door-to-door transfer"}
+                      : (state.arrivalTransitType ?? "unset") === "self"
+                        ? "€0 · arranged independently"
+                        : (state.arrivalTransitType ?? "unset") === "unset"
+                          ? "Choose Self-Arranged, Public Rail, or Private Chauffeur"
+                          : fleetLabel || "Door-to-door transfer"}
                 </p>
               </div>
               <Pencil className="h-3.5 w-3.5 shrink-0 text-[#C4A35A]/70" />
@@ -441,14 +460,20 @@ export function TravelDossierView({
             <ServiceStrip>
               {lastLoc.transitType === "private" ? (
                 <Car className="mt-0.5 h-4 w-4 shrink-0 text-[#C4A35A]" />
-              ) : (
+              ) : lastLoc.transitType === "public" ? (
                 <TrainFront className="mt-0.5 h-4 w-4 shrink-0 text-[#C4A35A]" />
+              ) : (
+                <CircleDot className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
               )}
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-semibold text-[#0B1F3A]">
-                  {lastLoc.transitType === "private"
-                    ? `Private Chauffeur${lastCityLabel ? ` from ${lastCityLabel} Hotel` : ""}`
-                    : `Airport Express Rail${lastCityLabel ? ` from ${lastCityLabel}` : ""}`}
+                  {lastLoc.transitType === "unset"
+                    ? "⚠️ Transfer Not Configured — Tap to Set Up"
+                    : lastLoc.transitType === "self"
+                      ? `Self-Arranged / On Your Own${lastCityLabel ? ` from ${lastCityLabel}` : ""}`
+                      : lastLoc.transitType === "private"
+                        ? `Private Chauffeur${lastCityLabel ? ` from ${lastCityLabel} Hotel` : ""}`
+                        : `Airport Express Rail${lastCityLabel ? ` from ${lastCityLabel}` : ""}`}
                 </p>
                 <p className="text-xs text-[#8A8278]">
                   {lastLoc.transitType === "public" &&
@@ -459,7 +484,11 @@ export function TravelDossierView({
                       )}`
                     : lastLoc.transitType === "public"
                       ? "Self-purchase tickets on site"
-                      : fleetLabel || "Door-to-door transfer"}
+                      : lastLoc.transitType === "self"
+                        ? "€0 · arranged independently"
+                        : lastLoc.transitType === "unset"
+                          ? "Choose Self-Arranged, Public Rail, or Private Chauffeur"
+                          : fleetLabel || "Door-to-door transfer"}
                 </p>
               </div>
               <Pencil className="h-3.5 w-3.5 shrink-0 text-[#C4A35A]/70" />
@@ -506,6 +535,9 @@ function LocationSegment({
   const isWaypoint =
     loc.visitType === "arrival" || loc.visitType === "departure";
   const hotelPref = state.cityHotels[loc.cityId];
+  const wantsHotel = hotelPref
+    ? Boolean(hotelPref.needsHotel)
+    : Boolean(state.needHotels);
   const tours = sortSelectedToursChronologically(
     state.selectedTours[loc.cityId] ?? []
   );
@@ -547,56 +579,65 @@ function LocationSegment({
         </TicketCard>
       ) : (
         <TicketCard accent="plain">
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex items-center gap-2">
-              <MapPin className="h-4 w-4 shrink-0 text-[#C4A35A]" />
-              <h2 className="font-display text-xl text-[#0B1F3A]">
-                {cityLabel}
-                <span className="mx-2 text-[#C4A35A]">·</span>
-                <span className="text-base font-sans font-semibold text-[#5C6570]">
+          <div className="flex w-full flex-col gap-1 overflow-hidden sm:flex-row sm:items-start sm:justify-between sm:gap-3">
+            <div className="flex min-w-0 items-start gap-2 overflow-hidden">
+              <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-[#C4A35A]" />
+              <div className="flex min-w-0 flex-col gap-1 overflow-hidden">
+                <h2 className="break-words text-sm font-semibold leading-tight text-[#0B1F3A] sm:font-display sm:text-xl sm:font-normal">
+                  {cityLabel}
+                </h2>
+                <p className="text-sm font-semibold leading-tight text-[#5C6570]">
                   {loc.nights} Night{loc.nights === 1 ? "" : "s"}
-                </span>
-              </h2>
+                </p>
+              </div>
             </div>
             {dateLabel ? (
-              <p className="shrink-0 text-xs text-[#8A8278]">{dateLabel}</p>
+              <p className="text-xs leading-tight text-[#8A8278] sm:shrink-0 sm:text-right">
+                {dateLabel}
+              </p>
             ) : null}
           </div>
 
-          {state.needHotels || hotelPref?.needsHotel !== false ? (
-            <div className="mt-4 flex items-start gap-2 border-t border-dashed border-[#E8E2D9] pt-3">
+          {wantsHotel ? (
+            <div className="mt-4 flex w-full items-start gap-2 overflow-hidden border-t border-dashed border-[#E8E2D9] pt-3">
               <BedDouble className="mt-0.5 h-4 w-4 shrink-0 text-[#C4A35A]" />
-              <p className="text-sm text-[#5C6570]">
-                <span className="font-semibold text-[#0B1F3A]">
+              <div className="flex min-w-0 flex-col gap-1 overflow-hidden">
+                <p className="break-words text-sm font-semibold leading-tight text-[#0B1F3A]">
                   {hotelPref
                     ? `${hotelPref.starRating}-Star Hotel Tier`
                     : `${state.hotelTier === "5-star" ? "5" : "4"}-Star Hotel Tier`}
-                </span>
-                {" · "}
-                {hotelPref
-                  ? (() => {
-                      const n = normalizeCityHotelPref(
-                        hotelPref,
-                        loc.cityId,
-                        state.roomCount
-                      );
-                      return (
-                        formatHotelRoomsSummary(
-                          n.rooms,
-                          n.standardOccupancy
-                        ) || `${state.roomCount}× Room`
-                      );
-                    })()
-                  : `${state.roomCount}× ${state.roomType} Room`}
-                {hotelPref ? (
-                  <span className="text-[#8A8278]">
-                    {" "}
-                    · {hotelPref.breakfast ? "Breakfast" : "No breakfast"}
-                  </span>
-                ) : null}
-              </p>
+                </p>
+                <p className="break-words text-sm leading-tight text-[#5C6570]">
+                  {hotelPref
+                    ? (() => {
+                        const n = normalizeCityHotelPref(
+                          hotelPref,
+                          loc.cityId,
+                          state.roomCount
+                        );
+                        return (
+                          formatHotelRoomsSummary(
+                            n.rooms,
+                            n.standardOccupancy
+                          ) || `${state.roomCount}× Room`
+                        );
+                      })()
+                    : `${state.roomCount}× ${state.roomType} Room`}
+                  {hotelPref ? (
+                    <span className="text-[#8A8278]">
+                      {" "}
+                      · {hotelPref.breakfast ? "Breakfast" : "No breakfast"}
+                    </span>
+                  ) : null}
+                </p>
+              </div>
             </div>
-          ) : null}
+          ) : (
+            <div className="mt-4 flex w-full items-center gap-2 overflow-hidden border-t border-dashed border-[#E8E2D9] pt-3 text-xs italic text-[#8A8278]">
+              <BedDouble className="h-4 w-4 shrink-0 text-[#D9D2C7]" />
+              <span>Accommodation Self-Arranged (No Hotel Required)</span>
+            </div>
+          )}
 
           {tours.length > 0 ? (
             <ul className="mt-3 space-y-2 border-t border-dashed border-[#E8E2D9] pt-3">
@@ -706,6 +747,12 @@ function TransitConnectorPill({
   const publicLabel = toIsHub
     ? `Express Rail from ${fromLabel} to ${toLabel}`
     : `Bullet Train (Shinkansen) to ${toLabel}`;
+  const selfLabel = toIsHub
+    ? `Self-Arranged / On Your Own to ${toLabel}`
+    : `Self-Arranged / On Your Own to ${toLabel}`;
+
+  const isUnset = mode === "unset";
+  const isSelf = mode === "self";
 
   const ticketNote =
     mode === "public" && needsTicket && (ticketPricePerPax ?? 0) > 0
@@ -714,31 +761,55 @@ function TransitConnectorPill({
         )}`
       : mode === "public" && needsTicket === false
         ? "Self-purchase tickets"
-        : null;
+        : isSelf
+          ? "€0 · arranged independently"
+          : null;
 
   return (
     <>
       <TimelineSpine />
-      <div className="flex justify-center py-0.5">
+      <div className="flex w-full justify-center overflow-hidden px-1 py-0.5">
         <button
           type="button"
           onClick={onClick}
-          className="group my-2 inline-flex cursor-pointer flex-col items-center gap-1 rounded-full border border-zinc-200 bg-white px-4 py-2 text-xs font-semibold text-zinc-800 shadow-sm transition-all hover:border-[#C4A35A] hover:shadow-md"
-          aria-label={`Change transit from ${fromLabel} to ${toLabel}`}
+          className={`group my-2 inline-flex max-w-full cursor-pointer flex-col items-center gap-1 rounded-full border px-3 py-2 text-xs font-semibold shadow-sm transition-all sm:px-4 ${
+            isUnset
+              ? "border-amber-400/70 bg-amber-50 text-amber-950 hover:border-amber-500 hover:shadow-md"
+              : "border-zinc-200 bg-white text-zinc-800 hover:border-[#C4A35A] hover:shadow-md"
+          }`}
+          aria-label={
+            isUnset
+              ? `Configure transit from ${fromLabel} to ${toLabel}`
+              : `Change transit from ${fromLabel} to ${toLabel}`
+          }
         >
-          <span className="inline-flex items-center gap-2">
-            {mode === "private" ? (
+          <span className="inline-flex max-w-full items-center gap-2 break-words text-center leading-tight">
+            {isUnset ? (
+              <span aria-hidden>⚠️</span>
+            ) : mode === "private" ? (
               <Car className="h-3.5 w-3.5 text-[#C4A35A]" />
-            ) : (
+            ) : mode === "public" ? (
               <TrainFront className="h-3.5 w-3.5 text-[#C4A35A]" />
+            ) : (
+              <CircleDot className="h-3.5 w-3.5 text-zinc-400" />
             )}
-            {mode === "private" ? privateLabel : publicLabel}
+            {isUnset
+              ? "Transfer Not Configured — Tap to Set Up"
+              : isSelf
+                ? selfLabel
+                : mode === "private"
+                  ? privateLabel
+                  : publicLabel}
             <Pencil className="h-3 w-3 text-zinc-400 opacity-0 transition group-hover:opacity-100" />
           </span>
           {ticketNote ? (
-            <span className="text-[10px] font-medium text-amber-700">
+            <span
+              className={`text-[10px] font-medium ${
+                isSelf ? "text-zinc-500" : "text-amber-700"
+              }`}
+            >
               {ticketNote}
-              {ticketType && ticketType !== "none"
+              {mode === "public" && ticketType && ticketType !== "none"
                 ? ticketType === "ic_card"
                   ? " · IC card"
                   : " · Shinkansen"
@@ -771,8 +842,8 @@ function TicketCard({
 
   return (
     <section
-      className={`rounded-2xl border border-[#E8E2D9] bg-white shadow-[0_2px_12px_rgba(11,31,58,0.04)] ${border} ${
-        compact ? "px-4 py-3" : "px-5 py-4"
+      className={`w-full overflow-hidden rounded-2xl border border-[#E8E2D9] bg-white shadow-[0_2px_12px_rgba(11,31,58,0.04)] ${border} ${
+        compact ? "px-4 py-3" : "px-4 py-4 sm:px-5"
       }`}
     >
       {children}

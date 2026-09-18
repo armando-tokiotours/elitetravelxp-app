@@ -8,12 +8,9 @@ import {
   ChevronRight,
   Pencil,
 } from "lucide-react";
-import {
-  cityPhoto,
-  pbFileUrl,
-  type PbAccommodation,
-  type PbCity,
-} from "@/lib/pocketbase/client";
+import type { PbAccommodation, PbCity } from "@/lib/pocketbase/client";
+import { buildCityMap, getCityName } from "@/lib/cityLabels";
+import { CityThumb } from "./CityThumb";
 import { isBuilderStepComplete } from "@/lib/builderSteps";
 import {
   useBuilderStore,
@@ -39,8 +36,6 @@ const HotelsEditorModal = dynamic(
   { ssr: false }
 );
 
-const LUXURY_PREVIEW_FALLBACK = "/photo/11007.jpg";
-
 const MONTHS = [
   "January",
   "February",
@@ -62,16 +57,6 @@ function monthNameFromIso(iso: string | null): string | null {
   const month = parts[1];
   if (!month || month < 1 || month > 12) return null;
   return MONTHS[month - 1];
-}
-
-function cityPreviewUrl(city: PbCity | undefined): string {
-  if (!city) return LUXURY_PREVIEW_FALLBACK;
-  const filename = cityPhoto(city);
-  if (!filename) return LUXURY_PREVIEW_FALLBACK;
-  return (
-    pbFileUrl(city.collectionId, city.id, filename, "200x200") ||
-    LUXURY_PREVIEW_FALLBACK
-  );
 }
 
 export function HotelsGuestsSection({
@@ -118,7 +103,8 @@ export function HotelsGuestsSection({
   }, [orderedCityIds, ensureCityHotels]);
 
   const cityById = (id: string) => cities.find((c) => c.id === id);
-  const cityName = (id: string) => cityById(id)?.name || "City";
+  const cityLabelMap = useMemo(() => buildCityMap(cities), [cities]);
+  const cityName = (id: string) => getCityName(id, cityLabelMap);
 
   const totalGuests = adults + children;
   const roomCapacity = Math.max(
@@ -139,11 +125,16 @@ export function HotelsGuestsSection({
         id,
         roomReq?.roomsNeeded ?? 1
       );
+      if (!pref.needsHotel) continue;
       if (totalHotelRooms(pref.rooms) === 0) {
         setCityHotel(id, { rooms: suggested });
       }
     }
-    const first = cityHotels[orderedCityIds[0]];
+    const firstHotelCity = orderedCityIds.find(
+      (id) => cityHotels[id]?.needsHotel !== false
+    );
+    if (!firstHotelCity) return;
+    const first = cityHotels[firstHotelCity];
     const count = first ? totalHotelRooms(first.rooms) : roomReq?.roomsNeeded;
     if (count && count > 0) setRoomCount(count);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -167,9 +158,9 @@ export function HotelsGuestsSection({
   const overallAllocation = useMemo(() => {
     if (hotelCities.length === 0) {
       return {
-        remaining: totalGuests,
-        covered: false,
-        label: "No hotel stops",
+        remaining: 0,
+        covered: true,
+        label: "No hotel needed · Self-arranged (€0)",
       };
     }
     let worstRemaining = 0;
@@ -203,13 +194,15 @@ export function HotelsGuestsSection({
   const summary =
     orderedCityIds.length === 0
       ? "Add locations first"
-      : [
-          `${totalGuests} guest${totalGuests === 1 ? "" : "s"}`,
-          roomReq ? roomReq.breakdownText : null,
-          `${hotelCities.length} hotel stop${hotelCities.length === 1 ? "" : "s"}`,
-        ]
-          .filter(Boolean)
-          .join(" · ");
+      : hotelCities.length === 0
+        ? `${totalGuests} guest${totalGuests === 1 ? "" : "s"} · No hotel needed (self-arranged €0)`
+        : [
+            `${totalGuests} guest${totalGuests === 1 ? "" : "s"}`,
+            roomReq ? roomReq.breakdownText : null,
+            `${hotelCities.length} hotel stop${hotelCities.length === 1 ? "" : "s"}`,
+          ]
+            .filter(Boolean)
+            .join(" · ");
 
   const monthName = monthNameFromIso(arrivalDate);
   const openEditor = () => setIsHotelModalOpen(true);
@@ -326,28 +319,30 @@ function HotelsSummaryWidget({
               pref.rooms,
               pref.standardOccupancy
             );
-            const preview = cityPreviewUrl(cityById(id));
             return (
               <li
                 key={id}
                 className="flex items-center gap-3 rounded-xl border border-zinc-800 bg-zinc-950/80 px-3 py-2"
               >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={preview}
-                  alt=""
-                  className="h-10 w-10 shrink-0 rounded-lg object-cover"
-                />
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm font-medium text-white">
+                <span className="h-10 w-10 shrink-0 overflow-hidden rounded-lg">
+                  <CityThumb
+                    city={cityById(id)}
+                    name={cityName(id)}
+                    alt=""
+                    thumb="200x200"
+                    className="h-full w-full object-cover"
+                  />
+                </span>
+                <span className="min-w-0 flex-1 overflow-hidden">
+                  <span className="block break-words text-sm font-semibold leading-tight text-white">
                     {cityName(id)}
                   </span>
-                  <span className="block truncate text-[11px] text-zinc-500">
+                  <span className="block break-words text-[11px] leading-tight text-zinc-500">
                     {pref.needsHotel
                       ? `${pref.starRating}★ · ${mix || "No rooms"} · ${
                           pref.breakfast ? "Breakfast" : "No breakfast"
                         }`
-                      : "Hotel not needed"}
+                      : "No hotel needed · Self-arranged (€0)"}
                   </span>
                 </span>
               </li>

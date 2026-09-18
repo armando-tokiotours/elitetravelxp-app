@@ -7,6 +7,33 @@ interface SendItineraryParams {
   customerName?: string;
 }
 
+/** Strip accidental quotes from .env values (common Docker/dotenv pitfall). */
+export function envVal(key: string): string | undefined {
+  const raw = process.env[key]?.trim();
+  if (!raw) return undefined;
+  if (
+    (raw.startsWith('"') && raw.endsWith('"')) ||
+    (raw.startsWith("'") && raw.endsWith("'"))
+  ) {
+    return raw.slice(1, -1).trim() || undefined;
+  }
+  return raw;
+}
+
+/** Require RESEND_API_KEY in the server environment (never hardcode keys). */
+export function resolveResendApiKey(): string | undefined {
+  return envVal("RESEND_API_KEY");
+}
+
+export class MailDispatchError extends Error {
+  status: number;
+  constructor(message: string, status = 500) {
+    super(message);
+    this.name = "MailDispatchError";
+    this.status = status;
+  }
+}
+
 /**
  * Transactional itinerary PDF via Resend.
  * Always BCC BUSINESS_CONCIERGE_EMAIL (default armando@tokiotours.nl).
@@ -17,24 +44,40 @@ export async function sendItineraryEmail({
   pdfBuffer,
   customerName = "Valued Guest",
 }: SendItineraryParams) {
-  const apiKey = process.env.RESEND_API_KEY?.trim();
+  const apiKey = resolveResendApiKey();
+  if (!process.env.RESEND_API_KEY?.trim() && !apiKey) {
+    throw new MailDispatchError(
+      "Resend API Key missing on server environment.",
+      401
+    );
+  }
   if (!apiKey) {
-    throw new Error("RESEND_API_KEY is not configured.");
+    throw new MailDispatchError(
+      "Resend API Key missing on server environment.",
+      401
+    );
+  }
+  if (!apiKey.startsWith("re_")) {
+    throw new MailDispatchError(
+      "RESEND_API_KEY looks invalid (expected to start with re_). Check VPS .env quoting.",
+      401
+    );
   }
 
   const resend = new Resend(apiKey);
   const businessEmail =
-    process.env.BUSINESS_CONCIERGE_EMAIL?.trim() || "armando@tokiotours.nl";
+    envVal("BUSINESS_CONCIERGE_EMAIL") || "armando@tokiotours.nl";
 
   const from =
-    process.env.MAIL_FROM?.trim() ||
-    "Japan Journey <onboarding@resend.dev>"; // Default testing address
+    envVal("MAIL_FROM") ||
+    envVal("SMTP_FROM") ||
+    "Japan Journey <onboarding@resend.dev>";
 
   const toNorm = to.trim().toLowerCase();
   const bcc =
     businessEmail.toLowerCase() === toNorm ? undefined : [businessEmail];
 
-  return await resend.emails.send({
+  const result = await resend.emails.send({
     from,
     to: [to],
     ...(bcc ? { bcc } : {}),
@@ -58,4 +101,17 @@ export async function sendItineraryEmail({
       },
     ],
   });
+
+  if (result.error) {
+    const msg = result.error.message || "Resend email failed.";
+    if (/auth|api key|unauthorized|forbidden/i.test(msg)) {
+      throw new MailDispatchError(
+        `Resend authentication failed: ${msg}. Verify RESEND_API_KEY on the VPS.`,
+        401
+      );
+    }
+    throw new MailDispatchError(msg, 500);
+  }
+
+  return { id: result.data?.id as string | undefined };
 }

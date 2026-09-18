@@ -35,6 +35,10 @@ export interface FieldDef {
   required?: boolean;
   options?: string[];
   accept?: string;
+  /** Max selections for multiselect (UI + validation). */
+  maxSelect?: number;
+  /** Helper copy under the field label. */
+  hint?: string;
   /** When saving, also write this legacy column (same value / same file). */
   legacyKey?: string;
 }
@@ -93,6 +97,38 @@ export const COLLECTIONS: CollectionDef[] = [
         type: "select",
         required: true,
         options: ["tour", "activity"],
+        hint: "Tour = multi-stop guided day · Activity = single experience / ticket",
+      },
+      {
+        key: "vibe_tags",
+        label: "Vibe tags",
+        type: "multiselect",
+        options: ["culture", "foodie", "modern", "nature", "multi_vibe"],
+        maxSelect: 4,
+        hint: "Tours: multiple vibes OK. Activities: pick 1 primary vibe.",
+      },
+      {
+        key: "access_type",
+        label: "Access type",
+        type: "select",
+        options: [
+          "guided_route",
+          "direct_ticket",
+          "vip_event",
+          "time_sensitive",
+        ],
+        hint: "Activities: Ticket / VIP / Time-sensitive. Tours default to guided route.",
+      },
+      {
+        key: "pace_tag",
+        label: "Pace / intensity",
+        type: "select",
+        options: ["relaxed", "standard", "active"],
+      },
+      {
+        key: "is_niche",
+        label: "Niche / VIP exclusive",
+        type: "bool",
       },
       { key: "title", label: "Title", type: "text", required: true },
       { key: "description", label: "Description", type: "textarea" },

@@ -12,7 +12,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { ArrowLeft } from "lucide-react";
 import { canAppendCity } from "@/lib/locationRules";
 import type { PbCity, PbHub } from "@/lib/pocketbase/client";
-import { cityPhoto, pbFileUrl } from "@/lib/pocketbase/client";
+import { getCityName } from "@/lib/cityLabels";
 import type { validateCityRoute } from "@/lib/routeValidator";
 import {
   matchesForCity,
@@ -25,6 +25,7 @@ import type {
 } from "@/store/useBuilderStore";
 import { BuilderPortalSheet } from "../BuilderPortalSheet";
 import { CityAccordionItem } from "../CityAccordionItem";
+import { CityThumb } from "../CityThumb";
 
 export function LocationsEditorModal({
   open,
@@ -143,10 +144,20 @@ export function LocationsEditorModal({
                 <h3 className="truncate font-display text-2xl text-white">
                   Locations &amp; Nights
                 </h3>
+                <p className="mt-0.5 text-[11px] text-zinc-500">
+                  Time in each city only — hotels come in Step 4
+                </p>
               </div>
             </div>
 
             <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4 pb-12">
+              <div className="rounded-xl border border-zinc-800 bg-zinc-950 px-3.5 py-2.5 text-xs text-zinc-400">
+                Set how many nights you spend in each city and how you travel
+                between stops. Accommodation is optional and configured next
+                under{" "}
+                <span className="font-semibold text-[#E8D5A3]">Hotels</span>.
+              </div>
+
               {routeToast ? (
                 <div
                   role="status"
@@ -190,7 +201,8 @@ export function LocationsEditorModal({
                     const fromLabel =
                       index === 0
                         ? hubShortName(arrivalHub)
-                        : cityMap[prev!.cityId]?.name ?? "Previous city";
+                        : cityMap[prev!.cityId]?.name ||
+                          getCityName(prev!.cityId);
                     const range = dateByKey[loc.key];
                     return (
                       <CityAccordionItem
@@ -270,10 +282,6 @@ export function LocationsEditorModal({
             ) : null}
             <ul className="space-y-2">
               {cities.map((city) => {
-                const filename = cityPhoto(city);
-                const img = filename
-                  ? pbFileUrl(city.collectionId, city.id, filename, "100x100")
-                  : "";
                 const disabled = !canAppendCity(locations, city.id);
                 return (
                   <li key={city.id}>
@@ -290,16 +298,15 @@ export function LocationsEditorModal({
                           : "border-zinc-700 bg-zinc-800 text-zinc-200 hover:border-[#C4A35A]"
                       }`}
                     >
-                      {img ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={img}
+                      <span className="h-11 w-11 shrink-0 overflow-hidden rounded-lg">
+                        <CityThumb
+                          city={city}
+                          name={city.name}
                           alt=""
-                          className="h-11 w-11 rounded-lg object-cover"
+                          thumb="100x100"
+                          className="h-full w-full object-cover"
                         />
-                      ) : (
-                        <div className="h-11 w-11 rounded-lg bg-zinc-700" />
-                      )}
+                      </span>
                       <span className="min-w-0 flex-1">
                         <span className="block font-medium text-zinc-200">
                           {city.name}

@@ -15,6 +15,9 @@ services:
       PORT: "3000"
       HOSTNAME: "0.0.0.0"
       NEXT_PUBLIC_POCKETBASE_URL: ${PUBLIC_URL:-https://travelexperiencesgroup.com}
+      # Server-side admin APIs use the Docker network (not public nginx)
+      POCKETBASE_INTERNAL_URL: http://pocketbase:8090
+      POCKETBASE_URL: http://pocketbase:8090
     ports:
       - "3200:3000"
     depends_on:

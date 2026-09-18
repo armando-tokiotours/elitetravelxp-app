@@ -23,6 +23,8 @@ export function TourDetailPanel({
   bookedLanguage = null,
   /** When false, video is paused / not auto-playing (carousel inactive slides). */
   mediaActive = true,
+  /** Gold “Recommended Match” badge from Experience Profiler */
+  recommended = false,
   onAdd,
 }: {
   tour: PbTour;
@@ -32,6 +34,7 @@ export function TourDetailPanel({
   /** Language code already booked for this tour (EN, NL, …) */
   bookedLanguage?: string | null;
   mediaActive?: boolean;
+  recommended?: boolean;
   /** Pass selected language code when adding; omit / empty when removing. */
   onAdd: (selectedLanguage?: string) => void;
 }) {
@@ -102,6 +105,7 @@ export function TourDetailPanel({
     <article className="overflow-hidden rounded-2xl border border-[#EEE8DF] bg-white shadow-[0_4px_20px_rgba(11,31,58,0.06)]">
       <div className="relative aspect-[4/5] max-h-[50dvh] w-full bg-[#0B1F3A]">
         {mediaUrl && mediaType === "Video" ? (
+          /* Target: 1080p · ~1.5Mbps · mp4/webm · <5MB (see lib/mediaStandards.ts) */
           <video
             key={mediaUrl}
             src={mediaUrl}
@@ -110,7 +114,7 @@ export function TourDetailPanel({
             loop
             playsInline
             disablePictureInPicture
-            preload={mediaActive ? "auto" : "metadata"}
+            preload={mediaActive ? "metadata" : "none"}
             ref={(el) => {
               if (!el) return;
               if (mediaActive) {
@@ -126,6 +130,8 @@ export function TourDetailPanel({
           <img
             src={mediaUrl}
             alt=""
+            loading="lazy"
+            decoding="async"
             className="h-full w-full object-cover"
           />
         ) : (
@@ -141,9 +147,35 @@ export function TourDetailPanel({
             {hours}h
           </span>
         ) : null}
+        {recommended ? (
+          <span className="absolute left-3 top-3 z-10 rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[10px] font-medium text-amber-400 shadow-md backdrop-blur-sm">
+            ⭐ Recommended Match
+          </span>
+        ) : null}
       </div>
 
       <div className="px-4 pt-4">
+        <div className="mb-2 flex flex-wrap gap-1.5">
+          {recommended ? (
+            <span className="inline-flex items-center rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[10px] font-medium text-amber-700">
+              ⭐ Recommended Match
+            </span>
+          ) : null}
+          {String(tour.category || "tour").toLowerCase() === "activity" ? (
+            <span className="inline-flex items-center rounded-full border border-violet-500/30 bg-violet-500/10 px-2 py-0.5 text-[10px] font-medium text-violet-700">
+              🎟️ Specific Experience / Access
+            </span>
+          ) : (
+            <span className="inline-flex items-center rounded-full border border-[#C4A35A]/40 bg-[#C4A35A]/10 px-2 py-0.5 text-[10px] font-medium text-[#8A6B2A]">
+              🗺️ Multi-District Tour
+            </span>
+          )}
+          {tour.is_niche ? (
+            <span className="inline-flex items-center rounded-full border border-purple-500/30 bg-purple-500/10 px-2 py-0.5 text-[10px] font-medium text-purple-700">
+              ✨ Exclusive / Special Interest
+            </span>
+          ) : null}
+        </div>
         <div className="flex items-start justify-between gap-3">
           <h4 className="font-display text-xl leading-snug text-[#0B1F3A]">
             {tour.title}

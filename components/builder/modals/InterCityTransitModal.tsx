@@ -2,10 +2,13 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
-import { Car, TrainFront, X } from "lucide-react";
+import { Car, CircleDot, TrainFront, X } from "lucide-react";
 import { allocateFleet } from "@/lib/vehicleAllocator";
 import type { BuilderConfig } from "@/lib/pocketbase/client";
-import type { CityTransitType } from "@/store/useBuilderStore";
+import {
+  coerceTransitType,
+  type CityTransitType,
+} from "@/store/useBuilderStore";
 import {
   buildTransitTicketChoice,
   detectTransitTicketKind,
@@ -46,7 +49,7 @@ export function InterCityTransitModal({
   onSave: (choice: TransitLegTicketChoice) => void;
 }) {
   const [mounted, setMounted] = useState(false);
-  const [selectedMode, setSelectedMode] = useState<CityTransitType>("public");
+  const [selectedMode, setSelectedMode] = useState<CityTransitType>("self");
   const [needsTicket, setNeedsTicket] = useState(true);
 
   useEffect(() => {
@@ -55,8 +58,10 @@ export function InterCityTransitModal({
 
   useEffect(() => {
     if (!open || !leg) return;
-    setSelectedMode(leg.mode === "private" ? "private" : "public");
-    setNeedsTicket(leg.needsTicket !== false);
+    const mode = coerceTransitType(leg.mode);
+    // Unset opens on Self-Arranged (€0) as the baseline choice
+    setSelectedMode(mode === "unset" ? "self" : mode);
+    setNeedsTicket(leg.needsTicket !== false && mode === "public");
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     return () => {
@@ -76,7 +81,8 @@ export function InterCityTransitModal({
 
   const priceBand = ticketPriceBand(ticketKind);
   const guests = Math.max(1, totalGuests);
-  const calculatedTicketPrice = needsTicket ? priceBand.est : 0;
+  const calculatedTicketPrice =
+    selectedMode === "public" && needsTicket ? priceBand.est : 0;
   const totalTicketCost = calculatedTicketPrice * guests;
 
   const movement = useMemo(() => {
@@ -102,7 +108,11 @@ export function InterCityTransitModal({
 
   const save = () => {
     onSave(
-      buildTransitTicketChoice(selectedMode, needsTicket, ticketKind)
+      buildTransitTicketChoice(
+        selectedMode,
+        selectedMode === "public" ? needsTicket : false,
+        ticketKind
+      )
     );
     onClose();
   };
@@ -145,6 +155,15 @@ export function InterCityTransitModal({
 
         <div className="max-h-[70vh] space-y-3 overflow-y-auto px-5 py-4">
           <TransitOption
+            selected={selectedMode === "self"}
+            onSelect={() => setSelectedMode("self")}
+            icon={<CircleDot className="h-5 w-5" />}
+            title="Self-Arranged / On Your Own"
+            body="You handle this leg independently. No transfer or rail tickets are included in your quotation (€0)."
+            meta={["€0", "Baseline · no booking"]}
+          />
+
+          <TransitOption
             selected={selectedMode === "public"}
             onSelect={() => setSelectedMode("public")}
             icon={<TrainFront className="h-5 w-5" />}
@@ -155,10 +174,8 @@ export function InterCityTransitModal({
                 : "Rapid express / bullet train between cities. Luggage stays with you on board."
             }
             meta={[
-              publicMins
-                ? `Est. ${publicMins} min`
-                : "Time varies by route",
-              "Included in base range",
+              publicMins ? `Est. ${publicMins} min` : "Time varies by route",
+              "Optional ticket booking",
             ]}
           />
 

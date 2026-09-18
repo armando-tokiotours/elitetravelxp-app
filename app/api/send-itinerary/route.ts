@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server";
-import { sendItineraryEmail } from "@/lib/email";
+import {
+  MailDispatchError,
+  resolveResendApiKey,
+  sendItineraryEmail,
+} from "@/lib/email";
 import { handleSendItinerary } from "@/lib/sendItinerary";
 
 /**
@@ -40,6 +44,14 @@ export async function POST(req: Request) {
 
   // Mode A: direct email dispatch with client-supplied PDF
   try {
+    const apiKey = resolveResendApiKey();
+    if (!process.env.RESEND_API_KEY?.trim() && !apiKey) {
+      return NextResponse.json(
+        { error: "Resend API Key missing on server environment." },
+        { status: 401 }
+      );
+    }
+
     const email = String(body.email || body.contactEmail || "")
       .trim()
       .toLowerCase();
@@ -67,22 +79,21 @@ export async function POST(req: Request) {
       customerName: customerName || undefined,
     });
 
-    if (result.error) {
-      return NextResponse.json(
-        { error: result.error.message || "Failed to send email" },
-        { status: 500 }
-      );
-    }
-
     return NextResponse.json({
       success: true,
       message: "Itinerary sent successfully",
-      id: result.data?.id,
+      id: result.id,
     });
   } catch (err: unknown) {
     console.error("Email Dispatch Error:", err);
+    if (err instanceof MailDispatchError) {
+      return NextResponse.json({ error: err.message }, { status: err.status });
+    }
     const message =
       err instanceof Error ? err.message : "Failed to send email";
-    return NextResponse.json({ error: message }, { status: 500 });
+    const status = /auth|api key|unauthorized|forbidden/i.test(message)
+      ? 401
+      : 500;
+    return NextResponse.json({ error: message }, { status });
   }
 }

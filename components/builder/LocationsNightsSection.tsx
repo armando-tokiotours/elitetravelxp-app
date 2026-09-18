@@ -19,6 +19,7 @@ import {
   matchSeasonalHighlights,
   type SeasonalHighlight,
 } from "@/lib/seasonalMatcher";
+import { buildCityMap, getCityName } from "@/lib/cityLabels";
 import { validateCityRoute } from "@/lib/routeValidator";
 import { useBuilderStore, type LocationStop } from "@/store/useBuilderStore";
 import { SectionContinue } from "./SectionContinue";
@@ -94,6 +95,7 @@ export function LocationsNightsSection({
     () => Object.fromEntries(cities.map((c) => [c.id, c])),
     [cities]
   );
+  const cityLabelMap = useMemo(() => buildCityMap(cities), [cities]);
 
   const dateRanges = useMemo(
     () => calculateCityDateRanges(arrivalDate, locations),
@@ -135,7 +137,7 @@ export function LocationsNightsSection({
       ? "No cities yet"
       : locations
           .map((l) => {
-            const name = cityMap[l.cityId]?.name ?? "City";
+            const name = getCityName(l.cityId, cityLabelMap);
             if (l.visitType === "arrival") return `${name} (arrival)`;
             if (l.visitType === "departure") return `${name} (departure)`;
             return `${name} (${l.nights}n)`;
@@ -164,6 +166,12 @@ export function LocationsNightsSection({
       icon="map"
       summary={summary}
     >
+      <p className="mb-3 rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2 text-xs text-zinc-400">
+        Plan <span className="font-semibold text-zinc-200">time in each city</span>{" "}
+        and transit between stops. Hotel booking is separate in Step 4 (default:{" "}
+        no hotel / self-arranged).
+      </p>
+
       {!arrivalDate ? (
         <p className="mb-3 rounded-xl bg-zinc-950 px-3 py-2 text-xs text-zinc-400">
           Set an arrival date in Step 1 to unlock seasonal concierge suggestions.
@@ -261,7 +269,7 @@ function RouteSummaryWidget({
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-zinc-500">
-            Your route
+            City nights · not hotels
           </p>
           <p className="mt-1 font-display text-xl text-white sm:text-2xl">
             {locations.length === 0
@@ -277,7 +285,8 @@ function RouteSummaryWidget({
       {locations.length > 0 ? (
         <div className="mt-4 flex flex-wrap items-center gap-1.5">
           {locations.map((loc, i) => {
-            const name = cityMap[loc.cityId]?.name ?? "City";
+            const name =
+              cityMap[loc.cityId]?.name ?? getCityName(loc.cityId);
             const nightsLabel =
               loc.visitType === "arrival"
                 ? "arr"
@@ -291,9 +300,11 @@ function RouteSummaryWidget({
                     →
                   </span>
                 ) : null}
-                <span className="inline-flex items-center gap-1 rounded-full border border-zinc-700 bg-zinc-950 px-2.5 py-1 text-xs text-zinc-200">
-                  <span className="font-medium text-white">{name}</span>
-                  <span className="text-zinc-500">{nightsLabel}</span>
+                <span className="inline-flex max-w-full items-center gap-1 overflow-hidden rounded-full border border-zinc-700 bg-zinc-950 px-2.5 py-1 text-xs text-zinc-200">
+                  <span className="break-words font-semibold leading-tight text-white">
+                    {name}
+                  </span>
+                  <span className="shrink-0 text-zinc-500">{nightsLabel}</span>
                 </span>
               </span>
             );
@@ -301,7 +312,8 @@ function RouteSummaryWidget({
         </div>
       ) : (
         <p className="mt-3 text-sm text-zinc-500">
-          Tap to add cities, set nights, and choose transit between stops.
+          Tap to add cities, set nights per stop, and choose transit. Hotels are
+          optional in the next step.
         </p>
       )}
 

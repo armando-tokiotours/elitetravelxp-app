@@ -154,11 +154,8 @@ export async function handleSendItinerary(
         pdfBuffer: pdf,
         customerName: contactName || undefined,
       });
-      if (result.error) {
-        throw new Error(result.error.message || "Resend email failed.");
-      }
       mailSent = true;
-      mailId = result.data?.id;
+      mailId = result.id;
     } catch (err) {
       console.error("[send-itinerary] mail error", err);
       mailNote =

@@ -22,11 +22,18 @@ import {
 } from "@/lib/tourValidator";
 import { useBuilderStore } from "@/store/useBuilderStore";
 import { BottomNav } from "@/components/builder/BottomNav";
+import { ExperienceProfilerModal } from "@/components/quiz/ExperienceProfilerModal";
 import { ScheduleTourDaySheet } from "@/components/builder/ScheduleTourDaySheet";
 import { TourDetailModal } from "@/components/builder/TourDetailModal";
+import { ActivityMatcherVideoCard } from "@/components/discover/ActivityMatcherVideoCard";
+import { DiscoverMatchesPanel } from "@/components/discover/DiscoverMatchesPanel";
+import { ActivityMatchReelModal } from "@/components/modals/ActivityMatchReelModal";
+import { buildMatchReelSlides } from "@/lib/matchReel";
+import { rankToursByProfile, isBestMatchTour } from "@/lib/experienceProfiler";
+import { useItineraryStore } from "@/store/useItineraryStore";
 import { Play } from "lucide-react";
 
-type ProfileTab = "tours" | "experiences" | "info";
+type ProfileTab = "tours" | "experiences" | "matches";
 
 export function DiscoverFeed() {
   const [config, setConfig] = useState<BuilderConfig | null>(null);
@@ -37,6 +44,8 @@ export function DiscoverFeed() {
   const [pickingTour, setPickingTour] = useState<PbTour | null>(null);
   const [pendingLanguage, setPendingLanguage] = useState("");
   const [toast, setToast] = useState<string | null>(null);
+  const [quizOpen, setQuizOpen] = useState(false);
+  const [reelOpen, setReelOpen] = useState(false);
 
   const locations = useBuilderStore((s) => s.locations);
   const arrivalDate = useBuilderStore((s) => s.arrivalDate);
@@ -44,6 +53,8 @@ export function DiscoverFeed() {
   const addCityTour = useBuilderStore((s) => s.addCityTour);
   const removeCityTour = useBuilderStore((s) => s.removeCityTour);
   const isEliteConcierge = useBuilderStore((s) => s.isEliteConcierge);
+  const experienceProfile = useBuilderStore((s) => s.experienceProfile);
+  const userProfile = useItineraryStore((s) => s.userProfile);
   const adults = useBuilderStore((s) => s.adults);
   const children = useBuilderStore((s) => s.children);
   const guests = useMemo(
@@ -91,22 +102,20 @@ export function DiscoverFeed() {
   }, [config, selectedCityId]);
 
   /** Guided tours vs activities for Discover tabs */
-  const tourItems = useMemo(
-    () =>
-      cityTours.filter((t) => {
-        const cat = String(t.category || "tour").toLowerCase();
-        return cat !== "activity";
-      }),
-    [cityTours]
-  );
-  const experienceTours = useMemo(
-    () =>
-      cityTours.filter((t) => {
-        const cat = String(t.category || "").toLowerCase();
-        return cat === "activity";
-      }),
-    [cityTours]
-  );
+  const tourItems = useMemo(() => {
+    const list = cityTours.filter((t) => {
+      const cat = String(t.category || "tour").toLowerCase();
+      return cat !== "activity";
+    });
+    return rankToursByProfile(list, experienceProfile);
+  }, [cityTours, experienceProfile]);
+  const experienceTours = useMemo(() => {
+    const list = cityTours.filter((t) => {
+      const cat = String(t.category || "").toLowerCase();
+      return cat === "activity";
+    });
+    return rankToursByProfile(list, experienceProfile);
+  }, [cityTours, experienceProfile]);
 
   const selectedCity = cities.find((c) => c.id === selectedCityId);
   const cityName = selectedCity?.name ?? "City";
@@ -119,6 +128,18 @@ export function DiscoverFeed() {
 
   const gridTours =
     profileTab === "experiences" ? experienceTours : tourItems;
+
+  const reelSlides = useMemo(
+    () =>
+      buildMatchReelSlides({
+        cityTours,
+        cityName,
+        profile: experienceProfile,
+        bookedTourIds: selectedTours.map((t) => t.tourId),
+        limit: 8,
+      }),
+    [cityTours, cityName, experienceProfile, selectedTours]
+  );
 
   const tryAddTour = useCallback(
     (tour: PbTour, scheduledDate: string, selectedLanguage: string) => {
@@ -272,13 +293,15 @@ export function DiscoverFeed() {
           </p>
         ) : (
           <>
-            {/* Profile header */}
+            {/* Destination header */}
             <div className="flex items-center gap-6 p-4 text-white">
               {cityImg ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
                   src={cityImg}
                   alt=""
+                  loading="lazy"
+                  decoding="async"
                   className="h-20 w-20 shrink-0 rounded-full border border-zinc-700 object-cover"
                 />
               ) : (
@@ -316,7 +339,7 @@ export function DiscoverFeed() {
                 [
                   { id: "tours" as const, label: "Tours" },
                   { id: "experiences" as const, label: "Experiences" },
-                  { id: "info" as const, label: "Extra Info" },
+                  { id: "matches" as const, label: "Your Matches" },
                 ] as const
               ).map((tab) => {
                 const active = profileTab === tab.id;
@@ -339,46 +362,57 @@ export function DiscoverFeed() {
             </div>
 
             {/* Tab panels */}
-            {profileTab === "info" ? (
-              <div className="space-y-3 px-4 py-6 text-sm text-zinc-300">
-                <h3 className="text-base font-semibold text-white">
-                  About {cityName}
-                </h3>
-                {cityBio ? (
-                  <p className="whitespace-pre-wrap leading-relaxed text-zinc-400">
-                    {cityBio}
+            {profileTab === "matches" ? (
+              <DiscoverMatchesPanel
+                cityName={cityName}
+                experienceProfile={experienceProfile}
+                userProfile={userProfile}
+                tours={cityTours}
+                onRetakeQuiz={() => setQuizOpen(true)}
+                onPlayReel={() => setReelOpen(true)}
+              />
+            ) : (
+              <>
+                {gridTours.length === 0 ? (
+                  <p className="px-4 py-10 text-center text-sm text-zinc-500">
+                    No{" "}
+                    {profileTab === "experiences" ? "experiences" : "tours"}{" "}
+                    available for this city yet.
                   </p>
                 ) : (
-                  <p className="text-zinc-500">
-                    No extra info published for this city yet.
-                  </p>
+                  <div className="grid grid-cols-3 gap-1">
+                    {gridTours.map((tour, index) => (
+                      <TourThumb
+                        key={tour.id}
+                        tour={tour}
+                        booked={selectedTours.some((t) => t.tourId === tour.id)}
+                        recommended={isBestMatchTour(tour, experienceProfile)}
+                        onClick={() => setModalSlide(index)}
+                      />
+                    ))}
+                  </div>
                 )}
-                <p className="text-xs text-zinc-500">
-                  {tourItems.length} tour{tourItems.length === 1 ? "" : "s"} ·{" "}
-                  {experienceTours.length} experience
-                  {experienceTours.length === 1 ? "" : "s"}
-                </p>
-              </div>
-            ) : gridTours.length === 0 ? (
-              <p className="col-span-3 px-4 py-10 text-center text-sm text-zinc-500">
-                No {profileTab === "experiences" ? "experiences" : "tours"}{" "}
-                available for this city yet.
-              </p>
-            ) : (
-              <div className="grid grid-cols-3 gap-1 pb-32">
-                {gridTours.map((tour, index) => (
-                  <TourThumb
-                    key={tour.id}
-                    tour={tour}
-                    booked={selectedTours.some((t) => t.tourId === tour.id)}
-                    onClick={() => setModalSlide(index)}
+
+                {/* Matcher CTA sits below the photo grid */}
+                <div className="px-4 pb-8 pt-5">
+                  <ActivityMatcherVideoCard
+                    onOpenQuiz={() => setQuizOpen(true)}
+                    onWatch={() => setReelOpen(true)}
                   />
-                ))}
-              </div>
+                </div>
+              </>
             )}
           </>
         )}
       </main>
+
+      <ActivityMatchReelModal
+        open={reelOpen}
+        onClose={() => setReelOpen(false)}
+        slides={reelSlides}
+        experienceProfile={experienceProfile}
+        userProfile={userProfile}
+      />
 
       <TourDetailModal
         open={modalSlide !== null && gridTours.length > 0}
@@ -423,6 +457,10 @@ export function DiscoverFeed() {
       <div className="md:hidden">
         <BottomNav />
       </div>
+      <ExperienceProfilerModal
+        open={quizOpen}
+        onClose={() => setQuizOpen(false)}
+      />
     </div>
   );
 }
@@ -430,10 +468,12 @@ export function DiscoverFeed() {
 function TourThumb({
   tour,
   booked,
+  recommended = false,
   onClick,
 }: {
   tour: PbTour;
   booked: boolean;
+  recommended?: boolean;
   onClick: () => void;
 }) {
   const isVideo = tourMediaType(tour) === "Video";
@@ -458,9 +498,12 @@ function TourThumb({
         <img
           src={thumbUrl}
           alt=""
+          loading="lazy"
+          decoding="async"
           className="h-full w-full object-cover transition group-hover:opacity-90"
         />
       ) : isVideo && mediaFile && tour.collectionId ? (
+        /* Target: 1080p · ~1.5Mbps · mp4/webm · <5MB (see lib/mediaStandards.ts) */
         <video
           src={pbFileUrl(tour.collectionId, tour.id, mediaFile)}
           muted
@@ -476,6 +519,33 @@ function TourThumb({
         </div>
       )}
       <span className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-0 transition group-hover:opacity-100" />
+      {recommended ? (
+        <span className="absolute left-1 top-1 z-10 rounded-full border border-amber-500/30 bg-amber-500/10 px-1.5 py-0.5 text-[8px] font-medium text-amber-400">
+          ⭐ Match
+        </span>
+      ) : null}
+      {String(tour.category || "tour").toLowerCase() === "activity" ? (
+        <span
+          className={`absolute z-10 rounded-full border border-violet-500/30 bg-violet-500/15 px-1.5 py-0.5 text-[8px] font-medium text-violet-200 ${
+            recommended ? "left-1 top-6" : "left-1 top-1"
+          }`}
+        >
+          🎟️ Experience
+        </span>
+      ) : (
+        <span
+          className={`absolute z-10 rounded-full border border-amber-500/30 bg-amber-500/15 px-1.5 py-0.5 text-[8px] font-medium text-amber-200 ${
+            recommended ? "left-1 top-6" : "left-1 top-1"
+          }`}
+        >
+          🗺️ Tour
+        </span>
+      )}
+      {tour.is_niche ? (
+        <span className="absolute right-1 bottom-1 z-10 rounded-full border border-purple-500/30 bg-purple-500/10 px-1.5 py-0.5 text-[8px] font-medium text-purple-300">
+          ✨ VIP
+        </span>
+      ) : null}
       {isVideo ? (
         <span className="absolute right-1.5 top-1.5 text-white drop-shadow-md">
           <Play className="h-3.5 w-3.5 fill-white" aria-hidden />
@@ -526,6 +596,8 @@ function CityStory({
             <img
               src={src}
               alt=""
+              loading="lazy"
+              decoding="async"
               className="h-16 w-16 rounded-full object-cover"
             />
           ) : (

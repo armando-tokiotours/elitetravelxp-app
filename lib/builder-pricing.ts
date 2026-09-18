@@ -23,6 +23,19 @@ import {
   isBillableChauffeurDay,
 } from "@/lib/chauffeurSelections";
 import { sumTransitTicketCosts } from "@/lib/transitTickets";
+import { ELITE_CONCIERGE_FEE } from "@/lib/eliteConcierge";
+
+function eliteConciergeFeeAmount(rules: SystemRulesMap): number {
+  const fromRules = ruleNumber(rules, "elite_concierge_fee", ELITE_CONCIERGE_FEE);
+  // Product lock: €50 design deposit (ignore legacy 2800 admin values)
+  return fromRules > 0 && fromRules <= 500 ? fromRules : ELITE_CONCIERGE_FEE;
+}
+
+/** Credit the design deposit once the guest has requested / paid / confirmed. */
+function shouldApplyConciergeTourCredit(state: BuilderState): boolean {
+  const s = state.bookingStatus;
+  return s === "requested" || s === "deposit_paid" || s === "confirmed";
+}
 
 export interface QuoteResult {
   min: number;
@@ -226,9 +239,14 @@ export function calculateBuilderQuote(
     let transitMin = 0;
     let transitMax = 0;
     let pricedLegs = 0;
+    let billableLegs = 0;
     for (let i = 0; i < state.locations.length - 1; i++) {
       const from = state.locations[i];
       const to = state.locations[i + 1];
+      if (from.transitType !== "public" && from.transitType !== "private") {
+        continue;
+      }
+      billableLegs++;
       const movement = config.cityMovements?.find(
         (m) => m.from_city_id === from.cityId && m.to_city_id === to.cityId
       );
@@ -244,12 +262,12 @@ export function calculateBuilderQuote(
         pricedLegs++;
       }
     }
-    if (pricedLegs < legs) {
+    if (pricedLegs < billableLegs) {
       const transit = config.transitModes.find(
         (t) => t.id === state.transitModeId
       );
       if (transit) {
-        const remaining = legs - pricedLegs;
+        const remaining = billableLegs - pricedLegs;
         transitMin += transit.price_per_leg * remaining * Math.max(1, guests);
         transitMax +=
           transit.price_per_leg * 1.25 * remaining * Math.max(1, guests);
@@ -261,7 +279,7 @@ export function calculateBuilderQuote(
 
   const ticketTotal = sumTransitTicketCosts({
     guests,
-    arrivalTransitType: state.arrivalTransitType ?? "public",
+    arrivalTransitType: state.arrivalTransitType ?? "unset",
     arrivalNeedsTicket: state.arrivalNeedsTicket,
     arrivalTicketPricePerPax: state.arrivalTicketPricePerPax,
     locations: state.locations,
@@ -302,10 +320,14 @@ export function calculateBuilderQuote(
     }
   }
 
-  if (state.isEliteConcierge) {
-    const fee = ruleNumber(rules, "elite_concierge_fee", 2800);
+  if (state.isEliteConcierge || state.experienceService === "concierge") {
+    const fee = eliteConciergeFeeAmount(rules);
     min += fee;
-    max += fee * 1.2;
+    max += fee;
+    if (shouldApplyConciergeTourCredit(state)) {
+      min -= fee;
+      max -= fee;
+    }
   }
 
   const veh = allocateVehicles(guests, config.vehicles, rules);
@@ -406,6 +428,8 @@ export function calculateInvoiceBreakdown(
   experiences: PriceRange;
   total: PriceRange;
   vehicleLine: string;
+  conciergeFee: number;
+  conciergeCredit: number;
 } {
   const rules = config.rules ?? {};
   const guests = state.adults + state.children;
@@ -569,9 +593,14 @@ export function calculateInvoiceBreakdown(
   const legs = Math.max(0, state.locations.length - 1);
   if (legs > 0) {
     let pricedLegs = 0;
+    let billableLegs = 0;
     for (let i = 0; i < state.locations.length - 1; i++) {
       const from = state.locations[i];
       const to = state.locations[i + 1];
+      if (from.transitType !== "public" && from.transitType !== "private") {
+        continue;
+      }
+      billableLegs++;
       const movement = config.cityMovements?.find(
         (m) => m.from_city_id === from.cityId && m.to_city_id === to.cityId
       );
@@ -587,12 +616,12 @@ export function calculateInvoiceBreakdown(
         pricedLegs++;
       }
     }
-    if (pricedLegs < legs) {
+    if (pricedLegs < billableLegs) {
       const transit = config.transitModes.find(
         (t) => t.id === state.transitModeId
       );
       if (transit) {
-        const remaining = legs - pricedLegs;
+        const remaining = billableLegs - pricedLegs;
         expMin += transit.price_per_leg * remaining * Math.max(1, guests);
         expMax +=
           transit.price_per_leg * 1.25 * remaining * Math.max(1, guests);
@@ -602,7 +631,7 @@ export function calculateInvoiceBreakdown(
 
   const ticketTotal = sumTransitTicketCosts({
     guests,
-    arrivalTransitType: state.arrivalTransitType ?? "public",
+    arrivalTransitType: state.arrivalTransitType ?? "unset",
     arrivalNeedsTicket: state.arrivalNeedsTicket,
     arrivalTicketPricePerPax: state.arrivalTicketPricePerPax,
     locations: state.locations,
@@ -629,10 +658,17 @@ export function calculateInvoiceBreakdown(
     }
   }
 
-  if (state.isEliteConcierge) {
-    const fee = ruleNumber(rules, "elite_concierge_fee", 2800);
-    expMin += fee;
-    expMax += fee * 1.2;
+  let conciergeFee = 0;
+  let conciergeCredit = 0;
+  if (state.isEliteConcierge || state.experienceService === "concierge") {
+    conciergeFee = eliteConciergeFeeAmount(rules);
+    expMin += conciergeFee;
+    expMax += conciergeFee;
+    if (shouldApplyConciergeTourCredit(state)) {
+      conciergeCredit = conciergeFee;
+      expMin -= conciergeCredit;
+      expMax -= conciergeCredit;
+    }
   }
 
   const veh = allocateVehicles(guests, config.vehicles, rules);
@@ -709,6 +745,8 @@ export function calculateInvoiceBreakdown(
       max: Math.round(baseMax * pricingMult),
     },
     vehicleLine,
+    conciergeFee,
+    conciergeCredit,
   };
 }
 

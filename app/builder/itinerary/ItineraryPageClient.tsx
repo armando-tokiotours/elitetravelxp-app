@@ -158,7 +158,7 @@ export default function ItineraryPageClient() {
   };
 
   return (
-    <div className="builder-theme min-h-screen bg-[#F5F0E8] pb-36 text-[#0B1F3A] md:pb-32">
+    <div className="builder-theme min-h-screen overflow-x-hidden bg-[#F5F0E8] pb-28 text-[#0B1F3A] md:pb-32">
       <header className="no-print border-b border-[#E8E2D9] bg-[#FBF8F2] px-4 py-5">
         <p className="text-[0.65rem] font-semibold uppercase tracking-[0.35em] text-[#C4A35A]">
           My Itinerary
@@ -239,7 +239,7 @@ export default function ItineraryPageClient() {
         )}
       </header>
 
-      <main className="mx-auto max-w-3xl px-4 py-6">
+      <main className="mx-auto w-full max-w-3xl overflow-x-hidden px-4 py-6 pb-28">
         {activeView === "dossier" ? (
           <TravelDossierView
             state={state}
@@ -261,7 +261,7 @@ export default function ItineraryPageClient() {
         )}
       </main>
 
-      <div className="no-print sticky-action-bar fixed inset-x-0 bottom-[3.75rem] z-30 px-3 pb-2 md:bottom-4">
+      <div className="no-print sticky-action-bar fixed inset-x-0 bottom-[calc(3.75rem+env(safe-area-inset-bottom))] z-30 px-3 pb-2 md:bottom-4">
         <div className="mx-auto flex max-w-3xl items-center gap-3 rounded-2xl bg-[#0B1F3A] px-4 py-3 shadow-[0_12px_40px_rgba(11,31,58,0.4)] sm:px-5 sm:py-3.5">
           <div className="min-w-0 flex-1">
             <p className="text-[0.6rem] font-semibold uppercase tracking-[0.18em] text-[#C4A35A]">

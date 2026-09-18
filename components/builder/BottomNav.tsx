@@ -1,46 +1,84 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { ExperienceProfilerModal } from "@/components/quiz/ExperienceProfilerModal";
 
 const TABS = [
-  { href: "/builder", label: "Builder", icon: BuilderIcon },
-  { href: "/discover", label: "Discover", icon: DiscoverIcon },
-  { href: "/builder/itinerary", label: "Itinerary", icon: ItineraryIcon },
-  { href: "/builder/preview", label: "Preview", icon: PreviewIcon },
-  { href: "/builder/export", label: "Export", icon: ExportIcon },
+  { href: "/builder", label: "Builder", icon: BuilderIcon, kind: "link" },
+  { href: "/discover", label: "Discover", icon: DiscoverIcon, kind: "link" },
+  {
+    href: "/builder/itinerary",
+    label: "Itinerary",
+    icon: ItineraryIcon,
+    kind: "link",
+  },
+  {
+    href: "/builder/preview",
+    label: "Preview",
+    icon: PreviewIcon,
+    kind: "link",
+  },
+  { href: "#quiz", label: "Match Quiz", icon: QuizIcon, kind: "quiz" },
 ] as const;
 
 export function BottomNav() {
   const pathname = usePathname();
+  const [quizOpen, setQuizOpen] = useState(false);
 
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-zinc-800 bg-black/95 backdrop-blur-md md:hidden">
-      <ul className="mx-auto flex max-w-lg items-stretch justify-around px-0.5 pb-[env(safe-area-inset-bottom)]">
-        {TABS.map((tab) => {
-          const active =
-            tab.href === "/builder"
-              ? pathname === "/builder"
-              : pathname.startsWith(tab.href);
-          const Icon = tab.icon;
-          return (
-            <li key={tab.href} className="flex-1">
-              <Link
-                href={tab.href}
-                className={`flex flex-col items-center gap-0.5 px-0.5 py-2.5 text-[0.6rem] ${
-                  active ? "text-white" : "text-zinc-400"
-                }`}
-              >
-                <Icon active={active} />
-                <span className={active ? "font-semibold" : ""}>
-                  {tab.label}
-                </span>
-              </Link>
-            </li>
-          );
-        })}
-      </ul>
-    </nav>
+    <>
+      <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-zinc-800 bg-black/95 backdrop-blur-md md:hidden">
+        <ul className="mx-auto flex max-w-lg items-stretch justify-around px-0.5 pb-[env(safe-area-inset-bottom)]">
+          {TABS.map((tab) => {
+            const Icon = tab.icon;
+            if (tab.kind === "quiz") {
+              return (
+                <li key="quiz" className="flex-1">
+                  <button
+                    type="button"
+                    onClick={() => setQuizOpen(true)}
+                    className={`flex w-full flex-col items-center gap-0.5 px-0.5 py-2.5 text-[0.6rem] ${
+                      quizOpen ? "text-white" : "text-zinc-400"
+                    }`}
+                    aria-pressed={quizOpen}
+                  >
+                    <Icon active={quizOpen} />
+                    <span className={quizOpen ? "font-semibold" : ""}>
+                      {tab.label}
+                    </span>
+                  </button>
+                </li>
+              );
+            }
+            const active =
+              tab.href === "/builder"
+                ? pathname === "/builder"
+                : pathname.startsWith(tab.href);
+            return (
+              <li key={tab.href} className="flex-1">
+                <Link
+                  href={tab.href}
+                  className={`flex flex-col items-center gap-0.5 px-0.5 py-2.5 text-[0.6rem] ${
+                    active ? "text-white" : "text-zinc-400"
+                  }`}
+                >
+                  <Icon active={active} />
+                  <span className={active ? "font-semibold" : ""}>
+                    {tab.label}
+                  </span>
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+      </nav>
+      <ExperienceProfilerModal
+        open={quizOpen}
+        onClose={() => setQuizOpen(false)}
+      />
+    </>
   );
 }
 
@@ -113,21 +151,15 @@ function PreviewIcon({ active }: { active: boolean }) {
   );
 }
 
-function ExportIcon({ active }: { active: boolean }) {
+function QuizIcon({ active }: { active: boolean }) {
+  const stroke = active ? "#C4A35A" : "#a1a1aa";
   return (
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
       <path
-        d="M12 4v10M8 8l4-4 4 4"
-        stroke={active ? "#C4A35A" : "#a1a1aa"}
-        strokeWidth="1.8"
-        strokeLinecap="round"
+        d="M12 3l1.8 4.8L19 9.5l-4 3.2 1.2 5.3L12 15.8 7.8 18l1.2-5.3-4-3.2 5.2-1.7L12 3z"
+        stroke={stroke}
+        strokeWidth="1.6"
         strokeLinejoin="round"
-      />
-      <path
-        d="M5 16v3a1 1 0 001 1h12a1 1 0 001-1v-3"
-        stroke={active ? "#C4A35A" : "#a1a1aa"}
-        strokeWidth="1.8"
-        strokeLinecap="round"
       />
     </svg>
   );

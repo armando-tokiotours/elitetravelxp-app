@@ -123,9 +123,9 @@ export function activeBookingRef(opts: {
   bookingStatus: BookingStatus;
 }): string {
   if (opts.bookingStatus === "draft") {
-    return opts.tempBookingRef || generateTempPNR();
+    return opts.tempBookingRef || "";
   }
-  return opts.confirmedBookingRef || opts.tempBookingRef || generateTempPNR();
+  return opts.confirmedBookingRef || opts.tempBookingRef || "";
 }
 
 export function formatBookingRefLabel(opts: {

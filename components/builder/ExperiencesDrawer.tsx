@@ -14,6 +14,13 @@ import {
 } from "@/lib/tourValidator";
 import { ScheduleTourDaySheet } from "./ScheduleTourDaySheet";
 import { TourDetailPanel } from "./TourDetailPanel";
+import {
+  isBestMatchTour,
+  rankToursByProfile,
+} from "@/lib/experienceProfiler";
+import { useBuilderStore } from "@/store/useBuilderStore";
+import { TravelProfileBadge } from "@/components/quiz/TravelProfileBadge";
+import { ExperienceProfilerModal } from "@/components/quiz/ExperienceProfilerModal";
 
 function tourCategory(tour: PbTour): "tour" | "activity" {
   const cat = String(tour.category || "tour").toLowerCase();
@@ -54,6 +61,7 @@ export function ExperiencesDrawer({
   const [activeTab, setActiveTab] = useState<"tours" | "experiences">(
     "tours"
   );
+  const [quizOpen, setQuizOpen] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -84,14 +92,17 @@ export function ExperiencesDrawer({
     [selectedTours]
   );
 
+  const experienceProfile = useBuilderStore((s) => s.experienceProfile);
+
   const filteredTours = useMemo(() => {
-    return tours.filter((t) => {
+    const list = tours.filter((t) => {
       const cat = tourCategory(t);
       return activeTab === "experiences"
         ? cat === "activity"
         : cat === "tour";
     });
-  }, [activeTab, tours]);
+    return rankToursByProfile(list, experienceProfile);
+  }, [activeTab, tours, experienceProfile]);
 
   const pickingTour = pickingTourId
     ? tours.find((t) => t.id === pickingTourId) ?? null
@@ -147,6 +158,15 @@ export function ExperiencesDrawer({
                 </button>
               </div>
 
+              {experienceProfile ? (
+                <div className="mt-3">
+                  <TravelProfileBadge
+                    onRetake={() => setQuizOpen(true)}
+                    tone="light"
+                  />
+                </div>
+              ) : null}
+
               <div
                 role="tablist"
                 aria-label="Filter by category"
@@ -200,11 +220,13 @@ export function ExperiencesDrawer({
               ) : (
                 filteredTours.map((tour) => {
                   const booked = selectedById[tour.id];
+                  const recommended = isBestMatchTour(tour, experienceProfile);
                   return (
                     <TourDetailPanel
                       key={tour.id}
                       tour={tour}
                       guests={guests}
+                      recommended={recommended}
                       scheduledLabel={
                         booked?.scheduledDate
                           ? dayOptions.find(
@@ -275,6 +297,10 @@ export function ExperiencesDrawer({
           </motion.div>
         </div>
       ) : null}
+      <ExperienceProfilerModal
+        open={quizOpen}
+        onClose={() => setQuizOpen(false)}
+      />
     </AnimatePresence>,
     document.body
   );

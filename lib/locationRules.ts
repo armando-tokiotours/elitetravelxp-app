@@ -1,4 +1,5 @@
 import type { CityVisitType, LocationStop } from "@/store/useBuilderStore";
+import { coerceTransitType } from "@/store/useBuilderStore";
 
 /** Visit types allowed for a stop at `index` in a list of `length`. */
 export function allowedVisitTypesForIndex(
@@ -56,7 +57,7 @@ export function correctLocationVisitTypes(
       ...loc,
       visitType,
       nights,
-      transitType: loc.transitType === "private" ? "private" : "public",
+      transitType: coerceTransitType(loc.transitType),
     };
   });
 }

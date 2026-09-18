@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
-import { ArrowLeft, Car, Ticket } from "lucide-react";
+import { ArrowLeft, Car, Sparkles, Ticket } from "lucide-react";
 import type {
   PbChauffeurRate,
   PbCity,
@@ -38,9 +38,14 @@ import {
   formatTransferPriceRange,
   priceFleetChauffeurDay,
 } from "@/lib/vehicleAllocator";
+import { recommendedToursForCity } from "@/lib/experienceProfiler";
 import { useBuilderStore } from "@/store/useBuilderStore";
+import { ExperienceProfilerModal } from "@/components/quiz/ExperienceProfilerModal";
+import { ActivityMatchReelModal } from "@/components/modals/ActivityMatchReelModal";
+import { buildTripMatchReelSlides } from "@/lib/matchReel";
 import { ConciergeSuggestionCard } from "../ConciergeSuggestionCard";
 import { ExperiencesDrawer } from "../ExperiencesDrawer";
+import { ActivityMatcherBanner } from "../ActivityMatcherBanner";
 import { FieldLabel } from "../ui";
 import { CityTransportModal } from "./CityTransportModal";
 
@@ -81,12 +86,16 @@ export function TailoredExperiencesModal({
     (s) => s.toggleChauffeurDayTour
   );
   const setExperienceService = useBuilderStore((s) => s.setExperienceService);
+  const experienceProfile = useBuilderStore((s) => s.experienceProfile);
   const durationDays = useBuilderStore((s) => s.durationDays);
   const totalPax = adults + children;
 
   const [mounted, setMounted] = useState(false);
   const [drawerCityId, setDrawerCityId] = useState<string | null>(null);
   const [expandedKey, setExpandedKey] = useState<string | null>(null);
+  const [quizOpen, setQuizOpen] = useState(false);
+  const [reelOpen, setReelOpen] = useState(false);
+  const [autoFillNote, setAutoFillNote] = useState<string | null>(null);
 
   const cityMap = useMemo(
     () => Object.fromEntries(cities.map((c) => [c.id, c])),
@@ -112,12 +121,29 @@ export function TailoredExperiencesModal({
     return map;
   }, [stayStops]);
 
+  const reelSlides = useMemo(
+    () =>
+      buildTripMatchReelSlides({
+        tours,
+        cityNames,
+        selectedTourIds,
+        profile: experienceProfile,
+        stayCityIds: Array.from(nightsByCity.keys()),
+        limit: 10,
+      }),
+    [tours, cityNames, selectedTourIds, experienceProfile, nightsByCity]
+  );
+
   useEffect(() => {
     setMounted(true);
   }, []);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      setAutoFillNote(null);
+      setQuizOpen(false);
+      return;
+    }
     document.body.style.overflow = "hidden";
   }, [open]);
 
@@ -168,6 +194,96 @@ export function TailoredExperiencesModal({
     onClose();
   };
 
+  const handleAutoFillRecommended = () => {
+    if (!experienceProfile) {
+      setQuizOpen(true);
+      return;
+    }
+    if (!arrivalDate) {
+      setAutoFillNote("Set your arrival date in Step 1 before auto-filling.");
+      return;
+    }
+    if (stayStops.length === 0) {
+      setAutoFillNote("Add stay cities in Step 3 before auto-filling.");
+      return;
+    }
+
+    let added = 0;
+    let skipped = 0;
+
+    const uniqueCities = Array.from(nightsByCity.entries());
+
+    for (const [cityId, nights] of uniqueCities) {
+      const picks = recommendedToursForCity(
+        tours,
+        cityId,
+        nights,
+        experienceProfile
+      );
+      const dayOptions = chauffeurDaysForCity(arrivalDate, locations, cityId);
+      if (dayOptions.length === 0) {
+        skipped += picks.length;
+        continue;
+      }
+
+      let workingRows = [
+        ...(useBuilderStore.getState().selectedTours[cityId] ?? []),
+      ];
+
+      for (const tour of picks) {
+        if (workingRows.some((r) => r.tourId === tour.id)) {
+          skipped += 1;
+          continue;
+        }
+        const duration_hours = Number(tour.duration_hours) || 0;
+        const lang =
+          tourLanguageChoices(tour.languages)[0]?.code || "EN";
+        let placed = false;
+        for (const day of dayOptions) {
+          const check = canAddTourOnDate({
+            selectedRows: workingRows,
+            scheduledDate: day.date,
+            newTourDurationHours: duration_hours,
+            tourId: tour.id,
+          });
+          if (!check.ok) continue;
+          const ok = addCityTour(cityId, {
+            tourId: tour.id,
+            title: tour.title,
+            duration_hours,
+            scheduledDate: day.date,
+            selectedLanguage: lang,
+            price: tourPrice(tour, { adults, children }),
+            ...(tour.languages?.length ? { languages: tour.languages } : {}),
+          });
+          if (ok) {
+            workingRows = [
+              ...(useBuilderStore.getState().selectedTours[cityId] ?? []),
+            ];
+            added += 1;
+            placed = true;
+            break;
+          }
+        }
+        if (!placed) skipped += 1;
+      }
+    }
+
+    if (added === 0) {
+      setAutoFillNote(
+        skipped > 0
+          ? "No new matches fit your schedule — browse city lists for ⭐ Recommended Match badges."
+          : "No strong matches yet — retake the quiz or browse city lists."
+      );
+    } else {
+      setAutoFillNote(
+        `Added ${added} recommended experience${added === 1 ? "" : "s"}${
+          skipped > 0 ? ` · ${skipped} already booked or full` : ""
+        }.`
+      );
+    }
+  };
+
   if (!mounted) return null;
 
   return createPortal(
@@ -215,6 +331,37 @@ export function TailoredExperiencesModal({
             </div>
 
             <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4 pb-12">
+              <ActivityMatcherBanner
+                onOpenQuiz={() => setQuizOpen(true)}
+                onWatch={() => setReelOpen(true)}
+              />
+
+              {experienceProfile ? (
+                <div className="space-y-2">
+                  <button
+                    type="button"
+                    onClick={handleAutoFillRecommended}
+                    className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-[#C4A35A]/50 bg-[#C4A35A]/15 px-4 py-3 text-sm font-semibold text-[#E8D5A3] transition hover:bg-[#C4A35A]/25"
+                  >
+                    <Sparkles className="h-4 w-4" aria-hidden />
+                    Auto-Fill Recommended Activities
+                  </button>
+                  {autoFillNote ? (
+                    <p
+                      role="status"
+                      className="rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2 text-center text-xs text-zinc-400"
+                    >
+                      {autoFillNote}
+                    </p>
+                  ) : (
+                    <p className="text-center text-[11px] text-zinc-500">
+                      Gold ⭐ Recommended Match badges appear in Tokyo,
+                      Kamakura, Kyoto &amp; other city lists.
+                    </p>
+                  )}
+                </div>
+              ) : null}
+
               <div className="rounded-xl bg-zinc-950 px-4 py-3 text-sm text-zinc-400">
                 Maximum {MAX_TOUR_HOURS_PER_DAY} hours of activities allowed per
                 day.{" "}
@@ -446,6 +593,16 @@ export function TailoredExperiencesModal({
           </motion.div>
         </motion.div>
       ) : null}
+      <ExperienceProfilerModal
+        open={quizOpen}
+        onClose={() => setQuizOpen(false)}
+      />
+      <ActivityMatchReelModal
+        open={reelOpen}
+        onClose={() => setReelOpen(false)}
+        slides={reelSlides}
+        experienceProfile={experienceProfile}
+      />
     </AnimatePresence>,
     document.body
   );

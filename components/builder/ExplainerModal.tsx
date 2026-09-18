@@ -271,6 +271,7 @@ export function ExplainerModal({
                 <article className="overflow-hidden rounded-2xl border border-[#EEE8DF] bg-white shadow-[0_4px_20px_rgba(11,31,58,0.06)]">
                   <div className="relative aspect-[4/5] max-h-[45dvh] w-full bg-[#0B1F3A] sm:max-h-[50dvh]">
                     {mediaUrl && mediaType === "Video" ? (
+                      /* Target: 1080p · ~1.5Mbps · mp4/webm · <5MB (see lib/mediaStandards.ts) */
                       <video
                         key={mediaUrl}
                         src={mediaUrl}
@@ -279,7 +280,7 @@ export function ExplainerModal({
                         loop
                         playsInline
                         disablePictureInPicture
-                        preload="auto"
+                        preload="metadata"
                         className="h-full w-full object-cover"
                       />
                     ) : mediaUrl ? (
@@ -287,6 +288,8 @@ export function ExplainerModal({
                       <img
                         src={mediaUrl}
                         alt=""
+                        loading="lazy"
+                        decoding="async"
                         className="h-full w-full object-cover"
                       />
                     ) : (
