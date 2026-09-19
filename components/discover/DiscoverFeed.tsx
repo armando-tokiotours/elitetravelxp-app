@@ -492,7 +492,7 @@ function TourThumb({
       type="button"
       onClick={onClick}
       aria-label={tour.title}
-      className="group relative aspect-square cursor-pointer bg-zinc-900"
+      className="group relative aspect-square cursor-pointer overflow-hidden bg-zinc-900"
     >
       {thumbUrl ? (
         // eslint-disable-next-line @next/next/no-img-element
@@ -501,7 +501,7 @@ function TourThumb({
           alt=""
           loading="lazy"
           decoding="async"
-          className="h-full w-full object-cover transition group-hover:opacity-90"
+          className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.03] group-hover:opacity-90"
         />
       ) : isVideo && mediaFile && tour.collectionId ? (
         /* Target: 1080p · ~1.5Mbps · mp4/webm · <5MB (see lib/mediaStandards.ts) */
@@ -519,22 +519,34 @@ function TourThumb({
           </span>
         </div>
       )}
-      <span className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-0 transition group-hover:opacity-100" />
+      <span className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent opacity-0 transition duration-300 group-hover:opacity-100" />
       {recommended ? (
-        <span className="absolute left-1 top-1 z-10 flex items-center gap-1 rounded-full bg-amber-500/90 px-2 py-0.5 text-[10px] font-bold text-zinc-950 shadow-md">
+        <span className="absolute left-1 top-1 z-20 flex items-center gap-1 rounded-full bg-amber-500/90 px-2 py-0.5 text-[10px] font-bold text-zinc-950 shadow-md">
           ⭐ Match
         </span>
       ) : null}
       {isVideo ? (
-        <span className="absolute right-1.5 top-1.5 text-white drop-shadow-md">
+        <span className="absolute right-1.5 top-1.5 z-20 text-white drop-shadow-md">
           <Play className="h-3.5 w-3.5 fill-white" aria-hidden />
         </span>
       ) : null}
       {booked ? (
-        <span className="absolute bottom-1 left-1 rounded bg-black/60 px-1 text-[9px] font-semibold text-[#E8D5A3]">
+        <span
+          className={`absolute z-20 rounded bg-black/60 px-1 text-[9px] font-semibold text-[#E8D5A3] ${
+            recommended ? "left-1 top-7" : "left-1 top-1"
+          }`}
+        >
           Added
         </span>
       ) : null}
+      {/* Subtle glass title — reveals on hover */}
+      <div className="pointer-events-none absolute inset-x-3 bottom-3 z-20 translate-y-2 opacity-0 transition-all duration-300 group-hover:translate-y-0 group-hover:opacity-100">
+        <div className="flex items-center justify-center rounded-lg border border-amber-500/30 bg-zinc-950/75 px-3 py-1.5 shadow-2xl backdrop-blur-md">
+          <span className="truncate text-center text-[10px] font-bold uppercase tracking-widest text-amber-300">
+            {tour.title}
+          </span>
+        </div>
+      </div>
     </button>
   );
 }
