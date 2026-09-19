@@ -576,7 +576,7 @@ function TravelPaceModal({
       {pace ? (
         <motion.div
           key="pace-explainer"
-          className="fixed inset-0 z-[100] flex items-end justify-center sm:items-center sm:p-4"
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm"
           role="dialog"
           aria-modal="true"
           aria-label={pace.title}
@@ -587,37 +587,37 @@ function TravelPaceModal({
           <button
             type="button"
             aria-label="Close"
-            className="absolute inset-0 cursor-default bg-black/55"
+            className="absolute inset-0 cursor-default"
             onClick={onClose}
           />
           <motion.div
-            className="relative z-[1] flex h-[90dvh] max-h-[90dvh] w-full max-w-lg flex-col overflow-hidden rounded-t-3xl bg-[#FBF8F2] shadow-2xl sm:h-[min(90dvh,52rem)] sm:max-h-[min(90dvh,52rem)] sm:rounded-3xl"
-            initial={{ opacity: 0, y: 20 }}
+            className="relative z-[1] flex max-h-[90dvh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-950 shadow-2xl"
+            initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 20 }}
-            transition={{ duration: 0.25, ease: "easeOut" }}
+            exit={{ opacity: 0, y: 16 }}
+            transition={{ duration: 0.22, ease: "easeOut" }}
           >
-            <div className="sticky top-0 z-20 flex shrink-0 items-center justify-between gap-3 border-b border-[#EEE8DF] bg-white px-4 pb-4 pt-6 sm:px-5">
+            <div className="sticky top-0 z-20 flex shrink-0 items-center justify-between gap-3 border-b border-zinc-800 bg-zinc-950 px-4 pb-4 pt-5 sm:px-5">
               <div className="min-w-0">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#C4A35A]">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-amber-400">
                   Travel pace
                 </p>
-                <h3 className="truncate font-display text-2xl text-[#0B1F3A]">
+                <h3 className="truncate font-display text-2xl text-white">
                   {pace.title}
                 </h3>
               </div>
               <button
                 type="button"
                 onClick={onClose}
-                className="shrink-0 rounded-full bg-[#0B1F3A] px-4 py-1.5 text-sm font-semibold text-white"
+                className="shrink-0 rounded-lg border border-zinc-700 px-3 py-1.5 text-sm font-semibold text-zinc-300 transition hover:border-zinc-500"
               >
                 Close
               </button>
             </div>
 
-            <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 pb-[max(7rem,env(safe-area-inset-bottom))] sm:px-5">
-              <article className="overflow-hidden rounded-2xl border border-[#EEE8DF] bg-white shadow-[0_4px_20px_rgba(11,31,58,0.06)]">
-                <div className="relative aspect-[4/5] max-h-[45dvh] w-full bg-[#0B1F3A] sm:max-h-[50dvh]">
+            <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-5">
+              <article className="overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900">
+                <div className="relative aspect-[4/5] max-h-[42dvh] w-full bg-zinc-950 sm:max-h-[48dvh]">
                   {pace.isVideo && pace.mediaUrl ? (
                     <LazyVideo
                       src={pace.mediaUrl}
@@ -638,25 +638,32 @@ function TravelPaceModal({
                   ) : null}
                 </div>
                 <div className="px-4 py-4 sm:px-5">
-                  <p className="text-sm font-semibold text-[#C4A35A]">
+                  <p className="text-sm font-semibold text-amber-400">
                     {pace.subtitle}
                   </p>
-                  <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-[#5C6570]">
+                  <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-zinc-400">
                     {pace.description}
                   </p>
                 </div>
               </article>
             </div>
 
-            <div className="shrink-0 border-t border-[#EEE8DF] bg-white px-4 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:px-5">
+            <div className="flex shrink-0 flex-col gap-2 border-t border-zinc-800 bg-zinc-950 px-4 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:flex-row-reverse sm:px-5">
               <button
                 type="button"
                 onClick={() => onSelect(pace.id)}
-                className="w-full rounded-full bg-[#0B1F3A] py-3.5 text-sm font-semibold text-white transition hover:bg-[#143052]"
+                className="w-full rounded-xl bg-amber-500 py-3 text-sm font-bold text-zinc-950 transition hover:bg-amber-400 sm:flex-1"
               >
                 {selected === pace.id
                   ? "✓ Selected — keep this pace"
-                  : `Select ${pace.title} pace`}
+                  : "Confirm Selection"}
+              </button>
+              <button
+                type="button"
+                onClick={onClose}
+                className="w-full rounded-xl border border-zinc-700 py-3 text-sm font-semibold text-zinc-300 transition hover:border-zinc-500 sm:flex-1"
+              >
+                Close
               </button>
             </div>
           </motion.div>

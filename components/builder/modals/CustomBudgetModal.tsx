@@ -45,34 +45,25 @@ export function CustomBudgetModal({
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-end justify-center bg-black p-0 sm:items-center sm:p-4">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm">
       <button
         type="button"
         className="absolute inset-0"
         aria-label="Close"
         onClick={onClose}
       />
-      <div className="relative z-10 w-full max-w-md rounded-t-3xl border border-zinc-800 bg-zinc-950 p-5 text-white shadow-2xl sm:rounded-3xl sm:p-6">
-        <div className="mb-4 flex items-start justify-between gap-3">
-          <div>
-            <p className="text-[0.65rem] font-bold uppercase tracking-[0.2em] text-amber-400">
-              Custom Budget Matcher
-            </p>
-            <h3 className="mt-1 font-display text-2xl text-white">
-              Set your target budget
-            </h3>
-            <p className="mt-1 text-sm text-zinc-400">
-              We’ll use this figure to suggest optimized itinerary options for
-              your trip.
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-full border border-zinc-700 px-3 py-1 text-sm text-zinc-300"
-          >
-            Close
-          </button>
+      <div className="relative z-10 w-full max-w-md rounded-2xl border border-zinc-800 bg-zinc-950 p-5 text-white shadow-2xl sm:p-6">
+        <div className="mb-4">
+          <p className="text-[0.65rem] font-bold uppercase tracking-[0.2em] text-amber-400">
+            Custom Budget Matcher
+          </p>
+          <h3 className="mt-1 font-display text-2xl text-white">
+            Set your target budget
+          </h3>
+          <p className="mt-1 text-sm text-zinc-400">
+            We’ll use this figure to suggest optimized itinerary options for
+            your trip.
+          </p>
         </div>
 
         <label className="block text-xs uppercase tracking-wider text-zinc-400">
@@ -103,17 +94,24 @@ export function CustomBudgetModal({
           </p>
         ) : null}
 
-        {error ? (
-          <p className="mt-3 text-sm text-red-400">{error}</p>
-        ) : null}
+        {error ? <p className="mt-3 text-sm text-red-400">{error}</p> : null}
 
-        <button
-          type="button"
-          onClick={handleSubmit}
-          className="mt-5 w-full rounded-xl bg-amber-500 py-3.5 text-sm font-bold text-zinc-950 transition hover:bg-amber-400"
-        >
-          Submit Budget Request
-        </button>
+        <div className="mt-5 flex flex-col gap-2 sm:flex-row-reverse">
+          <button
+            type="button"
+            onClick={handleSubmit}
+            className="w-full rounded-xl bg-amber-500 py-3 text-sm font-bold text-zinc-950 transition hover:bg-amber-400 sm:flex-1"
+          >
+            Confirm Selection
+          </button>
+          <button
+            type="button"
+            onClick={onClose}
+            className="w-full rounded-xl border border-zinc-700 py-3 text-sm font-semibold text-zinc-300 transition hover:border-zinc-500 sm:flex-1"
+          >
+            Close
+          </button>
+        </div>
       </div>
     </div>
   );

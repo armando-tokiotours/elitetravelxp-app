@@ -17,6 +17,7 @@ import {
 } from "@/lib/budgetCalculatorEngine";
 import { useBuilderStore } from "@/store/useBuilderStore";
 import { useSiteBrandingStore } from "@/store/useSiteBrandingStore";
+import { CustomBudgetModal } from "@/components/builder/modals/CustomBudgetModal";
 
 const PRESETS = [
   { id: "tight", label: "Tight", perDay: 50 },
@@ -50,6 +51,7 @@ export function BudgetPlannerForm() {
   void brandingItems;
 
   const setCustomBudgetTarget = useBuilderStore((s) => s.setCustomBudgetTarget);
+  const customBudgetTarget = useBuilderStore((s) => s.customBudgetTarget);
   const setAdults = useBuilderStore((s) => s.setAdults);
   const setChildren = useBuilderStore((s) => s.setChildren);
   const storeAdults = useBuilderStore((s) => s.adults);
@@ -67,10 +69,21 @@ export function BudgetPlannerForm() {
   const [loading, setLoading] = useState(true);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [ran, setRan] = useState(false);
+  const [welcomeOpen, setWelcomeOpen] = useState(true);
 
   useEffect(() => {
     void ensureLoaded();
   }, [ensureLoaded]);
+
+  useEffect(() => {
+    if (customBudgetTarget != null && customBudgetTarget > 0) {
+      setMode("total");
+      setPreset("custom");
+      setTargetDisplay(fromEurDisplay(customBudgetTarget, currency));
+    }
+    // Seed once from store on mount / when a target already exists
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [customBudgetTarget]);
 
   useEffect(() => {
     let cancelled = false;
@@ -145,6 +158,15 @@ export function BudgetPlannerForm() {
     setChildren(children);
   };
 
+  const applyWelcomeBudget = (amount: number) => {
+    setCustomBudgetTarget(amount);
+    setMode("total");
+    setPreset("custom");
+    setTargetDisplay(fromEurDisplay(amount, currency));
+    setWelcomeOpen(false);
+    setRan(true);
+  };
+
   const eyebrow = brand.subtitle || "TAILORED PLANNING";
   const headline =
     brand.title || "Travel Japan Your Way — Fits Any Budget";
@@ -154,6 +176,7 @@ export function BudgetPlannerForm() {
   const heroSrc = brand.mediaUrl || "/images/matcher-poster.webp";
 
   return (
+    <>
     <div className="mx-auto w-full max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
       <header className="relative overflow-hidden rounded-2xl border border-zinc-800">
         {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -532,5 +555,13 @@ export function BudgetPlannerForm() {
         </section>
       ) : null}
     </div>
+
+    <CustomBudgetModal
+      open={welcomeOpen}
+      onClose={() => setWelcomeOpen(false)}
+      initialValue={customBudgetTarget}
+      onSubmit={applyWelcomeBudget}
+    />
+    </>
   );
 }
