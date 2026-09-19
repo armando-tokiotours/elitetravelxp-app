@@ -350,7 +350,7 @@ export function SiteBrandingPanel({ getClient }: { getClient: () => PbClient }) 
         </p>
 
         <div className="mt-6 rounded-2xl border border-zinc-800 bg-zinc-950 p-5">
-          <p className="mb-3 text-[0.65rem] font-semibold uppercase tracking-[0.25em] text-[#C4A35A]">
+          <p className="mb-3 text-[0.65rem] font-semibold uppercase tracking-[0.25em] text-[#B85304]">
             Live preview
           </p>
           <p
@@ -379,13 +379,13 @@ export function SiteBrandingPanel({ getClient }: { getClient: () => PbClient }) 
         type="button"
         disabled={saving}
         onClick={() => void save()}
-        className="rounded-full bg-[#C4A35A] px-6 py-3 text-sm font-semibold text-zinc-100 shadow-sm transition hover:bg-[#b8944c] disabled:opacity-50"
+        className="rounded-full bg-[#B85304] px-6 py-3 text-sm font-semibold text-zinc-100 shadow-sm transition hover:bg-[#b8944c] disabled:opacity-50"
       >
         {saving ? "Saving…" : "Save Branding Updates"}
       </button>
 
-      <div className="rounded-2xl border border-[#C4A35A]/35 bg-[#C4A35A]/10 p-4">
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#C4A35A]">
+      <div className="rounded-2xl border border-[#B85304]/35 bg-[#B85304]/10 p-4">
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#B85304]">
           Promote · Value Proposition
         </p>
         <p className="mt-2 text-sm text-zinc-300">
@@ -396,8 +396,8 @@ export function SiteBrandingPanel({ getClient }: { getClient: () => PbClient }) 
         </p>
       </div>
 
-      <div className="rounded-2xl border border-[#C4A35A]/35 bg-[#C4A35A]/10 p-4">
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#C4A35A]">
+      <div className="rounded-2xl border border-[#B85304]/35 bg-[#B85304]/10 p-4">
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#B85304]">
           Promote · Budget Planner
         </p>
         <p className="mt-2 text-sm text-zinc-300">
@@ -407,7 +407,7 @@ export function SiteBrandingPanel({ getClient }: { getClient: () => PbClient }) 
             href="/budget-planner"
             target="_blank"
             rel="noreferrer"
-            className="text-[#C4A35A] underline-offset-2 hover:underline"
+            className="text-[#B85304] underline-offset-2 hover:underline"
           >
             /budget-planner
           </a>
@@ -493,7 +493,7 @@ function UploadField({
               type="checkbox"
               checked={publicOption.checked}
               onChange={(e) => publicOption.onChange(e.target.checked)}
-              className="mt-0.5 h-4 w-4 rounded border-zinc-700 accent-[#C4A35A]"
+              className="mt-0.5 h-4 w-4 rounded border-zinc-700 accent-[#B85304]"
             />
             <span>
               <span className="font-medium">

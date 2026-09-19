@@ -3,13 +3,12 @@
 import { useEffect, useState } from "react";
 import {
   activeBookingRef,
-  bookingRefBadgeLabel,
   type BookingStatus,
 } from "@/utils/pnr";
 
 /**
- * Booking reference chip — draft TMP (amber) vs official JPN (emerald).
- * Defers PNR text until after mount to avoid SSR/client hydration mismatch.
+ * Booking reference + status — 2/3 ref box, 1/3 status badge (card),
+ * or compact stacked layout (inline / print).
  */
 export function BookingRefBadge({
   tempBookingRef,
@@ -20,7 +19,7 @@ export function BookingRefBadge({
   tempBookingRef: string;
   confirmedBookingRef: string | null;
   bookingStatus: BookingStatus;
-  /** card = dossier navy header; inline = light backgrounds */
+  /** card = 2/3+1/3 split; inline = compact stacked for light/print */
   variant?: "card" | "inline";
 }) {
   const [ready, setReady] = useState(false);
@@ -28,7 +27,7 @@ export function BookingRefBadge({
     setReady(true);
   }, []);
 
-  const isDraft = bookingStatus === "draft";
+  const isConfirmed = bookingStatus !== "draft";
   const code = ready
     ? activeBookingRef({
         tempBookingRef,
@@ -36,37 +35,76 @@ export function BookingRefBadge({
         bookingStatus,
       })
     : "";
-  const badgeLabel = bookingRefBadgeLabel(bookingStatus);
 
-  const badgeClass = isDraft
-    ? "inline-block whitespace-nowrap bg-amber-500/10 text-amber-500 border border-amber-500/20 px-1.5 py-px text-[9px] leading-tight rounded uppercase font-semibold tracking-wide"
-    : "inline-block whitespace-nowrap bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-1.5 py-px text-[9px] leading-tight rounded uppercase font-semibold tracking-wide";
-
-  const shell =
-    variant === "inline"
-      ? "text-left"
-      : "rounded-lg border border-dashed border-white/20 px-3 py-1.5 text-right";
+  if (variant === "inline") {
+    return (
+      <div className="grid w-full grid-cols-3 items-stretch gap-2">
+        <div className="col-span-2 flex flex-col justify-center rounded-xl border border-[#E8E2D9] bg-white p-2.5 shadow-sm">
+          <span className="block text-[9px] font-bold uppercase tracking-wider text-[#8A8278]">
+            Booking Ref
+          </span>
+          <span
+            className="truncate font-mono text-[0.825rem] font-extrabold tracking-widest text-[#0B1F3A] sm:text-[0.96rem]"
+            suppressHydrationWarning
+          >
+            {code || "······"}
+          </span>
+        </div>
+        <div
+          className={`col-span-1 flex items-center justify-center rounded-xl border p-1.5 text-center transition-all duration-300 ${
+            isConfirmed
+              ? "border-emerald-500/60 bg-emerald-950/40 text-emerald-400 shadow-[0_0_10px_rgba(16,185,129,0.2)]"
+              : "border-[#B85304]/50 bg-[#B85304]/20 text-[#D9BB96]"
+          }`}
+        >
+          <span className="text-[9px] font-bold uppercase leading-tight tracking-wider sm:text-[10px]">
+            {isConfirmed ? (
+              "✓ Confirmed"
+            ) : (
+              <>
+                Draft
+                <br />
+                (Not Confirmed)
+              </>
+            )}
+          </span>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className={shell}>
-      <p
-        className={`text-[0.55rem] uppercase tracking-[0.2em] ${
-          variant === "inline" ? "text-[#8A8278]" : "text-[#C4A35A]/80"
+    <div className="my-0 grid w-full grid-cols-3 items-stretch gap-2">
+      <div className="col-span-2 flex flex-col justify-center rounded-xl border border-zinc-800 bg-[#121212] p-2.5 shadow-md">
+        <span className="block text-[9px] font-bold uppercase tracking-wider text-zinc-400">
+          Booking Ref
+        </span>
+        <span
+          className="truncate text-xs font-extrabold tracking-widest text-white sm:text-sm"
+          suppressHydrationWarning
+        >
+          {code || "······"}
+        </span>
+      </div>
+      <div
+        className={`col-span-1 flex items-center justify-center rounded-xl border p-1.5 text-center transition-all duration-300 ${
+          isConfirmed
+            ? "border-emerald-500/60 bg-emerald-950/40 text-emerald-400 shadow-[0_0_10px_rgba(16,185,129,0.2)]"
+            : "border-[#B85304]/50 bg-[#B85304]/20 text-[#D9BB96]"
         }`}
       >
-        Booking Ref
-      </p>
-      <p
-        className={`font-mono text-sm font-semibold tracking-wide ${
-          variant === "inline" ? "text-[#0B1F3A]" : "text-[#C4A35A]"
-        }`}
-        suppressHydrationWarning
-      >
-        {code || "······"}
-      </p>
-      <p className="mt-0.5">
-        <span className={badgeClass}>{badgeLabel}</span>
-      </p>
+        <span className="text-[9px] font-bold uppercase leading-tight tracking-wider sm:text-[10px]">
+          {isConfirmed ? (
+            "✓ Confirmed"
+          ) : (
+            <>
+              Draft
+              <br />
+              (Not Confirmed)
+            </>
+          )}
+        </span>
+      </div>
     </div>
   );
 }

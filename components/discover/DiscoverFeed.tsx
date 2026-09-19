@@ -246,7 +246,7 @@ export function DiscoverFeed() {
       />
 
       <div className={`${APP_SIDEBAR_RAIL_PAD} min-h-[100dvh] bg-black`}>
-        <header className="sticky top-0 z-40 border-b border-zinc-800 bg-black/95 text-white backdrop-blur-md md:hidden">
+        <header className="sticky top-0 z-40 border-b border-zinc-800 bg-black/95 text-white backdrop-blur-md lg:hidden">
           <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
             <div className="flex min-w-0 items-center gap-3">
               <MobileAppNav
@@ -254,7 +254,7 @@ export function DiscoverFeed() {
                 brandTitle="Discover"
               />
               <div className="min-w-0">
-                <p className="text-[0.6rem] font-semibold uppercase tracking-[0.28em] text-[#C4A35A]">
+                <p className="text-[0.6rem] font-semibold uppercase tracking-[0.28em] text-[#B85304]">
                   Elite Travel
                 </p>
                 <h1 className="font-display text-xl leading-tight">Discover</h1>
@@ -294,7 +294,7 @@ export function DiscoverFeed() {
       {toast ? (
         <div
           role="status"
-          className="fixed left-1/2 top-[7.5rem] z-50 max-w-[90vw] -translate-x-1/2 rounded-xl border border-[#C4A35A]/50 bg-[#F7EFD9] px-3.5 py-2.5 text-center text-sm text-[#6B5420] shadow-lg"
+          className="fixed left-1/2 top-[7.5rem] z-50 max-w-[90vw] -translate-x-1/2 rounded-xl border border-[#B85304]/50 bg-[#FAF0E6] px-3.5 py-2.5 text-center text-sm text-[#632502] shadow-lg"
         >
           ⚠️ {toast}
         </div>
@@ -319,7 +319,7 @@ export function DiscoverFeed() {
                   className="h-20 w-20 shrink-0 rounded-full border border-zinc-700 object-cover"
                 />
               ) : (
-                <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-full border border-zinc-700 bg-zinc-900 font-display text-2xl text-[#C4A35A]">
+                <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-full border border-zinc-700 bg-zinc-900 font-display text-2xl text-[#B85304]">
                   {cityName.slice(0, 1)}
                 </div>
               )}
@@ -469,7 +469,7 @@ export function DiscoverFeed() {
         onToast={setToast}
       />
 
-      <div className="md:hidden">
+      <div className="lg:hidden">
         <BottomNav />
       </div>
       <ExperienceProfilerModal
@@ -528,7 +528,7 @@ function TourThumb({
       )}
       <span className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent opacity-0 transition duration-300 group-hover:opacity-100" />
       {recommended ? (
-        <span className="absolute left-1 top-1 z-20 flex items-center gap-1 rounded-full bg-amber-500/90 px-2 py-0.5 text-[10px] font-bold text-zinc-950 shadow-md">
+        <span className="absolute left-1 top-1 z-20 flex items-center gap-1 rounded-full bg-accent-500/90 px-2 py-0.5 text-[10px] font-bold text-zinc-950 shadow-md">
           ⭐ Match
         </span>
       ) : null}
@@ -539,7 +539,7 @@ function TourThumb({
       ) : null}
       {booked ? (
         <span
-          className={`absolute z-20 rounded bg-black/60 px-1 text-[9px] font-semibold text-[#E8D5A3] ${
+          className={`absolute z-20 rounded bg-black/60 px-1 text-[9px] font-semibold text-[#F3D9C4] ${
             recommended ? "left-1 top-7" : "left-1 top-1"
           }`}
         >
@@ -547,8 +547,8 @@ function TourThumb({
         </span>
       ) : null}
       <div className="pointer-events-none absolute inset-x-3 bottom-3 z-20 translate-y-2 opacity-0 transition-all duration-300 group-hover:translate-y-0 group-hover:opacity-100">
-        <div className="flex items-center justify-center rounded-lg border border-amber-500/30 bg-zinc-950/75 px-3 py-1.5 shadow-2xl backdrop-blur-md">
-          <span className="truncate text-center text-[10px] font-bold uppercase tracking-widest text-amber-300">
+        <div className="flex items-center justify-center rounded-lg border border-[#B85304]/40 bg-zinc-950/75 px-3 py-1.5 shadow-2xl backdrop-blur-md">
+          <span className="truncate text-center text-[10px] font-bold uppercase tracking-widest text-accent-500">
             {tour.title}
           </span>
         </div>
@@ -589,7 +589,7 @@ function CityStory({
       <span
         className={`rounded-full p-[2px] ${
           active
-            ? "bg-gradient-to-tr from-[#C4A35A] via-[#E8D5A3] to-[#C4A35A]"
+            ? "bg-gradient-to-tr from-[#B85304] via-[#F3D9C4] to-[#B85304]"
             : "bg-white/25"
         }`}
       >
@@ -607,7 +607,7 @@ function CityStory({
               className="h-16 w-16 rounded-full object-cover"
             />
           ) : (
-            <span className="flex h-16 w-16 items-center justify-center rounded-full bg-[#1a3355] font-display text-lg text-[#C4A35A]">
+            <span className="flex h-16 w-16 items-center justify-center rounded-full bg-[#1a3355] font-display text-lg text-[#B85304]">
               {city.name.slice(0, 1)}
             </span>
           )}

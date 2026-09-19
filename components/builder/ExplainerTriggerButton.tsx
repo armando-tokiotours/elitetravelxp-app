@@ -110,7 +110,7 @@ export function ExplainerTriggerButton({
             <span className="ml-0.5 text-sm font-bold md:text-base">▶</span>
           </span>
           <span className="min-w-0 flex flex-col text-left">
-            <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#C4A35A]">
+            <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#D9BB96]">
               Watch
             </span>
             <span className="truncate text-sm font-bold text-white md:text-base">

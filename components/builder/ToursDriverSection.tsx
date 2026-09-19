@@ -1,20 +1,14 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useMemo, useState } from "react";
+import { useMemo, useState, type MouseEvent } from "react";
 import {
   CheckCircle2,
   ChevronRight,
   Compass,
   Sparkles,
 } from "lucide-react";
-import type {
-  PbChauffeurRate,
-  PbCity,
-  PbTour,
-  PbVehicle,
-} from "@/lib/pocketbase/client";
-import { countBillableChauffeurDays } from "@/lib/chauffeurSelections";
+import type { PbCity, PbTour } from "@/lib/pocketbase/client";
 import type { SeasonalHighlight } from "@/lib/seasonalMatcher";
 import {
   useBuilderStore,
@@ -22,12 +16,9 @@ import {
 } from "@/store/useBuilderStore";
 import { SectionBlock } from "./ui";
 import { ExplainerTriggerButton } from "./ExplainerTriggerButton";
-import { ActivityMatcherBanner } from "./ActivityMatcherBanner";
-import { EliteValuePropositionBanner } from "@/components/branding/EliteValueProposition";
-import { ExperienceProfilerModal } from "@/components/quiz/ExperienceProfilerModal";
-import { ActivityMatchReelModal } from "@/components/modals/ActivityMatchReelModal";
-import { buildTripMatchReelSlides } from "@/lib/matchReel";
 import { useLazyModalMount } from "./modals/useLazyModalMount";
+import { SectionContinue } from "./SectionContinue";
+import { EliteDifferenceModal } from "./modals/EliteDifferenceModal";
 
 const ConciergeEditorModal = dynamic(
   () =>
@@ -51,68 +42,35 @@ export function ToursDriverSection({
   cityNames,
   allowToursOnTravelDays = false,
   seasonalHighlights = [],
-  vehicles = [],
-  chauffeurRates = [],
 }: {
   tours: PbTour[];
   cities?: PbCity[];
   cityNames: Record<string, string>;
   allowToursOnTravelDays?: boolean;
   seasonalHighlights?: SeasonalHighlight[];
-  vehicles?: PbVehicle[];
-  chauffeurRates?: PbChauffeurRate[];
 }) {
   const [activeModal, setActiveModal] = useState<
     "concierge" | "tailored" | null
   >(null);
-  const [quizOpen, setQuizOpen] = useState(false);
-  const [reelOpen, setReelOpen] = useState(false);
+  const [eliteDiffOpen, setEliteDiffOpen] = useState(false);
   const conciergeMounted = useLazyModalMount(activeModal === "concierge");
   const tailoredMounted = useLazyModalMount(activeModal === "tailored");
 
   const experienceService = useBuilderStore((s) => s.experienceService);
+  const isEliteConcierge = useBuilderStore((s) => s.isEliteConcierge);
   const selectedTourIds = useBuilderStore((s) => s.selectedTourIds);
   const selectedToursMap = useBuilderStore((s) => s.selectedTours);
-  const chauffeurSelections = useBuilderStore((s) => s.chauffeurSelections);
-  const experienceProfile = useBuilderStore((s) => s.experienceProfile);
-  const locations = useBuilderStore((s) => s.locations);
+  const conciergeLocked = isEliteConcierge || experienceService === "concierge";
 
-  const chauffeurDayCount = countBillableChauffeurDays(chauffeurSelections);
   const tourCount = selectedTourIds.length;
-
-  const reelSlides = useMemo(
-    () =>
-      buildTripMatchReelSlides({
-        tours,
-        cityNames,
-        selectedTourIds,
-        profile: experienceProfile,
-        stayCityIds: locations
-          .filter(
-            (l) =>
-              l.visitType !== "arrival" &&
-              l.visitType !== "departure" &&
-              l.nights > 0
-          )
-          .map((l) => l.cityId),
-        limit: 10,
-      }),
-    [tours, cityNames, selectedTourIds, experienceProfile, locations]
-  );
 
   const summary =
     experienceService === "concierge"
       ? "Elite Concierge package"
       : experienceService === "tailored"
-        ? `${
-            tourCount === 0
-              ? "No tours"
-              : `${tourCount} experience${tourCount === 1 ? "" : "s"}`
-          } · Chauffeur: ${
-            chauffeurDayCount === 0
-              ? "No"
-              : `${chauffeurDayCount} day${chauffeurDayCount === 1 ? "" : "s"}`
-          }`
+        ? tourCount === 0
+          ? "No tours selected"
+          : `${tourCount} experience${tourCount === 1 ? "" : "s"}`
         : "Choose a pathway";
 
   const cityBreakdown = useMemo(() => {
@@ -134,31 +92,49 @@ export function ToursDriverSection({
       icon="tour"
       summary={summary}
     >
-      <div className="mb-4">
-        <ActivityMatcherBanner
-          onOpenQuiz={() => setQuizOpen(true)}
-          onWatch={() => setReelOpen(true)}
-        />
-      </div>
+      {conciergeLocked ? (
+        <div className="mb-4 rounded-2xl border border-[#B85304]/40 bg-[#B85304]/15 px-4 py-3">
+          <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-accent-500">
+            ✨ Elite Concierge Active
+          </p>
+          <p className="mt-1.5 text-sm leading-relaxed text-zinc-300">
+            Individual tours and experiences are deactivated. Your specialist
+            will curate day-by-day itinerary, tours, and logistics with a
+            bespoke quotation before final booking.
+          </p>
+        </div>
+      ) : null}
 
-      <div className="mb-4">
-        <EliteValuePropositionBanner tone="dark" compact />
-      </div>
-
-      <div className="mb-4 grid grid-cols-2 gap-3">
+      <div
+        className={`mb-4 grid grid-cols-2 gap-3 ${
+          conciergeLocked ? "opacity-90" : ""
+        }`}
+      >
         <PathwayCard
           kind="concierge"
           selected={experienceService === "concierge"}
           title="Elite Concierge"
-          description="Full day-by-day design by a luxury specialist — dining, access, and drivers included."
+          description="Full day-by-day design by a luxury specialist — dining, access, and cultural translation included."
           onClick={() => setActiveModal("concierge")}
         />
         <PathwayCard
           kind="tailored"
           selected={experienceService === "tailored"}
           title="Tailored Experiences"
-          description="Browse city experiences and book private chauffeurs day by day."
-          onClick={() => setActiveModal("tailored")}
+          description="Browse guided tours, workshops, and tickets city by city — drivers are configured in the next step."
+          actionLabel="Configure Experiences →"
+          onClick={() => {
+            if (conciergeLocked) {
+              setActiveModal("concierge");
+              return;
+            }
+            setActiveModal("tailored");
+          }}
+          onLearnMore={(e) => {
+            e.stopPropagation();
+            setEliteDiffOpen(true);
+          }}
+          disabled={conciergeLocked}
         />
       </div>
 
@@ -167,16 +143,11 @@ export function ToursDriverSection({
           featureKey="guide_explainer"
           title="Watch: Why you need a private guide in Japan"
         />
-        <ExplainerTriggerButton
-          featureKey="daily_transport_explainer"
-          title="Watch: Why you need private daily transport"
-        />
       </div>
 
       <SelectionSummaryWidget
         experienceService={experienceService}
         tourCount={tourCount}
-        chauffeurDayCount={chauffeurDayCount}
         cityBreakdown={cityBreakdown}
         onEdit={() =>
           setActiveModal(
@@ -185,6 +156,8 @@ export function ToursDriverSection({
         }
       />
 
+      <SectionContinue next={6} />
+
       {conciergeMounted ? (
         <ConciergeEditorModal
           open={activeModal === "concierge"}
@@ -192,7 +165,7 @@ export function ToursDriverSection({
         />
       ) : null}
 
-      {tailoredMounted ? (
+      {tailoredMounted && !conciergeLocked ? (
         <TailoredExperiencesModal
           open={activeModal === "tailored"}
           onClose={() => setActiveModal(null)}
@@ -201,20 +174,16 @@ export function ToursDriverSection({
           cityNames={cityNames}
           allowToursOnTravelDays={allowToursOnTravelDays}
           seasonalHighlights={seasonalHighlights}
-          vehicles={vehicles}
-          chauffeurRates={chauffeurRates}
+          hideTransport
         />
       ) : null}
 
-      <ExperienceProfilerModal
-        open={quizOpen}
-        onClose={() => setQuizOpen(false)}
-      />
-      <ActivityMatchReelModal
-        open={reelOpen}
-        onClose={() => setReelOpen(false)}
-        slides={reelSlides}
-        experienceProfile={experienceProfile}
+      <EliteDifferenceModal
+        open={eliteDiffOpen}
+        onClose={() => setEliteDiffOpen(false)}
+        onConfirm={() => {
+          if (!conciergeLocked) setActiveModal("tailored");
+        }}
       />
     </SectionBlock>
   );
@@ -226,22 +195,31 @@ function PathwayCard({
   title,
   description,
   onClick,
+  onLearnMore,
+  actionLabel,
+  disabled = false,
 }: {
   kind: "concierge" | "tailored";
   selected: boolean;
   title: string;
   description: string;
   onClick: () => void;
+  onLearnMore?: (e: MouseEvent) => void;
+  actionLabel?: string;
+  disabled?: boolean;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
       aria-pressed={selected}
+      disabled={disabled && kind === "tailored"}
       className={`group flex min-h-[9.5rem] flex-col rounded-[1.35rem] border p-4 text-left transition sm:min-h-[10.5rem] ${
-        selected
-          ? "border-[#C4A35A] bg-[#1C1C1E] ring-1 ring-[#C4A35A]/40"
-          : "border-zinc-800 bg-[#1C1C1E] hover:border-[#C4A35A]/45 hover:bg-[#222226]"
+        disabled && kind === "tailored"
+          ? "cursor-not-allowed border-zinc-800 bg-zinc-950 opacity-45"
+          : selected
+            ? "border-[#B85304] bg-[#1C1C1E] ring-1 ring-[#B85304]/40"
+            : "border-zinc-800 bg-[#1C1C1E] hover:border-[#B85304]/45 hover:bg-[#222226]"
       }`}
     >
       <div className="flex items-start justify-between gap-2">
@@ -251,7 +229,7 @@ function PathwayCard({
         <span
           className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full sm:h-8 sm:w-8 ${
             kind === "concierge"
-              ? "bg-[#C4A35A]/15 text-[#C4A35A]"
+              ? "bg-[#B85304]/15 text-[#B85304]"
               : "bg-sky-500/15 text-sky-400"
           }`}
           aria-hidden
@@ -271,16 +249,35 @@ function PathwayCard({
         {description}
       </p>
 
+      {onLearnMore ? (
+        <span
+          role="link"
+          tabIndex={0}
+          onClick={onLearnMore}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              onLearnMore(e as unknown as MouseEvent);
+            }
+          }}
+          className="mt-2 block cursor-pointer text-xs font-semibold text-[#B85304] underline transition hover:text-white"
+        >
+          Learn More
+        </span>
+      ) : null}
+
       <div className="mt-3 flex items-center justify-between gap-2 border-t border-zinc-800/80 pt-3 sm:mt-4">
         <span
           className={`text-xs font-medium ${
-            selected ? "text-[#C4A35A]" : "text-zinc-500"
+            selected ? "text-[#B85304]" : "text-zinc-500"
           }`}
         >
-          {selected ? "Selected" : "Open"}
+          {selected
+            ? "Selected"
+            : actionLabel ?? "Open"}
         </span>
         <ChevronRight
-          className="h-4 w-4 shrink-0 text-zinc-600 transition group-hover:text-[#C4A35A]"
+          className="h-4 w-4 shrink-0 text-zinc-600 transition group-hover:text-[#B85304]"
           aria-hidden
         />
       </div>
@@ -291,13 +288,11 @@ function PathwayCard({
 function SelectionSummaryWidget({
   experienceService,
   tourCount,
-  chauffeurDayCount,
   cityBreakdown,
   onEdit,
 }: {
   experienceService: ExperienceService;
   tourCount: number;
-  chauffeurDayCount: number;
   cityBreakdown: { cityId: string; name: string; count: number }[];
   onEdit: () => void;
 }) {
@@ -308,7 +303,7 @@ function SelectionSummaryWidget({
       type="button"
       onClick={onEdit}
       disabled={!hasSelection}
-      className="group w-full rounded-[1.35rem] border border-zinc-800 bg-zinc-900 p-4 text-left transition hover:border-[#C4A35A]/45 hover:bg-zinc-800/80 disabled:cursor-default disabled:opacity-70 sm:p-5"
+      className="group w-full rounded-[1.35rem] border border-zinc-800 bg-zinc-900 p-4 text-left transition hover:border-[#B85304]/45 hover:bg-zinc-800/80 disabled:cursor-default disabled:opacity-70 sm:p-5"
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
@@ -346,12 +341,6 @@ function SelectionSummaryWidget({
             {tourCount === 0
               ? "No experiences added yet"
               : `${tourCount} experience${tourCount === 1 ? "" : "s"}`}
-            {" · "}
-            {chauffeurDayCount === 0
-              ? "No chauffeur days"
-              : `${chauffeurDayCount} chauffeur day${
-                  chauffeurDayCount === 1 ? "" : "s"
-                }`}
           </p>
           {cityBreakdown.length > 0 ? (
             <ul className="flex flex-wrap gap-1.5">
@@ -370,7 +359,7 @@ function SelectionSummaryWidget({
 
       {hasSelection ? (
         <div className="mt-4 flex items-center justify-end border-t border-zinc-800/80 pt-3">
-          <span className="inline-flex items-center gap-1 text-xs font-medium text-zinc-500 transition group-hover:text-[#C4A35A]">
+          <span className="inline-flex items-center gap-1 text-xs font-medium text-zinc-500 transition group-hover:text-[#B85304]">
             Edit
             <ChevronRight className="h-3.5 w-3.5" aria-hidden />
           </span>

@@ -6,15 +6,16 @@ import { Lock } from "lucide-react";
 import { useBuilderStore } from "@/store/useBuilderStore";
 import { useBuilderAccordionOptional } from "./BuilderAccordion";
 
-const GOLD = "#C4A35A";
-const NAVY = "#0B1F3A";
+const GOLD = "#B85304";
+const NAVY = "#1E2D4A";
 
 export type SectionIcon =
   | "calendar"
   | "plane"
   | "hotel"
   | "map"
-  | "tour";
+  | "tour"
+  | "car";
 
 export function SectionBlock({
   number,
@@ -25,12 +26,12 @@ export function SectionBlock({
   summary,
 }: {
   number: number;
-  title: string;
+  title: ReactNode;
   children: ReactNode;
   id?: string;
   icon?: SectionIcon;
   /** Collapsed at-a-glance preview of the user's selection */
-  summary?: string;
+  summary?: ReactNode;
 }) {
   const accordion = useBuilderAccordionOptional();
   const highestUnlockedStep = useBuilderStore((s) => s.highestUnlockedStep);
@@ -49,11 +50,14 @@ export function SectionBlock({
     if (accordion) accordion.toggleSection(number);
   };
 
+  const summaryText = typeof summary === "string" ? summary : null;
+  const stepSaved = !locked && highestUnlockedStep > number;
+
   return (
     <section
       id={id}
       aria-disabled={locked || undefined}
-      className={`overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-900 shadow-[0_2px_16px_rgba(0,0,0,0.45)] ${
+      className={`scroll-mt-24 overflow-hidden rounded-2xl border border-[#2C2C2E] bg-[#121212] p-0 shadow-2xl ${
         locked ? "opacity-50" : ""
       }`}
     >
@@ -63,28 +67,37 @@ export function SectionBlock({
         aria-expanded={isOpen}
         aria-disabled={locked}
         disabled={locked}
-        className={`flex w-full items-center gap-3 px-4 py-4 text-left transition sm:gap-3.5 sm:px-6 sm:py-5 ${
+        className={`flex w-full items-center gap-3 px-4 py-4 text-left transition sm:gap-3.5 sm:px-5 sm:py-5 ${
           locked
             ? "cursor-not-allowed"
-            : "hover:bg-zinc-800/60"
+            : "hover:bg-[#1C1C1E]/80"
         }`}
       >
         <span
-          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-white shadow-[0_4px_12px_rgba(196,163,90,0.35)]"
-          style={{ background: GOLD }}
+          className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-colors ${
+            stepSaved
+              ? "bg-[#1E2D4A] text-cyan-400"
+              : "bg-[#1C1C1E] text-zinc-500"
+          }`}
           aria-hidden
         >
           <SectionGlyph name={icon} />
         </span>
 
         <div className="min-w-0 flex-1">
-          <h2 className="font-display text-xl tracking-tight text-white sm:text-[1.7rem]">
-            <span className="text-[#C4A35A]">{number}.</span> {title}
+          <h2 className="font-display text-sm font-extrabold tracking-tight text-white sm:text-[1.2rem]">
+            <span className="text-[#E2C498]">{number}.</span> {title}
           </h2>
           {!isOpen && !locked && summary ? (
-            <p className="mt-0.5 truncate text-xs font-medium text-[#C4A35A] sm:text-[0.8rem]">
-              {summary}
-            </p>
+            typeof summary === "string" ? (
+              <p className="mt-0.5 max-w-[180px] truncate text-[10px] font-medium text-[#E2C498] sm:max-w-none sm:text-xs">
+                {summary}
+              </p>
+            ) : (
+              <div className="mt-0.5 min-w-0 max-w-[180px] sm:max-w-none">
+                {summary}
+              </div>
+            )
           ) : null}
           {locked ? (
             <p className="mt-0.5 text-xs font-medium text-zinc-500">
@@ -93,15 +106,15 @@ export function SectionBlock({
           ) : null}
         </div>
 
-        {!isOpen && !locked && summary ? (
-          <span className="mr-1 hidden max-w-[9rem] truncate rounded-full border border-zinc-700 bg-zinc-950 px-2.5 py-1 text-[0.65rem] font-medium text-zinc-300 sm:inline-block lg:max-w-[14rem]">
-            {summary}
+        {!isOpen && !locked && summaryText ? (
+          <span className="mr-1 hidden max-w-[9rem] truncate rounded-full border border-[#2C2C2E] bg-[#1C1C1E] px-2.5 py-1 text-[0.65rem] font-medium text-zinc-300 sm:inline-block lg:max-w-[14rem]">
+            {summaryText}
           </span>
         ) : null}
 
         {locked ? (
           <span
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-zinc-700 bg-zinc-950 text-zinc-400"
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-zinc-700 bg-[#1C1C1E] text-zinc-400"
             aria-hidden
           >
             <Lock className="h-3.5 w-3.5" />
@@ -110,7 +123,7 @@ export function SectionBlock({
           <motion.span
             animate={{ rotate: isOpen ? 180 : 0 }}
             transition={{ duration: 0.25 }}
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-zinc-700 bg-zinc-950 text-white"
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-[#2C2C2E] bg-[#1C1C1E] text-[#F5EFE6]"
             aria-hidden
           >
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
@@ -136,7 +149,7 @@ export function SectionBlock({
             transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
             className="overflow-hidden"
           >
-            <div className="border-t border-zinc-800 px-4 pb-5 pt-4 sm:px-6 sm:pb-6">
+            <div className="border-t border-[#2C2C2E] bg-[#1C1C1E]/40 px-4 pb-5 pt-4 sm:px-5 sm:pb-6">
               {children}
             </div>
           </motion.div>
@@ -148,11 +161,11 @@ export function SectionBlock({
 
 function SectionGlyph({ name }: { name: SectionIcon }) {
   const common = {
-    width: 20,
-    height: 20,
+    width: 24,
+    height: 24,
     viewBox: "0 0 24 24",
     fill: "none",
-    stroke: "white",
+    stroke: "currentColor",
     strokeWidth: 1.8,
     strokeLinecap: "round" as const,
     strokeLinejoin: "round" as const,
@@ -183,6 +196,16 @@ function SectionGlyph({ name }: { name: SectionIcon }) {
         <svg {...common}>
           <circle cx="12" cy="12" r="9" />
           <path d="M12 8v4l2.5 2.5" />
+        </svg>
+      );
+    case "car":
+      return (
+        <svg {...common}>
+          <path d="M5 17h2M17 17h2" />
+          <path d="M3 13v-1.5A2.5 2.5 0 015.5 9H7l1.5-3.5A2 2 0 0110.3 4h3.4a2 2 0 011.8 1.1L17 9h1.5A2.5 2.5 0 0121 11.5V13" />
+          <path d="M3 13h18v3a1 1 0 01-1 1H4a1 1 0 01-1-1v-3z" />
+          <circle cx="7.5" cy="16.5" r="1.5" />
+          <circle cx="16.5" cy="16.5" r="1.5" />
         </svg>
       );
     default:
@@ -236,15 +259,14 @@ export function ChoicePill({
       onClick={onClick}
       className={`relative inline-flex items-center justify-center rounded-full font-semibold tracking-wide transition ${sizing} ${
         active
-          ? "border border-[#C4A35A] bg-[#0B1F3A] text-white shadow-md"
+          ? "border border-[#D9BB96] bg-[#0B1F3A] text-white shadow-md"
           : "border border-zinc-700 bg-zinc-800 text-zinc-300 hover:bg-zinc-700"
       } ${className}`}
     >
       {children}
       {active ? (
         <span
-          className={`absolute ${checkRight} top-1/2 flex -translate-y-1/2 items-center justify-center rounded-full font-bold text-white ${checkSize}`}
-          style={{ background: GOLD }}
+          className={`absolute ${checkRight} top-1/2 flex -translate-y-1/2 items-center justify-center rounded-full bg-[#D9BB96] font-bold text-[#0B1F3A] ${checkSize}`}
           aria-hidden
         >
           ✓
@@ -313,7 +335,7 @@ export function SelectField({
       id={id}
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-950 px-4 py-3 text-sm text-white outline-none transition focus:border-[#C4A35A] focus:ring-2 focus:ring-[#C4A35A]/25"
+      className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-950 px-4 py-3 text-sm text-white outline-none transition focus:border-[#B85304] focus:ring-2 focus:ring-[#B85304]/25"
     >
       <option value="">{placeholder}</option>
       {options.map((o) => (

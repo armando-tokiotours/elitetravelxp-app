@@ -116,7 +116,7 @@ export function BuilderAccordionProvider({
       {toast ? (
         <div
           role="status"
-          className="fixed bottom-[7.5rem] left-1/2 z-[60] w-[min(92vw,28rem)] -translate-x-1/2 rounded-xl border border-[#C4A35A]/50 bg-[#1a1510] px-4 py-3 text-center text-sm text-[#E8D5A3] shadow-lg md:bottom-28"
+          className="fixed bottom-[7.5rem] left-1/2 z-[60] w-[min(92vw,28rem)] -translate-x-1/2 rounded-xl border border-[#B85304]/50 bg-[#1a1510] px-4 py-3 text-center text-sm text-[#F3D9C4] shadow-lg md:bottom-28"
         >
           ⚠️ {toast}
         </div>

@@ -198,7 +198,7 @@ export function BrandingUiCardsAdmin({
       {msg ? <p className="mt-3 text-sm text-emerald-700">{msg}</p> : null}
 
       {byCategory.length === 0 ? (
-        <p className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+        <p className="mt-4 rounded-xl border border-accent-200 bg-accent-50 p-3 text-sm text-accent-900">
           No <code>branding_ui_items</code> records yet. Restart PocketBase so
           migrations can seed defaults.
         </p>
@@ -207,7 +207,7 @@ export function BrandingUiCardsAdmin({
       <div className="mt-6 space-y-8">
         {byCategory.map((group) => (
           <section key={group.cat}>
-            <h3 className="text-xs font-semibold uppercase tracking-[0.2em] text-[#C4A35A]">
+            <h3 className="text-xs font-semibold uppercase tracking-[0.2em] text-[#B85304]">
               {group.label}
             </h3>
             <div className="mt-3 grid gap-4 lg:grid-cols-2">

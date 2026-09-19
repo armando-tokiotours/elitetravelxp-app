@@ -51,10 +51,10 @@ function TeamShell({
       <div
         className={`${APP_SIDEBAR_RAIL_PAD} min-h-screen bg-zinc-950 text-white`}
       >
-        <header className="sticky top-0 z-40 flex items-center gap-3 border-b border-zinc-800 bg-zinc-950 px-4 py-3 md:hidden">
+        <header className="sticky top-0 z-40 flex items-center gap-3 border-b border-zinc-800 bg-zinc-950 px-4 py-3 lg:hidden">
           <MobileAppNav brandEyebrow="Elite Travel" brandTitle={title} />
           <div className="min-w-0">
-            <p className="text-[0.6rem] font-semibold uppercase tracking-[0.28em] text-[#C4A35A]">
+            <p className="text-[0.6rem] font-semibold uppercase tracking-[0.28em] text-[#B85304]">
               Elite Travel
             </p>
             <h1 className="font-display text-lg leading-tight text-white">
@@ -143,7 +143,7 @@ export function TeamAccessApp() {
                   required
                   value={emailInput}
                   onChange={(e) => setEmailInput(e.target.value)}
-                  className="mt-1 w-full rounded-xl border border-zinc-700 bg-zinc-950 px-3 py-2.5 text-sm text-zinc-100 outline-none focus:border-[#C4A35A]"
+                  className="mt-1 w-full rounded-xl border border-zinc-700 bg-zinc-950 px-3 py-2.5 text-sm text-zinc-100 outline-none focus:border-[#B85304]"
                 />
               </label>
               <label className="block text-xs uppercase tracking-wider text-zinc-400">
@@ -153,7 +153,7 @@ export function TeamAccessApp() {
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="mt-1 w-full rounded-xl border border-zinc-700 bg-zinc-950 px-3 py-2.5 text-sm text-zinc-100 outline-none focus:border-[#C4A35A]"
+                  className="mt-1 w-full rounded-xl border border-zinc-700 bg-zinc-950 px-3 py-2.5 text-sm text-zinc-100 outline-none focus:border-[#B85304]"
                 />
               </label>
               {authError ? (
@@ -162,7 +162,7 @@ export function TeamAccessApp() {
               <button
                 type="submit"
                 disabled={authLoading}
-                className="w-full rounded-full bg-amber-500 py-3 text-sm font-semibold text-zinc-950 disabled:opacity-50"
+                className="w-full rounded-full bg-accent-500 py-3 text-sm font-semibold text-zinc-950 disabled:opacity-50"
               >
                 {authLoading ? "Signing in…" : "Enter Team Access"}
               </button>
@@ -244,7 +244,7 @@ function TabButton({
       onClick={onClick}
       className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${
         active
-          ? "bg-amber-500 font-bold text-zinc-950"
+          ? "bg-accent-500 font-bold text-zinc-950"
           : "border border-zinc-800 bg-zinc-900/80 text-zinc-400 hover:text-white"
       }`}
     >
@@ -577,7 +577,7 @@ function SourceOfTruthPanel({ getClient }: { getClient: () => PbClient }) {
             }}
             className={`rounded-xl px-4 py-2.5 text-left text-sm font-medium ${
               category === c.id
-                ? "bg-amber-500 font-bold text-zinc-950"
+                ? "bg-accent-500 font-bold text-zinc-950"
                 : "border border-zinc-800 bg-zinc-900/80 text-zinc-400 hover:text-white"
             }`}
           >
@@ -600,7 +600,7 @@ function SourceOfTruthPanel({ getClient }: { getClient: () => PbClient }) {
                   setCreating(true);
                   setEditing(null);
                 }}
-                className="rounded-full bg-[#C4A35A] px-4 py-2 text-sm font-semibold text-[#0B1F3A]"
+                className="rounded-full bg-[#B85304] px-4 py-2 text-sm font-semibold text-[#0B1F3A]"
               >
                 + Add
               </button>
@@ -615,7 +615,7 @@ function SourceOfTruthPanel({ getClient }: { getClient: () => PbClient }) {
                 setCreating(true);
                 setEditing(null);
               }}
-              className="rounded-full bg-[#C4A35A] px-4 py-2 text-sm font-semibold text-[#0B1F3A]"
+              className="rounded-full bg-[#B85304] px-4 py-2 text-sm font-semibold text-[#0B1F3A]"
             >
               + Add
             </button>
@@ -648,7 +648,7 @@ function SourceOfTruthPanel({ getClient }: { getClient: () => PbClient }) {
                   onClick={() => setTourCategoryFilter(tab.id)}
                   className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
                     on
-                      ? "bg-amber-500 text-zinc-950 shadow-sm"
+                      ? "bg-accent-500 text-zinc-950 shadow-sm"
                       : "text-zinc-400 hover:bg-zinc-900 hover:text-white"
                   }`}
                 >
@@ -772,7 +772,7 @@ function SourceOfTruthPanel({ getClient }: { getClient: () => PbClient }) {
                       <td className="py-3 text-right whitespace-nowrap">
                         <button
                           type="button"
-                          className="mr-3 text-[#C4A35A]"
+                          className="mr-3 text-[#B85304]"
                           onClick={() => {
                             setEditing(row);
                             setCreating(false);
@@ -1243,7 +1243,7 @@ function RecordEditModal({
         onClick={onCancel}
         aria-hidden
       />
-      <div className="relative z-10 max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-t-3xl border border-zinc-800 bg-zinc-950 p-5 text-white shadow-xl sm:rounded-3xl sm:p-6">
+      <div className="relative z-10 max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-t-3xl border border-zinc-800 bg-zinc-950 p-5 text-white shadow-xl [color-scheme:dark] sm:rounded-3xl sm:p-6">
         <div className="mb-4 flex items-start justify-between gap-3">
           <h3 className="font-display text-2xl text-white">
             {initial
@@ -1270,10 +1270,10 @@ function RecordEditModal({
                     {f.label}
                   </p>
                   <div
-                    className={`rounded-2xl border-2 border-dashed p-5 text-center ${
+                    className={`rounded-2xl border-2 border-dashed p-5 text-center transition ${
                       dragKey === f.key
-                        ? "border-[#C4A35A] bg-[#F3EBD9]"
-                        : "border-[#D9D2C7] bg-white"
+                        ? "border-[#B85304] bg-[#1C1C1E]"
+                        : "border-[#2C2C2E] bg-[#121212] hover:border-[#B85304]"
                     }`}
                     onDragOver={(e) => {
                       e.preventDefault();
@@ -1301,14 +1301,14 @@ function RecordEditModal({
                         className="mx-auto mb-2 h-24 w-24 rounded-xl object-cover"
                       />
                     )}
-                    <p className="text-sm text-[#5C6570]">
+                    <p className="text-sm text-zinc-400">
                       {files[f.key]?.name ||
                         "Drag & drop image, or choose a file"}
                     </p>
                     <input
                       type="file"
                       accept={f.accept || "image/*"}
-                      className="mt-2 block w-full text-sm"
+                      className="mt-2 block w-full text-sm text-zinc-400 file:mr-3 file:rounded-lg file:border-0 file:bg-[#1C1C1E] file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-white"
                       onChange={(e) => {
                         const file = e.target.files?.[0] ?? null;
                         setFiles((s) => ({ ...s, [f.key]: file }));
@@ -1362,7 +1362,7 @@ function RecordEditModal({
                           min={0}
                           value={form[tf.key] ?? ""}
                           onChange={(e) => set(tf.key, e.target.value)}
-                          className="w-full rounded-xl border border-[#D9D2C7] bg-white px-2.5 py-2 text-sm"
+                          className="w-full rounded-xl border border-[#2C2C2E] bg-[#121212] px-2.5 py-2 text-sm text-white placeholder-zinc-500 outline-none [color-scheme:dark] focus:border-[#B85304] focus:ring-1 focus:ring-[#B85304]"
                         />
                       </div>
                     ))}
@@ -1431,10 +1431,10 @@ function RecordEditModal({
                     rows={3}
                     value={form[f.key] ?? ""}
                     onChange={(e) => set(f.key, e.target.value)}
-                    className="w-full rounded-xl border border-[#D9D2C7] bg-white px-3 py-2 text-sm"
+                    className="w-full rounded-xl border border-[#2C2C2E] bg-[#121212] px-3 py-2 text-sm text-white placeholder-zinc-500 outline-none [color-scheme:dark] focus:border-[#B85304] focus:ring-1 focus:ring-[#B85304]"
                   />
                 ) : f.type === "bool" ? (
-                  <div className="inline-flex rounded-full border border-[#D9D2C7] bg-white p-1">
+                  <div className="inline-flex rounded-full border border-[#2C2C2E] bg-[#121212] p-1">
                     {["true", "false"].map((v) => (
                       <button
                         key={v}
@@ -1443,7 +1443,7 @@ function RecordEditModal({
                         className={`rounded-full px-4 py-1.5 text-sm ${
                           (form[f.key] ?? "true") === v
                             ? "bg-[#0B1F3A] text-white"
-                            : "text-[#5C6570]"
+                            : "text-zinc-400"
                         }`}
                       >
                         {v === "true" ? "Active" : "Inactive"}
@@ -1451,7 +1451,7 @@ function RecordEditModal({
                     ))}
                   </div>
                 ) : f.type === "select" && f.key === "category" ? (
-                  <div className="inline-flex rounded-full border border-[#D9D2C7] bg-white p-1">
+                  <div className="inline-flex rounded-full border border-[#2C2C2E] bg-[#121212] p-1">
                     {(f.options || ["tour", "activity"]).map((o) => {
                       const label =
                         o === "activity"
@@ -1472,7 +1472,7 @@ function RecordEditModal({
                           className={`rounded-full px-4 py-1.5 text-sm font-medium transition ${
                             current === o
                               ? "bg-[#0B1F3A] text-white"
-                              : "text-[#5C6570] hover:text-[#0B1F3A]"
+                              : "text-zinc-400 hover:text-white"
                           }`}
                         >
                           {label}
@@ -1499,7 +1499,7 @@ function RecordEditModal({
                             className={`rounded-full border px-3 py-1.5 text-sm transition ${
                               on
                                 ? "border-[#0B1F3A] bg-[#0B1F3A] text-white"
-                                : "border-[#D9D2C7] bg-white text-[#5C6570] hover:border-[#0B1F3A]/40"
+                                : "border-[#2C2C2E] bg-[#121212] text-zinc-400 hover:border-[#B85304]/40"
                             }`}
                           >
                             {labels[o] ?? o}
@@ -1511,7 +1511,7 @@ function RecordEditModal({
                   <select
                     value={form[f.key] ?? ""}
                     onChange={(e) => set(f.key, e.target.value)}
-                    className="w-full rounded-xl border border-[#D9D2C7] bg-white px-3 py-2 text-sm"
+                    className="w-full rounded-xl border border-[#2C2C2E] bg-[#121212] px-3 py-2 text-sm text-white placeholder-zinc-500 outline-none [color-scheme:dark] focus:border-[#B85304] focus:ring-1 focus:ring-[#B85304]"
                   >
                     <option value="">Select…</option>
                     {(f.options || []).map((o) => (
@@ -1572,7 +1572,7 @@ function RecordEditModal({
                           className={`rounded-full border px-3 py-1.5 text-sm transition ${
                             on
                               ? "border-[#0B1F3A] bg-[#0B1F3A] text-white"
-                              : "border-[#D9D2C7] bg-white text-[#5C6570] hover:border-[#0B1F3A]/40"
+                              : "border-[#2C2C2E] bg-[#121212] text-zinc-400 hover:border-[#B85304]/40"
                           }`}
                         >
                           {optionLabel}
@@ -1584,7 +1584,7 @@ function RecordEditModal({
                   <select
                     value={form[f.key] ?? ""}
                     onChange={(e) => set(f.key, e.target.value)}
-                    className="w-full rounded-xl border border-[#D9D2C7] bg-white px-3 py-2 text-sm"
+                    className="w-full rounded-xl border border-[#2C2C2E] bg-[#121212] px-3 py-2 text-sm text-white placeholder-zinc-500 outline-none [color-scheme:dark] focus:border-[#B85304] focus:ring-1 focus:ring-[#B85304]"
                   >
                     <option value="">
                       {def.id === "seasonal_highlights"
@@ -1601,7 +1601,7 @@ function RecordEditModal({
                   <select
                     value={form[f.key] ?? ""}
                     onChange={(e) => set(f.key, e.target.value)}
-                    className="w-full rounded-xl border border-[#D9D2C7] bg-white px-3 py-2 text-sm"
+                    className="w-full rounded-xl border border-[#2C2C2E] bg-[#121212] px-3 py-2 text-sm text-white placeholder-zinc-500 outline-none [color-scheme:dark] focus:border-[#B85304] focus:ring-1 focus:ring-[#B85304]"
                   >
                     <option value="">Select airport / hub</option>
                     {hubs.map((h) => (
@@ -1614,7 +1614,7 @@ function RecordEditModal({
                   <select
                     value={form[f.key] ?? ""}
                     onChange={(e) => set(f.key, e.target.value)}
-                    className="w-full rounded-xl border border-[#D9D2C7] bg-white px-3 py-2 text-sm"
+                    className="w-full rounded-xl border border-[#2C2C2E] bg-[#121212] px-3 py-2 text-sm text-white placeholder-zinc-500 outline-none [color-scheme:dark] focus:border-[#B85304] focus:ring-1 focus:ring-[#B85304]"
                   >
                     <option value="">Select vehicle</option>
                     {vehicles.map((v) => (
@@ -1630,7 +1630,7 @@ function RecordEditModal({
                   <select
                     value={form[f.key] ?? ""}
                     onChange={(e) => set(f.key, e.target.value)}
-                    className="w-full rounded-xl border border-[#D9D2C7] bg-white px-3 py-2 text-sm"
+                    className="w-full rounded-xl border border-[#2C2C2E] bg-[#121212] px-3 py-2 text-sm text-white placeholder-zinc-500 outline-none [color-scheme:dark] focus:border-[#B85304] focus:ring-1 focus:ring-[#B85304]"
                   >
                     <option value="">No linked tour</option>
                     {tours.map((t) => (
@@ -1645,7 +1645,7 @@ function RecordEditModal({
                     step={f.type === "number" ? "any" : undefined}
                     value={form[f.key] ?? ""}
                     onChange={(e) => set(f.key, e.target.value)}
-                    className="w-full rounded-xl border border-[#D9D2C7] bg-white px-3 py-2 text-sm"
+                    className="w-full rounded-xl border border-[#2C2C2E] bg-[#121212] px-3 py-2 text-sm text-white placeholder-zinc-500 outline-none [color-scheme:dark] focus:border-[#B85304] focus:ring-1 focus:ring-[#B85304]"
                   />
                 )}
               </div>
@@ -1654,13 +1654,13 @@ function RecordEditModal({
         </div>
 
         {def.id === "hubs" ? (
-          <div className="mt-5 rounded-2xl border border-[#E8E2D9] bg-white p-4">
+          <div className="mt-5 rounded-2xl border border-[#2C2C2E] bg-[#1C1C1E] p-4">
             <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
               <div>
-                <h4 className="text-sm font-semibold uppercase tracking-wider text-[#0B1F3A]">
+                <h4 className="text-sm font-semibold uppercase tracking-wider text-white">
                   Vehicle Pricing
                 </h4>
-                <p className="mt-1 text-xs text-[#8A8278]">
+                <p className="mt-1 text-xs text-zinc-400">
                   Base fees per vehicle. Client max = base × 1.30.
                 </p>
               </div>
@@ -1677,16 +1677,16 @@ function RecordEditModal({
                     },
                   ])
                 }
-                className="rounded-full border border-[#C4A35A] bg-[#FBF8F2] px-3 py-1.5 text-xs font-semibold text-[#0B1F3A]"
+                className="rounded-full border border-[#B85304]/60 bg-[#121212] px-3 py-1.5 text-xs font-semibold text-[#D9BB96]"
               >
                 + Add Vehicle Rate
               </button>
             </div>
 
             {ratesLoading ? (
-              <p className="text-sm text-[#8A8278]">Loading rates…</p>
+              <p className="text-sm text-zinc-400">Loading rates…</p>
             ) : vehicleRates.length === 0 ? (
-              <p className="text-sm text-[#8A8278]">
+              <p className="text-sm text-zinc-400">
                 No vehicle rates yet. Add Alphard, 10-seater, 14-seater, etc.
               </p>
             ) : (
@@ -1694,7 +1694,7 @@ function RecordEditModal({
                 {vehicleRates.map((rate, idx) => (
                   <div
                     key={rate.key}
-                    className="grid gap-2 rounded-xl border border-[#EEE8DF] bg-[#FBF8F2] p-3 sm:grid-cols-[1.4fr_1fr_1fr_auto]"
+                    className="grid gap-2 rounded-xl border border-[#2C2C2E] bg-[#121212] p-3 sm:grid-cols-[1.4fr_1fr_1fr_auto]"
                   >
                     <label className="block text-[10px] uppercase tracking-wider text-[#8A8278]">
                       Vehicle
@@ -1709,7 +1709,7 @@ function RecordEditModal({
                             )
                           )
                         }
-                        className="mt-1 w-full rounded-lg border border-[#D9D2C7] bg-white px-2 py-2 text-sm"
+                        className="mt-1 w-full rounded-lg border border-[#2C2C2E] bg-[#121212] px-2 py-2 text-sm text-white placeholder-zinc-500 outline-none [color-scheme:dark] focus:border-[#B85304] focus:ring-1 focus:ring-[#B85304]"
                       >
                         <option value="">Select vehicle…</option>
                         {vehicles.map((v) => (
@@ -1738,7 +1738,7 @@ function RecordEditModal({
                             )
                           )
                         }
-                        className="mt-1 w-full rounded-lg border border-[#D9D2C7] bg-white px-2 py-2 text-sm"
+                        className="mt-1 w-full rounded-lg border border-[#2C2C2E] bg-[#121212] px-2 py-2 text-sm text-white placeholder-zinc-500 outline-none [color-scheme:dark] focus:border-[#B85304] focus:ring-1 focus:ring-[#B85304]"
                       />
                     </label>
                     <label className="block text-[10px] uppercase tracking-wider text-[#8A8278]">
@@ -1757,7 +1757,7 @@ function RecordEditModal({
                             )
                           )
                         }
-                        className="mt-1 w-full rounded-lg border border-[#D9D2C7] bg-white px-2 py-2 text-sm"
+                        className="mt-1 w-full rounded-lg border border-[#2C2C2E] bg-[#121212] px-2 py-2 text-sm text-white placeholder-zinc-500 outline-none [color-scheme:dark] focus:border-[#B85304] focus:ring-1 focus:ring-[#B85304]"
                       />
                     </label>
                     <div className="flex items-end">
@@ -1801,7 +1801,7 @@ function RecordEditModal({
           <button
             type="button"
             onClick={onCancel}
-            className="rounded-full border border-[#D9D2C7] px-5 py-2.5 text-sm"
+            className="rounded-full border border-[#2C2C2E] px-5 py-2.5 text-sm text-zinc-300 hover:border-zinc-500"
           >
             Cancel
           </button>
@@ -1921,7 +1921,7 @@ function RulesOfLogicPanel({ getClient }: { getClient: () => PbClient }) {
                       }
                       className={`rounded-full px-4 py-1.5 text-sm ${
                         (draft[row.key] ?? row.value) === v
-                          ? "bg-amber-500 font-semibold text-zinc-950"
+                          ? "bg-accent-500 font-semibold text-zinc-950"
                           : "text-zinc-400"
                       }`}
                     >
@@ -1948,7 +1948,7 @@ function RulesOfLogicPanel({ getClient }: { getClient: () => PbClient }) {
         type="button"
         disabled={saving}
         onClick={() => void saveAll()}
-        className="mt-6 rounded-full bg-amber-500 px-6 py-3 text-sm font-semibold text-zinc-950 disabled:opacity-50"
+        className="mt-6 rounded-full bg-accent-500 px-6 py-3 text-sm font-semibold text-zinc-950 disabled:opacity-50"
       >
         {saving ? "Saving…" : "Save rules"}
       </button>
@@ -2124,7 +2124,7 @@ function UsersPanel({
           type="button"
           disabled={saving || !email || !password}
           onClick={() => void createUser()}
-          className="mt-4 rounded-full bg-[#C4A35A] px-5 py-2 text-sm font-semibold text-[#0B1F3A] disabled:opacity-50"
+          className="mt-4 rounded-full bg-[#B85304] px-5 py-2 text-sm font-semibold text-[#0B1F3A] disabled:opacity-50"
         >
           {saving ? "Creating…" : "+ Create user"}
         </button>
@@ -2157,7 +2157,7 @@ function UsersPanel({
                     <td className="py-3 text-right whitespace-nowrap">
                       <button
                         type="button"
-                        className="mr-3 text-[#C4A35A]"
+                        className="mr-3 text-[#B85304]"
                         onClick={() => {
                           setResetId(row.id);
                           setResetPass("");
@@ -2184,7 +2184,7 @@ function UsersPanel({
       </div>
 
       {resetId ? (
-        <div className="mt-5 rounded-2xl border border-[#C4A35A]/40 bg-zinc-950 p-4">
+        <div className="mt-5 rounded-2xl border border-[#B85304]/40 bg-zinc-950 p-4">
           <h3 className="font-medium text-zinc-100">
             Reset password · {rows.find((r) => r.id === resetId)?.email}
           </h3>
@@ -2209,7 +2209,7 @@ function UsersPanel({
               type="button"
               disabled={saving}
               onClick={() => void resetPassword(resetId)}
-              className="rounded-full bg-amber-500 px-4 py-2 text-sm font-semibold text-zinc-950 disabled:opacity-50"
+              className="rounded-full bg-accent-500 px-4 py-2 text-sm font-semibold text-zinc-950 disabled:opacity-50"
             >
               Save password
             </button>

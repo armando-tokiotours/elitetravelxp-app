@@ -161,12 +161,12 @@ export function ExperienceProfilerModal({
                   <ArrowLeft className="h-4 w-4" />
                 </button>
               ) : (
-                <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#C4A35A]/15 text-[#C4A35A]">
+                <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#B85304]/15 text-[#B85304]">
                   <Sparkles className="h-4 w-4" />
                 </span>
               )}
               <div className="min-w-0 flex-1">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#C4A35A]">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#B85304]">
                   30-Second Style Quiz
                 </p>
                 <h2 className="truncate text-base font-bold text-white">
@@ -185,7 +185,7 @@ export function ExperienceProfilerModal({
 
             <div className="h-1 w-full bg-zinc-900">
               <div
-                className="h-full bg-[#C4A35A] transition-all duration-300"
+                className="h-full bg-[#B85304] transition-all duration-300"
                 style={{ width: `${Math.min(100, progress)}%` }}
               />
             </div>
@@ -208,11 +208,11 @@ export function ExperienceProfilerModal({
                     <SummaryRow label="Access Style" value={crowdLabel} />
                   </div>
 
-                  <div className="rounded-2xl border border-[#C4A35A]/35 bg-[#C4A35A]/10 p-4">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#C4A35A]">
+                  <div className="rounded-2xl border border-[#B85304]/35 bg-[#B85304]/10 p-4">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#B85304]">
                       Your Travel Profile
                     </p>
-                    <p className="mt-2 font-mono text-xs text-[#E8D5A3]">
+                    <p className="mt-2 font-mono text-xs text-[#F3D9C4]">
                       {draft.userProfileTag}
                     </p>
                     <p className="mt-2 text-sm leading-relaxed text-zinc-200">
@@ -224,7 +224,7 @@ export function ExperienceProfilerModal({
                   <button
                     type="button"
                     onClick={applyProfile}
-                    className="w-full rounded-full bg-[#0B1F3A] py-3 text-sm font-semibold text-white ring-1 ring-[#C4A35A]/40 transition hover:bg-[#143052]"
+                    className="w-full rounded-full bg-[#0B1F3A] py-3 text-sm font-semibold text-white ring-1 ring-[#B85304]/40 transition hover:bg-[#143052]"
                   >
                     Apply Profile &amp; View Matches
                   </button>
@@ -324,7 +324,7 @@ function QuizChoice({
       aria-pressed={selected}
       className={`w-full rounded-2xl border px-4 py-3.5 text-left transition ${
         selected
-          ? "border-[#C4A35A] bg-[#C4A35A]/12"
+          ? "border-[#B85304] bg-[#B85304]/12"
           : "border-zinc-800 bg-zinc-900 hover:border-zinc-600"
       }`}
     >

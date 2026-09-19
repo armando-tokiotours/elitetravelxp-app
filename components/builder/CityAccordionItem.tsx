@@ -10,6 +10,7 @@ import type {
 } from "@/store/useBuilderStore";
 import { coerceTransitType } from "@/store/useBuilderStore";
 import { allowedVisitTypesForIndex } from "@/lib/locationRules";
+import { useHybridTooltip } from "@/hooks/useHybridTooltip";
 import { ConciergeSuggestionCard } from "./ConciergeSuggestionCard";
 import { CityThumb } from "./CityThumb";
 
@@ -55,17 +56,23 @@ export function CityAccordionItem({
     : "stay";
   const isStay = visitType === "stay";
   const isLast = index === totalLocations - 1;
+  const nightsOk = isStay ? loc.nights >= 1 : true;
+  const transitOk = isLast || transit !== "unset";
+  const isConfigured = nightsOk && transitOk;
+  const nightsStatusClass = isConfigured
+    ? "text-emerald-400"
+    : "text-[#B85304]";
 
   return (
     <Reorder.Item
       value={loc}
       dragListener={false}
       dragControls={controls}
-      className="overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-900 shadow-[0_2px_12px_rgba(11,31,58,0.04)]"
+      className="w-full overflow-visible rounded-2xl border border-zinc-800 bg-zinc-900 shadow-[0_2px_12px_rgba(11,31,58,0.04)]"
     >
       {expanded ? (
         <div>
-          <div className="relative">
+          <div className="relative overflow-hidden rounded-t-2xl">
             <div className="absolute left-2 top-2 z-10">
               <DragHandle controls={controls} onLight />
             </div>
@@ -96,9 +103,9 @@ export function CityAccordionItem({
             </button>
           </div>
 
-          <div className="px-4 pb-4 pt-3">
-            <div className="flex w-full flex-col gap-1 overflow-hidden sm:flex-row sm:items-start sm:justify-between sm:gap-3">
-              <div className="flex min-w-0 flex-col gap-1 overflow-hidden">
+          <div className="w-full overflow-visible px-4 pb-4 pt-3 sm:px-5 sm:pb-5">
+            <div className="flex w-full flex-col gap-1 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
+              <div className="flex min-w-0 flex-col gap-1">
                 <h3 className="break-words text-sm font-semibold leading-tight text-white sm:font-display sm:text-2xl sm:font-normal">
                   {name}
                 </h3>
@@ -114,7 +121,7 @@ export function CityAccordionItem({
               {isStay ? (
                 <NightStepper value={loc.nights} onChange={onNights} />
               ) : (
-                <span className="shrink-0 rounded-full border border-zinc-700 bg-zinc-950 px-3 py-1.5 text-xs font-semibold capitalize text-[#C4A35A]">
+                <span className="shrink-0 rounded-full border border-zinc-700 bg-zinc-950 px-3 py-1.5 text-xs font-semibold capitalize text-[#F2F2F2]">
                   {visitType} · 0 nights
                 </span>
               )}
@@ -142,45 +149,58 @@ export function CityAccordionItem({
               </div>
             </div>
 
-            <div className="mt-4 flex flex-wrap items-end justify-between gap-3">
-              <div className="min-w-0 flex-1 overflow-hidden">
-                <p className="text-[11px] uppercase tracking-wider text-zinc-500">
+            <div className="relative z-30 mt-4 w-full overflow-visible rounded-xl border-t border-zinc-800/80 bg-[#121212] p-3 pt-3 sm:p-3.5">
+              {/* Row 1: Departure origin */}
+              <div className="mb-2.5 shrink-0 min-w-max">
+                <span className="mb-0.5 block text-[10px] font-bold uppercase tracking-wider text-zinc-400">
                   From
-                </p>
-                <p className="break-words text-sm font-medium leading-tight text-white">
+                </span>
+                <p className="whitespace-nowrap text-xs font-semibold text-white">
                   {fromLabel}
                 </p>
               </div>
 
+              {/* Row 2: Travel to next */}
               {!isLast ? (
-                <div className="text-right">
-                  <p className="mb-1.5 text-[11px] uppercase tracking-wider text-zinc-500">
+                <div className="relative z-30 flex flex-col gap-1.5 overflow-visible border-t border-zinc-800/80 pt-2.5">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">
                     Travel to next
-                  </p>
+                  </span>
                   {transit === "unset" ? (
-                    <p className="mb-1.5 text-[10px] font-medium text-amber-400">
+                    <p className="text-[10px] font-medium text-accent-500">
                       ⚠️ Not configured
                     </p>
                   ) : null}
-                  <div className="inline-flex flex-wrap justify-end rounded-full border border-zinc-700 bg-zinc-950 p-0.5">
-                    <TransitPill
-                      active={transit === "self"}
-                      onClick={() => onTransit("self")}
-                      label="Self"
-                      hint="€0"
-                    />
-                    <TransitPill
-                      active={transit === "public"}
-                      onClick={() => onTransit("public")}
-                      label="Public"
-                      hint="Train"
-                    />
-                    <TransitPill
-                      active={transit === "private"}
-                      onClick={() => onTransit("private")}
-                      label="Private"
-                      hint="Car"
-                    />
+                  <div className="relative z-30 flex flex-wrap items-center gap-2 overflow-visible">
+                    <div className="relative z-30 inline-flex shrink-0 overflow-visible rounded-full border border-zinc-700 bg-zinc-950 p-0.5">
+                      <TransitPill
+                        active={transit === "self"}
+                        onClick={() => onTransit("self")}
+                        label="Self"
+                        hint="€0"
+                        tooltip="Self-arranged — You figure out and manage your transit independently (€0)."
+                        tipWidth="w-52"
+                        tipAlign="left"
+                      />
+                      <TransitPill
+                        active={transit === "public"}
+                        onClick={() => onTransit("public")}
+                        label="Public"
+                        hint="Train"
+                        tooltip="Public Transit — We guide and secure train tickets/Shinkansen passes for your journey."
+                        tipWidth="w-52"
+                        tipAlign="center"
+                      />
+                      <TransitPill
+                        active={transit === "private"}
+                        onClick={() => onTransit("private")}
+                        label="Private"
+                        hint="Car"
+                        tooltip="Private Chauffeur — We provide a dedicated vehicle (e.g. Toyota Alphard) and private driver."
+                        tipWidth="w-52"
+                        tipAlign="right"
+                      />
+                    </div>
                   </div>
                 </div>
               ) : null}
@@ -222,7 +242,7 @@ export function CityAccordionItem({
               <span className="block break-words text-sm font-semibold leading-tight text-white">
                 {name}
               </span>
-              <span className="text-xs text-[#C4A35A]">
+              <span className={`text-xs font-medium ${nightsStatusClass}`}>
                 {isStay
                   ? `${loc.nights} night${loc.nights === 1 ? "" : "s"}`
                   : visitType === "arrival"
@@ -232,7 +252,7 @@ export function CityAccordionItem({
             </span>
             {dateLabel ? (
               <span className="shrink-0 text-xs text-zinc-400">
-                <span className="mr-0.5 text-[#C4A35A]">›</span>
+                <span className="mr-0.5 text-[#B85304]">›</span>
                 {dateLabel.toLowerCase()}
               </span>
             ) : null}
@@ -261,7 +281,7 @@ function VisitPill({
       onClick={onClick}
       className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
         active
-          ? "bg-[#0B1F3A] text-white ring-1 ring-[#C4A35A]/50"
+          ? "bg-[#0B1F3A] text-white ring-1 ring-[#B85304]/50"
           : "text-zinc-400 hover:bg-zinc-800 hover:text-white"
       }`}
     >
@@ -275,29 +295,81 @@ function TransitPill({
   onClick,
   label,
   hint,
+  tooltip,
+  tipWidth = "w-52",
+  tipAlign = "center",
 }: {
   active: boolean;
   onClick: () => void;
   label: string;
   hint: string;
+  tooltip: string;
+  tipWidth?: string;
+  tipAlign?: "left" | "center" | "right";
 }) {
+  const {
+    isOpen,
+    setIsOpen,
+    containerRef,
+    onMouseEnter,
+    onMouseLeave,
+  } = useHybridTooltip();
+
+  const tipPos =
+    tipAlign === "right"
+      ? "right-0 translate-x-0"
+      : tipAlign === "left"
+        ? "left-0 translate-x-0"
+        : "left-1/2 -translate-x-1/2";
+  const arrowPos =
+    tipAlign === "right"
+      ? "right-6 left-auto translate-x-0"
+      : tipAlign === "left"
+        ? "left-6 right-auto translate-x-0"
+        : "left-1/2 -translate-x-1/2";
+
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
-        active
-          ? "bg-[#0B1F3A] text-white ring-1 ring-[#C4A35A]/50"
-          : "text-zinc-400 hover:bg-zinc-800 hover:text-white"
-      }`}
+    <div
+      ref={containerRef}
+      className="group relative z-50 inline-block overflow-visible"
+      onMouseEnter={onMouseEnter}
+      onMouseLeave={onMouseLeave}
     >
-      {label}
-      <span
-        className={`ml-1 font-normal ${active ? "text-white/70" : "text-zinc-500"}`}
+      <div
+        role="tooltip"
+        className={`pointer-events-none absolute bottom-full z-50 mb-2 max-w-[220px] whitespace-normal break-words rounded-lg border border-[#B85304]/40 bg-[#D9BB96] p-2 text-center text-[10px] font-bold text-[#000000] shadow-2xl transition-all duration-150 ${tipPos} ${tipWidth} ${
+          isOpen
+            ? "visible opacity-100"
+            : "invisible opacity-0 group-hover:visible group-hover:opacity-100"
+        }`}
       >
-        ({hint})
-      </span>
-    </button>
+        <span>{tooltip}</span>
+        <div
+          className={`absolute top-full border-4 border-transparent border-t-[#D9BB96] ${arrowPos}`}
+          aria-hidden
+        />
+      </div>
+      <button
+        type="button"
+        onClick={() => {
+          onClick();
+          setIsOpen((prev) => !prev);
+        }}
+        aria-expanded={isOpen}
+        className={`rounded-full px-3 py-1.5 text-xs font-semibold transition active:scale-95 ${
+          active
+            ? "bg-[#0B1F3A] text-white ring-1 ring-[#D9BB96]/50"
+            : "text-zinc-400 hover:bg-zinc-800 hover:text-white"
+        }`}
+      >
+        {label}
+        <span
+          className={`ml-1 font-normal ${active ? "text-white/70" : "text-zinc-500"}`}
+        >
+          ({hint})
+        </span>
+      </button>
+    </div>
   );
 }
 
@@ -349,7 +421,7 @@ function DragHandle({
       className={`cursor-grab touch-none rounded-md px-1.5 py-1.5 active:cursor-grabbing ${
         onLight
           ? "bg-black/35 text-white backdrop-blur-sm"
-          : "text-[#C4A35A]"
+          : "text-white"
       }`}
     >
       <svg width="14" height="12" viewBox="0 0 14 12" fill="currentColor">

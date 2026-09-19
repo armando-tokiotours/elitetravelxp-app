@@ -21,7 +21,7 @@ function renderBodyBlocks(body: string) {
           {bullets.map((line, j) => (
             <li key={j} className="flex gap-2">
               <Check
-                className="mt-0.5 h-4 w-4 shrink-0 text-[#C4A35A]"
+                className="mt-0.5 h-4 w-4 shrink-0 text-[#B85304]"
                 aria-hidden
               />
               <span>{line.replace(/^[•\-\*]\s+/, "")}</span>
@@ -71,6 +71,9 @@ export function ConciergeEditorModal({
 }) {
   const experienceService = useBuilderStore((s) => s.experienceService);
   const setExperienceService = useBuilderStore((s) => s.setExperienceService);
+  const selectedTourIds = useBuilderStore((s) => s.selectedTourIds);
+  const selectedTours = useBuilderStore((s) => s.selectedTours);
+  const chauffeurSelections = useBuilderStore((s) => s.chauffeurSelections);
   const selected = experienceService === "concierge";
   const ensureBrandingLoaded = useSiteBrandingStore((s) => s.ensureLoaded);
   const brandingItems = useSiteBrandingStore((s) => s.itemsByKey);
@@ -79,6 +82,16 @@ export function ConciergeEditorModal({
 
   const [mounted, setMounted] = useState(false);
   const [isPolicyModalOpen, setIsPolicyModalOpen] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+
+  const hasAlaCartePicks =
+    selectedTourIds.length > 0 ||
+    Object.values(selectedTours).some((rows) => rows.length > 0) ||
+    Object.keys(chauffeurSelections).some((cityId) =>
+      Object.values(chauffeurSelections[cityId] ?? {}).some(
+        (sel) => sel && sel.mode !== "none"
+      )
+    );
 
   useEffect(() => {
     setMounted(true);
@@ -87,6 +100,7 @@ export function ConciergeEditorModal({
   useEffect(() => {
     if (!open) {
       setIsPolicyModalOpen(false);
+      setConfirmOpen(false);
       return;
     }
     void ensureBrandingLoaded();
@@ -111,6 +125,20 @@ export function ConciergeEditorModal({
   const inclusionBody = concierge.inclusionBody;
   const creditTitle = concierge.creditTitle || "100% credit toward your trip";
   const creditBody = concierge.creditBody;
+
+  const applyConcierge = () => {
+    setExperienceService("concierge");
+    setConfirmOpen(false);
+    onClose();
+  };
+
+  const onSelectClick = () => {
+    if (selected) {
+      onClose();
+      return;
+    }
+    setConfirmOpen(true);
+  };
 
   return createPortal(
     <AnimatePresence
@@ -147,7 +175,7 @@ export function ConciergeEditorModal({
                 <ArrowLeft className="h-5 w-5" />
               </button>
               <div className="min-w-0 flex-1">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#C4A35A]">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#B85304]">
                   Configure
                 </p>
                 <h3 className="truncate font-display text-2xl text-white">
@@ -171,7 +199,7 @@ export function ConciergeEditorModal({
               </div>
 
               <div className="px-0.5">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#C4A35A]">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#B85304]">
                   Premium
                 </p>
                 <h4 className="mt-1 font-display text-xl text-white sm:text-2xl">
@@ -183,7 +211,7 @@ export function ConciergeEditorModal({
               <div className="overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-900/80">
                 <div className="flex items-center gap-2 border-b border-zinc-800 px-4 py-3">
                   <Sparkles
-                    className="h-4 w-4 shrink-0 text-[#C4A35A]"
+                    className="h-4 w-4 shrink-0 text-[#B85304]"
                     aria-hidden
                   />
                   <h5 className="text-sm font-semibold text-white">
@@ -195,9 +223,9 @@ export function ConciergeEditorModal({
                 </div>
               </div>
 
-              <div className="overflow-hidden rounded-2xl border border-[#C4A35A]/35 bg-gradient-to-br from-zinc-950 to-zinc-900">
-                <div className="border-b border-[#C4A35A]/20 px-4 py-3">
-                  <h5 className="text-sm font-semibold text-[#C4A35A]">
+              <div className="overflow-hidden rounded-2xl border border-[#B85304]/35 bg-gradient-to-br from-zinc-950 to-zinc-900">
+                <div className="border-b border-[#B85304]/20 px-4 py-3">
+                  <h5 className="text-sm font-semibold text-[#B85304]">
                     {creditTitle}
                   </h5>
                 </div>
@@ -220,10 +248,7 @@ export function ConciergeEditorModal({
             <div className="flex flex-shrink-0 flex-col gap-3 border-t border-zinc-800 bg-[#0a0a0a]/90 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] backdrop-blur-md">
               <button
                 type="button"
-                onClick={() => {
-                  setExperienceService("concierge");
-                  onClose();
-                }}
+                onClick={onSelectClick}
                 className="w-full rounded-full bg-[#0B1F3A] py-3 text-sm font-semibold text-white transition hover:bg-[#143052]"
               >
                 {selected
@@ -249,6 +274,47 @@ export function ConciergeEditorModal({
             open={isPolicyModalOpen}
             onClose={() => setIsPolicyModalOpen(false)}
           />
+
+          {confirmOpen ? (
+            <div className="absolute inset-0 z-[60] flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm">
+              <div className="w-full max-w-md rounded-2xl border border-zinc-700 bg-zinc-950 p-5 shadow-2xl sm:p-6">
+                <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-accent-500">
+                  Confirm switch
+                </p>
+                <h4 className="mt-2 font-display text-xl text-white sm:text-2xl">
+                  Switch to 1-on-1 Bespoke Concierge Design?
+                </h4>
+                <p className="mt-3 text-sm leading-relaxed text-zinc-400">
+                  Selecting Elite Concierge replaces standard a-la-carte tour
+                  and driver picks. Your €{ELITE_CONCIERGE_FEE} deposit locks in
+                  a dedicated specialist who will design, price, and coordinate
+                  every tour, driver, and dining reservation directly with you.
+                </p>
+                {hasAlaCartePicks ? (
+                  <p className="mt-3 rounded-xl border border-[#B85304]/40 bg-[#B85304]/15 px-3 py-2 text-xs text-accent-200">
+                    Your current tour and private driver selections will be
+                    cleared when you confirm.
+                  </p>
+                ) : null}
+                <div className="mt-5 flex flex-col gap-2 sm:flex-row-reverse">
+                  <button
+                    type="button"
+                    onClick={applyConcierge}
+                    className="w-full rounded-xl bg-accent-500 py-3 text-sm font-bold text-zinc-950 transition hover:bg-[#9C4203] sm:flex-1"
+                  >
+                    Confirm &amp; Apply Concierge
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setConfirmOpen(false)}
+                    className="w-full rounded-xl border border-zinc-700 py-3 text-sm font-semibold text-zinc-300 transition hover:border-zinc-500 sm:flex-1"
+                  >
+                    Keep A-la-Carte Picks
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : null}
         </motion.div>
       ) : null}
     </AnimatePresence>,

@@ -49,6 +49,15 @@ export function AppShell({
   }, [pathname]);
 
   useEffect(() => {
+    const closeIfDesktop = () => {
+      if (window.innerWidth >= 1024) setOpen(false);
+    };
+    closeIfDesktop();
+    window.addEventListener("resize", closeIfDesktop);
+    return () => window.removeEventListener("resize", closeIfDesktop);
+  }, []);
+
+  useEffect(() => {
     document.body.style.overflow = open ? "hidden" : "";
     return () => {
       document.body.style.overflow = "";
@@ -70,8 +79,8 @@ export function AppShell({
       : "sticky top-0 z-40 border-b border-[#E8E2D9]/80 bg-[#FBF8F2]/95 backdrop-blur-md";
 
   const manageBtnClass = dark
-    ? "inline-flex items-center gap-1.5 rounded-xl border border-zinc-700 bg-zinc-900 px-2.5 py-2 text-[0.65rem] font-semibold uppercase tracking-wider text-zinc-200 transition hover:border-[#C4A35A] hover:text-white sm:px-3"
-    : "inline-flex items-center gap-1.5 rounded-xl border border-[#D9D2C7] bg-white px-2.5 py-2 text-[0.65rem] font-semibold uppercase tracking-wider text-[#0B1F3A] transition hover:border-[#C4A35A] sm:px-3";
+    ? "inline-flex items-center gap-1.5 rounded-xl border border-zinc-700 bg-zinc-900 px-2.5 py-2 text-[0.65rem] font-semibold uppercase tracking-wider text-zinc-200 transition hover:border-[#B85304] hover:text-white sm:px-3"
+    : "inline-flex items-center gap-1.5 rounded-xl border border-[#D9D2C7] bg-white px-2.5 py-2 text-[0.65rem] font-semibold uppercase tracking-wider text-[#0B1F3A] transition hover:border-[#B85304] sm:px-3";
 
   return (
     <div
@@ -82,7 +91,7 @@ export function AppShell({
       }`}
     >
       <header
-        className={`${headerClass}${hideHeaderOnDesktop ? " md:hidden" : ""}`}
+        className={`${headerClass}${hideHeaderOnDesktop ? " lg:hidden" : ""}`}
       >        <div
           className={`mx-auto flex items-center gap-2 px-4 py-3 sm:gap-3 sm:px-6 ${
             heroMode ? "max-w-5xl" : "max-w-3xl"
@@ -98,7 +107,7 @@ export function AppShell({
                 className={manageBtnClass}
                 aria-label="Manage Booking"
               >
-                <Ticket className="h-3.5 w-3.5 text-[#C4A35A]" />
+                <Ticket className="h-3.5 w-3.5 text-[#B85304]" />
                 <span className="hidden sm:inline">Manage Booking</span>
                 <span className="sm:hidden">Booking</span>
               </button>
@@ -107,10 +116,10 @@ export function AppShell({
                 aria-label="Open menu"
                 aria-expanded={open}
                 onClick={() => setOpen(true)}
-                className={`flex h-10 w-10 items-center justify-center rounded-xl transition ${
+                className={`flex h-10 w-10 items-center justify-center rounded-xl transition lg:hidden ${
                   dark
-                    ? "border border-zinc-700 bg-zinc-900 text-white hover:border-[#C4A35A]"
-                    : "border border-[#D9D2C7] bg-white text-[#0B1F3A] hover:border-[#C4A35A]"
+                    ? "border border-zinc-700 bg-zinc-900 text-white hover:border-[#B85304]"
+                    : "border border-[#D9D2C7] bg-white text-[#0B1F3A] hover:border-[#B85304]"
                 }`}
               >
                 <HamburgerIcon />
@@ -123,16 +132,16 @@ export function AppShell({
                 aria-label="Open menu"
                 aria-expanded={open}
                 onClick={() => setOpen(true)}
-                className={`flex h-10 w-10 items-center justify-center rounded-xl transition ${
+                className={`flex h-10 w-10 items-center justify-center rounded-xl transition lg:hidden ${
                   dark
-                    ? "border border-zinc-700 bg-zinc-900 text-white hover:border-[#C4A35A]"
-                    : "border border-[#D9D2C7] bg-white text-[#0B1F3A] hover:border-[#C4A35A]"
+                    ? "border border-zinc-700 bg-zinc-900 text-white hover:border-[#B85304]"
+                    : "border border-[#D9D2C7] bg-white text-[#0B1F3A] hover:border-[#B85304]"
                 }`}
               >
                 <HamburgerIcon />
               </button>
               <div className="min-w-0 flex-1">
-                <p className="text-[0.6rem] font-semibold uppercase tracking-[0.35em] text-[#C4A35A]">
+                <p className="text-[0.6rem] font-semibold uppercase tracking-[0.35em] text-[#B85304]">
                   {subtitle ?? "Elite Travel Experiences"}
                 </p>
                 {title ? (
@@ -151,7 +160,7 @@ export function AppShell({
                 className={manageBtnClass}
                 aria-label="Manage Booking"
               >
-                <Ticket className="h-3.5 w-3.5 text-[#C4A35A]" />
+                <Ticket className="h-3.5 w-3.5 text-[#B85304]" />
                 <span className="hidden sm:inline">Manage Booking</span>
                 <span className="sm:hidden">Booking</span>
               </button>
@@ -177,7 +186,7 @@ export function AppShell({
 
       <div
         className={`fixed inset-0 z-50 transition ${
-          hideHeaderOnDesktop ? "md:hidden " : ""
+          hideHeaderOnDesktop ? "lg:hidden " : ""
         }${open ? "pointer-events-auto" : "pointer-events-none"}`}
       >
         <button
@@ -195,7 +204,7 @@ export function AppShell({
         >
           <div className="flex items-center justify-between border-b border-white/10 px-5 py-5">
             <div>
-              <p className="text-[0.65rem] uppercase tracking-[0.3em] text-[#C4A35A]">
+              <p className="text-[0.65rem] uppercase tracking-[0.3em] text-[#B85304]">
                 Menu
               </p>
               <p className="mt-1 font-display text-xl">
@@ -233,7 +242,7 @@ export function AppShell({
                   href={link.href}
                   className={`rounded-xl px-4 py-3.5 text-sm tracking-wide transition ${
                     active
-                      ? "bg-[#C4A35A]/20 text-[#C4A35A]"
+                      ? "bg-[#B85304]/20 text-[#B85304]"
                       : "text-white/85 hover:bg-white/8"
                   }`}
                 >
@@ -272,7 +281,7 @@ export function AppShell({
       {toast ? (
         <div
           role="status"
-          className="fixed bottom-[7.5rem] left-1/2 z-[110] w-[min(92vw,28rem)] -translate-x-1/2 rounded-xl border border-[#C4A35A]/50 bg-[#1a1510] px-4 py-3 text-center text-sm text-[#E8D5A3] shadow-lg md:bottom-28"
+          className="fixed bottom-[7.5rem] left-1/2 z-[110] w-[min(92vw,28rem)] -translate-x-1/2 rounded-xl border border-[#B85304]/50 bg-[#1a1510] px-4 py-3 text-center text-sm text-[#F3D9C4] shadow-lg md:bottom-28"
         >
           {toast}
         </div>

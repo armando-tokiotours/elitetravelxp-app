@@ -31,7 +31,7 @@ export default function PreviewPage() {
   return (
     <div className="builder-theme min-h-screen bg-[#F5F0E8] pb-28 text-[#0B1F3A]">
       <header className="border-b border-[#E8E2D9] bg-[#FBF8F2] px-4 py-5">
-        <p className="text-[0.65rem] font-semibold uppercase tracking-[0.35em] text-[#C4A35A]">
+        <p className="text-[0.65rem] font-semibold uppercase tracking-[0.35em] text-[#B85304]">
           Preview Trip
         </p>
         <h1 className="mt-1 font-display text-3xl">
@@ -73,7 +73,7 @@ export default function PreviewPage() {
                   </div>
                 )}
                 <div className="p-4">
-                  <p className="text-xs uppercase tracking-[0.2em] text-[#C4A35A]">
+                  <p className="text-xs uppercase tracking-[0.2em] text-[#B85304]">
                     Stop {i + 1}
                   </p>
                   <h2 className="font-display text-2xl">

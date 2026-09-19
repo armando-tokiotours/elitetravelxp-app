@@ -54,7 +54,7 @@ export function CustomBudgetModal({
       />
       <div className="relative z-10 w-full max-w-md rounded-2xl border border-zinc-800 bg-zinc-950 p-5 text-white shadow-2xl sm:p-6">
         <div className="mb-4">
-          <p className="text-[0.65rem] font-bold uppercase tracking-[0.2em] text-amber-400">
+          <p className="text-[0.65rem] font-bold uppercase tracking-[0.2em] text-[#D9BB96]">
             Custom Budget Matcher
           </p>
           <h3 className="mt-1 font-display text-2xl text-white">
@@ -83,7 +83,7 @@ export function CustomBudgetModal({
                 setError(null);
               }}
               placeholder="1200"
-              className="w-full rounded-xl border border-zinc-700 bg-zinc-900 py-3 pl-8 pr-3 text-lg font-semibold text-white outline-none focus:border-amber-500"
+              className="w-full rounded-xl border border-zinc-700 bg-zinc-900 py-3 pl-8 pr-3 text-lg font-semibold text-white outline-none focus:border-[#B85304]"
             />
           </div>
         </label>
@@ -100,7 +100,7 @@ export function CustomBudgetModal({
           <button
             type="button"
             onClick={handleSubmit}
-            className="w-full rounded-xl bg-amber-500 py-3 text-sm font-bold text-zinc-950 transition hover:bg-amber-400 sm:flex-1"
+            className="w-full rounded-xl bg-[#D9BB96] py-3 text-sm font-bold text-[#0B1F3A] transition hover:bg-[#c9ab86] sm:flex-1"
           >
             Confirm Selection
           </button>

@@ -13,7 +13,7 @@ export function BudgetPlannerPageClient() {
     <div className={`min-h-dvh bg-zinc-950 text-white ${APP_SIDEBAR_RAIL_PAD}`}>
       <AppSidebar />
       <MobileAppNav />
-      <main className="pb-28 md:pb-10">
+      <main className="pb-28 lg:pb-10">
         <BudgetPlannerForm />
       </main>
       <BottomNav />

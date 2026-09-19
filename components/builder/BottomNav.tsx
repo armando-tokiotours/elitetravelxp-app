@@ -29,7 +29,7 @@ export function BottomNav() {
 
   return (
     <>
-      <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-zinc-800 bg-black/95 backdrop-blur-md md:hidden">
+      <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-zinc-800 bg-black/95 backdrop-blur-md lg:hidden">
         <ul className="mx-auto flex max-w-lg items-stretch justify-around px-0.5 pb-[env(safe-area-inset-bottom)]">
           {TABS.map((tab) => {
             const Icon = tab.icon;
@@ -87,7 +87,7 @@ function BuilderIcon({ active }: { active: boolean }) {
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
       <path
         d="M4 7h16M4 12h10M4 17h14"
-        stroke={active ? "#C4A35A" : "#a1a1aa"}
+        stroke={active ? "#B85304" : "#a1a1aa"}
         strokeWidth="1.8"
         strokeLinecap="round"
       />
@@ -96,7 +96,7 @@ function BuilderIcon({ active }: { active: boolean }) {
 }
 
 function DiscoverIcon({ active }: { active: boolean }) {
-  const stroke = active ? "#C4A35A" : "#a1a1aa";
+  const stroke = active ? "#B85304" : "#a1a1aa";
   return (
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
       <circle cx="12" cy="12" r="9" stroke={stroke} strokeWidth="1.8" />
@@ -119,12 +119,12 @@ function ItineraryIcon({ active }: { active: boolean }) {
         width="14"
         height="17"
         rx="2"
-        stroke={active ? "#C4A35A" : "#a1a1aa"}
+        stroke={active ? "#B85304" : "#a1a1aa"}
         strokeWidth="1.8"
       />
       <path
         d="M8 8h8M8 12h8M8 16h5"
-        stroke={active ? "#C4A35A" : "#a1a1aa"}
+        stroke={active ? "#B85304" : "#a1a1aa"}
         strokeWidth="1.6"
         strokeLinecap="round"
       />
@@ -139,12 +139,12 @@ function PreviewIcon({ active }: { active: boolean }) {
         cx="12"
         cy="12"
         r="3"
-        stroke={active ? "#C4A35A" : "#a1a1aa"}
+        stroke={active ? "#B85304" : "#a1a1aa"}
         strokeWidth="1.8"
       />
       <path
         d="M3 12s3.5-6 9-6 9 6 9 6-3.5 6-9 6-9-6-9-6z"
-        stroke={active ? "#C4A35A" : "#a1a1aa"}
+        stroke={active ? "#B85304" : "#a1a1aa"}
         strokeWidth="1.8"
       />
     </svg>
@@ -152,7 +152,7 @@ function PreviewIcon({ active }: { active: boolean }) {
 }
 
 function QuizIcon({ active }: { active: boolean }) {
-  const stroke = active ? "#C4A35A" : "#a1a1aa";
+  const stroke = active ? "#B85304" : "#a1a1aa";
   return (
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
       <path

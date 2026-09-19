@@ -42,11 +42,31 @@
 }
 
 :root {
-  --background: #f5f0e8;
-  --foreground: #0b1f3a;
-  --navy: #0b1f3a;
-  --gold: #c4a35a;
-  --cream: #fbf8f2;
+  --background: #000000;
+  --foreground: #ffffff;
+  --navy: #1e2d4a;
+  --imperial-navy: #1e2d4a;
+  /* Burnt Copper core CTA accent */
+  --gold: #e2c498;
+  --sand: #e2c498;
+  --copper: #b85304;
+  --accent: #b85304;
+  --accent-50: #fdf7f3;
+  --accent-100: #faf0e6;
+  --accent-200: #f3d9c4;
+  --accent-300: #ebbd9b;
+  --accent-400: #d9894e;
+  --accent-500: #b85304;
+  --accent-600: #9c4203;
+  --accent-700: #7e3202;
+  --accent-800: #632502;
+  --accent-900: #481901;
+  --accent-950: #2a0c00;
+  --charcoal: #1c1c1e;
+  --charcoal-elevated: #2c2c2e;
+  --card: #121212;
+  --ivory: #f5efe6;
+  --cream: #f5efe6;
   --font-h1: "Montserrat", system-ui, sans-serif;
   --font-h2: "Century Gothic", CenturyGothic, AppleGothic, sans-serif;
   --font-body: "Poppins", var(--font-poppins), system-ui, sans-serif;
@@ -59,7 +79,25 @@
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-navy: var(--navy);
+  --color-imperial-navy: var(--imperial-navy);
   --color-gold: var(--gold);
+  --color-sand: var(--sand);
+  --color-copper: var(--copper);
+  --color-charcoal: var(--charcoal);
+  --color-card: var(--card);
+  --color-ivory: var(--ivory);
+  --color-accent-50: var(--accent-50);
+  --color-accent-100: var(--accent-100);
+  --color-accent-200: var(--accent-200);
+  --color-accent-300: var(--accent-300);
+  --color-accent-400: var(--accent-400);
+  --color-accent-500: var(--accent-500);
+  --color-accent-600: var(--accent-600);
+  --color-accent-700: var(--accent-700);
+  --color-accent-800: var(--accent-800);
+  --color-accent-900: var(--accent-900);
+  --color-accent-950: var(--accent-950);
+  --color-accent: var(--accent-500);
   --font-sans: var(--font-body);
   --font-display: var(--font-h1);
 }
@@ -112,36 +150,25 @@ h3,
   text-transform: uppercase !important;
 }
 
-/* Desktop: native fixed parallax via bg-fixed */
+/* Hero photo — bottom-anchored on mobile so the pagoda stays in frame */
 .builder-hero-bg {
-  background-attachment: fixed;
+  background-attachment: scroll;
   background-size: cover;
-  background-position: center center;
+  background-position: center bottom;
+  background-color: #000000;
+  transform: translateZ(0);
 }
 
 @media (max-width: 768px) {
-  /*
-   * iOS Safari ignores / glitches background-attachment: fixed.
-   * Use a viewport-fixed layer clipped by the hero's overflow:hidden parent
-   * so the photo stays put while the builder card scrolls over it.
-   * Shorter height + right-biased position keeps more landscape / pagoda in frame.
-   */
   .builder-hero-bg {
-    position: fixed !important;
-    inset: 0 auto auto 0;
-    width: 100%;
-    height: 50vh;
-    max-height: 480px;
-    background-attachment: scroll !important;
-    background-position: 60% center !important;
+    background-position: 55% bottom !important;
     background-size: cover !important;
-    transform: translateZ(0);
   }
 }
 
 @media (min-width: 769px) {
   .builder-hero-bg {
-    background-position: center center !important;
+    background-position: center 70% !important;
   }
 }
 
@@ -158,6 +185,23 @@ h3,
 
 .animate-fade-up {
   animation: fade-up 0.65s ease-out both;
+}
+
+/* Keep dark form fields readable when browsers force light autofill */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+textarea:-webkit-autofill,
+textarea:-webkit-autofill:hover,
+textarea:-webkit-autofill:focus,
+select:-webkit-autofill,
+select:-webkit-autofill:hover,
+select:-webkit-autofill:focus {
+  -webkit-box-shadow: 0 0 0px 1000px #121212 inset !important;
+  box-shadow: 0 0 0px 1000px #121212 inset !important;
+  -webkit-text-fill-color: #ffffff !important;
+  caret-color: #ffffff;
+  transition: background-color 99999s ease-out 0s;
 }
 
 @media print {

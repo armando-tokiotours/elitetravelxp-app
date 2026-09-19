@@ -42,7 +42,7 @@ export function EliteValuePropositionBanner({
       ? "border-zinc-800 bg-zinc-950/80 text-white"
       : "border-[#E8E2D9] bg-[#FBF8F2] text-[#0B1F3A]";
   const muted = tone === "dark" ? "text-zinc-400" : "text-[#5C6570]";
-  const accent = tone === "dark" ? "text-amber-400" : "text-[#C4A35A]";
+  const accent = tone === "dark" ? "text-accent-500" : "text-[#B85304]";
 
   return (
     <aside
@@ -71,7 +71,7 @@ export function EliteValuePropositionBanner({
             const rest = colon > 0 ? line.slice(colon + 1).trim() : line;
             return (
               <li key={`vp-bullet-${i}`} className="flex gap-2">
-                <span className={`mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full ${accent === "text-amber-400" ? "bg-amber-400" : "bg-[#C4A35A]"}`} />
+                <span className={`mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full ${accent === "text-accent-500" ? "bg-accent-500" : "bg-[#B85304]"}`} />
                 <span>
                   {label ? (
                     <>
@@ -132,13 +132,13 @@ export function SelfGuidedEliteCompareCallout({
 
   const shell =
     tone === "dark"
-      ? "border-amber-500/25 bg-amber-500/5 text-zinc-400"
-      : "border-[#C4A35A]/35 bg-[#C4A35A]/8 text-[#5C6570]";
+      ? "border-[#B85304]/40 bg-[#B85304]/15 text-zinc-400"
+      : "border-[#B85304]/35 bg-[#B85304]/8 text-[#5C6570]";
 
   return (
     <div className={`mt-2 rounded-lg border px-2.5 py-2 text-[10px] leading-relaxed ${shell}`}>
       <p>{selfLine}</p>
-      <p className="mt-1 font-medium text-amber-400/90">{eliteLine}</p>
+      <p className="mt-1 font-medium text-accent-500/90">{eliteLine}</p>
     </div>
   );
 }

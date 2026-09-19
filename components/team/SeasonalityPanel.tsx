@@ -361,7 +361,7 @@ export function SeasonalityPanel({ getClient }: { getClient: () => PbClient }) {
           <button
             type="button"
             onClick={() => setEditing(emptyDraft())}
-            className="rounded-full bg-[#C4A35A] px-4 py-2 text-sm font-semibold text-zinc-100"
+            className="rounded-full bg-[#B85304] px-4 py-2 text-sm font-semibold text-zinc-100"
           >
             + Add rule
           </button>
@@ -421,7 +421,7 @@ export function SeasonalityPanel({ getClient }: { getClient: () => PbClient }) {
                   <td className="py-3 text-right">
                     <button
                       type="button"
-                      className="mr-2 text-sm font-medium text-[#C4A35A]"
+                      className="mr-2 text-sm font-medium text-[#B85304]"
                       onClick={() =>
                         setEditing({
                           id: row.id,
@@ -589,7 +589,7 @@ function TierBadge({ tier }: { tier: string }) {
     tier === "High"
       ? "bg-[#0B1F3A] text-white"
       : tier === "Mid"
-        ? "bg-[#C4A35A] text-zinc-100"
+        ? "bg-[#B85304] text-zinc-100"
         : "bg-[#E8E2D9] text-zinc-100";
   return (
     <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${tone}`}>

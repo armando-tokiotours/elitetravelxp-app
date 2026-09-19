@@ -274,7 +274,7 @@ export function HotelsEditorModal({
                 <ArrowLeft className="h-5 w-5" />
               </button>
               <div className="min-w-0 flex-1">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#C4A35A]">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#D9BB96]">
                   Configure
                 </p>
                 <h3 className="truncate font-display text-2xl text-white">
@@ -299,7 +299,7 @@ export function HotelsEditorModal({
                   <>
                     {" "}
                     Suggested:{" "}
-                    <span className="font-medium text-[#C4A35A]">
+                    <span className="font-medium text-[#B85304]">
                       {roomReq.breakdownText}
                     </span>
                   </>
@@ -353,7 +353,7 @@ export function HotelsEditorModal({
                 className={`rounded-xl px-4 py-3 text-sm font-medium ${
                   overallAllocation.covered
                     ? "bg-emerald-950/90 text-emerald-400"
-                    : "bg-amber-950/90 text-amber-400"
+                    : "bg-accent-950/90 text-accent-500"
                 }`}
               >
                 {overallAllocation.covered ? (
@@ -516,7 +516,7 @@ function CityHotelCard({
             aria-checked={needsHotel}
             onClick={() => onChange({ needsHotel: !needsHotel })}
             className={`relative h-7 w-12 shrink-0 rounded-full transition ${
-              needsHotel ? "bg-[#C4A35A]" : "bg-zinc-700"
+              needsHotel ? "bg-[#B85304]" : "bg-zinc-700"
             }`}
           >
             <span
@@ -562,7 +562,7 @@ function CityHotelCard({
                     onClick={() =>
                       onChange({ starRating: n as HotelStarRating })
                     }
-                    className="cursor-pointer p-0.5 text-amber-400 transition"
+                    className="cursor-pointer p-0.5 text-accent-500 transition"
                   >
                     <StarIcon filled={selected || starRating === n} />
                   </button>
@@ -580,7 +580,7 @@ function CityHotelCard({
               <div
                 className={`sticky top-0 z-20 mb-3 rounded-lg border-b border-zinc-800 px-3 py-2 shadow-sm backdrop-blur-md ${
                   allocation.remainingGuests > 0
-                    ? "bg-amber-950/90 text-amber-400"
+                    ? "bg-accent-950/90 text-accent-500"
                     : allocation.remainingGuests === 0 &&
                         allocation.tone === "ok"
                       ? "bg-emerald-950/90 text-emerald-400"
@@ -660,7 +660,7 @@ function CityHotelCard({
                             }
                             className={`rounded-full px-2.5 py-1 text-xs font-medium transition ${
                               standardOccupancy === occ
-                                ? "bg-[#0B1F3A] text-white ring-1 ring-amber-400"
+                                ? "bg-[#0B1F3A] text-white ring-1 ring-[#B85304]/40"
                                 : "bg-zinc-900 text-zinc-400 ring-1 ring-zinc-700 hover:ring-zinc-500"
                             }`}
                           >
@@ -689,7 +689,7 @@ function CityHotelCard({
                 onClick={() => onChange({ breakfast: true })}
                 label="With Breakfast"
                 icon="coffee"
-                hoverClass="hover:border-amber-400"
+                hoverClass="hover:border-accent-500/40"
               />
               <BreakfastPill
                 active={!breakfast}
@@ -759,7 +759,7 @@ function BreakfastPill({
       onClick={onClick}
       className={`flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium transition-all ${
         active
-          ? "border-amber-400 bg-[#0B1F3A] text-white shadow-sm"
+          ? "border-accent-500/40 bg-[#0B1F3A] text-white shadow-sm"
           : `border-zinc-700 bg-zinc-900 text-zinc-300 ${hoverClass}`
       }`}
     >

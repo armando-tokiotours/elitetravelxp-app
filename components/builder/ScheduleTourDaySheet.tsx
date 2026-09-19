@@ -55,7 +55,7 @@ export function ScheduleTourDaySheet({
             exit={{ y: "100%" }}
             transition={{ type: "spring", damping: 28, stiffness: 320 }}
           >
-            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#C4A35A]">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#B85304]">
               Schedule experience
             </p>
             <h4 className="mt-1 font-display text-xl text-[#0B1F3A]">
@@ -93,7 +93,7 @@ export function ScheduleTourDaySheet({
                       className={`flex w-full flex-col items-start gap-0.5 rounded-2xl border px-4 py-3 text-left transition sm:flex-row sm:items-center sm:justify-between ${
                         disabled
                           ? "cursor-not-allowed border-[#EEE8DF] bg-[#F5F2EC] opacity-70"
-                          : "border-[#EEE8DF] bg-[#FBF8F2] hover:border-[#C4A35A]/70 hover:bg-white"
+                          : "border-[#EEE8DF] bg-[#FBF8F2] hover:border-[#B85304]/70 hover:bg-white"
                       }`}
                     >
                       <span className="text-sm font-medium text-[#0B1F3A]">
@@ -104,7 +104,7 @@ export function ScheduleTourDaySheet({
                           Only {available}h available — tour is {tourHours}h
                         </span>
                       ) : (
-                        <span className="text-xs text-[#C4A35A]">
+                        <span className="text-xs text-[#B85304]">
                           {available}h available · Select
                         </span>
                       )}

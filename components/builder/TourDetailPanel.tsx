@@ -11,7 +11,6 @@ import {
 import { formatUsd } from "@/lib/builder-pricing";
 import { tourLanguageChoices } from "@/lib/tourLanguages";
 import { Globe, MapPinned, ListChecks, Plus, Check } from "lucide-react";
-import { WhyEliteSpecialistNote } from "@/components/branding/WhyEliteSpecialistNote";
 
 type InfoTab = "description" | "route" | "included";
 
@@ -149,7 +148,7 @@ export function TourDetailPanel({
           </span>
         ) : null}
         {recommended ? (
-          <span className="absolute left-3 top-3 z-10 rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[10px] font-medium text-amber-400 shadow-md backdrop-blur-sm">
+          <span className="absolute left-3 top-3 z-10 rounded-full border border-[#B85304]/40 bg-[#B85304]/15 px-2 py-0.5 text-[10px] font-medium text-accent-500 shadow-md backdrop-blur-sm">
             ⭐ Recommended Match
           </span>
         ) : null}
@@ -158,7 +157,7 @@ export function TourDetailPanel({
       <div className="px-4 pt-4">
         <div className="mb-2 flex flex-wrap gap-1.5">
           {recommended ? (
-            <span className="inline-flex items-center rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[10px] font-medium text-amber-700">
+            <span className="inline-flex items-center rounded-full border border-[#B85304]/40 bg-[#B85304]/15 px-2 py-0.5 text-[10px] font-medium text-accent-700">
               ⭐ Recommended Match
             </span>
           ) : null}
@@ -167,7 +166,7 @@ export function TourDetailPanel({
               🎟️ Specific Experience / Access
             </span>
           ) : (
-            <span className="inline-flex items-center rounded-full border border-[#C4A35A]/40 bg-[#C4A35A]/10 px-2 py-0.5 text-[10px] font-medium text-[#8A6B2A]">
+            <span className="inline-flex items-center rounded-full border border-[#B85304]/40 bg-[#B85304]/10 px-2 py-0.5 text-[10px] font-medium text-[#7E3202]">
               🗺️ Multi-District Tour
             </span>
           )}
@@ -191,15 +190,9 @@ export function TourDetailPanel({
           <p className="mt-1.5 text-xs text-[#5C6570]">{hours}h</p>
         ) : null}
 
-        <WhyEliteSpecialistNote
-          showCompare={
-            tour.is_self_guided === true || tour.guide_required === false
-          }
-        />
-
         {!selected ? (
           <div className="mt-3">
-            <p className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#C4A35A]">
+            <p className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#B85304]">
               <Globe className="h-3 w-3 shrink-0" aria-hidden />
               Preferred language
             </p>
@@ -218,8 +211,8 @@ export function TourDetailPanel({
                     }}
                     className={`rounded-full px-2.5 py-1 text-xs font-semibold transition ${
                       active
-                        ? "bg-[#0B1F3A] text-white ring-1 ring-[#C4A35A]"
-                        : "bg-[#F7F3EB] text-[#5C6570] ring-1 ring-[#EEE8DF] hover:ring-[#C4A35A]/60"
+                        ? "bg-[#0B1F3A] text-white ring-1 ring-[#B85304]"
+                        : "bg-[#F7F3EB] text-[#5C6570] ring-1 ring-[#EEE8DF] hover:ring-[#B85304]/60"
                     }`}
                   >
                     {code}
@@ -239,14 +232,14 @@ export function TourDetailPanel({
           </div>
         ) : bookedLanguage ? (
           <p className="mt-2 inline-flex items-center gap-1.5 text-xs font-medium text-[#0B1F3A]">
-            <Globe className="h-3 w-3 shrink-0 text-[#C4A35A]" aria-hidden />
+            <Globe className="h-3 w-3 shrink-0 text-[#B85304]" aria-hidden />
             Guided in {bookedLanguage}
           </p>
         ) : null}
 
         <div className="mt-3 min-h-[4.5rem]">
           {bodyLabel ? (
-            <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#C4A35A]">
+            <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#B85304]">
               {bodyLabel}
             </p>
           ) : null}
@@ -260,7 +253,7 @@ export function TourDetailPanel({
         </div>
 
         {selected && scheduledLabel ? (
-          <p className="mt-2 text-xs font-medium text-[#C4A35A]">
+          <p className="mt-2 text-xs font-medium text-[#B85304]">
             Scheduled · {scheduledLabel}
           </p>
         ) : null}
@@ -306,7 +299,7 @@ export function TourDetailPanel({
           }
           className={`flex flex-col items-center gap-1 px-2 py-3 text-xs font-semibold transition ${
             selected
-              ? "bg-[#C4A35A]/20 text-[#0B1F3A]"
+              ? "bg-[#B85304]/20 text-[#0B1F3A]"
               : pickedLanguage
                 ? "bg-[#0B1F3A] text-white hover:bg-[#143052]"
                 : "cursor-not-allowed bg-[#0B1F3A]/40 text-white/70"

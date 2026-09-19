@@ -94,11 +94,18 @@ export function ArrivalDepartureSection({
 
   const arriveName = hubDisplayName(hubs, arrivalTransferId);
   const departName = hubDisplayName(hubs, departureTransferId);
-  const summary = `${
-    arrivalTransferId ? arriveName : "—"
-  } → ${departureTransferId ? departName : "—"} · Pickup: ${
-    airportPickup ? "Yes" : "No"
-  }`;
+  const summary = (
+    <div className="flex max-w-[180px] flex-col gap-0.5 sm:max-w-none">
+      <span className="block truncate text-[10px] font-medium text-zinc-300 sm:text-xs">
+        {arrivalTransferId ? arriveName : "—"} →{" "}
+        {departureTransferId ? departName : "—"}
+      </span>
+      <span className="block text-[9px] font-semibold text-[#B85304] sm:text-[11px]">
+        Pickup: {airportPickup ? "Yes" : "No"} · Drop-off:{" "}
+        {airportDropoff ? "Yes" : "No"}
+      </span>
+    </div>
+  );
 
   return (
     <SectionBlock
@@ -169,7 +176,7 @@ export function ArrivalDepartureSection({
       />
       ) : null}
 
-      <SectionContinue next={3} label="Continue to Locations" />
+      <SectionContinue next={3} />
     </SectionBlock>
   );
 }
@@ -201,56 +208,56 @@ function HubSummaryCard({
         ? "VIP drop-off"
         : "No drop-off";
 
+  const iconWrap = configured
+    ? "border border-emerald-500/50 bg-emerald-950/40 text-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.25)]"
+    : "border border-zinc-700 bg-[#1C1C1E] text-zinc-500";
+
   return (
     <button
       type="button"
       onClick={onClick}
-      className="group flex min-h-[9.5rem] flex-col rounded-[1.35rem] border border-zinc-800 bg-[#1C1C1E] p-4 text-left transition hover:border-[#C4A35A]/45 hover:bg-[#222226] sm:min-h-[10.5rem] sm:p-5"
+      className="group flex min-h-[110px] flex-col justify-between rounded-2xl border border-[#2C2C2E] bg-[#121212] p-3 text-left transition hover:border-[#B85304]/45 hover:bg-[#222226] sm:min-h-[130px] sm:rounded-[1.35rem] sm:p-5"
     >
       <div className="flex items-start justify-between gap-2">
-        <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-zinc-500">
+        <p className="text-[9px] font-bold uppercase tracking-wider text-zinc-400 sm:text-[10px]">
           {title}
         </p>
         <span
-          className={`flex h-8 w-8 items-center justify-center rounded-full ${
-            kind === "arrival"
-              ? "bg-emerald-500/15"
-              : "bg-sky-500/15"
-          }`}
+          className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full transition-colors duration-200 sm:h-8 sm:w-8 ${iconWrap}`}
           aria-hidden
         >
           {kind === "arrival" ? (
             mode === "cruise" ? (
-              <Ship size={20} className="text-emerald-400" />
+              <Ship className="h-3 w-3 sm:h-4 sm:w-4" />
             ) : (
-              <PlaneLanding size={20} className="text-emerald-400" />
+              <PlaneLanding className="h-3 w-3 sm:h-4 sm:w-4" />
             )
           ) : mode === "cruise" ? (
-            <Ship size={20} className="text-sky-400" />
+            <Ship className="h-3 w-3 sm:h-4 sm:w-4" />
           ) : (
-            <PlaneTakeoff size={20} className="text-sky-400" />
+            <PlaneTakeoff className="h-3 w-3 sm:h-4 sm:w-4" />
           )}
         </span>
       </div>
 
       <p
-        className={`mt-3 line-clamp-2 font-display text-xl leading-snug text-white sm:text-2xl ${
+        className={`my-1 line-clamp-2 break-words whitespace-normal font-display text-sm font-bold leading-tight text-white sm:text-lg ${
           configured ? "" : "text-zinc-500"
         }`}
       >
         {hubName}
       </p>
 
-      <div className="mt-auto flex items-end justify-between gap-2 pt-4">
+      <div className="mt-auto flex items-end justify-between gap-2 pt-3 sm:pt-4">
         <div className="min-w-0">
-          <p className="truncate text-xs text-zinc-400">
+          <p className="truncate text-[10px] text-zinc-400 sm:text-xs">
             {modeLabel}
             <span className="text-zinc-600"> · </span>
             {vipLabel}
           </p>
         </div>
         <ChevronRight
-          className="h-4 w-4 shrink-0 text-zinc-600 transition group-hover:text-[#C4A35A]"
+          className="h-3.5 w-3.5 shrink-0 text-zinc-600 transition group-hover:text-[#B85304] sm:h-4 sm:w-4"
           aria-hidden
         />
       </div>

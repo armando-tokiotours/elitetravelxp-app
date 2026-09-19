@@ -162,7 +162,7 @@ export function DurationEditorModal({
                 <ArrowLeft className="h-5 w-5" />
               </button>
               <div className="min-w-0 flex-1">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#C4A35A]">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#D9BB96]">
                   Configure
                 </p>
                 <h3 className="truncate font-display text-2xl text-white">
@@ -173,7 +173,7 @@ export function DurationEditorModal({
 
             <div className="flex min-h-0 flex-1 flex-col gap-8 overflow-y-auto p-4 pb-12">
               <div>
-                <FieldLabel>Trip duration</FieldLabel>
+                <FieldLabel>Trip duration days</FieldLabel>
                 <div className="mt-2 flex flex-wrap gap-2">
                   {PRESETS.map((days) => (
                     <ChoicePill
@@ -182,7 +182,7 @@ export function DurationEditorModal({
                       active={!durationCustom && durationDays === days}
                       onClick={() => selectPreset(days)}
                     >
-                      {days} days
+                      {days}
                     </ChoicePill>
                   ))}
                   <ChoicePill
@@ -207,7 +207,7 @@ export function DurationEditorModal({
                         onChange={(e) => applyCustom(e.target.value)}
                         onBlur={commitCustom}
                         placeholder="e.g. 1, 2, 3, 7"
-                        className="w-36 rounded-xl border border-zinc-700 bg-zinc-900 px-3 py-2.5 text-sm text-white outline-none focus:border-[#C4A35A]"
+                        className="w-36 rounded-xl border border-zinc-700 bg-zinc-900 px-3 py-2.5 text-sm text-white outline-none focus:border-[#B85304]"
                       />
                       <span className="text-sm text-zinc-400">
                         Minimum 1 day · Step 3 nights must total{" "}
@@ -245,7 +245,7 @@ export function DurationEditorModal({
                     }
                   }}
                   disabled={!activeSeasonTier || !activeSeasonNote}
-                  className={`flex flex-col justify-center rounded-xl border border-amber-500/50 bg-zinc-900 p-3 text-left transition-all ${
+                  className={`flex flex-col justify-center rounded-xl border border-[#B85304]/40 bg-zinc-900 p-3 text-left transition-all ${
                     activeSeasonTier && activeSeasonNote
                       ? "cursor-pointer hover:bg-zinc-800"
                       : "cursor-default opacity-80"
@@ -278,7 +278,7 @@ export function DurationEditorModal({
                             {activeSeasonNote.note}
                           </p>
                         ) : null}
-                        <p className="mt-2 flex items-center gap-1 text-[10px] font-medium text-[#C4A35A]">
+                        <p className="mt-2 flex items-center gap-1 text-[10px] font-medium text-[#B85304]">
                           <Info className="h-3 w-3 shrink-0" aria-hidden />
                           Tap to learn more
                         </p>
@@ -307,10 +307,10 @@ export function DurationEditorModal({
                     const isSelected = travelPace === pace.id;
                     const hasSelection = travelPace !== null;
                     const cardClass = isSelected
-                      ? "border-2 border-[#C4A35A] opacity-100 scale-100 z-10"
+                      ? "border-2 border-[#B85304] opacity-100 scale-100 z-10"
                       : hasSelection
                         ? "border border-zinc-800 opacity-40 grayscale-[50%] scale-95"
-                        : "border border-zinc-800 opacity-100 hover:border-amber-400 scale-100";
+                        : "border border-zinc-800 opacity-100 hover:border-accent-500/40 scale-100";
                     return (
                       <button
                         key={pace.id}
@@ -343,7 +343,7 @@ export function DurationEditorModal({
                             aria-hidden
                           />
                           {isSelected ? (
-                            <span className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-full bg-[#C4A35A] text-[#0B1F3A]">
+                            <span className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-full bg-[#D9BB96] text-[#0B1F3A]">
                               <Check className="h-3.5 w-3.5" strokeWidth={3} />
                             </span>
                           ) : null}
@@ -480,7 +480,7 @@ function SeasonalityExplainerModal({
           >
             <div className="sticky top-0 z-20 flex shrink-0 items-center justify-between gap-3 border-b border-[#EEE8DF] bg-white px-4 pb-4 pt-6 sm:px-5">
               <div className="min-w-0">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#C4A35A]">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#B85304]">
                   Seasonality
                 </p>
                 <h3 className="truncate font-display text-2xl text-[#0B1F3A]">
@@ -508,7 +508,7 @@ function SeasonalityExplainerModal({
                 </div>
                 <div className="px-4 py-4 sm:px-5">
                   {crowds ? (
-                    <p className="text-sm font-semibold text-[#C4A35A]">
+                    <p className="text-sm font-semibold text-[#B85304]">
                       {crowds}
                     </p>
                   ) : null}
@@ -599,7 +599,7 @@ function TravelPaceModal({
           >
             <div className="sticky top-0 z-20 flex shrink-0 items-center justify-between gap-3 border-b border-zinc-800 bg-zinc-950 px-4 pb-4 pt-5 sm:px-5">
               <div className="min-w-0">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-amber-400">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#D9BB96]">
                   Travel pace
                 </p>
                 <h3 className="truncate font-display text-2xl text-white">
@@ -638,7 +638,7 @@ function TravelPaceModal({
                   ) : null}
                 </div>
                 <div className="px-4 py-4 sm:px-5">
-                  <p className="text-sm font-semibold text-amber-400">
+                  <p className="text-sm font-semibold text-white">
                     {pace.subtitle}
                   </p>
                   <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-zinc-400">
@@ -652,7 +652,7 @@ function TravelPaceModal({
               <button
                 type="button"
                 onClick={() => onSelect(pace.id)}
-                className="w-full rounded-xl bg-amber-500 py-3 text-sm font-bold text-zinc-950 transition hover:bg-amber-400 sm:flex-1"
+                className="w-full rounded-xl bg-accent-500 py-3 text-sm font-bold text-[#D9BB96] transition hover:bg-[#9C4203] sm:flex-1"
               >
                 {selected === pace.id
                   ? "✓ Selected — keep this pace"
@@ -718,14 +718,14 @@ function SeasonLeafIcon() {
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
       <path
         d="M12 3c4 2 7 6 7 10a7 7 0 11-14 0c0-4 3-8 7-10z"
-        stroke="#C4A35A"
+        stroke="#B85304"
         strokeWidth="1.6"
-        fill="#C4A35A"
+        fill="#B85304"
         fillOpacity="0.25"
       />
       <path
         d="M12 7v10"
-        stroke="#C4A35A"
+        stroke="#B85304"
         strokeWidth="1.4"
         strokeLinecap="round"
       />

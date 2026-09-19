@@ -56,7 +56,7 @@ export function RefundPolicyModal({
             exit={{ opacity: 0, y: 24 }}
             transition={{ duration: 0.22, ease: "easeOut" }}
           >
-            <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[#C4A35A]">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[#B85304]">
               Elite Concierge
             </p>
             <h2
@@ -68,7 +68,7 @@ export function RefundPolicyModal({
 
             <ul className="mt-4 space-y-4 text-sm leading-relaxed text-zinc-300">
               <li>
-                <p className="font-semibold text-amber-400">
+                <p className="font-semibold text-accent-500">
                   €{ELITE_CONCIERGE_FEE} Tour Credit
                 </p>
                 <p className="mt-1 text-zinc-400">
@@ -78,7 +78,7 @@ export function RefundPolicyModal({
                 </p>
               </li>
               <li>
-                <p className="font-semibold text-amber-400">
+                <p className="font-semibold text-accent-500">
                   Concierge Guarantee
                 </p>
                 <p className="mt-1 text-zinc-400">
@@ -88,7 +88,7 @@ export function RefundPolicyModal({
                 </p>
               </li>
               <li>
-                <p className="font-semibold text-amber-400">Cancellation</p>
+                <p className="font-semibold text-accent-500">Cancellation</p>
                 <p className="mt-1 text-zinc-400">
                   If you decide to cancel your trip design before booking, the
                   €{ELITE_CONCIERGE_FEE} covers the custom day-by-day research

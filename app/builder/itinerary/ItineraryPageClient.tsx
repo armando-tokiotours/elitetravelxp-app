@@ -25,7 +25,6 @@ import {
   TravelDossierView,
   resolveHub,
 } from "@/components/builder/TravelDossierView";
-import { BookingRefBadge } from "@/components/builder/BookingRefBadge";
 import {
   AppSidebar,
   APP_SIDEBAR_RAIL_PAD,
@@ -166,7 +165,7 @@ export default function ItineraryPageClient() {
   };
 
   return (
-    <div className="builder-theme min-h-screen overflow-x-hidden bg-[#F5F0E8] pb-28 text-[#0B1F3A] md:pb-32">
+    <div className="builder-theme min-h-screen overflow-x-hidden bg-[#F5F0E8] pb-44 text-[#0B1F3A] md:pb-36">
       <AppSidebar
         brandEyebrow="Elite Travel"
         brandTitle="Itinerary"
@@ -175,27 +174,19 @@ export default function ItineraryPageClient() {
 
       <div className={APP_SIDEBAR_RAIL_PAD}>
         <header className="no-print border-b border-[#E8E2D9] bg-[#FBF8F2] px-4 py-5">
-          <div className="mb-3 flex items-center gap-3 md:hidden">
+          <div className="mb-3 flex items-center gap-3 lg:hidden">
             <MobileAppNav
               brandEyebrow="Elite Travel"
               brandTitle="Itinerary"
             />
           </div>
-          <p className="text-[0.65rem] font-semibold uppercase tracking-[0.35em] text-[#C4A35A]">
+          <p className="text-[0.65rem] font-semibold uppercase tracking-[0.35em] text-[#4B4B4B]">
             My Itinerary
           </p>
           <h1 className="mt-1 font-display text-3xl">Your Japan Journey</h1>
           <p className="mt-1 text-sm text-[#8A8278]">
             Switch between travel dossier and private quotation.
           </p>
-        <div className="mt-3">
-          <BookingRefBadge
-            tempBookingRef={state.tempBookingRef}
-            confirmedBookingRef={state.confirmedBookingRef}
-            bookingStatus={state.bookingStatus}
-            variant="inline"
-          />
-        </div>
 
         <div
           className="mt-4 inline-flex rounded-full border border-[#E8E2D9] bg-white p-1 shadow-sm"
@@ -260,7 +251,7 @@ export default function ItineraryPageClient() {
         )}
       </header>
 
-      <main className="mx-auto w-full max-w-3xl overflow-x-hidden px-4 py-6 pb-28">
+      <main className="mx-auto w-full max-w-3xl overflow-x-hidden px-4 py-6 pb-40 md:pb-28">
         {activeView === "dossier" ? (
           <TravelDossierView
             state={state}
@@ -330,7 +321,7 @@ export default function ItineraryPageClient() {
       {printResult ? (
         <div className="no-print fixed inset-0 z-[80] flex items-end justify-center bg-black/45 p-4 sm:items-center">
           <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
-            <p className="text-[0.65rem] font-semibold uppercase tracking-[0.3em] text-[#C4A35A]">
+            <p className="text-[0.65rem] font-semibold uppercase tracking-[0.3em] text-[#B85304]">
               Itinerary saved
             </p>
             <h2 className="mt-2 font-display text-2xl text-[#0B1F3A]">
@@ -351,7 +342,7 @@ export default function ItineraryPageClient() {
       {submittedRef ? (
         <div className="no-print fixed inset-0 z-[80] flex items-end justify-center bg-black/45 p-4 sm:items-center">
           <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
-            <p className="text-[0.65rem] font-semibold uppercase tracking-[0.3em] text-[#C4A35A]">
+            <p className="text-[0.65rem] font-semibold uppercase tracking-[0.3em] text-[#B85304]">
               Payment received
             </p>
             <h2 className="mt-2 font-display text-2xl text-[#0B1F3A]">

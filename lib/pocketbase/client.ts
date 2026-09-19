@@ -148,6 +148,10 @@ export interface PbCity {
   cover_photo?: string;
   /** @deprecated legacy */
   image?: string;
+  /** Flat all-inclusive daily host / accompaniment rate (€) */
+  base_price?: number;
+  /** Multiplier applied to base_price for city difficulty / cost index */
+  base_price_modifier?: number;
   is_active?: boolean;
   sort_order?: number;
   collectionId: string;

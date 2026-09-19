@@ -114,7 +114,7 @@ export function PrintRequestModal({
       >
         <div className="flex items-start justify-between gap-3">
           <div>
-            <p className="text-[0.65rem] font-semibold uppercase tracking-[0.3em] text-[#C4A35A]">
+            <p className="text-[0.65rem] font-semibold uppercase tracking-[0.3em] text-[#B85304]">
               Send / Save PDF
             </p>
             <h2
@@ -148,7 +148,7 @@ export function PrintRequestModal({
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="mt-1 w-full rounded-xl border border-[#E8E2D9] bg-[#FBF8F2] px-3 py-2.5 text-sm text-[#0B1F3A] outline-none focus:border-[#C4A35A]"
+              className="mt-1 w-full rounded-xl border border-[#E8E2D9] bg-[#FBF8F2] px-3 py-2.5 text-sm text-[#0B1F3A] outline-none focus:border-[#B85304]"
               placeholder="Optional"
               autoComplete="name"
             />
@@ -162,7 +162,7 @@ export function PrintRequestModal({
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="mt-1 w-full rounded-xl border border-[#E8E2D9] bg-[#FBF8F2] px-3 py-2.5 text-sm text-[#0B1F3A] outline-none focus:border-[#C4A35A]"
+              className="mt-1 w-full rounded-xl border border-[#E8E2D9] bg-[#FBF8F2] px-3 py-2.5 text-sm text-[#0B1F3A] outline-none focus:border-[#B85304]"
               placeholder="you@example.com"
               autoComplete="email"
             />

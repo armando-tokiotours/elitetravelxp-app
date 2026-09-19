@@ -138,7 +138,7 @@ export function ExperiencesDrawer({
             <div className="sticky top-0 z-20 shrink-0 border-b border-[#EEE8DF] bg-white px-4 pb-3 pt-6 sm:px-5">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#C4A35A]">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#B85304]">
                     Browse
                   </p>
                   <h3 className="font-display text-2xl text-[#0B1F3A]">
@@ -202,7 +202,7 @@ export function ExperiencesDrawer({
             {toast ? (
               <div
                 role="status"
-                className="mx-4 mt-3 rounded-xl border border-[#C4A35A]/50 bg-[#F7EFD9] px-3.5 py-2.5 text-sm text-[#6B5420]"
+                className="mx-4 mt-3 rounded-xl border border-[#B85304]/50 bg-[#FAF0E6] px-3.5 py-2.5 text-sm text-[#632502]"
               >
                 ⚠️ {toast}
               </div>

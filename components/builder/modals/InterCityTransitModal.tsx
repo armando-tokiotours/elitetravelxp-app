@@ -133,7 +133,7 @@ export function InterCityTransitModal({
       <div className="relative z-[1] w-full max-w-md overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-950 text-white shadow-2xl">
         <div className="flex items-start justify-between gap-3 border-b border-zinc-800 px-5 py-4">
           <div className="min-w-0">
-            <p className="text-[0.65rem] font-semibold uppercase tracking-[0.28em] text-[#C4A35A]">
+            <p className="text-[0.65rem] font-semibold uppercase tracking-[0.28em] text-[#B85304]">
               Inter-city transit
             </p>
             <h2
@@ -181,7 +181,7 @@ export function InterCityTransitModal({
 
           {selectedMode === "public" ? (
             <div className="rounded-2xl border border-zinc-800 bg-zinc-900/80 p-4">
-              <p className="mb-2 mt-0 text-xs font-semibold uppercase tracking-wider text-amber-500">
+              <p className="mb-2 mt-0 text-xs font-semibold uppercase tracking-wider text-accent-500">
                 Do you need us to pre-book tickets / IC cards for this leg?
               </p>
               <p className="mb-3 text-[11px] leading-relaxed text-zinc-400">
@@ -236,7 +236,7 @@ export function InterCityTransitModal({
           <button
             type="button"
             onClick={save}
-            className="w-full rounded-xl bg-amber-500 py-3 text-sm font-bold text-black transition hover:bg-amber-400"
+            className="w-full rounded-xl bg-accent-500 py-3 text-sm font-bold text-black transition hover:bg-[#9C4203]"
           >
             Save Transport Choice
           </button>
@@ -265,7 +265,7 @@ function TicketRadio({
       aria-pressed={selected}
       className={`flex w-full items-center justify-between gap-3 rounded-xl border px-3 py-2.5 text-left transition ${
         selected
-          ? "border-amber-500/60 bg-amber-500/10"
+          ? "border-[#B85304]/40 bg-[#B85304]/15"
           : "border-zinc-700 bg-zinc-950 hover:border-zinc-500"
       }`}
     >
@@ -273,7 +273,7 @@ function TicketRadio({
         <span
           className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full border ${
             selected
-              ? "border-amber-400 bg-amber-400"
+              ? "border-accent-500/40 bg-accent-500"
               : "border-zinc-500 bg-transparent"
           }`}
         >
@@ -288,7 +288,7 @@ function TicketRadio({
       <span
         className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
           selected
-            ? "bg-amber-500/20 text-amber-300"
+            ? "bg-[#B85304]/15 text-accent-500"
             : "bg-zinc-800 text-zinc-400"
         }`}
       >
@@ -320,7 +320,7 @@ function TransitOption({
       aria-pressed={selected}
       className={`w-full rounded-2xl border p-4 text-left transition ${
         selected
-          ? "border-[#C4A35A] bg-[#C4A35A]/10 shadow-[0_0_0_1px_rgba(196,163,90,0.35)]"
+          ? "border-[#B85304] bg-[#B85304]/10 shadow-[0_0_0_1px_rgba(184, 83, 4,0.35)]"
           : "border-zinc-800 bg-zinc-900 hover:border-zinc-600"
       }`}
     >
@@ -328,7 +328,7 @@ function TransitOption({
         <span
           className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${
             selected
-              ? "bg-[#C4A35A]/20 text-[#C4A35A]"
+              ? "bg-[#B85304]/20 text-[#B85304]"
               : "bg-zinc-800 text-zinc-300"
           }`}
         >

@@ -114,7 +114,7 @@ export function CityTransportModal({
                 <ArrowLeft className="h-5 w-5" />
               </button>
               <div className="min-w-0 flex-1">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#C4A35A]">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#B85304]">
                   {cityName}
                 </p>
                 <h3 className="truncate font-display text-2xl text-white">
@@ -125,7 +125,7 @@ export function CityTransportModal({
 
             <div className="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto p-4 pb-12">
               <section>
-                <p className="mb-3 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#C4A35A]">
+                <p className="mb-3 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#B85304]">
                   How will you move?
                 </p>
                 <div className="grid grid-cols-2 gap-3">
@@ -144,7 +144,7 @@ export function CityTransportModal({
                       Complex subway systems, walking between stations — best
                       for light travel days.
                     </p>
-                    <p className="mt-3 inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-[#C4A35A]">
+                    <p className="mt-3 inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-[#B85304]">
                       <Play className="h-3 w-3" aria-hidden />
                       Watch explainer
                     </p>
@@ -153,9 +153,9 @@ export function CityTransportModal({
                   <button
                     type="button"
                     onClick={() => setExplainerType("private")}
-                    className="rounded-2xl border border-[#C4A35A]/40 bg-zinc-900 p-4 text-left transition hover:border-[#C4A35A] hover:bg-zinc-800"
+                    className="rounded-2xl border border-[#B85304]/40 bg-zinc-900 p-4 text-left transition hover:border-[#B85304] hover:bg-zinc-800"
                   >
-                    <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#C4A35A]/15 text-[#C4A35A]">
+                    <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#B85304]/15 text-[#B85304]">
                       <Car className="h-4 w-4" aria-hidden />
                     </span>
                     <h4 className="mt-3 text-sm font-bold text-white">
@@ -165,7 +165,7 @@ export function CityTransportModal({
                       Door-to-door luxury with luggage handled and direct
                       point-to-point service.
                     </p>
-                    <p className="mt-3 inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-[#C4A35A]">
+                    <p className="mt-3 inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-[#B85304]">
                       <Play className="h-3 w-3" aria-hidden />
                       Watch explainer
                     </p>
@@ -175,7 +175,7 @@ export function CityTransportModal({
 
               <section>
                 <div className="mb-3">
-                  <h4 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#C4A35A]">
+                  <h4 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#B85304]">
                     Day-by-day transport
                   </h4>
                   <p className="mt-1 text-sm text-zinc-400">

@@ -129,7 +129,7 @@ export function HubConfigModal({
                 <ArrowLeft className="h-5 w-5" />
               </button>
               <div className="min-w-0 flex-1">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#C4A35A]">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#D9BB96]">
                   Configure
                 </p>
                 <h3 className="truncate font-display text-2xl text-white">
@@ -193,7 +193,7 @@ export function HubConfigModal({
               </div>
 
               <div>
-                <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#C4A35A]">
+                <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#D9BB96]">
                   How it works
                 </p>
                 <ExplainerTriggerButton

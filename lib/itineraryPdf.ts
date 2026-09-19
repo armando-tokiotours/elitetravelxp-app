@@ -64,7 +64,7 @@ export async function buildItineraryPdf(
   });
 
   doc
-    .fillColor("#C4A35A")
+    .fillColor("#B85304")
     .fontSize(10)
     .text("ELITE TRAVEL EXPERIENCES", { align: "center" });
   doc
@@ -190,7 +190,7 @@ export async function buildItineraryPdf(
 
 function section(doc: PDFKit.PDFDocument, title: string) {
   doc
-    .fillColor("#C4A35A")
+    .fillColor("#B85304")
     .fontSize(9)
     .text(title.toUpperCase(), { characterSpacing: 1.2 });
   doc.moveDown(0.25);

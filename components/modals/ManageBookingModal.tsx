@@ -163,7 +163,7 @@ export function ManageBookingModal({
           <button
             type="submit"
             disabled={busy}
-            className="w-full rounded-xl bg-amber-500 py-3 font-bold text-black transition-all hover:bg-amber-400 disabled:cursor-wait disabled:opacity-70"
+            className="w-full rounded-xl bg-accent-500 py-3 font-bold text-black transition-all hover:bg-[#9C4203] disabled:cursor-wait disabled:opacity-70"
           >
             {busy ? "Retrieving…" : "Retrieve Itinerary"}
           </button>

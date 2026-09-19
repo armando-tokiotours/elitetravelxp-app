@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { ChevronDown } from "lucide-react";
 import {
   fetchBuilderConfig,
   transferLocation,
@@ -116,7 +117,7 @@ export function PrintItineraryDocument({
         <div className="no-print border-b border-[#E8E2D9] bg-[#FBF8F2] px-4 py-4">
           <div className="mx-auto flex max-w-3xl flex-wrap items-center justify-between gap-3">
             <div>
-              <p className="text-[0.65rem] font-semibold uppercase tracking-[0.3em] text-[#C4A35A]">
+              <p className="text-[0.65rem] font-semibold uppercase tracking-[0.3em] text-[#B85304]">
                 Elite Travel Experiences
               </p>
               <h1 className="font-display text-2xl">View / Print Itinerary</h1>
@@ -152,32 +153,30 @@ export function PrintItineraryDocument({
             : "mx-auto max-w-3xl px-4 py-8 sm:px-6 print:max-w-none print:px-0 print:py-0"
         }
       >
-        <header className="border-b border-[#C4A35A]/40 pb-6">
-          <div className="flex flex-col items-center gap-4 sm:flex-row sm:items-start sm:justify-between">
-            <div className="text-center sm:text-left">
-              <p className="text-[0.7rem] font-semibold uppercase tracking-[0.4em] text-[#C4A35A]">
-                Private Quotation
-              </p>
-              <h2 className="mt-2 font-display text-4xl text-[#0B1F3A]">
-                Japan Journey Design
-              </h2>
-              <p className="mt-2 text-sm text-[#8A8278]">
-                Prepared for your review ·{" "}
-                {new Date().toLocaleDateString("en-GB", {
-                  day: "numeric",
-                  month: "long",
-                  year: "numeric",
-                })}
-              </p>
-            </div>
-            <div className="no-print shrink-0">
-              <BookingRefBadge
-                tempBookingRef={state.tempBookingRef}
-                confirmedBookingRef={state.confirmedBookingRef}
-                bookingStatus={state.bookingStatus}
-                variant="inline"
-              />
-            </div>
+        <header className="border-b border-[#B85304]/40 pb-6">
+          <div className="text-center sm:text-left">
+            <p className="text-[0.7rem] font-semibold uppercase tracking-[0.4em] text-[#B85304]">
+              Private Quotation
+            </p>
+            <h2 className="mt-2 font-display text-[1.44rem] leading-tight text-[#0B1F3A] sm:text-4xl sm:leading-none">
+              Japan Journey Design
+            </h2>
+            <p className="mt-2 text-sm text-[#8A8278]">
+              Prepared for your review ·{" "}
+              {new Date().toLocaleDateString("en-GB", {
+                day: "numeric",
+                month: "long",
+                year: "numeric",
+              })}
+            </p>
+          </div>
+          <div className="no-print mt-4 w-full">
+            <BookingRefBadge
+              tempBookingRef={state.tempBookingRef}
+              confirmedBookingRef={state.confirmedBookingRef}
+              bookingStatus={state.bookingStatus}
+              variant="inline"
+            />
           </div>
         </header>
 
@@ -385,8 +384,8 @@ export function PrintItineraryDocument({
         </section>
 
         {quote ? (
-          <section className="mt-8 rounded-2xl border border-[#C4A35A]/45 bg-[#FBF6EA] p-6 text-center print:border print:bg-white">
-            <p className="text-[0.65rem] font-semibold uppercase tracking-[0.3em] text-[#C4A35A]">
+          <section className="mt-8 rounded-2xl border border-[#B85304]/45 bg-[#FDF7F3] p-6 text-center print:border print:bg-white">
+            <p className="text-[0.65rem] font-semibold uppercase tracking-[0.3em] text-[#B85304]">
               Experience Japan Range
             </p>
             <p className="mt-2 font-display text-3xl text-[#0B1F3A]">
@@ -407,6 +406,20 @@ export function PrintItineraryDocument({
               Indicative range based on current Source of Truth pricing. Final
               quotation confirmed by your Elite Travel consultant.
             </p>
+            {state.isEliteConcierge ||
+            state.experienceService === "concierge" ? (
+              <p className="mt-3 rounded-xl border border-[#B85304]/40 bg-accent-50 px-3 py-2 text-left text-xs leading-relaxed text-accent-900">
+                <span className="font-bold uppercase tracking-wide">
+                  ✨ Elite Concierge Active
+                </span>
+                <span className="mt-1 block">
+                  Individual tours and private drivers are currently
+                  deactivated. Your dedicated concierge will curate your 1-on-1
+                  daily itinerary, tours, and transfers, providing a bespoke
+                  quotation before final booking.
+                </span>
+              </p>
+            ) : null}
           </section>
         ) : null}
 
@@ -445,6 +458,7 @@ function CityExperienceBlock({
   config: BuilderConfig | null;
   vehicleLine: string;
 }) {
+  const [open, setOpen] = useState(false);
   const isWaypoint =
     loc.visitType === "arrival" || loc.visitType === "departure";
   const tours = sortSelectedToursChronologically(
@@ -454,6 +468,8 @@ function CityExperienceBlock({
   const chauffeurDays = Object.entries(chauffeurByDate).filter(([, sel]) =>
     isBillableChauffeurDay(sel)
   ).length;
+  const concierge =
+    state.isEliteConcierge || state.experienceService === "concierge";
 
   const transitIn =
     prev && index > 0
@@ -483,6 +499,36 @@ function CityExperienceBlock({
         ? "Tickets: self-purchase on site"
         : null;
 
+  const statusParts: string[] = [];
+  if (concierge) {
+    statusParts.push("Elite Concierge");
+  } else {
+    if (tours.length > 0) {
+      statusParts.push(
+        `${tours.length} experience${tours.length === 1 ? "" : "s"}`
+      );
+    }
+    if (chauffeurDays > 0) {
+      statusParts.push(
+        `${chauffeurDays} chauffeur day${chauffeurDays === 1 ? "" : "s"}`
+      );
+    }
+    if (statusParts.length === 0) {
+      if (transitIn && prev?.transitType === "self") {
+        statusParts.push("Self-Arranged");
+      } else if (transitIn && prev?.transitType === "private") {
+        statusParts.push("Private transfer in");
+      } else if (transitIn && prev?.transitType === "public") {
+        statusParts.push("Rail transfer in");
+      } else if (transitIn && prev?.transitType === "unset") {
+        statusParts.push("Transfer not set");
+      } else {
+        statusParts.push("Self-Arranged");
+      }
+    }
+  }
+  const statusLabel = statusParts.join(" · ");
+
   if (isWaypoint) {
     return (
       <div className="border-b border-[#EEE8DF] py-3 last:border-b-0">
@@ -498,69 +544,113 @@ function CityExperienceBlock({
           <p className="mt-1 text-xs text-[#5C6570]">{transitIn}</p>
         ) : null}
         {ticketLine ? (
-          <p className="mt-0.5 text-xs text-amber-800/80">{ticketLine}</p>
+          <p className="mt-0.5 text-xs text-accent-800/80">{ticketLine}</p>
         ) : null}
       </div>
     );
   }
 
   return (
-    <div className="border-b border-[#EEE8DF] py-3 last:border-b-0">
-      <div className="flex items-baseline justify-between gap-3">
-        <p className="text-sm font-semibold text-[#0B1F3A]">
-          {cityLabel}
-          <span className="text-[#8A8278]">
-            {" "}
-            · {loc.nights} Night{loc.nights === 1 ? "" : "s"}
-          </span>
-        </p>
-        {dateLabel ? (
-          <p className="shrink-0 text-xs text-[#8A8278]">{dateLabel}</p>
-        ) : null}
+    <div className="border-b border-[#EEE8DF] last:border-b-0">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        className="flex w-full items-center gap-3 py-3 text-left transition hover:bg-[#FDF7F3]/60 print:hidden"
+      >
+        <div className="min-w-0 flex-1">
+          <div className="flex items-baseline justify-between gap-3">
+            <p className="text-sm font-semibold text-[#0B1F3A]">
+              {cityLabel}
+              <span className="text-[#8A8278]">
+                {" "}
+                · {loc.nights} Night{loc.nights === 1 ? "" : "s"}
+              </span>
+            </p>
+            {dateLabel ? (
+              <p className="shrink-0 text-xs text-[#8A8278]">{dateLabel}</p>
+            ) : null}
+          </div>
+          <p className="mt-1 text-xs text-[#8A8278]">{statusLabel}</p>
+        </div>
+        <ChevronDown
+          className={`h-4 w-4 shrink-0 text-[#B85304]/80 transition-transform duration-200 ${
+            open ? "rotate-180" : ""
+          }`}
+          aria-hidden
+        />
+      </button>
+
+      {/* Always visible when printing */}
+      <div className="hidden print:block">
+        <div className="flex items-baseline justify-between gap-3 py-3">
+          <p className="text-sm font-semibold text-[#0B1F3A]">
+            {cityLabel}
+            <span className="text-[#8A8278]">
+              {" "}
+              · {loc.nights} Night{loc.nights === 1 ? "" : "s"}
+            </span>
+          </p>
+          {dateLabel ? (
+            <p className="shrink-0 text-xs text-[#8A8278]">{dateLabel}</p>
+          ) : null}
+        </div>
       </div>
 
-      <ul className="mt-2 space-y-1.5">
-        {transitIn ? (
-          <li className="text-xs text-[#5C6570]">{transitIn}</li>
-        ) : null}
-        {ticketLine ? (
-          <li className="text-xs text-amber-800/80">{ticketLine}</li>
-        ) : null}
+      <div
+        className={`grid transition-[grid-template-rows] duration-200 ease-out print:!grid-rows-[1fr] ${
+          open ? "grid-rows-[1fr]" : "grid-rows-[0fr] print:grid-rows-[1fr]"
+        }`}
+      >
+        <div className="overflow-hidden">
+          <ul className="space-y-1.5 pb-3 print:pb-3">
+            {transitIn ? (
+              <li className="text-xs text-[#5C6570]">{transitIn}</li>
+            ) : null}
+            {ticketLine ? (
+              <li className="text-xs text-accent-800/80">{ticketLine}</li>
+            ) : null}
 
-        {!state.isEliteConcierge &&
-          tours.map((row) => {
-            const catalog = config?.tours.find((t) => t.id === row.tourId);
-            const hours = catalog?.duration_hours ?? row.duration_hours;
-            return (
-              <li
-                key={`${row.tourId}-${row.scheduledDate}`}
-                className="text-xs text-[#5C6570]"
-              >
-                {row.title}
-                {hours ? ` · ${hours}h` : ""}
-                {row.selectedLanguage
-                  ? ` · ${row.selectedLanguage} Guide`
-                  : ""}
+            {!concierge &&
+              tours.map((row) => {
+                const catalog = config?.tours.find((t) => t.id === row.tourId);
+                const hours = catalog?.duration_hours ?? row.duration_hours;
+                return (
+                  <li
+                    key={`${row.tourId}-${row.scheduledDate}`}
+                    className="text-xs text-[#5C6570]"
+                  >
+                    {row.title}
+                    {hours ? ` · ${hours}h` : ""}
+                    {row.selectedLanguage
+                      ? ` · ${row.selectedLanguage} Guide`
+                      : ""}
+                  </li>
+                );
+              })}
+
+            {concierge ? (
+              <li className="text-xs text-[#5C6570]">
+                Tours &amp; private drivers curated 1:1 by Elite Concierge
               </li>
-            );
-          })}
+            ) : chauffeurDays > 0 ? (
+              <li className="text-xs text-[#5C6570]">
+                {chauffeurDays} Day{chauffeurDays === 1 ? "" : "s"} Private
+                Chauffeur · {vehicleLine}
+              </li>
+            ) : null}
 
-        {chauffeurDays > 0 ? (
-          <li className="text-xs text-[#5C6570]">
-            {chauffeurDays} Day{chauffeurDays === 1 ? "" : "s"} Private
-            Chauffeur · {vehicleLine}
-          </li>
-        ) : null}
-
-        {!state.isEliteConcierge &&
-        tours.length === 0 &&
-        chauffeurDays === 0 &&
-        !transitIn ? (
-          <li className="text-xs text-[#8A8278]">
-            No experiences or private chauffeur days yet
-          </li>
-        ) : null}
-      </ul>
+            {!concierge &&
+            tours.length === 0 &&
+            chauffeurDays === 0 &&
+            !transitIn ? (
+              <li className="text-xs text-[#8A8278]">
+                No experiences or private chauffeur days yet
+              </li>
+            ) : null}
+          </ul>
+        </div>
+      </div>
     </div>
   );
 }
@@ -574,7 +664,7 @@ function InvoiceCard({
 }) {
   return (
     <div className="rounded-2xl border border-[#E8E2D9] bg-white p-4 sm:p-5 print:border print:shadow-none">
-      <h3 className="mb-3 text-[0.65rem] font-semibold uppercase tracking-[0.22em] text-[#C4A35A]">
+      <h3 className="mb-3 text-[0.65rem] font-semibold uppercase tracking-[0.22em] text-[#B85304]">
         {title}
       </h3>
       <div>{children}</div>
@@ -606,13 +696,26 @@ function SectionSubtotal({
   min: number;
   max: number;
 }) {
+  const isZero = min <= 0 && max <= 0;
+  const isExperiences = /experiences/i.test(label);
+
+  if (isZero && isExperiences) {
+    return (
+      <div className="mt-4 border-t border-zinc-200 pt-4 font-bold text-[#0B1F3A]">
+        <span className="text-xs uppercase tracking-wider text-zinc-500">
+          {label}: €0 (Self-Arranged)
+        </span>
+      </div>
+    );
+  }
+
   return (
     <div className="mt-4 flex items-center justify-between border-t border-zinc-200 pt-4 font-bold text-[#0B1F3A]">
       <span className="text-xs uppercase tracking-wider text-zinc-500">
         {label}
       </span>
       <span className="text-sm">
-        {min <= 0 && max <= 0
+        {isZero
           ? "—"
           : `Est. ${formatUsd(min)} – ${formatUsd(Math.max(max, min))}`}
       </span>

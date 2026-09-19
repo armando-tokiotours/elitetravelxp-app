@@ -149,7 +149,7 @@ export function TourDetailModal({
               onClick={onClose}
               className="pointer-events-auto flex items-center gap-1.5 rounded-full border border-white/20 bg-black/60 px-3 py-1.5 text-xs font-medium text-white shadow-lg backdrop-blur-md transition-all hover:bg-black/80 active:scale-95"
             >
-              <ArrowLeft className="h-4 w-4 text-amber-400" aria-hidden />
+              <ArrowLeft className="h-4 w-4 text-accent-500" aria-hidden />
               <span>{backLabel}</span>
             </button>
             <button

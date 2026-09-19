@@ -407,7 +407,7 @@ export function ToursCsvSync({
             type="button"
             disabled={!!busy}
             onClick={() => void download()}
-            className="rounded-full border border-[#D9D2C7] bg-white px-3.5 py-2 text-sm font-medium text-[#0B1F3A] hover:border-[#C4A35A] disabled:opacity-50"
+            className="rounded-full border border-[#D9D2C7] bg-white px-3.5 py-2 text-sm font-medium text-[#0B1F3A] hover:border-[#B85304] disabled:opacity-50"
           >
             {busy === "down" ? "Preparing…" : "⬇️ Download CSV"}
           </button>
@@ -431,7 +431,7 @@ export function ToursCsvSync({
           />
           {busy === "up" ? (
             <span
-              className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-[#C4A35A] border-t-transparent"
+              className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-[#B85304] border-t-transparent"
               aria-label="Syncing"
             />
           ) : null}

@@ -25,7 +25,7 @@ import {
 } from "@/lib/selectedTours";
 import { canAddTourOnDate } from "@/lib/tourValidator";
 import {
-  BUILDER_STEP_COUNT,
+  BUILDER_ALL_STEPS_COMPLETE,
   clampHighestUnlockedStep,
 } from "@/lib/builderSteps";
 import type { ExperienceProfile } from "@/lib/experienceProfiler";
@@ -285,6 +285,8 @@ export interface BuilderActions {
   /** Schedule a tour on a specific stay date (required for chauffeur-by-tour). */
   addCityTour: (cityId: string, tour: SelectedTour) => boolean;
   removeCityTour: (cityId: string, tourId: string) => void;
+  /** Replace all date-bound tour selections (used by Tailored Experiences draft commit). */
+  commitSelectedTours: (selectedTours: SelectedToursByCity) => void;
   setSelectedTourIds: (ids: string[]) => void;
   setEliteConcierge: (v: boolean) => void;
   setExperienceService: (service: ExperienceService) => void;
@@ -994,7 +996,9 @@ export const useBuilderStore = create<BuilderState & BuilderActions>()(
 
       toggleCityTour: (cityId, tourId) => {
         const s = get();
-        if (s.isEliteConcierge) return false;
+        if (s.isEliteConcierge || s.experienceService === "concierge") {
+          return false;
+        }
         const current = s.selectedTours[cityId] ?? [];
         const isSelected = current.some((t) => t.tourId === tourId);
         let nextRows: SelectedTour[];
@@ -1036,7 +1040,9 @@ export const useBuilderStore = create<BuilderState & BuilderActions>()(
 
       addCityTour: (cityId, tour) => {
         const s = get();
-        if (s.isEliteConcierge) return false;
+        if (s.isEliteConcierge || s.experienceService === "concierge") {
+          return false;
+        }
         if (!tour.scheduledDate) return false;
         if (!String(tour.selectedLanguage || "").trim()) return false;
         const current = s.selectedTours[cityId] ?? [];
@@ -1086,6 +1092,15 @@ export const useBuilderStore = create<BuilderState & BuilderActions>()(
         });
       },
 
+      commitSelectedTours: (selectedTours) => {
+        const next: SelectedToursByCity = {};
+        for (const [cityId, rows] of Object.entries(selectedTours ?? {})) {
+          const sorted = sortSelectedToursChronologically(rows);
+          if (sorted.length) next[cityId] = sorted;
+        }
+        set(syncTourDerived(next));
+      },
+
       setSelectedTourIds: (ids) => set({ selectedTourIds: ids }),
 
       setEliteConcierge: (v) =>
@@ -1093,8 +1108,9 @@ export const useBuilderStore = create<BuilderState & BuilderActions>()(
           v
             ? {
                 isEliteConcierge: true,
-                experienceService: "concierge",
+                experienceService: "concierge" as const,
                 ...syncTourDerived({}),
+                ...syncChauffeurDerived({}),
               }
             : {
                 isEliteConcierge: false,
@@ -1109,6 +1125,7 @@ export const useBuilderStore = create<BuilderState & BuilderActions>()(
               experienceService: "concierge" as const,
               isEliteConcierge: true,
               ...syncTourDerived({}),
+              ...syncChauffeurDerived({}),
             };
           }
           if (service === "tailored") {
@@ -1124,14 +1141,18 @@ export const useBuilderStore = create<BuilderState & BuilderActions>()(
         }),
 
       setNeedDriver: (v) =>
-        set(() =>
-          v
-            ? { needDriver: true }
-            : syncChauffeurDerived({})
-        ),
+        set((s) => {
+          if (s.isEliteConcierge || s.experienceService === "concierge") {
+            return s;
+          }
+          return v ? { needDriver: true } : syncChauffeurDerived({});
+        }),
 
       setChauffeurDay: (cityId, date, on) =>
         set((s) => {
+          if (s.isEliteConcierge || s.experienceService === "concierge") {
+            return s;
+          }
           const next = upsertChauffeurSelection(
             s.chauffeurSelections,
             cityId,
@@ -1143,6 +1164,9 @@ export const useBuilderStore = create<BuilderState & BuilderActions>()(
 
       setChauffeurDaysForCity: (cityId, dates) =>
         set((s) => {
+          if (s.isEliteConcierge || s.experienceService === "concierge") {
+            return s;
+          }
           let next: ChauffeurSelections = { ...s.chauffeurSelections };
           delete next[cityId];
           for (const date of dates) {
@@ -1158,6 +1182,9 @@ export const useBuilderStore = create<BuilderState & BuilderActions>()(
 
       setChauffeurDayMode: (cityId, date, mode) =>
         set((s) => {
+          if (s.isEliteConcierge || s.experienceService === "concierge") {
+            return s;
+          }
           const current =
             s.chauffeurSelections[cityId]?.[date] ??
             emptyChauffeurSelection("none");
@@ -1181,6 +1208,9 @@ export const useBuilderStore = create<BuilderState & BuilderActions>()(
 
       toggleChauffeurDayTour: (cityId, date, tourId) =>
         set((s) => {
+          if (s.isEliteConcierge || s.experienceService === "concierge") {
+            return s;
+          }
           const current =
             s.chauffeurSelections[cityId]?.[date] ??
             emptyChauffeurSelection("by_tour");
@@ -1196,16 +1226,19 @@ export const useBuilderStore = create<BuilderState & BuilderActions>()(
         }),
 
       setChauffeurSelection: (cityId, date, selection) =>
-        set((s) =>
-          syncChauffeurDerived(
+        set((s) => {
+          if (s.isEliteConcierge || s.experienceService === "concierge") {
+            return s;
+          }
+          return syncChauffeurDerived(
             upsertChauffeurSelection(
               s.chauffeurSelections,
               cityId,
               date,
               selection
             )
-          )
-        ),
+          );
+        }),
 
       setActiveSeason: (tier, note) =>
         set({ activeSeasonTier: tier, activeSeasonNote: note }),
@@ -1233,7 +1266,7 @@ export const useBuilderStore = create<BuilderState & BuilderActions>()(
         set((s) => {
           const next = Math.max(
             1,
-            Math.min(BUILDER_STEP_COUNT, Math.floor(step) || 1)
+            Math.min(BUILDER_ALL_STEPS_COMPLETE, Math.floor(step) || 1)
           );
           if (next <= s.highestUnlockedStep) return s;
           return { highestUnlockedStep: next };
@@ -1243,7 +1276,7 @@ export const useBuilderStore = create<BuilderState & BuilderActions>()(
         set({
           highestUnlockedStep: Math.max(
             1,
-            Math.min(BUILDER_STEP_COUNT, Math.floor(step) || 1)
+            Math.min(BUILDER_ALL_STEPS_COMPLETE, Math.floor(step) || 1)
           ),
         }),
 
@@ -1267,7 +1300,7 @@ export const useBuilderStore = create<BuilderState & BuilderActions>()(
               : null);
           return {
             ...merged,
-            highestUnlockedStep: BUILDER_STEP_COUNT,
+            highestUnlockedStep: BUILDER_ALL_STEPS_COMPLETE,
             ...(locked
               ? {
                   confirmedBookingRef: locked,
@@ -1283,7 +1316,7 @@ export const useBuilderStore = create<BuilderState & BuilderActions>()(
       hydrateFromSnapshot: (snapshot: Partial<BuilderState>) =>
         set((s) => ({
           ...mergePersistedBuilderState(snapshot, s),
-          highestUnlockedStep: BUILDER_STEP_COUNT,
+          highestUnlockedStep: BUILDER_ALL_STEPS_COMPLETE,
         })),
 
       ensureTempBookingRef: () => {

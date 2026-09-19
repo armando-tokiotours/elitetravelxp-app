@@ -23,6 +23,7 @@ import type {
   CityVisitType,
   LocationStop,
 } from "@/store/useBuilderStore";
+import { useHybridTooltip } from "@/hooks/useHybridTooltip";
 import { BuilderPortalSheet } from "../BuilderPortalSheet";
 import { CityAccordionItem } from "../CityAccordionItem";
 import { CityThumb } from "../CityThumb";
@@ -128,61 +129,76 @@ export function LocationsEditorModal({
             exit={{ opacity: 0, y: 20 }}
             transition={{ duration: 0.25, ease: "easeOut" }}
           >
-            <div className="flex flex-shrink-0 items-center gap-4 border-b border-zinc-800 bg-[#0a0a0a] p-4 pt-[max(1rem,env(safe-area-inset-top))]">
+            <div className="flex flex-shrink-0 items-start gap-3 border-b border-zinc-800 bg-[#0a0a0a] p-4 pt-[max(1rem,env(safe-area-inset-top))]">
               <button
                 type="button"
                 onClick={onClose}
                 aria-label="Back"
-                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-zinc-700 bg-zinc-900 text-white transition hover:border-zinc-500"
+                className="mt-1 flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-zinc-700 bg-zinc-900 text-white transition hover:border-zinc-500"
               >
                 <ArrowLeft className="h-5 w-5" />
               </button>
               <div className="min-w-0 flex-1">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#C4A35A]">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#D9BB96]">
                   Configure
                 </p>
-                <h3 className="truncate font-display text-2xl text-white">
-                  Locations &amp; Nights
-                </h3>
-                <p className="mt-0.5 text-[11px] text-zinc-500">
+                <div className="mt-0.5 flex items-start justify-between gap-3">
+                  <h3 className="font-display text-2xl font-extrabold leading-tight text-white">
+                    Locations &amp;
+                    <br />
+                    Nights
+                  </h3>
+                  {routeWarnings[0] || !matches ? (
+                    <RouteNoticeBadge
+                      message={
+                        routeWarnings[0]
+                          ? routeWarnings[0].body || routeWarnings[0].title
+                          : `Nights total ${totalNights} — need ${durationDays} for your trip.`
+                      }
+                    />
+                  ) : null}
+                </div>
+                <p className="mt-1 text-[11px] text-zinc-500">
                   Time in each city only — hotels come in Step 4
                 </p>
               </div>
             </div>
 
-            <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4 pb-12">
+            <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-4 py-4 pb-12 sm:px-5">
               <div className="rounded-xl border border-zinc-800 bg-zinc-950 px-3.5 py-2.5 text-xs text-zinc-400">
                 Set how many nights you spend in each city and how you travel
                 between stops. Accommodation is optional and configured next
                 under{" "}
-                <span className="font-semibold text-[#E8D5A3]">Hotels</span>.
+                <span className="font-semibold text-[#F3D9C4]">Hotels</span>.
               </div>
 
               {routeToast ? (
                 <div
                   role="status"
-                  className="rounded-xl border border-[#C4A35A]/50 bg-zinc-950 px-3.5 py-2.5 text-sm text-[#E8D5A3]"
+                  className="rounded-xl border border-[#B85304]/50 bg-zinc-950 px-3.5 py-2.5 text-sm text-[#F3D9C4]"
                 >
                   {routeToast}
                 </div>
               ) : null}
 
-              {routeWarnings.map((w) => (
-                <div
-                  key={w.type}
-                  className={`rounded-xl px-3.5 py-3 text-sm ${
-                    w.type === "inefficient"
-                      ? "border border-[#C4A35A]/35 bg-zinc-950 text-zinc-300"
-                      : "border border-[#C4A35A]/50 bg-zinc-950 text-[#E8D5A3]"
-                  }`}
-                >
-                  <p className="font-semibold text-white">
-                    {w.type === "inefficient" ? "💡 " : "⚠️ "}
-                    {w.title}
-                  </p>
-                  <p className="mt-1 leading-relaxed">{w.body}</p>
-                </div>
-              ))}
+              {routeWarnings.length > 1
+                ? routeWarnings.slice(1).map((w) => (
+                    <div
+                      key={w.type}
+                      className={`rounded-xl px-3.5 py-3 text-sm ${
+                        w.type === "inefficient"
+                          ? "border border-[#B85304]/35 bg-zinc-950 text-zinc-300"
+                          : "border border-[#B85304]/50 bg-zinc-950 text-[#F3D9C4]"
+                      }`}
+                    >
+                      <p className="font-semibold text-white">
+                        {w.type === "inefficient" ? "💡 " : "⚠️ "}
+                        {w.title}
+                      </p>
+                      <p className="mt-1 leading-relaxed">{w.body}</p>
+                    </div>
+                  ))
+                : null}
 
               {locations.length === 0 ? (
                 <p className="rounded-xl border border-dashed border-zinc-700 bg-zinc-950 px-4 py-6 text-center text-sm text-zinc-400">
@@ -194,7 +210,7 @@ export function LocationsEditorModal({
                   axis="y"
                   values={locations}
                   onReorder={onReorder}
-                  className="flex flex-col gap-4"
+                  className="flex w-full flex-col gap-4 overflow-visible"
                 >
                   {locations.map((loc, index) => {
                     const prev = index > 0 ? locations[index - 1] : null;
@@ -239,7 +255,7 @@ export function LocationsEditorModal({
                 type="button"
                 onClick={() => setPickerOpen(true)}
                 disabled={cities.length === 0}
-                className="w-full rounded-full border border-dashed border-[#C4A35A] bg-zinc-950 py-3 text-sm font-semibold text-white transition hover:bg-zinc-800 disabled:opacity-40"
+                className="w-full rounded-full border border-dashed border-[#B85304] bg-zinc-950 py-3 text-sm font-semibold text-white transition hover:bg-zinc-800 disabled:opacity-40"
               >
                 + Add Location
               </button>
@@ -250,7 +266,7 @@ export function LocationsEditorModal({
                 className={`rounded-xl px-4 py-3 text-sm font-medium ${
                   matches
                     ? "bg-emerald-950/90 text-emerald-400"
-                    : "bg-amber-950/90 text-amber-400"
+                    : "bg-accent-950/90 text-accent-500"
                 }`}
               >
                 Total nights: {totalNights}{" "}
@@ -295,7 +311,7 @@ export function LocationsEditorModal({
                       className={`flex w-full items-center gap-3 rounded-xl border px-3 py-2.5 text-left transition ${
                         disabled
                           ? "cursor-not-allowed border-zinc-700 bg-zinc-800 opacity-50"
-                          : "border-zinc-700 bg-zinc-800 text-zinc-200 hover:border-[#C4A35A]"
+                          : "border-zinc-700 bg-zinc-800 text-zinc-200 hover:border-[#B85304]"
                       }`}
                     >
                       <span className="h-11 w-11 shrink-0 overflow-hidden rounded-lg">
@@ -327,5 +343,47 @@ export function LocationsEditorModal({
       ) : null}
     </AnimatePresence>,
     document.body
+  );
+}
+
+function RouteNoticeBadge({ message }: { message: string }) {
+  const {
+    isOpen,
+    containerRef,
+    onMouseEnter,
+    onMouseLeave,
+    onToggleClick,
+  } = useHybridTooltip();
+
+  return (
+    <div
+      ref={containerRef}
+      className="relative z-50 inline-block shrink-0"
+      onMouseEnter={onMouseEnter}
+      onMouseLeave={onMouseLeave}
+    >
+      <button
+        type="button"
+        onClick={onToggleClick}
+        aria-expanded={isOpen}
+        aria-describedby={isOpen ? "route-notice-tooltip" : undefined}
+        className="flex cursor-pointer items-center gap-1.5 rounded-lg border border-[#B85304]/60 bg-[#B85304]/15 px-3 py-1.5 text-xs font-bold text-[#B85304] shadow-sm transition hover:bg-[#B85304]/30 active:scale-95"
+      >
+        <span>⚠️ Route Notice</span>
+      </button>
+      {isOpen ? (
+        <div
+          id="route-notice-tooltip"
+          role="tooltip"
+          className="absolute right-0 top-full z-50 mt-2 w-64 max-w-[260px] rounded-xl border border-[#B85304]/40 bg-[#D9BB96] p-3 text-left text-[11px] font-semibold leading-tight text-[#000000] shadow-2xl animate-in fade-in duration-150"
+        >
+          <div
+            className="absolute bottom-full right-4 border-[6px] border-transparent border-b-[#D9BB96]"
+            aria-hidden
+          />
+          <p className="leading-snug">{message}</p>
+        </div>
+      ) : null}
+    </div>
   );
 }

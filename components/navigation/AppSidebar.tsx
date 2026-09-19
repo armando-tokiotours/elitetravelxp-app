@@ -39,11 +39,11 @@ export interface AppNavItem {
   action?: "manage";
 }
 
-/** Content offset for hover-rail sidebar — must equal collapsed rail width (`w-16`) so no gap shows. */
-export const APP_SIDEBAR_RAIL_PAD = "md:pl-16";
+/** Content offset for desktop hover-rail — matches collapsed `w-16` (extra at xl). */
+export const APP_SIDEBAR_RAIL_PAD = "lg:pl-16 xl:pl-20";
 
-/** @deprecated Prefer APP_SIDEBAR_RAIL_PAD — all desktop views use the hover rail. */
-export const APP_SIDEBAR_FULL_PAD = "lg:pl-64";
+/** @deprecated Prefer APP_SIDEBAR_RAIL_PAD — hover rail stays collapsed-width in flow. */
+export const APP_SIDEBAR_FULL_PAD = "lg:pl-16";
 
 /** Canonical app nav — labels can be overridden via `labelOverrides`. */
 export const APP_NAV_ITEMS: AppNavItem[] = [
@@ -160,7 +160,7 @@ function NavLinkList({
         const active = isNavActive(pathname, item);
 
         const railItemClass = active
-          ? "border-r-2 border-amber-400 bg-amber-500/10 text-amber-400"
+          ? "border-r-2 border-[#D9BB96]/40 bg-[#D9BB96]/15 text-[#D9BB96]"
           : "border-r-2 border-transparent text-zinc-300 hover:bg-zinc-900 hover:text-white";
 
         const railLayout = rail
@@ -186,7 +186,7 @@ function NavLinkList({
               }`}
             >
               <Icon
-                className="h-5 w-5 shrink-0 text-[#C4A35A]"
+                className="h-5 w-5 shrink-0 text-[#B85304]"
                 aria-hidden
               />
               {variant === "drawer" ? (
@@ -211,14 +211,14 @@ function NavLinkList({
                 ? `flex items-center gap-3 rounded-xl py-2.5 text-sm transition-all duration-300 ${railItemClass} ${railLayout}`
                 : `flex items-center gap-3 rounded-xl px-4 py-3.5 text-sm tracking-wide transition ${
                     active
-                      ? "bg-[#C4A35A]/20 text-[#C4A35A]"
+                      ? "bg-[#B85304]/20 text-[#B85304]"
                       : "text-white/85 hover:bg-white/8"
                   }`
             }
           >
             <Icon
               className={`h-5 w-5 shrink-0 ${
-                active ? "text-amber-400" : "text-zinc-500"
+                active ? "text-[#D9BB96]" : "text-zinc-500"
               }`}
               aria-hidden
             />
@@ -262,9 +262,9 @@ function AccountFooter({
   if (overlay) {
     if (isAuthenticated && email) {
       return (
-        <div className="mt-auto shrink-0 border-t border-zinc-800/80 pt-6 pb-[calc(5.5rem+env(safe-area-inset-bottom))] md:pb-8">
+        <div className="mt-auto shrink-0 border-t border-zinc-800/80 pb-32 pt-6">
           <div className="flex items-center gap-3 rounded-xl border border-zinc-800 bg-zinc-900 p-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-amber-500/10 text-amber-400">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[#B85304]/15 text-accent-500">
               <User className="h-5 w-5" aria-hidden />
             </div>
             <div className="min-w-0 flex-1">
@@ -278,7 +278,7 @@ function AccountFooter({
             className="mt-3 flex w-full items-center justify-between rounded-xl px-1 py-2 text-xs text-zinc-400 transition hover:text-white"
           >
             <span>Signed in</span>
-            <span className="font-semibold text-amber-400 hover:underline">
+            <span className="font-semibold text-accent-500 hover:underline">
               Sign out
             </span>
           </button>
@@ -287,13 +287,13 @@ function AccountFooter({
     }
 
     return (
-      <div className="mt-auto shrink-0 border-t border-zinc-800/80 pt-6 pb-[calc(5.5rem+env(safe-area-inset-bottom))] md:pb-8">
+      <div className="mt-auto shrink-0 border-t border-zinc-800/80 pb-32 pt-6">
         <button
           type="button"
           onClick={onManage}
           className="flex w-full items-center gap-3 rounded-xl border border-zinc-800 bg-zinc-900 p-3 text-left transition hover:border-zinc-700"
         >
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-amber-500/10 text-amber-400">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[#B85304]/15 text-accent-500">
             <Ticket className="h-5 w-5" aria-hidden />
           </div>
           <div className="min-w-0">
@@ -308,7 +308,7 @@ function AccountFooter({
           className="mt-3 flex items-center justify-between px-1 py-2 text-xs text-zinc-400 transition hover:text-white"
         >
           <span>Team Access</span>
-          <span className="font-semibold text-amber-400">Sign in</span>
+          <span className="font-semibold text-accent-500">Sign in</span>
         </Link>
       </div>
     );
@@ -332,7 +332,7 @@ function AccountFooter({
         className={`border-t border-zinc-800 ${compact ? "px-4 py-3" : "pt-4"}`}
       >
         <div className={`flex items-center gap-3 rounded-xl py-2 ${railLayout}`}>
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-zinc-900 text-[#C4A35A]">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-zinc-900 text-[#B85304]">
             <User className="h-4 w-4" aria-hidden />
           </span>
           <NavLabel rail={rail} expanded={expanded}>
@@ -371,7 +371,7 @@ function AccountFooter({
         onClick={onManage}
         className={`flex w-full items-center gap-3 rounded-xl py-2 text-left transition hover:bg-zinc-900 ${railLayout}`}
       >
-        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-zinc-900 text-[#C4A35A]">
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-zinc-900 text-[#B85304]">
           <Ticket className="h-4 w-4" aria-hidden />
         </span>
         <NavLabel rail={rail} expanded={expanded}>
@@ -432,14 +432,14 @@ function FullScreenNavOverlay({
       role="dialog"
       aria-modal="true"
       aria-label="Main menu"
-      className="fixed inset-0 z-[80] flex h-[100dvh] min-h-screen w-screen flex-col bg-zinc-950 text-white opacity-100"
+      className="fixed inset-0 z-[80] flex h-[100dvh] min-h-screen w-screen flex-col bg-[#000000] text-white opacity-100 lg:hidden"
     >
-      <div className="relative z-[81] flex shrink-0 items-center justify-between border-b border-zinc-800 bg-zinc-950 px-4 py-3">
+      <div className="relative z-[81] flex shrink-0 items-center justify-between border-b border-[#2C2C2E] bg-[#000000] px-4 py-3">
         <div className="flex min-w-0 items-center gap-2">
           <button
             type="button"
             onClick={onClose}
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-zinc-800 bg-zinc-900 text-zinc-300 transition hover:bg-zinc-800 hover:text-white"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[#2C2C2E] bg-[#1C1C1E] text-zinc-300 transition hover:bg-[#2C2C2E] hover:text-white"
             aria-label="Return to page"
           >
             <span className="text-lg leading-none" aria-hidden>
@@ -447,10 +447,10 @@ function FullScreenNavOverlay({
             </span>
           </button>
           <div className="min-w-0">
-            <p className="text-[0.55rem] font-semibold uppercase tracking-[0.28em] text-[#C4A35A]">
+            <p className="text-[0.55rem] font-semibold uppercase tracking-[0.28em] text-[#E2C498]">
               {brandEyebrow}
             </p>
-            <p className="text-xs font-bold uppercase tracking-widest text-amber-400">
+            <p className="text-xs font-bold uppercase tracking-widest text-[#E2C498]">
               Menu
             </p>
           </div>
@@ -458,13 +458,13 @@ function FullScreenNavOverlay({
         <button
           type="button"
           onClick={onClose}
-          className="rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-1.5 text-xs font-semibold text-zinc-400 transition hover:text-white"
+          className="rounded-lg border border-[#2C2C2E] bg-[#1C1C1E] px-3 py-1.5 text-xs font-semibold text-zinc-400 transition hover:text-white"
         >
           Close
         </button>
       </div>
 
-      <div className="relative z-[81] mx-auto flex w-full max-w-lg flex-1 flex-col overflow-y-auto overscroll-contain bg-zinc-950 px-6 py-6 pb-32">
+      <div className="relative z-[81] mx-auto flex w-full max-w-lg flex-1 flex-col overflow-y-auto overscroll-contain bg-[#000000] px-6 py-6 pb-32">
         <div className="mb-6 flex shrink-0 items-center gap-3">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
@@ -501,7 +501,8 @@ function FullScreenNavOverlay({
 }
 
 /**
- * Fixed left desktop icon rail. Opens a full-screen solid menu overlay.
+ * Desktop-only left accordion rail (`lg+`). Collapsed `w-16` icon bar;
+ * expands to `w-64` on hover to reveal labels. Never opens a full-screen overlay.
  */
 export function AppSidebar({
   brandEyebrow = "Elite Travel",
@@ -512,20 +513,17 @@ export function AppSidebar({
   brandEyebrow?: string;
   brandTitle?: string;
   labelOverrides?: Partial<Record<AppNavId, string>>;
-  /** Kept for API compat — menu opens full-screen on click */
+  /** When true (default), expand rail width on hover to show labels */
   expandOnHover?: boolean;
 }) {
-  void expandOnHover;
+  void brandEyebrow;
+  void brandTitle;
   const pathname = usePathname();
   const router = useRouter();
   const logoSrc = useBrandLogo();
   const [manageOpen, setManageOpen] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
-  const [menuOpen, setMenuOpen] = useState(false);
-
-  useEffect(() => {
-    setMenuOpen(false);
-  }, [pathname]);
+  const [expanded, setExpanded] = useState(false);
 
   useEffect(() => {
     if (!toast) return;
@@ -534,78 +532,59 @@ export function AppSidebar({
   }, [toast]);
 
   const openManage = () => setManageOpen(true);
+  const showLabels = expandOnHover ? expanded : true;
 
   return (
     <>
-      <aside className="fixed bottom-0 left-0 top-0 z-[60] hidden w-16 flex-col border-r border-zinc-800 bg-zinc-950 opacity-100 md:flex">
-        <button
-          type="button"
-          onClick={() => setMenuOpen(true)}
-          className="flex flex-col items-center gap-1 px-2 py-3"
-          aria-label="Open menu"
-          aria-expanded={menuOpen}
+      <aside
+        className={`fixed bottom-0 left-0 top-0 z-50 hidden flex-col border-r border-[#2C2C2E] bg-[#000000] transition-[width] duration-200 ease-in-out lg:flex ${
+          showLabels ? "w-64" : "w-16"
+        }`}
+        onMouseEnter={() => {
+          if (expandOnHover) setExpanded(true);
+        }}
+        onMouseLeave={() => {
+          if (expandOnHover) setExpanded(false);
+        }}
+        aria-label="Main navigation"
+      >
+        <div
+          className={`flex shrink-0 items-center gap-3 border-b border-[#2C2C2E] py-3 ${
+            showLabels ? "justify-start px-3" : "justify-center px-2"
+          }`}
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={logoSrc}
             alt="Elite Travel Experiences"
-            className="h-9 w-9 object-contain"
+            className="h-9 w-9 shrink-0 object-contain"
           />
-        </button>
+          <NavLabel rail expanded={showLabels}>
+            <div className="min-w-0">
+              <p className="text-[0.55rem] font-semibold uppercase tracking-[0.2em] text-[#E2C498]">
+                Elite Travel
+              </p>
+              <p className="truncate text-xs font-bold text-[#F5EFE6]">Menu</p>
+            </div>
+          </NavLabel>
+        </div>
 
-        <nav className="flex flex-1 flex-col gap-1 p-2" aria-label="Quick">
-          {APP_NAV_ITEMS.map((item) => {
-            const Icon = item.icon;
-            const active = isNavActive(pathname, item);
-            const label = labelOverrides?.[item.id] ?? item.label;
-            const cls = `flex items-center justify-center rounded-xl py-2.5 transition ${
-              active
-                ? "border-r-2 border-amber-400 bg-amber-500/10 text-amber-400"
-                : "border-r-2 border-transparent text-zinc-400 hover:bg-zinc-900 hover:text-white"
-            }`;
-            if (item.action === "manage") {
-              return (
-                <button
-                  key={item.id}
-                  type="button"
-                  title={label}
-                  onClick={() => setMenuOpen(true)}
-                  className={cls}
-                >
-                  <Icon className="h-5 w-5 text-[#C4A35A]" aria-hidden />
-                </button>
-              );
-            }
-            return (
-              <button
-                key={item.id}
-                type="button"
-                title={label}
-                onClick={() => setMenuOpen(true)}
-                className={cls}
-              >
-                <Icon
-                  className={`h-5 w-5 ${active ? "text-amber-400" : "text-zinc-500"}`}
-                  aria-hidden
-                />
-              </button>
-            );
-          })}
-        </nav>
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden p-2">
+          <NavLinkList
+            pathname={pathname}
+            onManage={openManage}
+            labelOverrides={labelOverrides}
+            variant="sidebar"
+            rail
+            expanded={showLabels}
+          />
+          <AccountFooter
+            onManage={openManage}
+            rail
+            expanded={showLabels}
+          />
+        </div>
       </aside>
-
-      <div className="hidden md:block">
-        <FullScreenNavOverlay
-          open={menuOpen}
-          onClose={() => setMenuOpen(false)}
-          brandEyebrow={brandEyebrow}
-          brandTitle={brandTitle}
-          logoSrc={logoSrc}
-          pathname={pathname}
-          labelOverrides={labelOverrides}
-          onManage={openManage}
-        />
-      </div>
 
       <ManageBookingModal
         open={manageOpen}
@@ -618,7 +597,7 @@ export function AppSidebar({
       {toast ? (
         <div
           role="status"
-          className="fixed bottom-8 left-1/2 z-[110] hidden w-[min(92vw,28rem)] -translate-x-1/2 rounded-xl border border-[#C4A35A]/50 bg-[#1a1510] px-4 py-3 text-center text-sm text-[#E8D5A3] shadow-lg md:block"
+          className="fixed bottom-8 left-1/2 z-[110] hidden w-[min(92vw,28rem)] -translate-x-1/2 rounded-xl border border-[#B85304]/50 bg-[#1a1510] px-4 py-3 text-center text-sm text-[#F3D9C4] shadow-lg lg:block"
         >
           {toast}
         </div>
@@ -628,7 +607,7 @@ export function AppSidebar({
 }
 
 /**
- * Mobile hamburger → full-screen solid menu. Shown below `md`.
+ * Mobile/tablet hamburger → full-screen solid menu. Strictly `< lg` only.
  */
 export function MobileAppNav({
   brandEyebrow = "Elite Travel",
@@ -651,6 +630,15 @@ export function MobileAppNav({
   }, [pathname]);
 
   useEffect(() => {
+    const closeIfDesktop = () => {
+      if (window.innerWidth >= 1024) setOpen(false);
+    };
+    closeIfDesktop();
+    window.addEventListener("resize", closeIfDesktop);
+    return () => window.removeEventListener("resize", closeIfDesktop);
+  }, []);
+
+  useEffect(() => {
     if (!toast) return;
     const t = window.setTimeout(() => setToast(null), 3800);
     return () => window.clearTimeout(t);
@@ -663,12 +651,12 @@ export function MobileAppNav({
         aria-label="Open menu"
         aria-expanded={open}
         onClick={() => setOpen(true)}
-        className="flex h-10 w-10 items-center justify-center rounded-xl border border-zinc-700 bg-zinc-900 text-white transition hover:border-[#C4A35A] md:hidden"
+        className="flex h-10 w-10 items-center justify-center rounded-xl border border-zinc-700 bg-zinc-900 text-white transition hover:border-[#B85304] lg:hidden"
       >
         <HamburgerIcon />
       </button>
 
-      <div className="md:hidden">
+      <div className="lg:hidden">
         <FullScreenNavOverlay
           open={open}
           onClose={() => setOpen(false)}
@@ -692,7 +680,7 @@ export function MobileAppNav({
       {toast ? (
         <div
           role="status"
-          className="fixed bottom-[7.5rem] left-1/2 z-[110] w-[min(92vw,28rem)] -translate-x-1/2 rounded-xl border border-[#C4A35A]/50 bg-[#1a1510] px-4 py-3 text-center text-sm text-[#E8D5A3] shadow-lg md:hidden"
+          className="fixed bottom-[7.5rem] left-1/2 z-[110] w-[min(92vw,28rem)] -translate-x-1/2 rounded-xl border border-[#B85304]/50 bg-[#1a1510] px-4 py-3 text-center text-sm text-[#F3D9C4] shadow-lg lg:hidden"
         >
           {toast}
         </div>

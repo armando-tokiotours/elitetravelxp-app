@@ -22,8 +22,12 @@ import {
   type DriverMode,
 } from "@/lib/chauffeurSelections";
 import { chauffeurDaysForCity } from "@/lib/dateCascade";
-import type { SelectedTour } from "@/lib/selectedTours";
-import { sortSelectedToursChronologically } from "@/lib/selectedTours";
+import type { SelectedTour, SelectedToursByCity } from "@/lib/selectedTours";
+import {
+  selectedTourIdsByCity,
+  selectedTourIdsFromMap,
+  sortSelectedToursChronologically,
+} from "@/lib/selectedTours";
 import {
   canAddTourOnDate,
   MAX_TOUR_HOURS_PER_DAY,
@@ -59,6 +63,7 @@ export function TailoredExperiencesModal({
   seasonalHighlights = [],
   vehicles = [],
   chauffeurRates = [],
+  hideTransport = false,
 }: {
   open: boolean;
   onClose: () => void;
@@ -69,23 +74,21 @@ export function TailoredExperiencesModal({
   seasonalHighlights?: SeasonalHighlight[];
   vehicles?: PbVehicle[];
   chauffeurRates?: PbChauffeurRate[];
+  /** When true, only show experiences (drivers live in Builder Step 6). */
+  hideTransport?: boolean;
 }) {
   const locations = useBuilderStore((s) => s.locations);
   const arrivalDate = useBuilderStore((s) => s.arrivalDate);
-  const selectedTourIds = useBuilderStore((s) => s.selectedTourIds);
-  const selectedToursMap = useBuilderStore((s) => s.selectedTours);
-  const selectedToursByCity = useBuilderStore((s) => s.selectedToursByCity);
+  const committedTours = useBuilderStore((s) => s.selectedTours);
   const chauffeurSelections = useBuilderStore((s) => s.chauffeurSelections);
   const adults = useBuilderStore((s) => s.adults);
   const children = useBuilderStore((s) => s.children);
-  const toggleTour = useBuilderStore((s) => s.toggleTour);
-  const addCityTour = useBuilderStore((s) => s.addCityTour);
-  const removeCityTour = useBuilderStore((s) => s.removeCityTour);
   const setChauffeurDayMode = useBuilderStore((s) => s.setChauffeurDayMode);
   const toggleChauffeurDayTour = useBuilderStore(
     (s) => s.toggleChauffeurDayTour
   );
   const setExperienceService = useBuilderStore((s) => s.setExperienceService);
+  const commitSelectedTours = useBuilderStore((s) => s.commitSelectedTours);
   const experienceProfile = useBuilderStore((s) => s.experienceProfile);
   const durationDays = useBuilderStore((s) => s.durationDays);
   const totalPax = adults + children;
@@ -96,6 +99,79 @@ export function TailoredExperiencesModal({
   const [quizOpen, setQuizOpen] = useState(false);
   const [reelOpen, setReelOpen] = useState(false);
   const [autoFillNote, setAutoFillNote] = useState<string | null>(null);
+  /** Isolated draft — only commits to builder store on Done */
+  const [draftTours, setDraftTours] = useState<SelectedToursByCity>({});
+
+  useEffect(() => {
+    if (!open) return;
+    // Snapshot committed selections when the configure module opens
+    const snapshot: SelectedToursByCity = {};
+    for (const [cityId, rows] of Object.entries(committedTours ?? {})) {
+      snapshot[cityId] = rows.map((r) => ({ ...r }));
+    }
+    setDraftTours(snapshot);
+    setAutoFillNote(null);
+    setDrawerCityId(null);
+  }, [open]); // eslint-disable-line react-hooks/exhaustive-deps -- snapshot once per open
+
+  const selectedToursMap = draftTours;
+  const selectedTourIds = useMemo(
+    () => selectedTourIdsFromMap(draftTours),
+    [draftTours]
+  );
+  const selectedToursByCity = useMemo(
+    () => selectedTourIdsByCity(draftTours),
+    [draftTours]
+  );
+
+  const draftAddCityTour = (
+    cityId: string,
+    tour: SelectedTour
+  ): boolean => {
+    if (!tour.scheduledDate) return false;
+    if (!String(tour.selectedLanguage || "").trim()) return false;
+    let ok = false;
+    setDraftTours((prev) => {
+      const current = prev[cityId] ?? [];
+      const without = current.filter((t) => t.tourId !== tour.tourId);
+      const duration_hours = Number(tour.duration_hours) || 0;
+      const check = canAddTourOnDate({
+        selectedRows: without,
+        scheduledDate: tour.scheduledDate,
+        newTourDurationHours: duration_hours,
+        tourId: tour.tourId,
+      });
+      if (!check.ok) return prev;
+      ok = true;
+      const nextRows = sortSelectedToursChronologically([
+        ...without,
+        {
+          tourId: tour.tourId,
+          title: tour.title,
+          duration_hours,
+          scheduledDate: tour.scheduledDate,
+          selectedLanguage: String(tour.selectedLanguage).trim(),
+          price: Number(tour.price) || 0,
+          ...(tour.languages?.length ? { languages: tour.languages } : {}),
+          ...(tour.customDuration ? { customDuration: true } : {}),
+        },
+      ]);
+      return { ...prev, [cityId]: nextRows };
+    });
+    return ok;
+  };
+
+  const draftRemoveCityTour = (cityId: string, tourId: string) => {
+    setDraftTours((prev) => {
+      const current = prev[cityId] ?? [];
+      if (!current.some((t) => t.tourId === tourId)) return prev;
+      const nextRows = current.filter((t) => t.tourId !== tourId);
+      const next = { ...prev };
+      if (nextRows.length === 0) delete next[cityId];
+      else next[cityId] = nextRows;
+      return next;
+    });
+  };
 
   const cityMap = useMemo(
     () => Object.fromEntries(cities.map((c) => [c.id, c])),
@@ -190,7 +266,12 @@ export function TailoredExperiencesModal({
   const chauffeurDayCount = countBillableChauffeurDays(chauffeurSelections);
 
   const handleDone = () => {
+    commitSelectedTours(draftTours);
     setExperienceService("tailored");
+    onClose();
+  };
+
+  const handleCancel = () => {
     onClose();
   };
 
@@ -210,6 +291,10 @@ export function TailoredExperiencesModal({
 
     let added = 0;
     let skipped = 0;
+    const nextDraft: SelectedToursByCity = {};
+    for (const [cityId, rows] of Object.entries(draftTours)) {
+      nextDraft[cityId] = rows.map((r) => ({ ...r }));
+    }
 
     const uniqueCities = Array.from(nightsByCity.entries());
 
@@ -226,9 +311,7 @@ export function TailoredExperiencesModal({
         continue;
       }
 
-      let workingRows = [
-        ...(useBuilderStore.getState().selectedTours[cityId] ?? []),
-      ];
+      let workingRows = [...(nextDraft[cityId] ?? [])];
 
       for (const tour of picks) {
         if (workingRows.some((r) => r.tourId === tour.id)) {
@@ -247,27 +330,31 @@ export function TailoredExperiencesModal({
             tourId: tour.id,
           });
           if (!check.ok) continue;
-          const ok = addCityTour(cityId, {
-            tourId: tour.id,
-            title: tour.title,
-            duration_hours,
-            scheduledDate: day.date,
-            selectedLanguage: lang,
-            price: tourPrice(tour, { adults, children }),
-            ...(tour.languages?.length ? { languages: tour.languages } : {}),
-          });
-          if (ok) {
-            workingRows = [
-              ...(useBuilderStore.getState().selectedTours[cityId] ?? []),
-            ];
-            added += 1;
-            placed = true;
-            break;
-          }
+          const without = workingRows.filter((t) => t.tourId !== tour.id);
+          workingRows = sortSelectedToursChronologically([
+            ...without,
+            {
+              tourId: tour.id,
+              title: tour.title,
+              duration_hours,
+              scheduledDate: day.date,
+              selectedLanguage: lang,
+              price: tourPrice(tour, { adults, children }),
+              ...(tour.languages?.length
+                ? { languages: tour.languages }
+                : {}),
+            },
+          ]);
+          nextDraft[cityId] = workingRows;
+          added += 1;
+          placed = true;
+          break;
         }
         if (!placed) skipped += 1;
       }
     }
+
+    setDraftTours(nextDraft);
 
     if (added === 0) {
       setAutoFillNote(
@@ -314,14 +401,14 @@ export function TailoredExperiencesModal({
             <div className="flex flex-shrink-0 items-center gap-4 border-b border-zinc-800 bg-[#0a0a0a] p-4 pt-[max(1rem,env(safe-area-inset-top))]">
               <button
                 type="button"
-                onClick={onClose}
-                aria-label="Back"
+                onClick={handleCancel}
+                aria-label="Cancel without saving"
                 className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-zinc-700 bg-zinc-900 text-white transition hover:border-zinc-500"
               >
                 <ArrowLeft className="h-5 w-5" />
               </button>
               <div className="min-w-0 flex-1">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#C4A35A]">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#B85304]">
                   Configure
                 </p>
                 <h3 className="truncate font-display text-2xl text-white">
@@ -341,9 +428,9 @@ export function TailoredExperiencesModal({
                   <button
                     type="button"
                     onClick={handleAutoFillRecommended}
-                    className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-[#C4A35A]/50 bg-[#C4A35A]/15 px-4 py-3 text-sm font-semibold text-[#E8D5A3] transition hover:bg-[#C4A35A]/25"
+                    className="inline-flex w-full items-center justify-center gap-1.5 rounded-full border border-[#B85304]/50 bg-[#B85304]/15 px-3 py-2.5 text-[13px] font-semibold text-[#F3D9C4] transition hover:bg-[#B85304]/25 sm:gap-2 sm:px-4 sm:py-3 sm:text-sm"
                   >
-                    <Sparkles className="h-4 w-4" aria-hidden />
+                    <Sparkles className="h-3.5 w-3.5 sm:h-4 sm:w-4" aria-hidden />
                     Auto-Fill Recommended Activities
                   </button>
                   {autoFillNote ? (
@@ -386,10 +473,7 @@ export function TailoredExperiencesModal({
                         selectedTourIds.includes(m.highlight.suggested_tour_id)
                       }
                       onAddTour={(id) => {
-                        if (!m.cityId) {
-                          if (!selectedTourIds.includes(id)) toggleTour(id);
-                          return;
-                        }
+                        if (!m.cityId) return;
                         const cityRows = selectedToursMap[m.cityId] ?? [];
                         const citySelected =
                           selectedToursByCity[m.cityId] ?? [];
@@ -414,7 +498,7 @@ export function TailoredExperiencesModal({
                           const lang =
                             tourLanguageChoices(tour.languages)[0]?.code ||
                             "EN";
-                          addCityTour(m.cityId, {
+                          draftAddCityTour(m.cityId, {
                             tourId: tour.id,
                             title: tour.title,
                             duration_hours: Number(tour.duration_hours) || 0,
@@ -436,8 +520,8 @@ export function TailoredExperiencesModal({
                 <FieldLabel>Your cities</FieldLabel>
                 {stayStops.length === 0 ? (
                   <p className="mt-2 rounded-xl border border-dashed border-zinc-700 bg-zinc-950 p-4 text-sm text-zinc-400">
-                    Add stay cities in Step 3 to browse experiences and book a
-                    private chauffeur by day.
+                    Add stay cities in Step 3 to browse experiences
+                    {hideTransport ? "." : " and book a private chauffeur by day."}
                   </p>
                 ) : (
                   <div className="mt-2 flex flex-col gap-3">
@@ -496,6 +580,7 @@ export function TailoredExperiencesModal({
                             toggleChauffeurDayTour(stop.cityId, date, tourId)
                           }
                           arrivalDateMissing={!arrivalDate}
+                          hideTransport={hideTransport}
                         />
                       );
                     })}
@@ -509,19 +594,23 @@ export function TailoredExperiencesModal({
                 {tourCount === 0
                   ? "No experiences yet"
                   : `${tourCount} experience${tourCount === 1 ? "" : "s"}`}
-                {" · "}
-                {chauffeurDayCount === 0
-                  ? "No chauffeur days"
-                  : `${chauffeurDayCount} chauffeur day${
-                      chauffeurDayCount === 1 ? "" : "s"
-                    }`}
+                {!hideTransport ? (
+                  <>
+                    {" · "}
+                    {chauffeurDayCount === 0
+                      ? "No chauffeur days"
+                      : `${chauffeurDayCount} chauffeur day${
+                          chauffeurDayCount === 1 ? "" : "s"
+                        }`}
+                  </>
+                ) : null}
               </p>
               <button
                 type="button"
                 onClick={handleDone}
-                className="w-full rounded-full bg-[#0B1F3A] py-3 text-sm font-semibold text-white transition hover:bg-[#143052]"
+                className="w-full rounded-full bg-[#1E2D4A] py-3 text-sm font-semibold text-white transition hover:bg-[#243656]"
               >
-                Done
+                Save &amp; Apply
               </button>
             </div>
 
@@ -548,7 +637,7 @@ export function TailoredExperiencesModal({
               guests={{ adults, children }}
               onRemoveTour={(tourId) => {
                 if (!drawerCityId) return;
-                removeCityTour(drawerCityId, tourId);
+                draftRemoveCityTour(drawerCityId, tourId);
               }}
               onAddTour={(tour, scheduledDate, selectedLanguage) => {
                 if (!drawerCityId) return { ok: false };
@@ -573,7 +662,7 @@ export function TailoredExperiencesModal({
                     message: check.message ?? TOUR_DAY_PACKED_MESSAGE,
                   };
                 }
-                const ok = addCityTour(drawerCityId, {
+                const ok = draftAddCityTour(drawerCityId, {
                   tourId: tour.id,
                   title: tour.title,
                   duration_hours,
@@ -630,6 +719,7 @@ function CityExperienceAccordion({
   onSetDayMode,
   onToggleDayTour,
   arrivalDateMissing,
+  hideTransport = false,
 }: {
   city?: PbCity;
   cityName: string;
@@ -647,6 +737,7 @@ function CityExperienceAccordion({
   onSetDayMode: (date: string, mode: DriverMode) => void;
   onToggleDayTour: (date: string, tourId: string) => void;
   arrivalDateMissing: boolean;
+  hideTransport?: boolean;
 }) {
   const [transportOpen, setTransportOpen] = useState(false);
 
@@ -656,10 +747,12 @@ function CityExperienceAccordion({
       ? pbFileUrl(city.collectionId, city.id, filename, "200x140")
       : "";
 
-  const summaryBits = [
-    `${experienceCount} Experience${experienceCount === 1 ? "" : "s"}`,
-    `${driverDayCount} Driver Day${driverDayCount === 1 ? "" : "s"}`,
-  ].join(" · ");
+  const summaryBits = hideTransport
+    ? `${experienceCount} Experience${experienceCount === 1 ? "" : "s"}`
+    : [
+        `${experienceCount} Experience${experienceCount === 1 ? "" : "s"}`,
+        `${driverDayCount} Driver Day${driverDayCount === 1 ? "" : "s"}`,
+      ].join(" · ");
 
   const orderedTours = useMemo(
     () => sortSelectedToursChronologically(selectedTours),
@@ -703,7 +796,7 @@ function CityExperienceAccordion({
           </span>
         </span>
         <span
-          className={`shrink-0 text-[#C4A35A] transition ${
+          className={`shrink-0 text-[#B85304] transition ${
             expanded ? "rotate-180" : ""
           }`}
           aria-hidden
@@ -714,13 +807,17 @@ function CityExperienceAccordion({
 
       {expanded ? (
         <div className="border-t border-zinc-800 px-4 py-4">
-          <div className="mb-4 grid grid-cols-2 gap-3">
+          <div
+            className={`mb-4 grid gap-3 ${
+              hideTransport ? "grid-cols-1" : "grid-cols-2"
+            }`}
+          >
             <button
               type="button"
               onClick={onBrowse}
               className="cursor-pointer rounded-xl border border-zinc-800 bg-zinc-900 p-4 text-left transition-all hover:bg-zinc-800"
             >
-              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#C4A35A]/15 text-[#C4A35A]">
+              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#B85304]/15 text-[#B85304]">
                 <Ticket className="h-4 w-4" aria-hidden />
               </span>
               <p className="mt-2 text-sm font-bold text-white md:text-base">
@@ -731,21 +828,23 @@ function CityExperienceAccordion({
               </p>
             </button>
 
-            <button
-              type="button"
-              onClick={() => setTransportOpen(true)}
-              className="cursor-pointer rounded-xl border border-zinc-800 bg-zinc-900 p-4 text-left transition-all hover:bg-zinc-800"
-            >
-              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-sky-500/15 text-sky-400">
-                <Car className="h-4 w-4" aria-hidden />
-              </span>
-              <p className="mt-2 text-sm font-bold text-white md:text-base">
-                City Transport
-              </p>
-              <p className="mt-1 text-xs text-zinc-400">
-                {driverDayCount} Driver Day{driverDayCount === 1 ? "" : "s"}
-              </p>
-            </button>
+            {!hideTransport ? (
+              <button
+                type="button"
+                onClick={() => setTransportOpen(true)}
+                className="cursor-pointer rounded-xl border border-zinc-800 bg-zinc-900 p-4 text-left transition-all hover:bg-zinc-800"
+              >
+                <span className="flex h-8 w-8 items-center justify-center rounded-full bg-sky-500/15 text-sky-400">
+                  <Car className="h-4 w-4" aria-hidden />
+                </span>
+                <p className="mt-2 text-sm font-bold text-white md:text-base">
+                  City Transport
+                </p>
+                <p className="mt-1 text-xs text-zinc-400">
+                  {driverDayCount} Driver Day{driverDayCount === 1 ? "" : "s"}
+                </p>
+              </button>
+            ) : null}
           </div>
 
           {orderedTours.length > 0 || chauffeurDayLabels.length > 0 ? (
@@ -770,7 +869,7 @@ function CityExperienceAccordion({
                   })}
                 </ul>
               ) : null}
-              {chauffeurDayLabels.length > 0 ? (
+              {chauffeurDayLabels.length > 0 && !hideTransport ? (
                 <p className="text-xs text-zinc-400">
                   {chauffeurDayLabels.join(", ")}: Private Chauffeur
                 </p>
@@ -778,27 +877,30 @@ function CityExperienceAccordion({
             </div>
           ) : (
             <p className="text-xs text-zinc-500">
-              Tap a widget to add experiences or configure private transport.
-              Max {MAX_TOUR_HOURS_PER_DAY}h of activities per day.
+              {hideTransport
+                ? `Tap City Experiences to add tours and tickets. Max ${MAX_TOUR_HOURS_PER_DAY}h of activities per day.`
+                : `Tap a widget to add experiences or configure private transport. Max ${MAX_TOUR_HOURS_PER_DAY}h of activities per day.`}
             </p>
           )}
         </div>
       ) : null}
 
-      <CityTransportModal
-        open={transportOpen}
-        onClose={() => setTransportOpen(false)}
-        cityName={cityName}
-        cityId={cityId}
-        dayOptions={dayOptions}
-        daySelections={daySelections}
-        selectedTours={selectedTours}
-        dailyRateLabel={dailyRateLabel}
-        fleetLabel={fleetLabel}
-        arrivalDateMissing={arrivalDateMissing}
-        onSetDayMode={onSetDayMode}
-        onToggleDayTour={onToggleDayTour}
-      />
+      {!hideTransport ? (
+        <CityTransportModal
+          open={transportOpen}
+          onClose={() => setTransportOpen(false)}
+          cityName={cityName}
+          cityId={cityId}
+          dayOptions={dayOptions}
+          daySelections={daySelections}
+          selectedTours={selectedTours}
+          dailyRateLabel={dailyRateLabel}
+          fleetLabel={fleetLabel}
+          arrivalDateMissing={arrivalDateMissing}
+          onSetDayMode={onSetDayMode}
+          onToggleDayTour={onToggleDayTour}
+        />
+      ) : null}
     </div>
   );
 }

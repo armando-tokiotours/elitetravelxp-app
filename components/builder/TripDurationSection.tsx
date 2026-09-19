@@ -92,13 +92,13 @@ export function TripDurationSection({
       <button
         type="button"
         onClick={openEditor}
-        className="mt-3 flex w-full items-center justify-center gap-2 rounded-full border border-[#C4A35A]/50 bg-zinc-950 py-2.5 text-sm font-semibold text-white transition hover:border-[#C4A35A] hover:bg-[#0B1F3A]"
+        className="mt-3 flex w-full items-center justify-center gap-2 rounded-full border border-[#B85304]/50 bg-zinc-950 py-2.5 text-sm font-semibold text-white transition hover:border-[#B85304] hover:bg-[#0B1F3A]"
       >
         <Pencil className="h-3.5 w-3.5" aria-hidden />
         Edit Trip Details
       </button>
 
-      <SectionContinue next={2} label="Continue to Arrival" />
+      <SectionContinue next={2} />
 
       {modalMounted ? (
         <DurationEditorModal

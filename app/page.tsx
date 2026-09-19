@@ -5,11 +5,11 @@ export default function HomePage() {
     <div className="relative flex min-h-screen flex-col overflow-hidden bg-[#F5F0E8]">
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,_rgba(196,163,90,0.18)_0%,_transparent_55%)]"
+        className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,_rgba(184, 83, 4,0.18)_0%,_transparent_55%)]"
       />
       <svg
         aria-hidden
-        className="pointer-events-none absolute right-0 top-0 h-64 w-64 text-[#C4A35A]/25"
+        className="pointer-events-none absolute right-0 top-0 h-64 w-64 text-[#B85304]/25"
         viewBox="0 0 200 200"
         fill="none"
       >
@@ -21,7 +21,7 @@ export default function HomePage() {
       </svg>
 
       <header className="relative z-10 px-6 py-6 sm:px-10">
-        <p className="text-[0.65rem] font-semibold uppercase tracking-[0.4em] text-[#C4A35A]">
+        <p className="text-[0.65rem] font-semibold uppercase tracking-[0.4em] text-[#B85304]">
           Elite Travel Experiences
         </p>
       </header>
@@ -51,7 +51,7 @@ export default function HomePage() {
           </Link>
           <Link
             href="/team-access"
-            className="rounded-full border border-[#0B1F3A]/30 px-8 py-3.5 text-sm font-semibold tracking-[0.12em] text-[#0B1F3A] uppercase transition hover:border-[#C4A35A] hover:text-[#C4A35A]"
+            className="rounded-full border border-[#0B1F3A]/30 px-8 py-3.5 text-sm font-semibold tracking-[0.12em] text-[#0B1F3A] uppercase transition hover:border-[#B85304] hover:text-[#B85304]"
           >
             Team Access
           </Link>

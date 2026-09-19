@@ -88,9 +88,9 @@ export function DiscoverMatchesPanel({
   return (
     <div className="space-y-4 px-4 py-6">
       <div className="space-y-4 rounded-2xl border border-zinc-800 bg-zinc-900/50 p-4">
-        <div className="flex items-center justify-between gap-3 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3">
+        <div className="flex items-center justify-between gap-3 rounded-xl border border-[#B85304]/40 bg-[#B85304]/15 p-3">
           <div className="min-w-0">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-amber-400">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-accent-500">
               Active Match Profile
             </span>
             <p className="mt-0.5 text-xs font-semibold text-zinc-200">
@@ -102,14 +102,14 @@ export function DiscoverMatchesPanel({
           <button
             type="button"
             onClick={onRetakeQuiz}
-            className="shrink-0 rounded-lg bg-amber-500 px-3 py-1.5 text-xs font-bold text-zinc-950 transition-colors hover:bg-amber-400"
+            className="shrink-0 rounded-lg bg-accent-500 px-3 py-1.5 text-xs font-bold text-zinc-950 transition-colors hover:bg-[#9C4203]"
           >
             {vibe ? "Retake Quiz" : "Take Quiz"}
           </button>
         </div>
 
         <div className="rounded-xl border border-zinc-800 bg-zinc-950 p-3 text-xs leading-relaxed text-zinc-300">
-          <h4 className="mb-1 flex items-center gap-1.5 font-bold text-amber-300">
+          <h4 className="mb-1 flex items-center gap-1.5 font-bold text-accent-500">
             ✨ Tailored Suggestions for {cityName}
           </h4>
           <p>{conciergeAdvice(cityName, experienceProfile, userProfile)}</p>
@@ -117,7 +117,7 @@ export function DiscoverMatchesPanel({
 
         {matched.length > 0 ? (
           <div>
-            <p className="mb-2 text-[10px] font-bold uppercase tracking-wider text-[#C4A35A]">
+            <p className="mb-2 text-[10px] font-bold uppercase tracking-wider text-[#B85304]">
               ⭐ Recommended for your vibe
             </p>
             <ul className="space-y-1.5">
@@ -137,7 +137,7 @@ export function DiscoverMatchesPanel({
           <button
             type="button"
             onClick={onPlayReel}
-            className="flex w-full items-center justify-center gap-2 rounded-xl border border-[#C4A35A]/40 bg-[#C4A35A]/15 py-3 text-sm font-semibold text-[#E8D5A3] transition hover:bg-[#C4A35A]/25"
+            className="flex w-full items-center justify-center gap-2 rounded-xl border border-[#B85304]/40 bg-[#B85304]/15 py-3 text-sm font-semibold text-[#F3D9C4] transition hover:bg-[#B85304]/25"
           >
             ▶ Play Match Reel
           </button>

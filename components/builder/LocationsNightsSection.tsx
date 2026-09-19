@@ -55,6 +55,7 @@ export function LocationsNightsSection({
   const arrivalTransferId = useBuilderStore((s) => s.arrivalTransferId);
   const departureTransferId = useBuilderStore((s) => s.departureTransferId);
   const selectedTourIds = useBuilderStore((s) => s.selectedTourIds);
+  const highestUnlockedStep = useBuilderStore((s) => s.highestUnlockedStep);
   const addLocation = useBuilderStore((s) => s.addLocation);
   const removeLocation = useBuilderStore((s) => s.removeLocation);
   const setLocationNights = useBuilderStore((s) => s.setLocationNights);
@@ -161,15 +162,19 @@ export function LocationsNightsSection({
   return (
     <SectionBlock
       number={3}
-      title="Locations & Nights"
+      title={
+        <>
+          Locations &amp;
+          <br />
+          Nights
+        </>
+      }
       id="section-locations"
       icon="map"
       summary={summary}
     >
-      <p className="mb-3 rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2 text-xs text-zinc-400">
-        Plan <span className="font-semibold text-zinc-200">time in each city</span>{" "}
-        and transit between stops. Hotel booking is separate in Step 4 (default:{" "}
-        no hotel / self-arranged).
+      <p className="mb-3 rounded-xl border border-[#2C2C2E] bg-[#1C1C1E] p-3 text-xs text-zinc-300">
+        Plan your time in each city and transit between stops.
       </p>
 
       {!arrivalDate ? (
@@ -185,19 +190,20 @@ export function LocationsNightsSection({
         durationDays={durationDays}
         matches={matches}
         warningCount={routeWarnings.length}
+        stepSaved={highestUnlockedStep >= 4 || locations.length > 0}
         onClick={openEditor}
       />
 
       <button
         type="button"
         onClick={openEditor}
-        className="mt-3 flex w-full items-center justify-center gap-2 rounded-full border border-[#C4A35A]/50 bg-zinc-950 py-2.5 text-sm font-semibold text-white transition hover:border-[#C4A35A] hover:bg-[#0B1F3A]"
+        className="mt-3 flex w-full items-center justify-center gap-2 rounded-full border border-[#B85304]/50 bg-zinc-950 py-2.5 text-sm font-semibold text-white transition hover:border-[#B85304] hover:bg-[#0B1F3A]"
       >
         <Pencil className="h-3.5 w-3.5" aria-hidden />
         {locations.length === 0 ? "Build your route" : "Edit Route"}
       </button>
 
-      <SectionContinue next={4} label="Continue to Hotels" />
+      <SectionContinue next={4} />
 
       {modalMounted ? (
       <LocationsEditorModal
@@ -250,6 +256,7 @@ function RouteSummaryWidget({
   durationDays,
   matches,
   warningCount,
+  stepSaved,
   onClick,
 }: {
   locations: LocationStop[];
@@ -258,13 +265,14 @@ function RouteSummaryWidget({
   durationDays: number;
   matches: boolean;
   warningCount: number;
+  stepSaved: boolean;
   onClick: () => void;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className="group w-full rounded-[1.35rem] border border-zinc-800 bg-[#1C1C1E] p-4 text-left transition hover:border-[#C4A35A]/45 hover:bg-[#222226] sm:p-5"
+      className="group w-full rounded-[1.35rem] border border-zinc-800 bg-[#1C1C1E] p-4 text-left transition hover:border-[#B85304]/45 hover:bg-[#222226] sm:p-5"
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
@@ -277,7 +285,13 @@ function RouteSummaryWidget({
               : `${locations.length} stop${locations.length === 1 ? "" : "s"}`}
           </p>
         </div>
-        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-emerald-500/15 text-emerald-400">
+        <span
+          className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-colors ${
+            stepSaved
+              ? "border border-cyan-500/40 bg-[#1E2D4A] text-cyan-300 shadow-[0_0_12px_rgba(56,189,248,0.25)]"
+              : "border border-zinc-700 bg-[#1C1C1E] text-zinc-500"
+          }`}
+        >
           <MapPinned className="h-4 w-4" aria-hidden />
         </span>
       </div>
@@ -321,7 +335,7 @@ function RouteSummaryWidget({
         <div className="min-w-0">
           <p
             className={`inline-flex items-center gap-1.5 text-xs font-medium ${
-              matches ? "text-emerald-400" : "text-amber-400"
+              matches ? "text-emerald-400" : "text-accent-500"
             }`}
           >
             {matches ? (
@@ -333,14 +347,14 @@ function RouteSummaryWidget({
               : ` · Need ${durationDays} for your trip`}
           </p>
           {warningCount > 0 ? (
-            <p className="mt-1 text-[11px] text-[#E8D5A3]">
+            <p className="mt-1 text-[11px] text-[#F3D9C4]">
               {warningCount} route note{warningCount === 1 ? "" : "s"} — open
               editor to review
             </p>
           ) : null}
         </div>
         <ChevronRight
-          className="h-4 w-4 shrink-0 text-zinc-600 transition group-hover:text-[#C4A35A]"
+          className="h-4 w-4 shrink-0 text-zinc-600 transition group-hover:text-[#B85304]"
           aria-hidden
         />
       </div>

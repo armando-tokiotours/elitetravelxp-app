@@ -1,6 +1,6 @@
 /**
  * Sequential Builder step validation + unlock helpers.
- * Steps: 1 Duration → 2 Arrival → 3 Locations → 4 Hotels → 5 Tours
+ * Steps: 1 Duration → 2 Arrival → 3 Locations → 4 Hotels → 5 Tours → 6 Drivers
  */
 
 import {
@@ -10,7 +10,9 @@ import {
   type StandardOccupancy,
 } from "@/lib/hotelCalculator";
 
-export const BUILDER_STEP_COUNT = 5;
+export const BUILDER_STEP_COUNT = 6;
+/** highestUnlockedStep after Step 6 is saved (past the last accordion step). */
+export const BUILDER_ALL_STEPS_COMPLETE = BUILDER_STEP_COUNT + 1;
 
 export const BUILDER_SECTION_IDS = [
   "",
@@ -19,6 +21,7 @@ export const BUILDER_SECTION_IDS = [
   "section-locations",
   "section-hotels",
   "section-tours",
+  "section-drivers",
 ] as const;
 
 export type BuilderStepSnapshot = {
@@ -109,6 +112,7 @@ export function isBuilderStepComplete(
       });
     }
     case 5:
+    case 6:
       return true;
     default:
       return false;
@@ -140,6 +144,8 @@ export function builderStepIncompleteMessage(
       return "Please add at least one city before continuing.";
     case 4:
       return "Please allocate rooms for all guests (or turn off hotels) before continuing.";
+    case 5:
+      return "Please choose tours & experiences (or skip) before continuing.";
     default:
       return "Please complete this step before continuing.";
   }
@@ -155,9 +161,9 @@ export function clampHighestUnlockedStep(
 ): number {
   const capped = Math.max(
     1,
-    Math.min(BUILDER_STEP_COUNT, Math.floor(highest) || 1)
+    Math.min(BUILDER_ALL_STEPS_COMPLETE, Math.floor(highest) || 1)
   );
-  for (let step = 1; step < capped; step++) {
+  for (let step = 1; step < capped && step <= BUILDER_STEP_COUNT; step++) {
     if (!isBuilderStepComplete(step, state)) return step;
   }
   return capped;
@@ -167,7 +173,11 @@ export function canOpenBuilderStep(
   step: number,
   highestUnlockedStep: number
 ): boolean {
-  return step >= 1 && step <= highestUnlockedStep;
+  return (
+    step >= 1 &&
+    step <= BUILDER_STEP_COUNT &&
+    step <= highestUnlockedStep
+  );
 }
 
 /** Convenience for hotel math consumers / tests. */
