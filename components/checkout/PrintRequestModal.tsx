@@ -39,7 +39,9 @@ export function PrintRequestModal({
 
   useEffect(() => {
     if (!isOpen) return;
-    fetchBuilderConfig().then(setConfig).catch(() => setConfig(null));
+    fetchBuilderConfig({ includeAccommodations: true })
+      .then(setConfig)
+      .catch(() => setConfig(null));
   }, [isOpen]);
 
   const quote = useMemo(

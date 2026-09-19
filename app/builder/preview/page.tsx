@@ -18,7 +18,9 @@ export default function PreviewPage() {
 
   useEffect(() => {
     useBuilderStore.persist.rehydrate();
-    fetchBuilderConfig().then(setConfig).catch(() => setConfig(null));
+    fetchBuilderConfig({ includeAccommodations: true })
+      .then(setConfig)
+      .catch(() => setConfig(null));
   }, []);
 
   const quote = useMemo(

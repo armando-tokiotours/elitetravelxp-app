@@ -321,11 +321,11 @@ export function SeasonalityPanel({ getClient }: { getClient: () => PbClient }) {
   };
 
   return (
-    <div className="rounded-2xl border border-[#E8E2D9] bg-white p-5">
+    <div className="rounded-2xl border border-zinc-800/80 bg-zinc-900/60 p-5">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="font-display text-2xl">Seasonality Rules</h2>
-          <p className="mt-1 text-sm text-[#8A8278]">
+          <p className="mt-1 text-sm text-zinc-400">
             Map calendar windows to Low / Mid / High hotel tiers and concierge
             notes shown when guests pick an arrival date.
           </p>
@@ -335,7 +335,7 @@ export function SeasonalityPanel({ getClient }: { getClient: () => PbClient }) {
             type="button"
             disabled={busyCsv}
             onClick={exportCsv}
-            className="rounded-full border border-[#D9D2C7] bg-white px-4 py-2 text-sm font-semibold text-[#0B1F3A] disabled:opacity-50"
+            className="rounded-full border border-zinc-700 bg-zinc-900 px-4 py-2 text-sm font-semibold text-zinc-100 disabled:opacity-50"
           >
             Export CSV
           </button>
@@ -343,7 +343,7 @@ export function SeasonalityPanel({ getClient }: { getClient: () => PbClient }) {
             type="button"
             disabled={busyCsv}
             onClick={() => fileRef.current?.click()}
-            className="rounded-full border border-[#D9D2C7] bg-white px-4 py-2 text-sm font-semibold text-[#0B1F3A] disabled:opacity-50"
+            className="rounded-full border border-zinc-700 bg-zinc-900 px-4 py-2 text-sm font-semibold text-zinc-100 disabled:opacity-50"
           >
             {busyCsv ? "Importing…" : "Import CSV"}
           </button>
@@ -361,7 +361,7 @@ export function SeasonalityPanel({ getClient }: { getClient: () => PbClient }) {
           <button
             type="button"
             onClick={() => setEditing(emptyDraft())}
-            className="rounded-full bg-[#C4A35A] px-4 py-2 text-sm font-semibold text-[#0B1F3A]"
+            className="rounded-full bg-[#C4A35A] px-4 py-2 text-sm font-semibold text-zinc-100"
           >
             + Add rule
           </button>
@@ -381,16 +381,16 @@ export function SeasonalityPanel({ getClient }: { getClient: () => PbClient }) {
       {msg ? <p className="mb-3 text-sm text-emerald-700">{msg}</p> : null}
 
       {loading ? (
-        <p className="text-sm text-[#8A8278]">Loading season_tiers…</p>
+        <p className="text-sm text-zinc-400">Loading season_tiers…</p>
       ) : rows.length === 0 ? (
-        <p className="text-sm text-[#8A8278]">
+        <p className="text-sm text-zinc-400">
           No rules yet. Export a template CSV or click + Add rule.
         </p>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full min-w-[640px] text-left text-sm">
             <thead>
-              <tr className="border-b border-[#EEE8DF] text-xs uppercase tracking-wider text-[#8A8278]">
+              <tr className="border-b border-zinc-800 text-xs uppercase tracking-wider text-zinc-400">
                 <th className="pb-2 font-medium">Month</th>
                 <th className="pb-2 font-medium">Days</th>
                 <th className="pb-2 font-medium">Tier</th>
@@ -401,7 +401,7 @@ export function SeasonalityPanel({ getClient }: { getClient: () => PbClient }) {
             <tbody>
               {rows.map((row) => (
                 <tr key={row.id} className="border-b border-[#F5F0E8]">
-                  <td className="py-3 pr-2 font-medium text-[#0B1F3A]">
+                  <td className="py-3 pr-2 font-medium text-zinc-100">
                     {row.month}
                     {row.is_active === false ? (
                       <span className="ml-2 text-xs text-[#B8B0A4]">
@@ -455,19 +455,19 @@ export function SeasonalityPanel({ getClient }: { getClient: () => PbClient }) {
 
       {editing ? (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 sm:items-center">
-          <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-5 shadow-xl">
-            <h3 className="font-display text-xl text-[#0B1F3A]">
+          <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-zinc-900 p-5 shadow-xl">
+            <h3 className="font-display text-xl text-zinc-100">
               {editing.id ? "Edit seasonality rule" : "Add seasonality rule"}
             </h3>
             <div className="mt-4 grid gap-3">
-              <label className="text-xs uppercase tracking-wider text-[#8A8278]">
+              <label className="text-xs uppercase tracking-wider text-zinc-400">
                 Month
                 <select
                   value={editing.month}
                   onChange={(e) =>
                     setEditing({ ...editing, month: e.target.value })
                   }
-                  className="mt-1 w-full rounded-xl border border-[#D9D2C7] px-3 py-2.5 text-sm text-[#0B1F3A]"
+                  className="mt-1 w-full rounded-xl border border-zinc-700 px-3 py-2.5 text-sm text-zinc-100"
                 >
                   {MONTHS.map((m) => (
                     <option key={m} value={m}>
@@ -477,7 +477,7 @@ export function SeasonalityPanel({ getClient }: { getClient: () => PbClient }) {
                 </select>
               </label>
               <div className="grid grid-cols-2 gap-3">
-                <label className="text-xs uppercase tracking-wider text-[#8A8278]">
+                <label className="text-xs uppercase tracking-wider text-zinc-400">
                   Start day
                   <input
                     type="number"
@@ -490,10 +490,10 @@ export function SeasonalityPanel({ getClient }: { getClient: () => PbClient }) {
                         start_day: Number(e.target.value) || 1,
                       })
                     }
-                    className="mt-1 w-full rounded-xl border border-[#D9D2C7] px-3 py-2.5 text-sm"
+                    className="mt-1 w-full rounded-xl border border-zinc-700 px-3 py-2.5 text-sm"
                   />
                 </label>
-                <label className="text-xs uppercase tracking-wider text-[#8A8278]">
+                <label className="text-xs uppercase tracking-wider text-zinc-400">
                   End day
                   <input
                     type="number"
@@ -506,18 +506,18 @@ export function SeasonalityPanel({ getClient }: { getClient: () => PbClient }) {
                         end_day: Number(e.target.value) || 1,
                       })
                     }
-                    className="mt-1 w-full rounded-xl border border-[#D9D2C7] px-3 py-2.5 text-sm"
+                    className="mt-1 w-full rounded-xl border border-zinc-700 px-3 py-2.5 text-sm"
                   />
                 </label>
               </div>
-              <label className="text-xs uppercase tracking-wider text-[#8A8278]">
+              <label className="text-xs uppercase tracking-wider text-zinc-400">
                 Season tier
                 <select
                   value={editing.tier}
                   onChange={(e) =>
                     setEditing({ ...editing, tier: e.target.value })
                   }
-                  className="mt-1 w-full rounded-xl border border-[#D9D2C7] px-3 py-2.5 text-sm"
+                  className="mt-1 w-full rounded-xl border border-zinc-700 px-3 py-2.5 text-sm"
                 >
                   {TIERS.map((t) => (
                     <option key={t} value={t}>
@@ -526,7 +526,7 @@ export function SeasonalityPanel({ getClient }: { getClient: () => PbClient }) {
                   ))}
                 </select>
               </label>
-              <label className="text-xs uppercase tracking-wider text-[#8A8278]">
+              <label className="text-xs uppercase tracking-wider text-zinc-400">
                 Crowd level
                 <input
                   type="text"
@@ -535,10 +535,10 @@ export function SeasonalityPanel({ getClient }: { getClient: () => PbClient }) {
                     setEditing({ ...editing, crowd_level: e.target.value })
                   }
                   placeholder="High Crowds, Quiet…"
-                  className="mt-1 w-full rounded-xl border border-[#D9D2C7] px-3 py-2.5 text-sm"
+                  className="mt-1 w-full rounded-xl border border-zinc-700 px-3 py-2.5 text-sm"
                 />
               </label>
-              <label className="text-xs uppercase tracking-wider text-[#8A8278]">
+              <label className="text-xs uppercase tracking-wider text-zinc-400">
                 Concierge note
                 <textarea
                   rows={3}
@@ -546,10 +546,10 @@ export function SeasonalityPanel({ getClient }: { getClient: () => PbClient }) {
                   onChange={(e) =>
                     setEditing({ ...editing, concierge_note: e.target.value })
                   }
-                  className="mt-1 w-full rounded-xl border border-[#D9D2C7] px-3 py-2.5 text-sm"
+                  className="mt-1 w-full rounded-xl border border-zinc-700 px-3 py-2.5 text-sm"
                 />
               </label>
-              <label className="flex items-center gap-2 text-sm text-[#0B1F3A]">
+              <label className="flex items-center gap-2 text-sm text-zinc-100">
                 <input
                   type="checkbox"
                   checked={editing.is_active}
@@ -564,7 +564,7 @@ export function SeasonalityPanel({ getClient }: { getClient: () => PbClient }) {
               <button
                 type="button"
                 onClick={() => setEditing(null)}
-                className="rounded-full border border-[#D9D2C7] px-4 py-2 text-sm"
+                className="rounded-full border border-zinc-700 px-4 py-2 text-sm"
               >
                 Cancel
               </button>
@@ -589,8 +589,8 @@ function TierBadge({ tier }: { tier: string }) {
     tier === "High"
       ? "bg-[#0B1F3A] text-white"
       : tier === "Mid"
-        ? "bg-[#C4A35A] text-[#0B1F3A]"
-        : "bg-[#E8E2D9] text-[#0B1F3A]";
+        ? "bg-[#C4A35A] text-zinc-100"
+        : "bg-[#E8E2D9] text-zinc-100";
   return (
     <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${tone}`}>
       {tier || "—"}

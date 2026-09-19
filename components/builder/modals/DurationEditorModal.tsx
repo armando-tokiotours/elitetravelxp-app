@@ -12,7 +12,10 @@ import {
   type TravelPace,
 } from "@/store/useBuilderStore";
 import { ChoicePill, FieldLabel } from "../ui";
-import { TRAVEL_PACES, type PaceId } from "@/lib/travelPace";
+import { type PaceId } from "@/lib/travelPace";
+import { paceBrandingKey } from "@/lib/brandingUi";
+import { useSiteBrandingStore } from "@/store/useSiteBrandingStore";
+import { LazyVideo } from "@/components/ui/LazyVideo";
 
 const PRESETS = [10, 14, 21] as const;
 const SEASON_IMAGES: Record<SeasonTierName, string> = {
@@ -45,6 +48,11 @@ export function DurationEditorModal({
   const setAdults = useBuilderStore((s) => s.setAdults);
   const setChildren = useBuilderStore((s) => s.setChildren);
   const setTravelPace = useBuilderStore((s) => s.setTravelPace);
+  const ensureBrandingLoaded = useSiteBrandingStore((s) => s.ensureLoaded);
+  const brandingItems = useSiteBrandingStore((s) => s.itemsByKey);
+  const getTravelPaces = useSiteBrandingStore((s) => s.getTravelPaces);
+  const travelPaces = getTravelPaces();
+  void brandingItems; // subscribe so cards refresh after PB load
 
   const [mounted, setMounted] = useState(false);
   const [customDraft, setCustomDraft] = useState(String(durationDays));
@@ -64,8 +72,9 @@ export function DurationEditorModal({
 
   useEffect(() => {
     if (!open) return;
+    void ensureBrandingLoaded();
     document.body.style.overflow = "hidden";
-  }, [open]);
+  }, [open, ensureBrandingLoaded]);
 
   useEffect(() => {
     return () => {
@@ -294,7 +303,7 @@ export function DurationEditorModal({
                   Tap a style to learn more, then confirm your preferred rhythm.
                 </p>
                 <div className="grid grid-cols-3 gap-2.5 sm:gap-3">
-                  {TRAVEL_PACES.map((pace) => {
+                  {travelPaces.map((pace) => {
                     const isSelected = travelPace === pace.id;
                     const hasSelection = travelPace !== null;
                     const cardClass = isSelected
@@ -311,12 +320,24 @@ export function DurationEditorModal({
                         className={`group relative overflow-hidden rounded-2xl text-left transition-all duration-300 ease-in-out ${cardClass}`}
                       >
                         <span className="relative block aspect-[3/4] w-full bg-zinc-900">
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img
-                            src={pace.image}
-                            alt=""
-                            className="h-full w-full object-cover"
-                          />
+                          {pace.isVideo && pace.mediaUrl ? (
+                            <LazyVideo
+                              src={pace.mediaUrl}
+                              poster={pace.posterUrl || undefined}
+                              muted
+                              loop
+                              playsInline
+                              autoPlay
+                              className="h-full w-full object-cover"
+                            />
+                          ) : pace.image ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              src={pace.image}
+                              alt=""
+                              className="h-full w-full object-cover"
+                            />
+                          ) : null}
                           <span
                             className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-transparent"
                             aria-hidden
@@ -528,7 +549,12 @@ function TravelPaceModal({
   onSelect: (id: PaceId) => void;
 }) {
   const [mounted, setMounted] = useState(false);
-  const pace = paceId ? TRAVEL_PACES.find((p) => p.id === paceId) : null;
+  const brandingItems = useSiteBrandingStore((s) => s.itemsByKey);
+  const getItem = useSiteBrandingStore((s) => s.getItem);
+  const pace = paceId
+    ? { id: paceId, ...getItem(paceBrandingKey(paceId)) }
+    : null;
+  void brandingItems;
 
   useEffect(() => {
     setMounted(true);
@@ -553,7 +579,7 @@ function TravelPaceModal({
           className="fixed inset-0 z-[100] flex items-end justify-center sm:items-center sm:p-4"
           role="dialog"
           aria-modal="true"
-          aria-label={pace.label}
+          aria-label={pace.title}
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
@@ -577,7 +603,7 @@ function TravelPaceModal({
                   Travel pace
                 </p>
                 <h3 className="truncate font-display text-2xl text-[#0B1F3A]">
-                  {pace.label}
+                  {pace.title}
                 </h3>
               </div>
               <button
@@ -592,22 +618,31 @@ function TravelPaceModal({
             <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 pb-[max(7rem,env(safe-area-inset-bottom))] sm:px-5">
               <article className="overflow-hidden rounded-2xl border border-[#EEE8DF] bg-white shadow-[0_4px_20px_rgba(11,31,58,0.06)]">
                 <div className="relative aspect-[4/5] max-h-[45dvh] w-full bg-[#0B1F3A] sm:max-h-[50dvh]">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={pace.image}
-                    alt=""
-                    className="h-full w-full object-cover"
-                  />
+                  {pace.isVideo && pace.mediaUrl ? (
+                    <LazyVideo
+                      src={pace.mediaUrl}
+                      poster={pace.posterUrl || undefined}
+                      muted
+                      loop
+                      playsInline
+                      autoPlay
+                      className="h-full w-full object-cover"
+                    />
+                  ) : pace.mediaUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={pace.mediaUrl}
+                      alt=""
+                      className="h-full w-full object-cover"
+                    />
+                  ) : null}
                 </div>
                 <div className="px-4 py-4 sm:px-5">
                   <p className="text-sm font-semibold text-[#C4A35A]">
-                    {pace.tagline}
+                    {pace.subtitle}
                   </p>
-                  <p className="mt-2 text-sm leading-relaxed text-[#5C6570]">
+                  <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-[#5C6570]">
                     {pace.description}
-                  </p>
-                  <p className="mt-3 text-sm leading-relaxed text-[#5C6570]">
-                    {pace.detail}
                   </p>
                 </div>
               </article>
@@ -621,7 +656,7 @@ function TravelPaceModal({
               >
                 {selected === pace.id
                   ? "✓ Selected — keep this pace"
-                  : `Select ${pace.label} pace`}
+                  : `Select ${pace.title} pace`}
               </button>
             </div>
           </motion.div>

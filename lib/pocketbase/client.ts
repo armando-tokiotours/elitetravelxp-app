@@ -60,17 +60,33 @@ export function getTeamPocketBase(): PocketBase {
   return teamClient;
 }
 
+export type PbFileUrlOpts = {
+  /** PocketBase registered thumb size, e.g. "100x100" or "600x400" */
+  thumb?: string;
+  /**
+   * Hint for clients/CDNs. PocketBase 0.25 ignores this, but Next.js Image
+   * and future PB versions may honor it. Safe to append.
+   */
+  format?: "webp" | "png" | "jpeg";
+};
+
 export function pbFileUrl(
   collectionIdOrName: string,
   recordId: string,
   filename: string,
-  thumb?: string
+  thumbOrOpts?: string | PbFileUrlOpts
 ): string {
   if (!filename) return "";
   const base = `${getPbBaseUrl()}/api/files/${collectionIdOrName}/${recordId}/${encodeURIComponent(filename)}`;
-  if (!thumb) return base;
-  // Thumb sizes must be registered on the file field (see migration 1740000035).
-  return `${base}?thumb=${encodeURIComponent(thumb)}`;
+  const opts: PbFileUrlOpts =
+    typeof thumbOrOpts === "string"
+      ? { thumb: thumbOrOpts }
+      : thumbOrOpts ?? {};
+  const params = new URLSearchParams();
+  if (opts.thumb) params.set("thumb", opts.thumb);
+  if (opts.format) params.set("format", opts.format);
+  const q = params.toString();
+  return q ? `${base}?${q}` : base;
 }
 
 /** Prefer new field names; fall back to legacy columns during migration. */
@@ -330,6 +346,72 @@ export function featureExplainerThumbnailUrl(
     row.id,
     file,
     "800x400"
+  );
+}
+
+export type BrandingUiCategory =
+  | "pace"
+  | "quiz_vibe"
+  | "quiz_pace"
+  | "quiz_crowd"
+  | "concierge"
+  | "matcher";
+
+export interface PbBrandingUiItem {
+  id: string;
+  key: string;
+  category: BrandingUiCategory | string;
+  title?: string;
+  subtitle?: string;
+  description?: string;
+  media?: string;
+  /** Video poster / hero still */
+  poster?: string;
+  cta_primary?: string;
+  cta_secondary?: string;
+  inclusion_title?: string;
+  inclusion_body?: string;
+  credit_title?: string;
+  credit_body?: string;
+  sort_order?: number;
+  collectionId?: string;
+}
+
+export async function fetchBrandingUiItems(): Promise<PbBrandingUiItem[]> {
+  const pb = getPocketBase();
+  try {
+    return await pb.collection("branding_ui_items").getFullList<PbBrandingUiItem>({
+      sort: "sort_order,key",
+      requestKey: null,
+    });
+  } catch {
+    return [];
+  }
+}
+
+export function brandingUiMediaUrl(
+  row: PbBrandingUiItem | null | undefined,
+  thumb?: string
+): string {
+  if (!row?.media || !row.id) return "";
+  return pbFileUrl(
+    String(row.collectionId ?? "branding_ui_items"),
+    row.id,
+    row.media,
+    thumb ? { thumb, format: "webp" } : undefined
+  );
+}
+
+export function brandingUiPosterUrl(
+  row: PbBrandingUiItem | null | undefined,
+  thumb = "600x400"
+): string {
+  if (!row?.poster || !row.id) return "";
+  return pbFileUrl(
+    String(row.collectionId ?? "branding_ui_items"),
+    row.id,
+    row.poster,
+    { thumb, format: "webp" }
   );
 }
 
@@ -633,8 +715,27 @@ export function ruleBool(
   return v === "true" || v === "1" || v === "yes";
 }
 
-export async function fetchBuilderConfig(): Promise<BuilderConfig> {
+/** Hotel rate matrix — ~700KB; load only when Hotels step (or print/export) needs it. */
+export async function fetchAccommodations(): Promise<PbAccommodation[]> {
+  return getPocketBase()
+    .collection("accommodations")
+    .getFullList<PbAccommodation>({ sort: "tier,room_type" });
+}
+
+export type FetchBuilderConfigOpts = {
+  /**
+   * Include the accommodations collection (~713KB).
+   * Default false — Discover never needs it; Builder loads it on Hotels step.
+   * Pass true for print / export / itinerary quote pages.
+   */
+  includeAccommodations?: boolean;
+};
+
+export async function fetchBuilderConfig(
+  opts: FetchBuilderConfigOpts = {}
+): Promise<BuilderConfig> {
   const pb = getPocketBase();
+  const includeAccommodations = opts.includeAccommodations === true;
 
   const [
     citiesRaw,
@@ -654,9 +755,9 @@ export async function fetchBuilderConfig(): Promise<BuilderConfig> {
     legacyRules,
   ] = await Promise.all([
     pb.collection("cities").getFullList<PbCity>({ sort: "sort_order,name" }),
-    pb.collection("accommodations").getFullList<PbAccommodation>({
-      sort: "tier,room_type",
-    }),
+    includeAccommodations
+      ? fetchAccommodations()
+      : Promise.resolve([] as PbAccommodation[]),
     pb.collection("vehicles").getFullList<PbVehicle>({
       sort: "max_passengers",
     }),
@@ -752,6 +853,15 @@ export async function fetchBuilderConfig(): Promise<BuilderConfig> {
 export interface DiscoverConfig {
   cities: PbCity[];
   tours: PbTour[];
+}
+
+/** Lightweight tours list for Budget Planner (price-asc friendly). */
+export async function fetchBudgetPlannerTours(): Promise<PbTour[]> {
+  const pb = getPocketBase();
+  return pb.collection("tours").getFullList<PbTour>({
+    sort: "price_1_pax,title",
+    expand: "city_id",
+  });
 }
 
 export async function fetchDiscoverConfig(): Promise<DiscoverConfig> {

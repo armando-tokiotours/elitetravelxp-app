@@ -58,7 +58,9 @@ export function PrintItineraryDocument({
   useEffect(() => {
     useBuilderStore.persist.rehydrate();
     setReady(true);
-    fetchBuilderConfig().then(setConfig).catch(() => setConfig(null));
+    fetchBuilderConfig({ includeAccommodations: true })
+      .then(setConfig)
+      .catch(() => setConfig(null));
   }, []);
 
   const quote = useMemo(
@@ -207,32 +209,32 @@ export function PrintItineraryDocument({
         <section className="mt-4">
           <InvoiceCard title="Arrival & departure hubs">
             <DetailRow
-              left={`Arrive: ${hubLabel(arrival)} · ${
+              left="Arrival Hub"
+              right={`${hubLabel(arrival)} · ${
                 state.arrivalMode === "cruise" ? "Cruise" : "Flight"
               }`}
-              right=""
             />
             <DetailRow
-              left={
+              left="VIP Arrival Pickup"
+              right={
                 state.airportPickup
-                  ? `VIP Pickup: Yes · Vehicle: ${vehicleLine}`
-                  : "VIP Pickup: No"
+                  ? vehicleLine
+                  : "Not selected"
               }
-              right=""
             />
             <DetailRow
-              left={`Depart: ${hubLabel(departure)} · ${
+              left="Departure Hub"
+              right={`${hubLabel(departure)} · ${
                 state.departureMode === "cruise" ? "Cruise" : "Flight"
               }`}
-              right=""
             />
             <DetailRow
-              left={
+              left="VIP Departure Drop-off"
+              right={
                 state.airportDropoff
-                  ? `VIP Drop-off: Yes · Vehicle: ${vehicleLine}`
-                  : "VIP Drop-off: No"
+                  ? vehicleLine
+                  : "Not selected"
               }
-              right=""
             />
             {breakdown ? (
               <SectionSubtotal
@@ -582,12 +584,12 @@ function InvoiceCard({
 
 function DetailRow({ left, right }: { left: string; right: string }) {
   return (
-    <div className="flex w-full flex-col gap-1 overflow-hidden border-b border-[#F0EBE3] py-2 text-sm last:border-b-0 sm:flex-row sm:justify-between sm:gap-4">
-      <span className="min-w-0 break-words leading-tight text-[#5C6570]">
+    <div className="flex w-full items-center justify-between gap-4 border-b border-[#F0EBE3] py-2 text-sm last:border-b-0">
+      <span className="min-w-0 shrink-0 leading-tight text-[#5C6570] sm:shrink">
         {left}
       </span>
       {right ? (
-        <span className="break-words text-left font-medium leading-tight text-[#0B1F3A] sm:shrink-0 sm:text-right">
+        <span className="min-w-0 flex-1 break-words text-right font-semibold leading-tight text-[#0B1F3A]">
           {right}
         </span>
       ) : null}

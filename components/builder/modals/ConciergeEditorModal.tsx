@@ -1,12 +1,66 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import { ArrowLeft, Check, Sparkles } from "lucide-react";
 import { ELITE_CONCIERGE_FEE } from "@/lib/eliteConcierge";
 import { useBuilderStore } from "@/store/useBuilderStore";
+import { useSiteBrandingStore } from "@/store/useSiteBrandingStore";
 import { RefundPolicyModal } from "@/components/modals/RefundPolicyModal";
+import { LazyVideo } from "@/components/ui/LazyVideo";
+
+function renderBodyBlocks(body: string) {
+  const blocks = body.split(/\n\n+/).map((b) => b.trim()).filter(Boolean);
+  return blocks.map((block, i) => {
+    const lines = block.split("\n").map((l) => l.trim()).filter(Boolean);
+    const bullets = lines.filter((l) => /^[•\-\*]\s+/.test(l));
+    if (bullets.length > 0 && bullets.length === lines.length) {
+      return (
+        <ul key={i} className="space-y-2.5 text-zinc-300">
+          {bullets.map((line, j) => (
+            <li key={j} className="flex gap-2">
+              <Check
+                className="mt-0.5 h-4 w-4 shrink-0 text-[#C4A35A]"
+                aria-hidden
+              />
+              <span>{line.replace(/^[•\-\*]\s+/, "")}</span>
+            </li>
+          ))}
+        </ul>
+      );
+    }
+    const isNote =
+      /replaces any individually|commitment deposit|rolls into your invoice/i.test(
+        block
+      );
+    if (isNote) {
+      return (
+        <p
+          key={i}
+          className="rounded-xl border border-zinc-700/80 bg-zinc-950/60 px-3 py-2.5 text-xs text-zinc-500"
+        >
+          {block}
+        </p>
+      );
+    }
+    const isMuted =
+      /Think of it as a commitment/i.test(block) ||
+      (i === blocks.length - 1 && block.length < 120);
+    return (
+      <p
+        key={i}
+        className={
+          isMuted
+            ? "text-xs text-zinc-500"
+            : "text-sm leading-relaxed text-zinc-400"
+        }
+      >
+        {block}
+      </p>
+    );
+  });
+}
 
 export function ConciergeEditorModal({
   open,
@@ -18,10 +72,13 @@ export function ConciergeEditorModal({
   const experienceService = useBuilderStore((s) => s.experienceService);
   const setExperienceService = useBuilderStore((s) => s.setExperienceService);
   const selected = experienceService === "concierge";
+  const ensureBrandingLoaded = useSiteBrandingStore((s) => s.ensureLoaded);
+  const brandingItems = useSiteBrandingStore((s) => s.itemsByKey);
+  const concierge = useSiteBrandingStore((s) => s.getEliteConciergeModal)();
+  void brandingItems;
 
   const [mounted, setMounted] = useState(false);
   const [isPolicyModalOpen, setIsPolicyModalOpen] = useState(false);
-  const videoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
     setMounted(true);
@@ -32,8 +89,9 @@ export function ConciergeEditorModal({
       setIsPolicyModalOpen(false);
       return;
     }
+    void ensureBrandingLoaded();
     document.body.style.overflow = "hidden";
-  }, [open]);
+  }, [open, ensureBrandingLoaded]);
 
   useEffect(() => {
     return () => {
@@ -41,20 +99,18 @@ export function ConciergeEditorModal({
     };
   }, []);
 
-  useEffect(() => {
-    if (!open) return;
-    const el = videoRef.current;
-    if (!el) return;
-    el.muted = true;
-    const play = el.play();
-    if (play && typeof play.catch === "function") {
-      play.catch(() => {
-        /* autoplay may be blocked until gesture; muted usually succeeds */
-      });
-    }
-  }, [open]);
-
   if (!mounted) return null;
+
+  const videoSrc =
+    concierge.mediaUrl || "/videos/elite-concierge-preview.mp4";
+  const posterSrc = concierge.posterUrl || "/images/concierge-poster.webp";
+  const sectionTitle = concierge.title || "Day-by-Day Design";
+  const depositLine =
+    concierge.subtitle || `Design deposit €${ELITE_CONCIERGE_FEE}`;
+  const inclusionTitle = concierge.inclusionTitle || "What's included";
+  const inclusionBody = concierge.inclusionBody;
+  const creditTitle = concierge.creditTitle || "100% credit toward your trip";
+  const creditBody = concierge.creditBody;
 
   return createPortal(
     <AnimatePresence
@@ -101,17 +157,14 @@ export function ConciergeEditorModal({
             </div>
 
             <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4 pb-12">
-              {/* Target: 1080p · ~1.5Mbps · mp4 · <5MB (see lib/mediaStandards.ts) */}
               <div className="relative mb-1 aspect-video w-full overflow-hidden rounded-2xl border border-zinc-800/80 bg-zinc-950 shadow-2xl">
-                <video
-                  ref={videoRef}
-                  src="/videos/elite-concierge-preview.mp4"
+                <LazyVideo
+                  src={videoSrc}
+                  poster={posterSrc}
                   autoPlay
                   loop
                   muted
                   playsInline
-                  preload="auto"
-                  poster="/images/concierge-poster.webp"
                   aria-label="Elite Concierge preview"
                   className="pointer-events-none h-full w-full object-cover"
                 />
@@ -122,14 +175,11 @@ export function ConciergeEditorModal({
                   Premium
                 </p>
                 <h4 className="mt-1 font-display text-xl text-white sm:text-2xl">
-                  Day-by-Day Design
+                  {sectionTitle}
                 </h4>
-                <p className="mt-1.5 text-sm text-zinc-500">
-                  Design deposit €{ELITE_CONCIERGE_FEE}
-                </p>
+                <p className="mt-1.5 text-sm text-zinc-500">{depositLine}</p>
               </div>
 
-              {/* Card 1: Inclusions */}
               <div className="overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-900/80">
                 <div className="flex items-center gap-2 border-b border-zinc-800 px-4 py-3">
                   <Sparkles
@@ -137,64 +187,22 @@ export function ConciergeEditorModal({
                     aria-hidden
                   />
                   <h5 className="text-sm font-semibold text-white">
-                    What&apos;s included
+                    {inclusionTitle}
                   </h5>
                 </div>
                 <div className="space-y-3 px-4 py-4 text-sm leading-relaxed text-zinc-400">
-                  <p>
-                    Skip individual planning. A dedicated luxury concierge
-                    curates your entire day-by-day itinerary: exclusive dining
-                    reservations, hidden sights, and private drivers for the full
-                    trip.
-                  </p>
-                  <ul className="space-y-2.5 text-zinc-300">
-                    <li className="flex gap-2">
-                      <Check
-                        className="mt-0.5 h-4 w-4 shrink-0 text-[#C4A35A]"
-                        aria-hidden
-                      />
-                      Full itinerary design by a Japan specialist
-                    </li>
-                    <li className="flex gap-2">
-                      <Check
-                        className="mt-0.5 h-4 w-4 shrink-0 text-[#C4A35A]"
-                        aria-hidden
-                      />
-                      Hard-to-get reservations and private access
-                    </li>
-                    <li className="flex gap-2">
-                      <Check
-                        className="mt-0.5 h-4 w-4 shrink-0 text-[#C4A35A]"
-                        aria-hidden
-                      />
-                      Private drivers coordinated across your route
-                    </li>
-                  </ul>
-                  <p className="rounded-xl border border-zinc-700/80 bg-zinc-950/60 px-3 py-2.5 text-xs text-zinc-500">
-                    Selecting Elite Concierge replaces any individually chosen
-                    city experiences with the concierge design package.
-                  </p>
+                  {renderBodyBlocks(inclusionBody)}
                 </div>
               </div>
 
-              {/* Card 2: 100% Credit Offer */}
               <div className="overflow-hidden rounded-2xl border border-[#C4A35A]/35 bg-gradient-to-br from-zinc-950 to-zinc-900">
                 <div className="border-b border-[#C4A35A]/20 px-4 py-3">
                   <h5 className="text-sm font-semibold text-[#C4A35A]">
-                    100% credit toward your trip
+                    {creditTitle}
                   </h5>
                 </div>
                 <div className="space-y-2 px-4 py-4 text-sm leading-relaxed text-zinc-300">
-                  <p>
-                    The €{ELITE_CONCIERGE_FEE} design deposit is fully applied as
-                    a credit toward your final trip balance when you confirm your
-                    booking. You are not paying an extra fee on top of your
-                    itinerary.
-                  </p>
-                  <p className="text-xs text-zinc-500">
-                    Think of it as a commitment deposit that rolls into your
-                    invoice, not a sunk cost.
-                  </p>
+                  {renderBodyBlocks(creditBody)}
                 </div>
               </div>
 

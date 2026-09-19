@@ -20,7 +20,11 @@ import {
   type PbCity,
 } from "@/lib/pocketbase/client";
 import { useTeamAuth } from "@/store/useTeamAuth";
-import { AppShell } from "@/components/layout/AppShell";
+import {
+  AppSidebar,
+  APP_SIDEBAR_RAIL_PAD,
+  MobileAppNav,
+} from "@/components/navigation/AppSidebar";
 import { SiteBrandingPanel } from "@/components/team/SiteBrandingPanel";
 import { HotelRatesUploader } from "@/components/team/HotelRatesUploader";
 import { SeasonalityPanel } from "@/components/team/SeasonalityPanel";
@@ -29,6 +33,40 @@ import { formatTourTierSummary } from "@/lib/tourPricing";
 import { optimizeFileForUpload } from "@/lib/optimizeUploadClient";
 
 type PbClient = PocketBase;
+
+function TeamShell({
+  children,
+  title = "Admin",
+}: {
+  children: React.ReactNode;
+  title?: string;
+}) {
+  return (
+    <>
+      <AppSidebar
+        brandEyebrow="Elite Travel"
+        brandTitle={title}
+        expandOnHover
+      />
+      <div
+        className={`${APP_SIDEBAR_RAIL_PAD} min-h-screen bg-zinc-950 text-white`}
+      >
+        <header className="sticky top-0 z-40 flex items-center gap-3 border-b border-zinc-800 bg-zinc-950 px-4 py-3 md:hidden">
+          <MobileAppNav brandEyebrow="Elite Travel" brandTitle={title} />
+          <div className="min-w-0">
+            <p className="text-[0.6rem] font-semibold uppercase tracking-[0.28em] text-[#C4A35A]">
+              Elite Travel
+            </p>
+            <h1 className="font-display text-lg leading-tight text-white">
+              {title}
+            </h1>
+          </div>
+        </header>
+        {children}
+      </div>
+    </>
+  );
+}
 
 export function TeamAccessApp() {
   const [ready, setReady] = useState(false);
@@ -62,23 +100,23 @@ export function TeamAccessApp() {
 
   if (!ready) {
     return (
-      <AppShell title="Team Access" hideBottomPad>
-        <p className="p-8 text-center text-sm text-[#8A8278]">Loading…</p>
-      </AppShell>
+      <TeamShell title="Team Access">
+        <p className="p-8 text-center text-sm text-zinc-400">Loading…</p>
+      </TeamShell>
     );
   }
 
   if (!isAuthenticated) {
     return (
-      <AppShell title="Team Access" subtitle="Protected" hideBottomPad>
+      <TeamShell title="Team Access">
         <main className="mx-auto max-w-md px-4 py-10">
-          <div className="rounded-2xl border border-[#E8E2D9] bg-white p-6 shadow-sm">
-            <h2 className="font-display text-2xl text-[#0B1F3A]">Team login</h2>
-            <p className="mt-2 text-sm text-[#8A8278]">
+          <div className="rounded-2xl border border-zinc-800/80 bg-zinc-900/60 p-6 shadow-sm">
+            <h2 className="font-display text-2xl text-white">Team login</h2>
+            <p className="mt-2 text-sm text-zinc-400">
               Sign in with PocketBase admin credentials to manage Source of Truth,
               Rules of Logic, and team users.
             </p>
-            <p className="mt-1 text-[11px] text-[#A39A8E]">
+            <p className="mt-1 text-[11px] text-zinc-500">
               PocketBase: {getPbBaseUrl()}
             </p>
             <form
@@ -98,60 +136,60 @@ export function TeamAccessApp() {
                 }
               }}
             >
-              <label className="block text-xs uppercase tracking-wider text-[#8A8278]">
+              <label className="block text-xs uppercase tracking-wider text-zinc-400">
                 Email
                 <input
                   type="email"
                   required
                   value={emailInput}
                   onChange={(e) => setEmailInput(e.target.value)}
-                  className="mt-1 w-full rounded-xl border border-[#D9D2C7] px-3 py-2.5 text-sm outline-none focus:border-[#C4A35A]"
+                  className="mt-1 w-full rounded-xl border border-zinc-700 bg-zinc-950 px-3 py-2.5 text-sm text-zinc-100 outline-none focus:border-[#C4A35A]"
                 />
               </label>
-              <label className="block text-xs uppercase tracking-wider text-[#8A8278]">
+              <label className="block text-xs uppercase tracking-wider text-zinc-400">
                 Password
                 <input
                   type="password"
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="mt-1 w-full rounded-xl border border-[#D9D2C7] px-3 py-2.5 text-sm outline-none focus:border-[#C4A35A]"
+                  className="mt-1 w-full rounded-xl border border-zinc-700 bg-zinc-950 px-3 py-2.5 text-sm text-zinc-100 outline-none focus:border-[#C4A35A]"
                 />
               </label>
               {authError ? (
-                <p className="text-sm text-red-600">{authError}</p>
+                <p className="text-sm text-red-400">{authError}</p>
               ) : null}
               <button
                 type="submit"
                 disabled={authLoading}
-                className="w-full rounded-full bg-[#0B1F3A] py-3 text-sm font-semibold text-white disabled:opacity-50"
+                className="w-full rounded-full bg-amber-500 py-3 text-sm font-semibold text-zinc-950 disabled:opacity-50"
               >
                 {authLoading ? "Signing in…" : "Enter Team Access"}
               </button>
             </form>
           </div>
         </main>
-      </AppShell>
+      </TeamShell>
     );
   }
 
   return (
-    <AppShell title="Team Access" subtitle="Admin dashboard" hideBottomPad>
+    <TeamShell title="Admin">
       <main className="mx-auto max-w-5xl px-4 py-6 sm:px-6">
         <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-          <p className="text-sm text-[#8A8278]">
-            Signed in as <span className="text-[#0B1F3A]">{email}</span>
+          <p className="text-sm text-zinc-400">
+            Signed in as <span className="text-zinc-100">{email}</span>
           </p>
           <button
             type="button"
             onClick={logout}
-            className="rounded-full border border-[#D9D2C7] px-4 py-1.5 text-sm"
+            className="rounded-full border border-zinc-700 px-4 py-1.5 text-sm text-zinc-300 transition hover:border-zinc-500 hover:text-white"
           >
             Sign out
           </button>
         </div>
 
-        <div className="mb-6 inline-flex flex-wrap rounded-full border border-[#D9D2C7] bg-white p-1">
+        <div className="mb-6 inline-flex flex-wrap gap-1.5 rounded-2xl border border-zinc-800 bg-zinc-900/60 p-1.5">
           <TabButton active={tab === "truth"} onClick={() => setTab("truth")}>
             Source of Truth
           </TabButton>
@@ -187,7 +225,7 @@ export function TeamAccessApp() {
           <UsersPanel getClient={getClient} currentEmail={email} />
         )}
       </main>
-    </AppShell>
+    </TeamShell>
   );
 }
 
@@ -204,8 +242,10 @@ function TabButton({
     <button
       type="button"
       onClick={onClick}
-      className={`rounded-full px-5 py-2 text-sm font-semibold transition ${
-        active ? "bg-[#0B1F3A] text-white" : "text-[#5C6570]"
+      className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${
+        active
+          ? "bg-amber-500 font-bold text-zinc-950"
+          : "border border-zinc-800 bg-zinc-900/80 text-zinc-400 hover:text-white"
       }`}
     >
       {children}
@@ -531,8 +571,8 @@ function SourceOfTruthPanel({ getClient }: { getClient: () => PbClient }) {
             }}
             className={`rounded-xl px-4 py-2.5 text-left text-sm font-medium ${
               category === c.id
-                ? "bg-[#0B1F3A] text-white"
-                : "border border-[#E8E2D9] bg-white text-[#0B1F3A]"
+                ? "bg-amber-500 font-bold text-zinc-950"
+                : "border border-zinc-800 bg-zinc-900/80 text-zinc-400 hover:text-white"
             }`}
           >
             {c.label}
@@ -540,7 +580,7 @@ function SourceOfTruthPanel({ getClient }: { getClient: () => PbClient }) {
         ))}
       </aside>
 
-      <section className="rounded-2xl border border-[#E8E2D9] bg-white p-4 sm:p-5">
+      <section className="rounded-2xl border border-zinc-800/80 bg-zinc-900/60 p-4 sm:p-5">
         {category === "tours" ? (
           <ToursCsvSync
             title={def.label}
@@ -562,7 +602,7 @@ function SourceOfTruthPanel({ getClient }: { getClient: () => PbClient }) {
           />
         ) : (
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-            <h2 className="font-display text-2xl">{def.label}</h2>
+            <h2 className="font-display text-2xl text-white">{def.label}</h2>
             <button
               type="button"
               onClick={() => {
@@ -577,7 +617,7 @@ function SourceOfTruthPanel({ getClient }: { getClient: () => PbClient }) {
         )}
 
         {category === "tours" ? (
-          <div className="mb-4 inline-flex w-fit flex-wrap items-center gap-1 rounded-xl border border-[#E8E2D9] bg-[#F7F3EB] p-1.5">
+          <div className="mb-4 inline-flex w-fit flex-wrap items-center gap-1 rounded-xl border border-zinc-800 bg-zinc-950 p-1.5">
             {(
               [
                 {
@@ -602,8 +642,8 @@ function SourceOfTruthPanel({ getClient }: { getClient: () => PbClient }) {
                   onClick={() => setTourCategoryFilter(tab.id)}
                   className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
                     on
-                      ? "bg-[#0B1F3A] text-white shadow-sm"
-                      : "text-[#5C6570] hover:bg-white hover:text-[#0B1F3A]"
+                      ? "bg-amber-500 text-zinc-950 shadow-sm"
+                      : "text-zinc-400 hover:bg-zinc-900 hover:text-white"
                   }`}
                 >
                   {tab.label}
@@ -614,10 +654,10 @@ function SourceOfTruthPanel({ getClient }: { getClient: () => PbClient }) {
         ) : null}
 
         {error ? (
-          <div className="mb-3 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+          <div className="mb-3 rounded-xl border border-red-500/40 bg-red-950/40 p-3 text-sm text-red-300">
             <p className="font-medium">{error}</p>
             {debug ? (
-              <pre className="mt-2 max-h-40 overflow-auto whitespace-pre-wrap text-[11px] text-red-600/80">
+              <pre className="mt-2 max-h-40 overflow-auto whitespace-pre-wrap text-[11px] text-red-400/80">
                 {debug}
               </pre>
             ) : null}
@@ -629,9 +669,9 @@ function SourceOfTruthPanel({ getClient }: { getClient: () => PbClient }) {
         ) : null}
 
         {loading ? (
-          <p className="text-sm text-[#8A8278]">Loading…</p>
+          <p className="text-sm text-zinc-400">Loading…</p>
         ) : displayedRows.length === 0 ? (
-          <p className="text-sm text-[#8A8278]">
+          <p className="text-sm text-zinc-400">
             {category === "tours" && tourCategoryFilter !== "all"
               ? "No records in this filter. Try All or another tab."
               : "No records yet. Click + Add."}
@@ -640,7 +680,7 @@ function SourceOfTruthPanel({ getClient }: { getClient: () => PbClient }) {
           <div className="overflow-x-auto">
             <table className="w-full min-w-[640px] text-left text-sm">
               <thead>
-                <tr className="border-b border-[#EEE8DF] text-xs uppercase tracking-wider text-[#8A8278]">
+                <tr className="border-b border-zinc-800 text-xs uppercase tracking-wider text-zinc-400">
                   <th className="pb-2 pr-2 font-medium">Photo</th>
                   <th className="pb-2 font-medium">Record</th>
                   <th className="pb-2 font-medium">Details</th>
@@ -668,7 +708,7 @@ function SourceOfTruthPanel({ getClient }: { getClient: () => PbClient }) {
                   return (
                     <tr
                       key={String(row.id)}
-                      className="border-b border-[#F5F0E8]"
+                      className="border-b border-zinc-800/60"
                     >
                       <td className="py-3 pr-2">
                         {thumb && row.media_type !== "Video" ? (
@@ -679,19 +719,19 @@ function SourceOfTruthPanel({ getClient }: { getClient: () => PbClient }) {
                             className="h-10 w-10 rounded-lg object-cover"
                           />
                         ) : thumb && row.media_type === "Video" ? (
-                          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#0B1F3A] text-[10px] text-white">
+                          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-zinc-800 text-[10px] text-white">
                             ▶
                           </div>
                         ) : (
-                          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#F3EDE4] text-[10px] text-[#8A8278]">
+                          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-zinc-800 text-[10px] text-zinc-500">
                             —
                           </div>
                         )}
                       </td>
-                      <td className="py-3 pr-3 font-medium text-[#0B1F3A]">
+                      <td className="py-3 pr-3 font-medium text-zinc-100">
                         {displayRowTitle(def, row, cities, hubs, vehicles)}
                       </td>
-                      <td className="py-3 pr-3 text-[#8A8278]">
+                      <td className="py-3 pr-3 text-zinc-400">
                         {rowSubtitle(def, row)}
                       </td>
                       <td className="py-3 pr-3">
@@ -701,8 +741,8 @@ function SourceOfTruthPanel({ getClient }: { getClient: () => PbClient }) {
                             onClick={() => void toggleActive(row)}
                             className={`rounded-full px-3 py-1 text-xs font-semibold ${
                               active
-                                ? "bg-emerald-50 text-emerald-800"
-                                : "bg-[#F3EDE4] text-[#8A8278]"
+                                ? "bg-emerald-500/15 text-emerald-400"
+                                : "bg-zinc-800 text-zinc-400"
                             }`}
                           >
                             {active ? "Active" : "Inactive"}
@@ -711,8 +751,8 @@ function SourceOfTruthPanel({ getClient }: { getClient: () => PbClient }) {
                           <span
                             className={`rounded-full px-3 py-1 text-xs font-semibold ${
                               row.is_recommended_order
-                                ? "bg-emerald-50 text-emerald-800"
-                                : "bg-[#F3EDE4] text-[#8A8278]"
+                                ? "bg-emerald-500/15 text-emerald-400"
+                                : "bg-zinc-800 text-zinc-400"
                             }`}
                           >
                             {row.is_recommended_order
@@ -720,7 +760,7 @@ function SourceOfTruthPanel({ getClient }: { getClient: () => PbClient }) {
                               : "Alt direction"}
                           </span>
                         ) : (
-                          <span className="text-xs text-[#8A8278]">—</span>
+                          <span className="text-xs text-zinc-500">—</span>
                         )}
                       </td>
                       <td className="py-3 text-right whitespace-nowrap">
@@ -1179,9 +1219,9 @@ function RecordEditModal({
         onClick={onCancel}
         aria-hidden
       />
-      <div className="relative z-10 max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-t-3xl border border-[#E8E2D9] bg-[#FBF8F2] p-5 shadow-xl sm:rounded-3xl sm:p-6">
+      <div className="relative z-10 max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-t-3xl border border-zinc-800 bg-zinc-950 p-5 text-white shadow-xl sm:rounded-3xl sm:p-6">
         <div className="mb-4 flex items-start justify-between gap-3">
-          <h3 className="font-display text-2xl text-[#0B1F3A]">
+          <h3 className="font-display text-2xl text-white">
             {initial
               ? `Edit · ${displayRowTitle(def, initial, cities, hubs, vehicles)}`
               : `New ${def.label.slice(0, -1)}`}
@@ -1189,7 +1229,7 @@ function RecordEditModal({
           <button
             type="button"
             onClick={onCancel}
-            className="rounded-full border border-[#D9D2C7] px-3 py-1 text-sm"
+            className="rounded-full border border-zinc-700 px-3 py-1 text-sm text-zinc-300"
           >
             Close
           </button>
@@ -1814,19 +1854,19 @@ function RulesOfLogicPanel({ getClient }: { getClient: () => PbClient }) {
   };
 
   if (loading) {
-    return <p className="text-sm text-[#8A8278]">Loading app_settings…</p>;
+    return <p className="text-sm text-zinc-400">Loading app_settings…</p>;
   }
 
   return (
-    <div className="rounded-2xl border border-[#E8E2D9] bg-white p-5">
-      <h2 className="font-display text-2xl">Rules of Logic</h2>
-      <p className="mt-1 text-sm text-[#8A8278]">
+    <div className="rounded-2xl border border-zinc-800/80 bg-zinc-900/60 p-5">
+      <h2 className="font-display text-2xl text-white">Rules of Logic</h2>
+      <p className="mt-1 text-sm text-zinc-400">
         Stored in <code>app_settings</code> — vehicle allocation, tour days, and
         pricing multipliers.
       </p>
 
       {error ? (
-        <p className="mt-3 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+        <p className="mt-3 rounded-xl border border-red-500/40 bg-red-950/40 p-3 text-sm text-red-300">
           {error}
         </p>
       ) : null}
@@ -1838,16 +1878,16 @@ function RulesOfLogicPanel({ getClient }: { getClient: () => PbClient }) {
           return (
             <div
               key={row.id}
-              className="flex flex-col gap-2 border-b border-[#F0EBE3] pb-4 sm:flex-row sm:items-center sm:justify-between"
+              className="flex flex-col gap-2 border-b border-zinc-800 pb-4 sm:flex-row sm:items-center sm:justify-between"
             >
               <div className="max-w-md">
-                <p className="font-medium text-[#0B1F3A]">{row.key}</p>
-                <p className="text-xs text-[#8A8278]">
+                <p className="font-medium text-zinc-100">{row.key}</p>
+                <p className="text-xs text-zinc-400">
                   {row.description || info?.description}
                 </p>
               </div>
               {isBool ? (
-                <div className="inline-flex rounded-full border border-[#D9D2C7] bg-[#F7F3EC] p-1">
+                <div className="inline-flex rounded-full border border-zinc-700 bg-zinc-950 p-1">
                   {["true", "false"].map((v) => (
                     <button
                       key={v}
@@ -1857,8 +1897,8 @@ function RulesOfLogicPanel({ getClient }: { getClient: () => PbClient }) {
                       }
                       className={`rounded-full px-4 py-1.5 text-sm ${
                         (draft[row.key] ?? row.value) === v
-                          ? "bg-[#0B1F3A] text-white"
-                          : "text-[#5C6570]"
+                          ? "bg-amber-500 font-semibold text-zinc-950"
+                          : "text-zinc-400"
                       }`}
                     >
                       {v === "true" ? "On" : "Off"}
@@ -1872,7 +1912,7 @@ function RulesOfLogicPanel({ getClient }: { getClient: () => PbClient }) {
                   onChange={(e) =>
                     setDraft((d) => ({ ...d, [row.key]: e.target.value }))
                   }
-                  className="w-full max-w-[12rem] rounded-xl border border-[#D9D2C7] px-3 py-2 text-sm sm:text-right"
+                  className="w-full max-w-[12rem] rounded-xl border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 sm:text-right"
                 />
               )}
             </div>
@@ -1884,11 +1924,11 @@ function RulesOfLogicPanel({ getClient }: { getClient: () => PbClient }) {
         type="button"
         disabled={saving}
         onClick={() => void saveAll()}
-        className="mt-6 rounded-full bg-[#0B1F3A] px-6 py-3 text-sm font-semibold text-white disabled:opacity-50"
+        className="mt-6 rounded-full bg-amber-500 px-6 py-3 text-sm font-semibold text-zinc-950 disabled:opacity-50"
       >
         {saving ? "Saving…" : "Save rules"}
       </button>
-      {msg ? <p className="mt-3 text-sm text-[#5C6570]">{msg}</p> : null}
+      {msg ? <p className="mt-3 text-sm text-zinc-400">{msg}</p> : null}
     </div>
   );
 }
@@ -2011,48 +2051,48 @@ function UsersPanel({
   };
 
   return (
-    <div className="rounded-2xl border border-[#E8E2D9] bg-white p-5">
-      <h2 className="font-display text-2xl">Users</h2>
-      <p className="mt-1 text-sm text-[#8A8278]">
+    <div className="rounded-2xl border border-zinc-800/80 bg-zinc-900/60 p-5">
+      <h2 className="font-display text-2xl text-white">Users</h2>
+      <p className="mt-1 text-sm text-zinc-400">
         Create and manage PocketBase admin accounts that can open Team Access.
       </p>
 
       {error ? (
-        <p className="mt-3 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+        <p className="mt-3 rounded-xl border border-red-500/40 bg-red-950/40 p-3 text-sm text-red-300">
           {error}
         </p>
       ) : null}
-      {msg ? <p className="mt-3 text-sm text-emerald-700">{msg}</p> : null}
+      {msg ? <p className="mt-3 text-sm text-emerald-400">{msg}</p> : null}
 
-      <div className="mt-6 rounded-2xl border border-[#EEE8DF] bg-[#FBF8F2] p-4">
-        <h3 className="font-medium text-[#0B1F3A]">Create user</h3>
+      <div className="mt-6 rounded-2xl border border-zinc-800 bg-zinc-950 p-4">
+        <h3 className="font-medium text-zinc-100">Create user</h3>
         <div className="mt-3 grid gap-3 sm:grid-cols-2">
-          <label className="block text-xs uppercase tracking-wider text-[#8A8278] sm:col-span-2">
+          <label className="block text-xs uppercase tracking-wider text-zinc-400 sm:col-span-2">
             Email
             <input
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="mt-1 w-full rounded-xl border border-[#D9D2C7] bg-white px-3 py-2 text-sm"
+              className="mt-1 w-full rounded-xl border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-100"
               placeholder="colleague@tokiotours.nl"
             />
           </label>
-          <label className="block text-xs uppercase tracking-wider text-[#8A8278]">
+          <label className="block text-xs uppercase tracking-wider text-zinc-400">
             Password
             <input
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="mt-1 w-full rounded-xl border border-[#D9D2C7] bg-white px-3 py-2 text-sm"
+              className="mt-1 w-full rounded-xl border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-100"
             />
           </label>
-          <label className="block text-xs uppercase tracking-wider text-[#8A8278]">
+          <label className="block text-xs uppercase tracking-wider text-zinc-400">
             Confirm password
             <input
               type="password"
               value={passwordConfirm}
               onChange={(e) => setPasswordConfirm(e.target.value)}
-              className="mt-1 w-full rounded-xl border border-[#D9D2C7] bg-white px-3 py-2 text-sm"
+              className="mt-1 w-full rounded-xl border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-100"
             />
           </label>
         </div>
@@ -2067,25 +2107,25 @@ function UsersPanel({
       </div>
 
       <div className="mt-6">
-        <h3 className="mb-3 font-medium text-[#0B1F3A]">Existing users</h3>
+        <h3 className="mb-3 font-medium text-zinc-100">Existing users</h3>
         {loading ? (
-          <p className="text-sm text-[#8A8278]">Loading…</p>
+          <p className="text-sm text-zinc-400">Loading…</p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[480px] text-left text-sm">
               <thead>
-                <tr className="border-b border-[#EEE8DF] text-xs uppercase tracking-wider text-[#8A8278]">
+                <tr className="border-b border-zinc-800 text-xs uppercase tracking-wider text-zinc-400">
                   <th className="pb-2 font-medium">Email</th>
                   <th className="pb-2 text-right font-medium">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {rows.map((row) => (
-                  <tr key={row.id} className="border-b border-[#F5F0E8]">
-                    <td className="py-3 pr-3 font-medium text-[#0B1F3A]">
+                  <tr key={row.id} className="border-b border-zinc-800/60">
+                    <td className="py-3 pr-3 font-medium text-zinc-100">
                       {row.email}
                       {row.email === currentEmail ? (
-                        <span className="ml-2 text-xs font-normal text-[#8A8278]">
+                        <span className="ml-2 text-xs font-normal text-zinc-500">
                           (you)
                         </span>
                       ) : null}
@@ -2104,7 +2144,7 @@ function UsersPanel({
                       </button>
                       <button
                         type="button"
-                        className="text-red-600 disabled:opacity-40"
+                        className="text-red-400 disabled:opacity-40"
                         disabled={row.email === currentEmail}
                         onClick={() => void removeUser(row)}
                       >
@@ -2120,8 +2160,8 @@ function UsersPanel({
       </div>
 
       {resetId ? (
-        <div className="mt-5 rounded-2xl border border-[#C4A35A]/40 bg-[#FBF8F2] p-4">
-          <h3 className="font-medium text-[#0B1F3A]">
+        <div className="mt-5 rounded-2xl border border-[#C4A35A]/40 bg-zinc-950 p-4">
+          <h3 className="font-medium text-zinc-100">
             Reset password · {rows.find((r) => r.id === resetId)?.email}
           </h3>
           <div className="mt-3 grid gap-3 sm:grid-cols-2">
@@ -2130,14 +2170,14 @@ function UsersPanel({
               placeholder="New password"
               value={resetPass}
               onChange={(e) => setResetPass(e.target.value)}
-              className="rounded-xl border border-[#D9D2C7] bg-white px-3 py-2 text-sm"
+              className="rounded-xl border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-100"
             />
             <input
               type="password"
               placeholder="Confirm password"
               value={resetConfirm}
               onChange={(e) => setResetConfirm(e.target.value)}
-              className="rounded-xl border border-[#D9D2C7] bg-white px-3 py-2 text-sm"
+              className="rounded-xl border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-100"
             />
           </div>
           <div className="mt-3 flex gap-2">
@@ -2145,14 +2185,14 @@ function UsersPanel({
               type="button"
               disabled={saving}
               onClick={() => void resetPassword(resetId)}
-              className="rounded-full bg-[#0B1F3A] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+              className="rounded-full bg-amber-500 px-4 py-2 text-sm font-semibold text-zinc-950 disabled:opacity-50"
             >
               Save password
             </button>
             <button
               type="button"
               onClick={() => setResetId(null)}
-              className="rounded-full border border-[#D9D2C7] px-4 py-2 text-sm"
+              className="rounded-full border border-zinc-700 px-4 py-2 text-sm text-zinc-300"
             >
               Cancel
             </button>

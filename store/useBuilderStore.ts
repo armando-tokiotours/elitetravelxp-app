@@ -229,6 +229,8 @@ export interface BuilderState {
   tempBookingRef: string;
   confirmedBookingRef: string | null;
   bookingStatus: BookingStatus;
+  /** Client-stated target trip budget in EUR (Custom Budget Matcher) */
+  customBudgetTarget: number | null;
 }
 
 export interface BuilderActions {
@@ -310,6 +312,7 @@ export interface BuilderActions {
   ) => void;
   setTravelPace: (pace: TravelPace) => void;
   setExperienceProfile: (profile: ExperienceProfile | null) => void;
+  setCustomBudgetTarget: (amount: number | null) => void;
   /** Unlock up to `step` after Continue validation (never decreases). */
   unlockBuilderStep: (step: number) => void;
   /** Clamp unlock after earlier steps become incomplete. */
@@ -381,6 +384,7 @@ const initialState: BuilderState = {
   tempBookingRef: "",
   confirmedBookingRef: null,
   bookingStatus: "draft",
+  customBudgetTarget: null,
 };
 
 function syncChauffeurDerived(selections: ChauffeurSelections) {
@@ -430,6 +434,7 @@ const BUILDER_PERSIST_KEYS = [
   "tempBookingRef",
   "confirmedBookingRef",
   "bookingStatus",
+  "customBudgetTarget",
 ] as const satisfies readonly (keyof BuilderState)[];
 
 function pickBuilderPayload(raw: unknown): Partial<BuilderState> {
@@ -606,6 +611,12 @@ export function mergePersistedBuilderState(
           ? "confirmed"
           : current.bookingStatus
         : current.bookingStatus || "draft";
+    })(),
+    customBudgetTarget: (() => {
+      if (!("customBudgetTarget" in p)) return current.customBudgetTarget;
+      if (p.customBudgetTarget == null) return null;
+      const n = Number(p.customBudgetTarget);
+      return Number.isFinite(n) && n > 0 ? Math.round(n) : null;
     })(),
   };
 }
@@ -1209,6 +1220,14 @@ export const useBuilderStore = create<BuilderState & BuilderActions>()(
 
       setExperienceProfile: (profile) =>
         set({ experienceProfile: profile }),
+
+      setCustomBudgetTarget: (amount) =>
+        set({
+          customBudgetTarget:
+            amount != null && Number.isFinite(amount) && amount > 0
+              ? Math.round(amount)
+              : null,
+        }),
 
       unlockBuilderStep: (step) =>
         set((s) => {

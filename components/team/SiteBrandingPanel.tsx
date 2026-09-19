@@ -11,6 +11,7 @@ import {
   type PbSiteBranding,
   type PublicBrandAssets,
 } from "@/lib/pocketbase/client";
+import { BrandingUiCardsAdmin } from "@/components/team/BrandingUiCardsAdmin";
 
 type PbClient = PocketBase;
 
@@ -215,14 +216,14 @@ export function SiteBrandingPanel({ getClient }: { getClient: () => PbClient }) 
   };
 
   if (loading) {
-    return <p className="text-sm text-[#8A8278]">Loading site branding…</p>;
+    return <p className="text-sm text-zinc-400">Loading site branding…</p>;
   }
 
   return (
     <div className="space-y-6">
-      <div className="rounded-2xl border border-[#E8E2D9] bg-white p-5 sm:p-6">
-        <h2 className="font-display text-2xl text-[#0B1F3A]">Site Branding</h2>
-        <p className="mt-1 text-sm text-[#8A8278]">
+      <div className="rounded-2xl border border-zinc-800/80 bg-zinc-900/60 p-5 sm:p-6">
+        <h2 className="font-display text-2xl text-zinc-100">Site Branding</h2>
+        <p className="mt-1 text-sm text-zinc-400">
           Controls the builder navbar logo and hero section. One active record.
         </p>
 
@@ -271,41 +272,41 @@ export function SiteBrandingPanel({ getClient }: { getClient: () => PbClient }) 
         </div>
 
         <div className="mt-6 grid gap-4">
-          <label className="block text-xs uppercase tracking-wider text-[#8A8278]">
+          <label className="block text-xs uppercase tracking-wider text-zinc-400">
             Main title (navy / white)
             <input
               type="text"
               value={main}
               onChange={(e) => setMain(e.target.value)}
-              className="mt-1 w-full rounded-xl border border-[#D9D2C7] px-3 py-2.5 text-sm text-[#0B1F3A]"
+              className="mt-1 w-full rounded-xl border border-zinc-700 px-3 py-2.5 text-sm text-zinc-100"
             />
           </label>
-          <label className="block text-xs uppercase tracking-wider text-[#8A8278]">
+          <label className="block text-xs uppercase tracking-wider text-zinc-400">
             Highlighted title (gold)
             <input
               type="text"
               value={highlight}
               onChange={(e) => setHighlight(e.target.value)}
-              className="mt-1 w-full rounded-xl border border-[#D9D2C7] px-3 py-2.5 text-sm text-[#0B1F3A]"
+              className="mt-1 w-full rounded-xl border border-zinc-700 px-3 py-2.5 text-sm text-zinc-100"
             />
           </label>
-          <label className="block text-xs uppercase tracking-wider text-[#8A8278]">
+          <label className="block text-xs uppercase tracking-wider text-zinc-400">
             Subtitle
             <textarea
               rows={2}
               value={subtitle}
               onChange={(e) => setSubtitle(e.target.value)}
-              className="mt-1 w-full rounded-xl border border-[#D9D2C7] px-3 py-2.5 text-sm text-[#0B1F3A]"
+              className="mt-1 w-full rounded-xl border border-zinc-700 px-3 py-2.5 text-sm text-zinc-100"
             />
           </label>
         </div>
       </div>
 
-      <div className="rounded-2xl border border-[#E8E2D9] bg-white p-5 sm:p-6">
-        <h2 className="font-display text-2xl text-[#0B1F3A]">
+      <div className="rounded-2xl border border-zinc-800/80 bg-zinc-900/60 p-5 sm:p-6">
+        <h2 className="font-display text-2xl text-zinc-100">
           Typography Settings
         </h2>
-        <p className="mt-1 text-sm text-[#8A8278]">
+        <p className="mt-1 text-sm text-zinc-400">
           Type &apos;Momo Trust Display&apos; or &apos;Poppins&apos; to use local
           fonts, or type a Google Font name if you provide a URL below.
         </p>
@@ -333,14 +334,14 @@ export function SiteBrandingPanel({ getClient }: { getClient: () => PbClient }) 
           ))}
         </datalist>
 
-        <label className="mt-5 block text-xs uppercase tracking-wider text-[#8A8278]">
+        <label className="mt-5 block text-xs uppercase tracking-wider text-zinc-400">
           Google Fonts Import URL
           <input
             type="url"
             value={googleUrl}
             onChange={(e) => setGoogleUrl(e.target.value)}
             placeholder="https://fonts.googleapis.com/css2?family=Playfair+Display&display=swap"
-            className="mt-1 w-full rounded-xl border border-[#D9D2C7] px-3 py-2.5 text-sm text-[#0B1F3A]"
+            className="mt-1 w-full rounded-xl border border-zinc-700 px-3 py-2.5 text-sm text-zinc-100"
           />
         </label>
         <p className="mt-1.5 text-xs text-[#A39A8E]">
@@ -348,18 +349,18 @@ export function SiteBrandingPanel({ getClient }: { getClient: () => PbClient }) 
           to rely on local fonts.
         </p>
 
-        <div className="mt-6 rounded-2xl border border-[#E8E2D9] bg-[#FBF8F2] p-5">
+        <div className="mt-6 rounded-2xl border border-zinc-800 bg-zinc-950 p-5">
           <p className="mb-3 text-[0.65rem] font-semibold uppercase tracking-[0.25em] text-[#C4A35A]">
             Live preview
           </p>
           <p
-            className="text-3xl text-[#0B1F3A]"
+            className="text-3xl text-zinc-100"
             style={{ fontFamily: `"${fontH1}", serif` }}
           >
             Heading 1 — {fontH1}
           </p>
           <p
-            className="mt-2 text-2xl text-[#0B1F3A]"
+            className="mt-2 text-2xl text-zinc-100"
             style={{ fontFamily: `"${fontH2}", sans-serif` }}
           >
             Heading 2 — {fontH2}
@@ -378,10 +379,31 @@ export function SiteBrandingPanel({ getClient }: { getClient: () => PbClient }) 
         type="button"
         disabled={saving}
         onClick={() => void save()}
-        className="rounded-full bg-[#C4A35A] px-6 py-3 text-sm font-semibold text-[#0B1F3A] shadow-sm transition hover:bg-[#b8944c] disabled:opacity-50"
+        className="rounded-full bg-[#C4A35A] px-6 py-3 text-sm font-semibold text-zinc-100 shadow-sm transition hover:bg-[#b8944c] disabled:opacity-50"
       >
         {saving ? "Saving…" : "Save Branding Updates"}
       </button>
+
+      <div className="rounded-2xl border border-[#C4A35A]/35 bg-[#C4A35A]/10 p-4">
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#C4A35A]">
+          Promote · Budget Planner
+        </p>
+        <p className="mt-2 text-sm text-zinc-300">
+          Use the Budget Planner card below to set eyebrow, headline, subtitle,
+          and hero image shown on{" "}
+          <a
+            href="/budget-planner"
+            target="_blank"
+            rel="noreferrer"
+            className="text-[#C4A35A] underline-offset-2 hover:underline"
+          >
+            /budget-planner
+          </a>
+          . Link this page from campaigns when guests have a fixed spend limit.
+        </p>
+      </div>
+
+      <BrandingUiCardsAdmin getClient={getClient} />
     </div>
   );
 }
@@ -396,14 +418,14 @@ function FontField({
   onChange: (v: string) => void;
 }) {
   return (
-    <label className="block text-xs uppercase tracking-wider text-[#8A8278]">
+    <label className="block text-xs uppercase tracking-wider text-zinc-400">
       {label}
       <input
         type="text"
         list="elite-font-presets"
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="mt-1 w-full rounded-xl border border-[#D9D2C7] px-3 py-2.5 text-sm text-[#0B1F3A]"
+        className="mt-1 w-full rounded-xl border border-zinc-700 px-3 py-2.5 text-sm text-zinc-100"
       />
     </label>
   );
@@ -430,11 +452,11 @@ function UploadField({
 }) {
   return (
     <div>
-      <p className="mb-1 text-xs uppercase tracking-wider text-[#8A8278]">
+      <p className="mb-1 text-xs uppercase tracking-wider text-zinc-400">
         {label}
       </p>
       <p className="mb-2 text-xs text-[#A39A8E]">{hint}</p>
-      <div className="overflow-hidden rounded-2xl border border-dashed border-[#D9D2C7] bg-[#FBF8F2] p-4">
+      <div className="overflow-hidden rounded-2xl border border-dashed border-zinc-700 bg-zinc-950 p-4">
         {preview ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
@@ -443,7 +465,7 @@ function UploadField({
             className={`mx-auto rounded-xl ${previewClass}`}
           />
         ) : (
-          <div className="flex h-28 items-center justify-center text-sm text-[#8A8278]">
+          <div className="flex h-28 items-center justify-center text-sm text-zinc-400">
             No image yet
           </div>
         )}
@@ -454,18 +476,18 @@ function UploadField({
           onChange={(e) => onFile(e.target.files?.[0] ?? null)}
         />
         {publicOption ? (
-          <label className="mt-3 flex cursor-pointer items-start gap-2.5 text-sm text-[#0B1F3A]">
+          <label className="mt-3 flex cursor-pointer items-start gap-2.5 text-sm text-zinc-100">
             <input
               type="checkbox"
               checked={publicOption.checked}
               onChange={(e) => publicOption.onChange(e.target.checked)}
-              className="mt-0.5 h-4 w-4 rounded border-[#D9D2C7] accent-[#C4A35A]"
+              className="mt-0.5 h-4 w-4 rounded border-zinc-700 accent-[#C4A35A]"
             />
             <span>
               <span className="font-medium">
                 Also save to project public assets
               </span>
-              <span className="mt-0.5 block text-xs text-[#8A8278]">
+              <span className="mt-0.5 block text-xs text-zinc-400">
                 {publicOption.pathHint}
               </span>
             </span>

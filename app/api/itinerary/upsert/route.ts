@@ -76,11 +76,15 @@ export async function POST(request: Request) {
       notes: [
         contactName ? `Contact: ${contactName}` : "",
         contactPhone ? `Phone: ${contactPhone}` : "",
+        state.customBudgetTarget
+          ? `Custom budget target: €${Math.round(Number(state.customBudgetTarget))}`
+          : "",
       ]
         .filter(Boolean)
         .join(" · "),
       payload: {
         ...state,
+        custom_budget_target: state.customBudgetTarget ?? null,
         departureDate,
         quote,
         depositPercent,

@@ -8,9 +8,6 @@ import {
   createExperienceProfile,
   experienceToUserTravelProfile,
   PACE_SUMMARY_LABEL,
-  QUIZ_CROWD,
-  QUIZ_PACE,
-  QUIZ_VIBE,
   type ExperienceProfile,
   type ProfilerCrowdStyle,
   type ProfilerPace,
@@ -19,6 +16,7 @@ import {
 } from "@/lib/experienceProfiler";
 import { useBuilderStore } from "@/store/useBuilderStore";
 import { useItineraryStore } from "@/store/useItineraryStore";
+import { useSiteBrandingStore } from "@/store/useSiteBrandingStore";
 
 const STEPS: QuizStepId[] = ["vibe", "pace", "crowd"];
 
@@ -33,6 +31,12 @@ export function ExperienceProfilerModal({
   const setTravelPace = useBuilderStore((s) => s.setTravelPace);
   const existing = useBuilderStore((s) => s.experienceProfile);
   const setUserProfile = useItineraryStore((s) => s.setUserProfile);
+  const ensureBrandingLoaded = useSiteBrandingStore((s) => s.ensureLoaded);
+  const brandingItems = useSiteBrandingStore((s) => s.itemsByKey);
+  const quizVibe = useSiteBrandingStore((s) => s.getQuizVibe)();
+  const quizPace = useSiteBrandingStore((s) => s.getQuizPace)();
+  const quizCrowd = useSiteBrandingStore((s) => s.getQuizCrowd)();
+  void brandingItems;
 
   const [mounted, setMounted] = useState(false);
   const [step, setStep] = useState(0);
@@ -48,6 +52,7 @@ export function ExperienceProfilerModal({
 
   useEffect(() => {
     if (!open) return;
+    void ensureBrandingLoaded();
     setVibe(existing?.vibe ?? null);
     setPace(existing?.pace ?? null);
     setCrowd(existing?.crowdStyle ?? null);
@@ -63,7 +68,7 @@ export function ExperienceProfilerModal({
     return () => {
       document.body.style.overflow = prev;
     };
-  }, [open, existing]);
+  }, [open, existing, ensureBrandingLoaded]);
 
   if (!mounted) return null;
 
@@ -109,14 +114,14 @@ export function ExperienceProfilerModal({
   };
 
   const vibeLabel =
-    QUIZ_VIBE.find((o) => o.id === (draft?.vibe ?? vibe))?.label ?? "—";
+    quizVibe.find((o) => o.id === (draft?.vibe ?? vibe))?.label ?? "—";
   const paceLabel = draft
     ? PACE_SUMMARY_LABEL[draft.pace]
     : pace
       ? PACE_SUMMARY_LABEL[pace]
       : "—";
   const crowdLabel =
-    QUIZ_CROWD.find((o) => o.id === (draft?.crowdStyle ?? crowd))?.label ??
+    quizCrowd.find((o) => o.id === (draft?.crowdStyle ?? crowd))?.label ??
     "—";
 
   return createPortal(
@@ -246,7 +251,7 @@ export function ExperienceProfilerModal({
                   </p>
                   <div className="space-y-2.5">
                     {stepId === "vibe"
-                      ? QUIZ_VIBE.map((opt) => (
+                      ? quizVibe.map((opt) => (
                           <QuizChoice
                             key={opt.id}
                             label={opt.label}
@@ -257,7 +262,7 @@ export function ExperienceProfilerModal({
                         ))
                       : null}
                     {stepId === "pace"
-                      ? QUIZ_PACE.map((opt) => (
+                      ? quizPace.map((opt) => (
                           <QuizChoice
                             key={opt.id}
                             label={opt.label}
@@ -268,7 +273,7 @@ export function ExperienceProfilerModal({
                         ))
                       : null}
                     {stepId === "crowd"
-                      ? QUIZ_CROWD.map((opt) => (
+                      ? quizCrowd.map((opt) => (
                           <QuizChoice
                             key={opt.id}
                             label={opt.label}

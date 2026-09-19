@@ -1,12 +1,14 @@
 "use client";
 
+import { useEffect } from "react";
 import { Play, Sparkles, Target } from "lucide-react";
 import { useBuilderStore } from "@/store/useBuilderStore";
+import { useSiteBrandingStore } from "@/store/useSiteBrandingStore";
 import { TravelProfileBadge } from "@/components/quiz/TravelProfileBadge";
 
 /**
  * Dual CTA banner for Tailored Experiences / Discover:
- * Match Reel + Style Quiz
+ * Match Reel + Style Quiz — copy & media from Site Branding.
  */
 export function ActivityMatcherBanner({
   onOpenQuiz,
@@ -17,6 +19,24 @@ export function ActivityMatcherBanner({
   onWatch?: () => void;
 }) {
   const profile = useBuilderStore((s) => s.experienceProfile);
+  const ensureLoaded = useSiteBrandingStore((s) => s.ensureLoaded);
+  const brandingItems = useSiteBrandingStore((s) => s.itemsByKey);
+  const banner = useSiteBrandingStore((s) => s.getActivityMatcherBanner)();
+  void brandingItems;
+
+  useEffect(() => {
+    void ensureLoaded();
+  }, [ensureLoaded]);
+
+  const eyebrow = banner.title || "Activity Matcher";
+  const headline = profile
+    ? "Matches stay active across Builder & Discover"
+    : banner.subtitle;
+  const primaryCta = banner.ctaPrimary || "Watch Your Activity Match Reel";
+  const secondaryCta = profile
+    ? "Edit Style Quiz"
+    : banner.ctaSecondary || "Take 30-Sec Style Quiz";
+  const imageSrc = banner.mediaUrl || "/images/matcher-poster.webp";
 
   return (
     <div className="space-y-2.5">
@@ -26,7 +46,7 @@ export function ActivityMatcherBanner({
         <div className="relative aspect-[21/9] min-h-[7rem] w-full sm:aspect-[2.4/1]">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src="/images/concierge-poster.webp"
+            src={imageSrc}
             alt=""
             loading="lazy"
             decoding="async"
@@ -36,12 +56,10 @@ export function ActivityMatcherBanner({
           <div className="absolute inset-0 flex flex-col justify-center gap-3 px-4 py-3 sm:px-5">
             <div>
               <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#C4A35A]">
-                Activity Matcher
+                {eyebrow}
               </p>
               <p className="mt-0.5 text-sm font-semibold leading-snug text-white sm:text-base">
-                {profile
-                  ? "Matches stay active across Builder & Discover"
-                  : "Unsure what to pick? Take our 30-Second Activity Matcher"}
+                {headline}
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
@@ -51,7 +69,7 @@ export function ActivityMatcherBanner({
                 className="flex items-center gap-2 rounded-xl border border-amber-500/30 bg-zinc-900/90 px-4 py-2 text-xs font-semibold text-amber-300 shadow-lg transition-all hover:border-amber-400"
               >
                 <Play className="h-4 w-4 fill-amber-400" aria-hidden />
-                <span>Watch Your Activity Match Reel</span>
+                <span>{primaryCta}</span>
               </button>
               <button
                 type="button"
@@ -63,7 +81,7 @@ export function ActivityMatcherBanner({
                 ) : (
                   <Target className="h-3 w-3" aria-hidden />
                 )}
-                {profile ? "Edit Style Quiz" : "Take 30-Sec Style Quiz"}
+                {secondaryCta}
               </button>
             </div>
           </div>

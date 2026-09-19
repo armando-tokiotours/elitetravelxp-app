@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   BedDouble,
   CheckCircle2,
@@ -9,6 +9,7 @@ import {
   Pencil,
 } from "lucide-react";
 import type { PbAccommodation, PbCity } from "@/lib/pocketbase/client";
+import { fetchAccommodations } from "@/lib/pocketbase/client";
 import { buildCityMap, getCityName } from "@/lib/cityLabels";
 import { CityThumb } from "./CityThumb";
 import { isBuilderStepComplete } from "@/lib/builderSteps";
@@ -60,16 +61,45 @@ function monthNameFromIso(iso: string | null): string | null {
 }
 
 export function HotelsGuestsSection({
-  accommodations,
   cities,
   maxAdultsPerRoom = 3,
+  onAccommodationsLoaded,
 }: {
-  accommodations: PbAccommodation[];
   cities: PbCity[];
   maxAdultsPerRoom?: number;
+  /** Sync loaded hotel matrix into parent BuilderConfig for quote calc */
+  onAccommodationsLoaded?: (rows: PbAccommodation[]) => void;
 }) {
+  const [accommodations, setAccommodations] = useState<PbAccommodation[]>([]);
+  const [hotelsLoading, setHotelsLoading] = useState(false);
   const [isHotelModalOpen, setIsHotelModalOpen] = useState(false);
   const modalMounted = useLazyModalMount(isHotelModalOpen);
+  const onLoadedRef = useRef(onAccommodationsLoaded);
+  onLoadedRef.current = onAccommodationsLoaded;
+
+  const highestUnlockedStep = useBuilderStore((s) => s.highestUnlockedStep);
+  const hotelsStepActive = highestUnlockedStep >= 4;
+
+  useEffect(() => {
+    if (!hotelsStepActive) return;
+    let cancelled = false;
+    setHotelsLoading(true);
+    (async () => {
+      try {
+        const rows = await fetchAccommodations();
+        if (cancelled) return;
+        setAccommodations(rows);
+        onLoadedRef.current?.(rows);
+      } catch {
+        if (!cancelled) setAccommodations([]);
+      } finally {
+        if (!cancelled) setHotelsLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [hotelsStepActive]);
 
   const locations = useBuilderStore((s) => s.locations);
   const cityHotels = useBuilderStore((s) => s.cityHotels);
@@ -225,10 +255,16 @@ export function HotelsGuestsSection({
         onClick={openEditor}
       />
 
+      {hotelsLoading ? (
+        <p className="mt-2 text-center text-xs text-zinc-500">
+          Loading hotel rates…
+        </p>
+      ) : null}
+
       <button
         type="button"
         onClick={openEditor}
-        disabled={orderedCityIds.length === 0}
+        disabled={orderedCityIds.length === 0 || hotelsLoading}
         className="mt-3 flex w-full items-center justify-center gap-2 rounded-full border border-[#C4A35A]/50 bg-zinc-950 py-2.5 text-sm font-semibold text-white transition hover:border-[#C4A35A] hover:bg-[#0B1F3A] disabled:cursor-not-allowed disabled:opacity-40"
       >
         <Pencil className="h-3.5 w-3.5" aria-hidden />

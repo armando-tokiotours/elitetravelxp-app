@@ -33,6 +33,11 @@ import { buildMatchReelSlides } from "@/lib/matchReel";
 import { rankToursByProfile, isBestMatchTour } from "@/lib/experienceProfiler";
 import { useItineraryStore } from "@/store/useItineraryStore";
 import { Play } from "lucide-react";
+import {
+  AppSidebar,
+  APP_SIDEBAR_RAIL_PAD,
+  MobileAppNav,
+} from "@/components/navigation/AppSidebar";
 
 type ProfileTab = "tours" | "experiences" | "matches";
 
@@ -224,7 +229,7 @@ export function DiscoverFeed() {
               selectedCity.collectionId,
               selectedCity.id,
               filename,
-              PB_THUMBS.chip
+              { thumb: PB_THUMBS.chip, format: "webp" }
             )
           : "";
       })()
@@ -234,28 +239,41 @@ export function DiscoverFeed() {
 
   return (
     <div className="builder-theme relative min-h-[100dvh] bg-black text-white">
-      <header className="sticky top-0 z-40 border-b border-zinc-800 bg-black/95 text-white backdrop-blur-md">
-        <div className="mx-auto flex max-w-lg items-center justify-between px-4 py-3">
-          <div>
-            <p className="text-[0.6rem] font-semibold uppercase tracking-[0.28em] text-[#C4A35A]">
-              Elite Travel
-            </p>
-            <h1 className="font-display text-xl leading-tight">Discover</h1>
-          </div>
-          <Link
-            href="/builder"
-            className="rounded-full border border-white/20 px-3 py-1.5 text-xs font-semibold text-white/90"
-          >
-            Builder
-          </Link>
-        </div>
-      </header>
+      <AppSidebar
+        brandEyebrow="Elite Travel"
+        brandTitle="Discover"
+        expandOnHover
+      />
 
-      <div
-        className="mx-auto flex max-w-lg snap-x snap-mandatory gap-4 overflow-x-auto border-b border-zinc-800 bg-black px-4 py-4 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-        role="tablist"
-        aria-label="Cities"
-      >
+      <div className={`${APP_SIDEBAR_RAIL_PAD} min-h-[100dvh] bg-black`}>
+        <header className="sticky top-0 z-40 border-b border-zinc-800 bg-black/95 text-white backdrop-blur-md md:hidden">
+          <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
+            <div className="flex min-w-0 items-center gap-3">
+              <MobileAppNav
+                brandEyebrow="Elite Travel"
+                brandTitle="Discover"
+              />
+              <div className="min-w-0">
+                <p className="text-[0.6rem] font-semibold uppercase tracking-[0.28em] text-[#C4A35A]">
+                  Elite Travel
+                </p>
+                <h1 className="font-display text-xl leading-tight">Discover</h1>
+              </div>
+            </div>
+            <Link
+              href="/builder"
+              className="rounded-full border border-white/20 px-3 py-1.5 text-xs font-semibold text-white/90"
+            >
+              Builder
+            </Link>
+          </div>
+        </header>
+
+        <div
+          className="mx-auto flex max-w-6xl snap-x snap-mandatory gap-4 overflow-x-auto border-b border-zinc-800 bg-black px-4 py-4 [-ms-overflow-style:none] [scrollbar-width:none] lg:px-8 [&::-webkit-scrollbar]:hidden"
+          role="tablist"
+          aria-label="Cities"
+        >
         {loading ? (
           <p className="text-sm text-white/50">Loading cities…</p>
         ) : cities.length === 0 ? (
@@ -282,7 +300,7 @@ export function DiscoverFeed() {
         </div>
       ) : null}
 
-      <main className="mx-auto max-w-lg bg-black pb-32 md:pb-12">
+      <main className="mx-auto max-w-6xl bg-black px-4 pb-32 md:pb-12 lg:px-8">
         {loading || !selectedCity ? (
           <p className="py-16 text-center text-sm text-zinc-500">
             {loading ? "Loading…" : "Select a city"}
@@ -290,7 +308,7 @@ export function DiscoverFeed() {
         ) : (
           <>
             {/* Destination header */}
-            <div className="flex items-center gap-6 p-4 text-white">
+            <div className="mx-auto flex max-w-lg items-center gap-6 p-4 text-white lg:max-w-none">
               {cityImg ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
@@ -401,6 +419,7 @@ export function DiscoverFeed() {
           </>
         )}
       </main>
+      </div>
 
       <ActivityMatchReelModal
         open={reelOpen}
@@ -476,7 +495,10 @@ function TourThumb({
   const thumbFile = tourPhoto(tour);
   const thumbUrl =
     thumbFile && tour.collectionId
-      ? pbFileUrl(tour.collectionId, tour.id, thumbFile, PB_THUMBS.card)
+      ? pbFileUrl(tour.collectionId, tour.id, thumbFile, {
+          thumb: PB_THUMBS.card,
+          format: "webp",
+        })
       : "";
 
   return (
@@ -491,7 +513,7 @@ function TourThumb({
         <img
           src={thumbUrl}
           alt=""
-          width={400}
+          width={600}
           height={400}
           loading="lazy"
           decoding="async"
@@ -550,7 +572,10 @@ function CityStory({
   const filename = cityPhoto(city);
   const src =
     filename && city.collectionId
-      ? pbFileUrl(city.collectionId, city.id, filename, PB_THUMBS.pill)
+      ? pbFileUrl(city.collectionId, city.id, filename, {
+          thumb: PB_THUMBS.pill,
+          format: "webp",
+        })
       : "";
 
   return (

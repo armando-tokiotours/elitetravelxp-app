@@ -57,9 +57,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="en"
-      className={`${momoTrust.variable} ${poppins.variable} h-full antialiased`}
+      className={`${momoTrust.variable} ${poppins.variable} h-full bg-black antialiased`}
     >
-      <body className="flex min-h-full flex-col bg-[#F5F0E8] font-sans text-[#0B1F3A]">
+      <body className="flex min-h-full flex-col bg-black font-sans text-[#0B1F3A]">
         <DynamicTypography />
         {children}
       </body>

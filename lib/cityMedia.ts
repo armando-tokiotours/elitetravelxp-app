@@ -17,13 +17,17 @@ export function citySlugFromName(name: string | undefined | null): string {
 /** PocketBase file URL for a city cover (empty if no photo). */
 export function cityPbImageUrl(
   city: PbCity | null | undefined,
-  thumb?: string
+  thumbOrOpts?: string | { thumb?: string; format?: "webp" | "png" | "jpeg" }
 ): string {
   if (!city) return "";
   const file = cityPhoto(city);
   if (!file) return "";
   const collection = city.collectionId || "cities";
-  return pbFileUrl(collection, city.id, file, thumb);
+  const opts =
+    typeof thumbOrOpts === "string"
+      ? { thumb: thumbOrOpts, format: "webp" as const }
+      : { format: "webp" as const, ...thumbOrOpts };
+  return pbFileUrl(collection, city.id, file, opts);
 }
 
 /**

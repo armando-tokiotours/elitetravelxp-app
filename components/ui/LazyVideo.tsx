@@ -21,6 +21,7 @@ export function LazyVideo({
   className,
   muted = true,
   playsInline = true,
+  autoPlay,
   ...rest
 }: Props) {
   const ref = useRef<HTMLVideoElement>(null);
@@ -51,6 +52,14 @@ export function LazyVideo({
     return () => io.disconnect();
   }, [src, rootMargin]);
 
+  useEffect(() => {
+    const video = ref.current;
+    if (!video || !activeSrc || !autoPlay) return;
+    void video.play().catch(() => {
+      /* autoplay may be blocked — poster + controls remain usable */
+    });
+  }, [activeSrc, autoPlay]);
+
   return (
     <video
       ref={ref}
@@ -58,7 +67,8 @@ export function LazyVideo({
       poster={poster}
       muted={muted}
       playsInline={playsInline}
-      preload={activeSrc ? "metadata" : "none"}
+      autoPlay={Boolean(autoPlay && activeSrc)}
+      preload="none"
       className={className}
       {...rest}
     />

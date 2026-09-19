@@ -58,11 +58,17 @@ export function paceBadgeLabel(pace: string): string {
 function tourImageUrl(tour: PbTour): string {
   const thumb = tourPhoto(tour);
   if (thumb && tour.collectionId) {
-    return pbFileUrl(tour.collectionId, tour.id, thumb, PB_THUMBS.reel);
+    return pbFileUrl(tour.collectionId, tour.id, thumb, {
+      thumb: PB_THUMBS.reel,
+      format: "webp",
+    });
   }
   const media = tourMediaFile(tour);
   if (media && tour.collectionId && tourMediaType(tour) !== "Video") {
-    return pbFileUrl(tour.collectionId, tour.id, media, PB_THUMBS.reel);
+    return pbFileUrl(tour.collectionId, tour.id, media, {
+      thumb: PB_THUMBS.reel,
+      format: "webp",
+    });
   }
   return "/images/matcher-poster-card.webp";
 }

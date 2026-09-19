@@ -9,6 +9,7 @@ import { ManageBookingModal } from "@/components/modals/ManageBookingModal";
 const LINKS = [
   { href: "/builder", label: "Home / Builder" },
   { href: "/discover", label: "Discover Experiences" },
+  { href: "/budget-planner", label: "Budget Planner" },
   { href: "/builder/itinerary", label: "My Saved Itineraries" },
   { href: "/team-access", label: "Team Access (Admin)" },
 ] as const;
@@ -24,6 +25,8 @@ export function AppShell({
   transparentHeader = false,
   /** Luxury dark chrome (builder / discover-aligned) */
   dark = false,
+  /** Hide top header on desktop when AppSidebar is the primary nav */
+  hideHeaderOnDesktop = false,
 }: {
   children: ReactNode;
   title?: string;
@@ -33,6 +36,7 @@ export function AppShell({
   heroMode?: boolean;
   transparentHeader?: boolean;
   dark?: boolean;
+  hideHeaderOnDesktop?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [manageOpen, setManageOpen] = useState(false);
@@ -77,8 +81,9 @@ export function AppShell({
           : "bg-[#F5F0E8] text-[#0B1F3A]"
       }`}
     >
-      <header className={headerClass}>
-        <div
+      <header
+        className={`${headerClass}${hideHeaderOnDesktop ? " md:hidden" : ""}`}
+      >        <div
           className={`mx-auto flex items-center gap-2 px-4 py-3 sm:gap-3 sm:px-6 ${
             heroMode ? "max-w-5xl" : "max-w-3xl"
           }`}
@@ -172,8 +177,8 @@ export function AppShell({
 
       <div
         className={`fixed inset-0 z-50 transition ${
-          open ? "pointer-events-auto" : "pointer-events-none"
-        }`}
+          hideHeaderOnDesktop ? "md:hidden " : ""
+        }${open ? "pointer-events-auto" : "pointer-events-none"}`}
       >
         <button
           type="button"

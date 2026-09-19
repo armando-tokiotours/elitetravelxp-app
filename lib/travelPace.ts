@@ -1,7 +1,9 @@
 import type { TravelPace } from "@/store/useBuilderStore";
+import { BRANDING_UI_FALLBACKS, paceBrandingKey } from "@/lib/brandingUi";
 
 export type PaceId = Exclude<TravelPace, null>;
 
+/** Static fallbacks — prefer `useSiteBrandingStore().getTravelPaces()` at runtime. */
 export const TRAVEL_PACES: {
   id: PaceId;
   label: string;
@@ -9,38 +11,18 @@ export const TRAVEL_PACES: {
   description: string;
   detail: string;
   image: string;
-}[] = [
-  {
-    id: "fast",
-    label: "Fast",
-    tagline: "See more, linger less",
-    description:
-      "Packed days with multiple highlights. Ideal if this is a first visit and you want maximum coverage.",
-    detail:
-      "Expect earlier starts, efficient transfers between cities, and fuller daily schedules. Best for energetic travelers who prefer momentum over downtime.",
-    image: "/photo/pace-fast.jpg",
-  },
-  {
-    id: "moderate",
-    label: "Moderate",
-    tagline: "Balanced discovery",
-    description:
-      "A classic rhythm — signature experiences with room to breathe between them.",
-    detail:
-      "One primary focus per day with optional add-ons. Comfortable pacing for couples and families who want culture and rest in equal measure.",
-    image: "/photo/pace-moderate.jpg",
-  },
-  {
-    id: "relaxed",
-    label: "Relaxed",
-    tagline: "Slow luxury",
-    description:
-      "Fewer moves, deeper stays. Space for spa mornings, long lunches, and unhurried evenings.",
-    detail:
-      "Longer city stays and lighter daily agendas. Perfect when the journey itself is the destination and recovery matters as much as sightseeing.",
-    image: "/photo/pace-relaxed.jpg",
-  },
-];
+}[] = (["fast", "moderate", "relaxed"] as PaceId[]).map((id) => {
+  const fb = BRANDING_UI_FALLBACKS[paceBrandingKey(id)]!;
+  const [description, detail = ""] = fb.description.split(/\n\n/);
+  return {
+    id,
+    label: fb.title,
+    tagline: fb.subtitle,
+    description,
+    detail,
+    image: fb.mediaFallback,
+  };
+});
 
 export function travelPaceLabel(pace: TravelPace): string | null {
   if (!pace) return null;

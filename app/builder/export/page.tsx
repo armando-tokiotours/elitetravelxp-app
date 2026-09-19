@@ -26,7 +26,9 @@ export default function ExportPage() {
 
   useEffect(() => {
     useBuilderStore.persist.rehydrate();
-    fetchBuilderConfig().then(setConfig).catch(() => setConfig(null));
+    fetchBuilderConfig({ includeAccommodations: true })
+      .then(setConfig)
+      .catch(() => setConfig(null));
   }, []);
 
   const quote = useMemo(

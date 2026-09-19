@@ -3,12 +3,12 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowRight, FileText, Plane, Ticket } from "lucide-react";
+import { FileText, Plane, Ticket } from "lucide-react";
 import {
   fetchBuilderConfig,
   type BuilderConfig,
 } from "@/lib/pocketbase/client";
-import { calculateBuilderQuote, formatUsd } from "@/lib/builder-pricing";
+import { calculateBuilderQuote } from "@/lib/builder-pricing";
 import { submitBookingRequest } from "@/lib/bookingRequest";
 import { calculateCityDateRanges } from "@/lib/dateCascade";
 import { allocateFleet } from "@/lib/vehicleAllocator";
@@ -26,6 +26,12 @@ import {
   resolveHub,
 } from "@/components/builder/TravelDossierView";
 import { BookingRefBadge } from "@/components/builder/BookingRefBadge";
+import {
+  AppSidebar,
+  APP_SIDEBAR_RAIL_PAD,
+  MobileAppNav,
+} from "@/components/navigation/AppSidebar";
+import { PriceSummaryFooter } from "@/components/builder/PriceSummaryFooter";
 
 type ViewMode = "dossier" | "invoice";
 
@@ -52,7 +58,9 @@ export default function ItineraryPageClient() {
   useEffect(() => {
     useBuilderStore.persist.rehydrate();
     ensureTempBookingRef();
-    fetchBuilderConfig().then(setConfig).catch(() => setConfig(null));
+    fetchBuilderConfig({ includeAccommodations: true })
+      .then(setConfig)
+      .catch(() => setConfig(null));
   }, [ensureTempBookingRef]);
 
   useEffect(() => {
@@ -159,14 +167,27 @@ export default function ItineraryPageClient() {
 
   return (
     <div className="builder-theme min-h-screen overflow-x-hidden bg-[#F5F0E8] pb-28 text-[#0B1F3A] md:pb-32">
-      <header className="no-print border-b border-[#E8E2D9] bg-[#FBF8F2] px-4 py-5">
-        <p className="text-[0.65rem] font-semibold uppercase tracking-[0.35em] text-[#C4A35A]">
-          My Itinerary
-        </p>
-        <h1 className="mt-1 font-display text-3xl">Your Japan Journey</h1>
-        <p className="mt-1 text-sm text-[#8A8278]">
-          Switch between travel dossier and private quotation.
-        </p>
+      <AppSidebar
+        brandEyebrow="Elite Travel"
+        brandTitle="Itinerary"
+        expandOnHover
+      />
+
+      <div className={APP_SIDEBAR_RAIL_PAD}>
+        <header className="no-print border-b border-[#E8E2D9] bg-[#FBF8F2] px-4 py-5">
+          <div className="mb-3 flex items-center gap-3 md:hidden">
+            <MobileAppNav
+              brandEyebrow="Elite Travel"
+              brandTitle="Itinerary"
+            />
+          </div>
+          <p className="text-[0.65rem] font-semibold uppercase tracking-[0.35em] text-[#C4A35A]">
+            My Itinerary
+          </p>
+          <h1 className="mt-1 font-display text-3xl">Your Japan Journey</h1>
+          <p className="mt-1 text-sm text-[#8A8278]">
+            Switch between travel dossier and private quotation.
+          </p>
         <div className="mt-3">
           <BookingRefBadge
             tempBookingRef={state.tempBookingRef}
@@ -260,37 +281,17 @@ export default function ItineraryPageClient() {
           </div>
         )}
       </main>
-
-      <div className="no-print sticky-action-bar fixed inset-x-0 bottom-[calc(3.75rem+env(safe-area-inset-bottom))] z-30 px-3 pb-2 md:bottom-4">
-        <div className="mx-auto flex max-w-3xl items-center gap-3 rounded-2xl bg-[#0B1F3A] px-4 py-3 shadow-[0_12px_40px_rgba(11,31,58,0.4)] sm:px-5 sm:py-3.5">
-          <div className="min-w-0 flex-1">
-            <p className="text-[0.6rem] font-semibold uppercase tracking-[0.18em] text-[#C4A35A]">
-              Experience Japan Range
-            </p>
-            <p className="truncate font-display text-lg leading-tight text-white sm:text-xl">
-              {quote
-                ? `Est. ${formatUsd(quote.min)} – ${formatUsd(quote.max)}`
-                : "Calculating…"}
-            </p>
-            {minPerPerson != null && maxPerPerson != null ? (
-              <p className="mt-0.5 truncate text-[11px] text-white/55">
-                Est. {formatUsd(minPerPerson)} – {formatUsd(maxPerPerson)} per
-                person
-                {totalGuests > 1 ? ` · ${totalGuests} guests` : ""}
-              </p>
-            ) : null}
-          </div>
-          <button
-            type="button"
-            disabled={!quote}
-            onClick={handleRequestPay}
-            className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-[#C4A35A] px-3.5 py-2.5 text-sm font-semibold text-[#0B1F3A] transition hover:bg-[#d4b56a] disabled:opacity-60 sm:px-5 sm:py-3"
-          >
-            Request & Pay
-            <ArrowRight className="h-4 w-4" />
-          </button>
-        </div>
       </div>
+
+      <PriceSummaryFooter
+        quoteMin={quote?.min ?? null}
+        quoteMax={quote?.max ?? null}
+        minPerPerson={minPerPerson}
+        maxPerPerson={maxPerPerson}
+        totalGuests={totalGuests}
+        onRequestPay={handleRequestPay}
+        requestDisabled={!quote}
+      />
 
       <RevolutCheckoutModal
         isOpen={isCheckoutModalOpen}
