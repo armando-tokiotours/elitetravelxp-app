@@ -335,8 +335,14 @@ function rowSubtitle(def: CollectionDef, row: Record<string, unknown>): string {
           .join("+")
       : "";
     const crowd = row.crowd_tag ? String(row.crowd_tag).replace(/_/g, " ") : "";
+    const pricing = row.pricing_tier ? String(row.pricing_tier) : "";
+    const badge = row.display_badge ? String(row.display_badge) : "";
+    const self = row.is_self_guided === true ? "self-guided" : null;
     return [
       cat,
+      pricing || null,
+      self,
+      badge || null,
       vibes || null,
       crowd || null,
       tier || null,
@@ -885,7 +891,25 @@ function RecordEditModal({
         }
       }
       if (f.type === "bool") {
-        base[f.key] = v === false || v === "false" ? "false" : "true";
+        if (
+          def.id === "tours" &&
+          f.key === "is_self_guided" &&
+          (v == null || v === "")
+        ) {
+          base[f.key] = "false";
+        } else if (
+          def.id === "tours" &&
+          f.key === "guide_required" &&
+          (v == null || v === "")
+        ) {
+          // Default: guided tours need a guide; self-guided rows flip this off
+          const self =
+            initial?.is_self_guided === true ||
+            String(initial?.access_type || "") === "direct_ticket";
+          base[f.key] = self ? "false" : "true";
+        } else {
+          base[f.key] = v === false || v === "false" ? "false" : "true";
+        }
       } else if (f.type === "multiselect") {
         if (Array.isArray(v)) {
           base[f.key] = JSON.stringify(

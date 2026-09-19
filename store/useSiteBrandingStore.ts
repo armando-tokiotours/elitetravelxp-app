@@ -118,6 +118,7 @@ interface SiteBrandingState {
   getEliteConciergeModal: () => ResolvedBrandingUiItem;
   getActivityMatcherBanner: () => ResolvedBrandingUiItem;
   getBudgetPlanner: () => ResolvedBrandingUiItem;
+  getValueProposition: () => ResolvedBrandingUiItem;
 }
 
 export const useSiteBrandingStore = create<SiteBrandingState>((set, get) => ({
@@ -207,4 +208,7 @@ export const useSiteBrandingStore = create<SiteBrandingState>((set, get) => ({
 
   getBudgetPlanner: () =>
     resolveItem("budget_planner", get().itemsByKey.budget_planner),
+
+  getValueProposition: () =>
+    resolveItem("value_proposition", get().itemsByKey.value_proposition),
 }));

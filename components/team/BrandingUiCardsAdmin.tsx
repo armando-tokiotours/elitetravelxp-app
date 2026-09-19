@@ -25,9 +25,11 @@ const CATEGORY_LABEL: Record<string, string> = {
   concierge: "Elite Concierge modal",
   matcher: "Activity Matcher banner",
   planner: "Budget Planner page",
+  value: "Value proposition",
 };
 
 const CATEGORY_ORDER = [
+  "value",
   "matcher",
   "planner",
   "concierge",
@@ -183,9 +185,9 @@ export function BrandingUiCardsAdmin({
         Quiz &amp; UI Cards
       </h2>
       <p className="mt-1 text-sm text-[#8A8278]">
-        Edit the Discover Activity Matcher banner, Budget Planner hero, Elite
-        Concierge modal, Travel Pace cards, and Style Quiz options. Empty fields
-        fall back to built-in copy and media.
+        Edit Value Proposition messaging, Discover Activity Matcher banner,
+        Budget Planner hero, Elite Concierge modal, Travel Pace cards, and Style
+        Quiz options. Empty fields fall back to built-in copy and media.
       </p>
 
       {error ? (
@@ -215,11 +217,13 @@ export function BrandingUiCardsAdmin({
                 const fb = BRANDING_UI_FALLBACKS[row.key];
                 const isMatcher = row.key === "activity_matcher_banner";
                 const isBudgetPlanner = row.key === "budget_planner";
+                const isValueProp = row.key === "value_proposition";
                 const isConcierge = row.key === "elite_concierge_modal";
                 const previewIsVideo =
                   (draft.file && isVideoFilename(draft.file.name)) ||
                   isVideoFilename(draft.preview);
-                const wide = isMatcher || isBudgetPlanner || isConcierge;
+                const wide =
+                  isMatcher || isBudgetPlanner || isConcierge || isValueProp;
 
                 return (
                   <div
@@ -332,13 +336,15 @@ export function BrandingUiCardsAdmin({
                     ) : null}
 
                     <label className="mt-3 block text-xs uppercase tracking-wider text-[#8A8278]">
-                      {isBudgetPlanner
-                        ? "Headline title"
-                        : isMatcher
-                          ? "Section eyebrow label"
-                          : isConcierge
-                            ? "Section header"
-                            : "Card title"}
+                      {isValueProp
+                        ? "Section header"
+                        : isBudgetPlanner
+                          ? "Headline title"
+                          : isMatcher
+                            ? "Section eyebrow label"
+                            : isConcierge
+                              ? "Section header"
+                              : "Card title"}
                       <input
                         type="text"
                         value={draft.title}
@@ -351,13 +357,15 @@ export function BrandingUiCardsAdmin({
                     </label>
 
                     <label className="mt-3 block text-xs uppercase tracking-wider text-[#8A8278]">
-                      {isBudgetPlanner
-                        ? "Header eyebrow label"
-                        : isMatcher
-                          ? "Banner headline"
-                          : isConcierge
-                            ? "Deposit subtitle"
-                            : "Card subtitle"}
+                      {isValueProp
+                        ? "Core hook"
+                        : isBudgetPlanner
+                          ? "Header eyebrow label"
+                          : isMatcher
+                            ? "Banner headline"
+                            : isConcierge
+                              ? "Deposit subtitle"
+                              : "Card subtitle"}
                       <input
                         type="text"
                         value={draft.subtitle}
@@ -368,6 +376,81 @@ export function BrandingUiCardsAdmin({
                         className="mt-1 w-full rounded-xl border border-[#D9D2C7] px-3 py-2.5 text-sm text-[#0B1F3A]"
                       />
                     </label>
+
+                    {isValueProp ? (
+                      <>
+                        <label className="mt-3 block text-xs uppercase tracking-wider text-[#8A8278]">
+                          Value bullets (one per line)
+                          <textarea
+                            rows={5}
+                            value={draft.description}
+                            onChange={(e) =>
+                              updateDraft(row.id, {
+                                description: e.target.value,
+                              })
+                            }
+                            placeholder={fb?.description}
+                            className="mt-1 w-full rounded-xl border border-[#D9D2C7] px-3 py-2.5 text-sm text-[#0B1F3A]"
+                          />
+                        </label>
+                        <label className="mt-3 block text-xs uppercase tracking-wider text-[#8A8278]">
+                          Why Book an Elite Specialist? (title)
+                          <input
+                            type="text"
+                            value={draft.inclusionTitle}
+                            onChange={(e) =>
+                              updateDraft(row.id, {
+                                inclusionTitle: e.target.value,
+                              })
+                            }
+                            placeholder={fb?.inclusionTitle}
+                            className="mt-1 w-full rounded-xl border border-[#D9D2C7] px-3 py-2.5 text-sm text-[#0B1F3A]"
+                          />
+                        </label>
+                        <label className="mt-3 block text-xs uppercase tracking-wider text-[#8A8278]">
+                          Why Book body
+                          <textarea
+                            rows={3}
+                            value={draft.inclusionBody}
+                            onChange={(e) =>
+                              updateDraft(row.id, {
+                                inclusionBody: e.target.value,
+                              })
+                            }
+                            placeholder={fb?.inclusionBody}
+                            className="mt-1 w-full rounded-xl border border-[#D9D2C7] px-3 py-2.5 text-sm text-[#0B1F3A]"
+                          />
+                        </label>
+                        <label className="mt-3 block text-xs uppercase tracking-wider text-[#8A8278]">
+                          Self-guided comparison line
+                          <input
+                            type="text"
+                            value={draft.creditTitle}
+                            onChange={(e) =>
+                              updateDraft(row.id, {
+                                creditTitle: e.target.value,
+                              })
+                            }
+                            placeholder={fb?.creditTitle}
+                            className="mt-1 w-full rounded-xl border border-[#D9D2C7] px-3 py-2.5 text-sm text-[#0B1F3A]"
+                          />
+                        </label>
+                        <label className="mt-3 block text-xs uppercase tracking-wider text-[#8A8278]">
+                          Elite guided comparison line
+                          <textarea
+                            rows={2}
+                            value={draft.creditBody}
+                            onChange={(e) =>
+                              updateDraft(row.id, {
+                                creditBody: e.target.value,
+                              })
+                            }
+                            placeholder={fb?.creditBody}
+                            className="mt-1 w-full rounded-xl border border-[#D9D2C7] px-3 py-2.5 text-sm text-[#0B1F3A]"
+                          />
+                        </label>
+                      </>
+                    ) : null}
 
                     {isBudgetPlanner ? (
                       <label className="mt-3 block text-xs uppercase tracking-wider text-[#8A8278]">

@@ -462,6 +462,18 @@ export interface PbTour {
   price_4_pax?: number;
   /** Flat add-on per guest beyond 4 */
   price_extra_pax?: number;
+  /**
+   * Budget planner: free | low_cost | standard | luxury
+   */
+  pricing_tier?: "free" | "low_cost" | "standard" | "luxury" | string;
+  /** Entry ticket only — no private guide package */
+  is_self_guided?: boolean;
+  /** When false / with is_self_guided, skip guide surcharge in budget math */
+  guide_required?: boolean;
+  /** Per-person ticket / landmark entry fee (EUR) for self-guided items */
+  base_price_eur?: number;
+  /** Optional storefront badge override */
+  display_badge?: "FREE / LOW-COST" | "POPULAR" | "SELF-GUIDED" | string;
   duration_hours?: number;
   /** Guided languages offered for this experience */
   languages?: string[];
@@ -858,10 +870,28 @@ export interface DiscoverConfig {
 /** Lightweight tours list for Budget Planner (price-asc friendly). */
 export async function fetchBudgetPlannerTours(): Promise<PbTour[]> {
   const pb = getPocketBase();
-  return pb.collection("tours").getFullList<PbTour>({
-    sort: "price_1_pax,title",
-    expand: "city_id",
-  });
+  // Prefer curated free/low/self-guided; fall back to full active catalog.
+  try {
+    const curated = await pb.collection("tours").getFullList<PbTour>({
+      filter:
+        "(pricing_tier = 'free' || pricing_tier = 'low_cost' || is_self_guided = true)",
+      sort: "base_price_eur,price_1_pax,title",
+      expand: "city_id",
+    });
+    const rest = await pb.collection("tours").getFullList<PbTour>({
+      filter:
+        "(pricing_tier != 'free' && pricing_tier != 'low_cost' && is_self_guided != true)",
+      sort: "price_1_pax,title",
+      expand: "city_id",
+    });
+    const seen = new Set(curated.map((t) => t.id));
+    return [...curated, ...rest.filter((t) => !seen.has(t.id))];
+  } catch {
+    return pb.collection("tours").getFullList<PbTour>({
+      sort: "price_1_pax,title",
+      expand: "city_id",
+    });
+  }
 }
 
 export async function fetchDiscoverConfig(): Promise<DiscoverConfig> {

@@ -206,9 +206,12 @@ export function ActivityMatchReelModal({
                         : vibe
                           ? [vibe]
                           : []
-                      ).map((v) => (
+                      )
+                        .map((v) => String(v).trim())
+                        .filter(Boolean)
+                        .map((v, i) => (
                         <span
-                          key={v}
+                          key={`${slide.id}-vibe-${v}-${i}`}
                           className="rounded-md border border-amber-500/25 bg-zinc-800/80 px-2 py-0.5 text-[10px] text-amber-300"
                         >
                           {vibeBadgeLabel(v)}

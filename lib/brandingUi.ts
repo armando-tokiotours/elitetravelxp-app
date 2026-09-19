@@ -10,7 +10,8 @@ export type BrandingUiCategory =
   | "quiz_crowd"
   | "concierge"
   | "matcher"
-  | "planner";
+  | "planner"
+  | "value";
 
 export type BrandingUiKey = string;
 
@@ -200,6 +201,24 @@ export const BRANDING_UI_FALLBACKS: Record<string, BrandingUiFallback> = {
     sortOrder: 1,
     ctaPrimary: "Open Budget Planner",
     ctaSecondary: "Back to Builder",
+  },
+  value_proposition: {
+    key: "value_proposition",
+    category: "value",
+    title: "The Elite Travel Difference",
+    subtitle: "Cultural Translation, Not Just Sightseeing",
+    description:
+      "Seamless Logistics: Zero language barriers, no local rule confusion, and VIP crowd navigation.\nCultural Translator: Move beyond Wikipedia facts—understand the deep history, unwritten etiquette, and hidden stories.\nTime & Comfort Optimization: Skip queues, avoid travel friction, and experience Japan at your preferred rhythm.",
+    mediaFallback: "",
+    sortOrder: 0,
+    ctaPrimary: "Explore Elite Experiences",
+    ctaSecondary: "Compare options",
+    inclusionTitle: "Why Book an Elite Specialist?",
+    inclusionBody:
+      "Logistics mastery, culture-to-culture translation, and exclusive access — so you experience Japan without friction, guesswork, or tourist-trap detours.",
+    creditTitle: "Self-Guided (Ticket Only): Photo opportunity & entry.",
+    creditBody:
+      "Elite Guided Experience: Full cultural translation, zero transit friction, and local etiquette masterclass.",
   },
 };
 

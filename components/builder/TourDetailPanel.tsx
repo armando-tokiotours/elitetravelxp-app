@@ -11,6 +11,7 @@ import {
 import { formatUsd } from "@/lib/builder-pricing";
 import { tourLanguageChoices } from "@/lib/tourLanguages";
 import { Globe, MapPinned, ListChecks, Plus, Check } from "lucide-react";
+import { WhyEliteSpecialistNote } from "@/components/branding/WhyEliteSpecialistNote";
 
 type InfoTab = "description" | "route" | "included";
 
@@ -107,7 +108,7 @@ export function TourDetailPanel({
         {mediaUrl && mediaType === "Video" ? (
           /* Target: 1080p · ~1.5Mbps · mp4/webm · <5MB (see lib/mediaStandards.ts) */
           <video
-            key={mediaUrl}
+            key={mediaUrl || `tour-media-${tour.id}`}
             src={mediaUrl}
             autoPlay={mediaActive}
             muted
@@ -190,6 +191,12 @@ export function TourDetailPanel({
           <p className="mt-1.5 text-xs text-[#5C6570]">{hours}h</p>
         ) : null}
 
+        <WhyEliteSpecialistNote
+          showCompare={
+            tour.is_self_guided === true || tour.guide_required === false
+          }
+        />
+
         {!selected ? (
           <div className="mt-3">
             <p className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#C4A35A]">
@@ -197,11 +204,11 @@ export function TourDetailPanel({
               Preferred language
             </p>
             <div className="mt-2 flex flex-wrap gap-1.5">
-              {languageChoices.map(({ name, code }) => {
+              {languageChoices.map(({ name, code }, i) => {
                 const active = pickedLanguage === code;
                 return (
                   <button
-                    key={code}
+                    key={code || `lang-${i}`}
                     type="button"
                     title={name}
                     aria-pressed={active}

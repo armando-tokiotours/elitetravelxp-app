@@ -179,6 +179,33 @@ export const COLLECTIONS: CollectionDef[] = [
         type: "number",
         required: true,
       },
+      {
+        key: "pricing_tier",
+        label: "Pricing tier (Budget Planner)",
+        type: "select",
+        options: ["free", "low_cost", "standard", "luxury"],
+      },
+      {
+        key: "is_self_guided",
+        label: "Self-guided (ticket only / no private guide)",
+        type: "bool",
+      },
+      {
+        key: "guide_required",
+        label: "Guide required",
+        type: "bool",
+      },
+      {
+        key: "base_price_eur",
+        label: "Base ticket / entry (€ per person)",
+        type: "number",
+      },
+      {
+        key: "display_badge",
+        label: "Display badge",
+        type: "select",
+        options: ["FREE / LOW-COST", "POPULAR", "SELF-GUIDED"],
+      },
       { key: "duration_hours", label: "Duration (hours)", type: "number" },
       {
         key: "languages",

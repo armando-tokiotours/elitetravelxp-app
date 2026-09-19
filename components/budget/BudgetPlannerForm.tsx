@@ -18,6 +18,10 @@ import {
 import { useBuilderStore } from "@/store/useBuilderStore";
 import { useSiteBrandingStore } from "@/store/useSiteBrandingStore";
 import { CustomBudgetModal } from "@/components/builder/modals/CustomBudgetModal";
+import {
+  EliteValuePropositionBanner,
+  SelfGuidedEliteCompareCallout,
+} from "@/components/branding/EliteValueProposition";
 
 const PRESETS = [
   { id: "tight", label: "Tight", perDay: 50 },
@@ -198,6 +202,10 @@ export function BudgetPlannerForm() {
           </p>
         </div>
       </header>
+
+      <div className="mt-6">
+        <EliteValuePropositionBanner tone="dark" compact />
+      </div>
 
       <section className="mt-8 rounded-2xl border border-zinc-800 bg-zinc-900/60 p-5 sm:p-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -443,11 +451,12 @@ export function BudgetPlannerForm() {
                     : "";
                 const selected = selectedIds.has(s.tour.id);
                 const tagLabel =
-                  s.tag === "free_or_low"
-                    ? "Free / low-cost"
+                  s.badgeLabel ||
+                  (s.tag === "free_or_low"
+                    ? "FREE / LOW-COST"
                     : s.tag === "value"
                       ? "Fits budget"
-                      : "Stretch";
+                      : "Stretch");
                 return (
                   <div
                     key={s.tour.id}
@@ -476,7 +485,9 @@ export function BudgetPlannerForm() {
                         </h3>
                         <span
                           className={`rounded-full px-2 py-0.5 text-[10px] uppercase tracking-wide ${
-                            s.tag === "free_or_low"
+                            s.tag === "free_or_low" ||
+                            s.badgeLabel === "FREE / LOW-COST" ||
+                            s.badgeLabel === "SELF-GUIDED"
                               ? "bg-emerald-500/15 text-emerald-400"
                               : s.tag === "value"
                                 ? "bg-sky-500/15 text-sky-300"
@@ -491,12 +502,19 @@ export function BudgetPlannerForm() {
                         {s.tour.category === "activity"
                           ? " · Experience"
                           : " · Tour"}
+                        {s.isSelfGuided ? " · Self-guided" : ""}
                       </p>
                       <p className="mt-1 text-sm text-[#C4A35A]">
-                        {s.partyPrice === 0
+                        {s.partyPrice === 0 ||
+                        (s.isSelfGuided && s.partyPrice === 0)
                           ? "Free / self-guided"
-                          : `${formatMoney(s.partyPrice, currency)} party · ${formatMoney(s.perPerson, currency)}/pp`}
+                          : s.isSelfGuided
+                            ? `${formatMoney(s.partyPrice, currency)} ticket · ${formatMoney(s.perPerson, currency)}/pp`
+                            : `${formatMoney(s.partyPrice, currency)} party · ${formatMoney(s.perPerson, currency)}/pp`}
                       </p>
+                      {s.isSelfGuided || s.tag === "free_or_low" ? (
+                        <SelfGuidedEliteCompareCallout tone="dark" />
+                      ) : null}
                     </div>
                     <button
                       type="button"

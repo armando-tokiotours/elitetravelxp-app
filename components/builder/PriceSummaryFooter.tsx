@@ -26,11 +26,11 @@ export function PriceSummaryFooter({
   const hasTarget = customBudgetTarget != null && customBudgetTarget > 0;
 
   return (
-    <div className="no-print sticky-action-bar fixed inset-x-0 bottom-16 z-30 mx-auto mb-2 w-full max-w-xl px-3 md:bottom-4 md:pl-16">
-      <div className="flex flex-col gap-2 overflow-x-hidden">
-        {/* Top — calculated estimate */}
-        <div className="flex items-center justify-between gap-3 rounded-xl border border-zinc-800 bg-zinc-950 px-3.5 py-2.5 shadow-xl">
-          <div className="min-w-0 flex-1">
+    <div className="no-print sticky-action-bar fixed inset-x-0 bottom-16 z-30 mb-2 w-full px-4 md:bottom-4 md:pl-16">
+      <div className="mx-auto flex w-full max-w-5xl flex-row items-stretch justify-between gap-3 overflow-x-hidden">
+        {/* Card 1 — calculated estimate (left) */}
+        <div className="flex flex-1 flex-col justify-between gap-1.5 rounded-xl border border-zinc-800 bg-zinc-950 p-3 shadow-xl">
+          <div className="min-w-0">
             <p className="text-[9px] font-bold uppercase tracking-widest text-amber-500">
               Experience Japan Range
             </p>
@@ -41,8 +41,7 @@ export function PriceSummaryFooter({
             </p>
             {minPerPerson != null && maxPerPerson != null ? (
               <p className="mt-0.5 truncate text-[10px] text-zinc-400">
-                Est. {formatUsd(minPerPerson)} – {formatUsd(maxPerPerson)} /
-                person
+                {formatUsd(minPerPerson)} – {formatUsd(maxPerPerson)} / pax
                 {totalGuests > 0 ? ` · ${totalGuests} guests` : ""}
               </p>
             ) : null}
@@ -51,32 +50,34 @@ export function PriceSummaryFooter({
             type="button"
             disabled={requestDisabled || quoteMin == null}
             onClick={onRequestPay}
-            className="inline-flex shrink-0 items-center gap-1 rounded-lg bg-amber-500 px-3 py-1.5 text-xs font-bold text-zinc-950 transition hover:bg-amber-400 disabled:opacity-60"
+            className="mt-1 flex w-full items-center justify-center gap-1 rounded-lg bg-amber-500 px-3 py-1.5 text-center text-xs font-bold text-zinc-950 transition hover:bg-amber-400 disabled:opacity-60"
           >
             Request & Pay
             <ArrowRight className="h-3.5 w-3.5" aria-hidden />
           </button>
         </div>
 
-        {/* Bottom — target budget → Budget Planner */}
-        <div className="flex items-center justify-between gap-3 rounded-xl border border-zinc-800 bg-zinc-950 px-3.5 py-2.5 shadow-xl">
-          <div className="min-w-0 flex-1">
+        {/* Card 2 — target budget (right) → /budget-planner */}
+        <div className="flex flex-1 flex-col justify-between gap-1.5 rounded-xl border border-zinc-800 bg-zinc-950 p-3 shadow-xl">
+          <div className="min-w-0">
             <p className="text-[9px] font-bold uppercase tracking-widest text-amber-400">
               Your Target Budget
             </p>
-            <p className="mt-0.5 truncate text-xs font-bold text-white">
+            <p className="mt-0.5 truncate text-sm font-extrabold text-white">
               {hasTarget
                 ? `Target: ${formatUsd(customBudgetTarget)}`
-                : "Have a specific budget?"}
+                : "Custom Budget"}
+            </p>
+            <p className="mt-0.5 truncate text-[10px] text-zinc-400">
+              Tailored plan options
             </p>
           </div>
           <Link
             href="/budget-planner"
-            className="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border border-amber-500/40 bg-zinc-900 px-3 py-1.5 text-xs font-bold text-amber-300 transition hover:bg-amber-500 hover:text-zinc-950"
+            className="mt-1 flex w-full items-center justify-center gap-1 rounded-lg border border-amber-500/40 bg-zinc-900 px-3 py-1.5 text-center text-xs font-bold text-amber-300 transition hover:bg-amber-500 hover:text-zinc-950"
           >
-            <span>
-              {hasTarget ? "Edit Target" : "🎯 Set Target Budget"}
-            </span>
+            <span>🎯 Set Budget</span>
+            <ArrowRight className="h-3.5 w-3.5" aria-hidden />
           </Link>
         </div>
       </div>

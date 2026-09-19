@@ -386,6 +386,18 @@ export function SiteBrandingPanel({ getClient }: { getClient: () => PbClient }) 
 
       <div className="rounded-2xl border border-[#C4A35A]/35 bg-[#C4A35A]/10 p-4">
         <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#C4A35A]">
+          Promote · Value Proposition
+        </p>
+        <p className="mt-2 text-sm text-zinc-300">
+          Edit &quot;The Elite Travel Difference&quot; card below (header, core
+          hook, bullets, Why Book copy, and self-guided vs Elite comparison
+          lines). It surfaces on Builder Tours, experience detail modals, and
+          the Budget Planner.
+        </p>
+      </div>
+
+      <div className="rounded-2xl border border-[#C4A35A]/35 bg-[#C4A35A]/10 p-4">
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#C4A35A]">
           Promote · Budget Planner
         </p>
         <p className="mt-2 text-sm text-zinc-300">

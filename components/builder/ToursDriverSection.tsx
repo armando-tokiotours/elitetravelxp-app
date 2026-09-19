@@ -23,6 +23,7 @@ import {
 import { SectionBlock } from "./ui";
 import { ExplainerTriggerButton } from "./ExplainerTriggerButton";
 import { ActivityMatcherBanner } from "./ActivityMatcherBanner";
+import { EliteValuePropositionBanner } from "@/components/branding/EliteValueProposition";
 import { ExperienceProfilerModal } from "@/components/quiz/ExperienceProfilerModal";
 import { ActivityMatchReelModal } from "@/components/modals/ActivityMatchReelModal";
 import { buildTripMatchReelSlides } from "@/lib/matchReel";
@@ -138,6 +139,10 @@ export function ToursDriverSection({
           onOpenQuiz={() => setQuizOpen(true)}
           onWatch={() => setReelOpen(true)}
         />
+      </div>
+
+      <div className="mb-4">
+        <EliteValuePropositionBanner tone="dark" compact />
       </div>
 
       <div className="mb-4 grid grid-cols-2 gap-3">
