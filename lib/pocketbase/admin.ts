@@ -12,9 +12,13 @@ function envVal(key: string): string | undefined {
   return raw;
 }
 
+function sleep(ms: number) {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
 /**
  * Server-only PocketBase client authenticated as admin.
- * Used for PNR uniqueness checks and email+PNR itinerary retrieval.
+ * Retries briefly so cold-start / post-deploy upsert races don't fail APIs.
  *
  * Prefer the Docker-internal URL so auth does not depend on public nginx.
  */
@@ -34,19 +38,28 @@ export async function getAdminPocketBase(): Promise<PocketBase> {
   const pb = new PocketBase(url);
   pb.autoCancellation(false);
 
-  try {
-    await pb.collection("_superusers").authWithPassword(email, password);
-  } catch (err) {
-    console.error(
-      "PocketBase Admin Auth Warning: Ensure superuser upsert script has executed.",
-      err
-    );
-    const msg = err instanceof Error ? err.message : String(err);
-    throw new Error(
-      `PocketBase admin auth failed against ${url}: ${msg}. ` +
-        `After pb:push, run: docker exec elite-pocketbase ./pocketbase superuser upsert "$PB_ADMIN_EMAIL" "$PB_ADMIN_PASSWORD"`
-    );
+  let lastErr: unknown;
+  for (let attempt = 1; attempt <= 5; attempt++) {
+    try {
+      await pb.collection("_superusers").authWithPassword(email, password);
+      return pb;
+    } catch (err) {
+      lastErr = err;
+      console.warn(
+        `[getAdminPocketBase] auth attempt ${attempt}/5 failed — retrying…`,
+        err instanceof Error ? err.message : err
+      );
+      await sleep(400 * attempt);
+    }
   }
 
-  return pb;
+  console.error(
+    "PocketBase Admin Auth Warning: Ensure superuser upsert script has executed.",
+    lastErr
+  );
+  const msg = lastErr instanceof Error ? lastErr.message : String(lastErr);
+  throw new Error(
+    `PocketBase admin auth failed against ${url}: ${msg}. ` +
+      `After pb:push, run: docker exec elite-pocketbase ./pocketbase superuser upsert "$PB_ADMIN_EMAIL" "$PB_ADMIN_PASSWORD"`
+  );
 }

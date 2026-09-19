@@ -521,30 +521,8 @@ function TourThumb({
       )}
       <span className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-0 transition group-hover:opacity-100" />
       {recommended ? (
-        <span className="absolute left-1 top-1 z-10 rounded-full border border-amber-500/30 bg-amber-500/10 px-1.5 py-0.5 text-[8px] font-medium text-amber-400">
+        <span className="absolute left-1 top-1 z-10 flex items-center gap-1 rounded-full bg-amber-500/90 px-2 py-0.5 text-[10px] font-bold text-zinc-950 shadow-md">
           ⭐ Match
-        </span>
-      ) : null}
-      {String(tour.category || "tour").toLowerCase() === "activity" ? (
-        <span
-          className={`absolute z-10 rounded-full border border-violet-500/30 bg-violet-500/15 px-1.5 py-0.5 text-[8px] font-medium text-violet-200 ${
-            recommended ? "left-1 top-6" : "left-1 top-1"
-          }`}
-        >
-          🎟️ Experience
-        </span>
-      ) : (
-        <span
-          className={`absolute z-10 rounded-full border border-amber-500/30 bg-amber-500/15 px-1.5 py-0.5 text-[8px] font-medium text-amber-200 ${
-            recommended ? "left-1 top-6" : "left-1 top-1"
-          }`}
-        >
-          🗺️ Tour
-        </span>
-      )}
-      {tour.is_niche ? (
-        <span className="absolute right-1 bottom-1 z-10 rounded-full border border-purple-500/30 bg-purple-500/10 px-1.5 py-0.5 text-[8px] font-medium text-purple-300">
-          ✨ VIP
         </span>
       ) : null}
       {isVideo ? (

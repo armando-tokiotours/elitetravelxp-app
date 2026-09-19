@@ -17,7 +17,8 @@ function envVal(key: string): string | undefined {
 
 /**
  * Accepts REVOLUT_MERCHANT_SECRET_KEY (preferred) or legacy REVOLUT_SECRET_KEY.
- * No hardcoded fake key — a placeholder would still fail Revolut auth.
+ * Sandbox/live is selected by NEXT_PUBLIC_REVOLUT_MODE (default sandbox).
+ * Never hardcode a fake sk_* key — missing env returns empty and the route 503s.
  */
 export function getRevolutMerchantSecret(): string {
   return (
