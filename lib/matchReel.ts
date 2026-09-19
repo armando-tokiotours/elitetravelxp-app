@@ -5,6 +5,7 @@ import {
   tourPhoto,
   type PbTour,
 } from "@/lib/pocketbase/client";
+import { PB_THUMBS } from "@/lib/mediaThumbs";
 import { resolveTourTags } from "@/types/experience";
 import {
   isBestMatchTour,
@@ -57,13 +58,13 @@ export function paceBadgeLabel(pace: string): string {
 function tourImageUrl(tour: PbTour): string {
   const thumb = tourPhoto(tour);
   if (thumb && tour.collectionId) {
-    return pbFileUrl(tour.collectionId, tour.id, thumb, "800x1200");
+    return pbFileUrl(tour.collectionId, tour.id, thumb, PB_THUMBS.reel);
   }
   const media = tourMediaFile(tour);
   if (media && tour.collectionId && tourMediaType(tour) !== "Video") {
-    return pbFileUrl(tour.collectionId, tour.id, media, "800x1200");
+    return pbFileUrl(tour.collectionId, tour.id, media, PB_THUMBS.reel);
   }
-  return "/images/matcher-poster.webp";
+  return "/images/matcher-poster-card.webp";
 }
 
 function tourVideoUrl(tour: PbTour): string | undefined {

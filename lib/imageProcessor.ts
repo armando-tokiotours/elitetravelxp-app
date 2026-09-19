@@ -23,7 +23,8 @@ export interface ProcessedImageResult {
 export interface OptimizedUpload {
   buffer: Buffer;
   filename: string;
-  contentType: "image/webp";
+  /** JPEG for PocketBase thumb generation (PB 0.25 cannot thumb WebP reliably) */
+  contentType: "image/jpeg";
   width: number;
   height: number;
   bytes: number;
@@ -79,8 +80,9 @@ export async function processAndSaveImage(
 
 /**
  * Compress an upload for PocketBase storage.
- * Caps at hero size, converts to WebP, strips metadata.
- * Keeps original extension replaced with .webp so records stay lean.
+ * Caps at hero size, outputs JPEG (mozjpeg) so PB can generate ?thumb= variants.
+ * (PocketBase 0.25 returns the original file when thumb sizes aren't registered
+ * or when the source is WebP without thumb support.)
  */
 export async function optimizeUploadImage(
   fileBuffer: Buffer,
@@ -97,14 +99,14 @@ export async function optimizeUploadImage(
   });
 
   const { data, info } = await pipeline
-    .webp({ quality, effort: 4 })
+    .jpeg({ quality, mozjpeg: true })
     .toBuffer({ resolveWithObject: true });
 
   const base = path.parse(originalName).name || "upload";
   return {
     buffer: data,
-    filename: `${base}.webp`,
-    contentType: "image/webp",
+    filename: `${base}.jpg`,
+    contentType: "image/jpeg",
     width: info.width,
     height: info.height,
     bytes: data.byteLength,

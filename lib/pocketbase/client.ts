@@ -68,7 +68,9 @@ export function pbFileUrl(
 ): string {
   if (!filename) return "";
   const base = `${getPbBaseUrl()}/api/files/${collectionIdOrName}/${recordId}/${encodeURIComponent(filename)}`;
-  return thumb ? `${base}?thumb=${thumb}` : base;
+  if (!thumb) return base;
+  // Thumb sizes must be registered on the file field (see migration 1740000035).
+  return `${base}?thumb=${encodeURIComponent(thumb)}`;
 }
 
 /** Prefer new field names; fall back to legacy columns during migration. */
@@ -743,6 +745,24 @@ export async function fetchBuilderConfig(): Promise<BuilderConfig> {
     seasonTiers,
     branding: brandingRows[0] ?? null,
     rules,
+  };
+}
+
+/** Slim catalog for Discover — cities + tours only (no hotels/rates payload). */
+export interface DiscoverConfig {
+  cities: PbCity[];
+  tours: PbTour[];
+}
+
+export async function fetchDiscoverConfig(): Promise<DiscoverConfig> {
+  const pb = getPocketBase();
+  const [citiesRaw, toursRaw] = await Promise.all([
+    pb.collection("cities").getFullList<PbCity>({ sort: "sort_order,name" }),
+    pb.collection("tours").getFullList<PbTour>({ sort: "title" }),
+  ]);
+  return {
+    cities: citiesRaw.filter((c) => c.is_active !== false),
+    tours: toursRaw.filter((t) => t.is_active !== false),
   };
 }
 

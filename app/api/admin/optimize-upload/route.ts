@@ -1,8 +1,7 @@
 /**
  * POST /api/admin/optimize-upload
- * Compresses an image to WebP (max 1920×1080) for Team Access → PocketBase uploads.
- * Body: multipart form field `file`
- * Response: image/webp binary with X-Optimized-* headers
+ * Compresses an image to JPEG ≤1920×1080 for Team Access → PocketBase uploads.
+ * JPEG (not WebP) so PocketBase can generate registered ?thumb= sizes.
  */
 import { NextRequest, NextResponse } from "next/server";
 import {
@@ -34,12 +33,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Empty file" }, { status: 400 });
     }
 
-    // Skip tiny already-optimized assets
-    if (buf.byteLength < 50_000 && file.type === "image/webp") {
+    // Skip tiny already-optimized JPEGs
+    if (buf.byteLength < 50_000 && file.type === "image/jpeg") {
       return new NextResponse(buf, {
         status: 200,
         headers: {
-          "Content-Type": "image/webp",
+          "Content-Type": "image/jpeg",
           "X-Optimized-Filename": file.name,
           "X-Optimized-Skipped": "1",
           "X-Optimized-Bytes": String(buf.byteLength),

@@ -9,6 +9,7 @@ import {
 } from "@/lib/experienceProfiler";
 import type { UserTravelProfile } from "@/store/useItineraryStore";
 import type { PbTour } from "@/lib/pocketbase/client";
+import { LazyVideo } from "@/components/ui/LazyVideo";
 
 function conciergeAdvice(
   cityName: string,
@@ -143,13 +144,11 @@ export function DiscoverMatchesPanel({
         ) : null}
 
         <div className="relative aspect-video overflow-hidden rounded-xl border border-zinc-800">
-          {/* Target: 1080p · ~1.5Mbps · mp4 · <5MB (see lib/mediaStandards.ts) */}
-          <video
+          <LazyVideo
             src="/videos/activity-matcher-guide.mp4"
+            poster="/images/matcher-poster-card.webp"
             controls
             playsInline
-            preload="metadata"
-            poster="/images/matcher-poster.webp"
             className="h-full w-full object-cover"
           />
         </div>

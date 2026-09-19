@@ -1,9 +1,11 @@
 "use client";
 
 import { Play, Target } from "lucide-react";
+import { MediaImage } from "@/components/ui/MediaImage";
 
 /**
  * Discover-only matcher CTA — sits below the tour/experience photo grid.
+ * Poster-only (no video) until the user opens Match Reel / Matches panel.
  */
 export function ActivityMatcherVideoCard({
   onOpenQuiz,
@@ -15,13 +17,12 @@ export function ActivityMatcherVideoCard({
   return (
     <div className="overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-950 shadow-lg">
       <div className="relative aspect-[21/9] min-h-[8rem] w-full sm:aspect-[2.4/1]">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src="/images/matcher-poster.webp"
+        <MediaImage
+          src="/images/matcher-poster-card.webp"
           alt=""
-          loading="lazy"
-          decoding="async"
-          className="absolute inset-0 h-full w-full object-cover opacity-65"
+          fill
+          sizes="(max-width: 768px) 100vw, 640px"
+          className="object-cover opacity-65"
         />
         <div className="absolute inset-0 bg-gradient-to-r from-black/90 via-black/65 to-black/35" />
         <div className="absolute inset-0 flex flex-col justify-center gap-3 px-4 py-3 sm:px-5">

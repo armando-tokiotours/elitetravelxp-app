@@ -20,11 +20,13 @@ export function isOptimizableImage(file: {
   return /\.(jpe?g|png|webp|gif|avif|tiff?)$/i.test(name);
 }
 
-/** PocketBase `?thumb=` sizes used across the app. */
+/** PocketBase `?thumb=` sizes used across the app (must match migration 1740000035). */
 export const PB_THUMBS = {
-  pill: "120x120",
-  chip: "100x100",
-  card: "600x400",
+  pill: "100x100",
+  chip: "120x120",
+  card: "400x400",
+  cardWide: "600x400",
   banner: "800x400",
+  reel: "800x1200",
   hero: "1920x1080",
 } as const;

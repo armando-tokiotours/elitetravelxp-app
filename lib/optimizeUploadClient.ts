@@ -5,9 +5,8 @@ import { isOptimizableImage } from "@/lib/mediaThumbs";
 
 export async function optimizeFileForUpload(file: File): Promise<File> {
   if (!isOptimizableImage(file)) return file;
-  // Skip videos and already-small webps
   if (file.type.startsWith("video/")) return file;
-  if (file.type === "image/webp" && file.size < 80_000) return file;
+  if (file.type === "image/jpeg" && file.size < 80_000) return file;
 
   try {
     const fd = new FormData();
@@ -23,8 +22,10 @@ export async function optimizeFileForUpload(file: File): Promise<File> {
     const blob = await res.blob();
     const name =
       res.headers.get("X-Optimized-Filename") ||
-      file.name.replace(/\.[^.]+$/, ".webp");
-    return new File([blob], name, { type: "image/webp" });
+      file.name.replace(/\.[^.]+$/, ".jpg");
+    return new File([blob], name, {
+      type: res.headers.get("Content-Type") || "image/jpeg",
+    });
   } catch (e) {
     console.warn("[optimizeFileForUpload] failed, using original", e);
     return file;

@@ -4,15 +4,16 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   cityPhoto,
-  fetchBuilderConfig,
+  fetchDiscoverConfig,
   pbFileUrl,
   tourMediaType,
   tourPhoto,
   tourPrice,
-  type BuilderConfig,
+  type DiscoverConfig,
   type PbCity,
   type PbTour,
 } from "@/lib/pocketbase/client";
+import { PB_THUMBS } from "@/lib/mediaThumbs";
 import { chauffeurDaysForCity } from "@/lib/dateCascade";
 import {
   canAddTourOnDate,
@@ -36,7 +37,7 @@ import { Play } from "lucide-react";
 type ProfileTab = "tours" | "experiences" | "matches";
 
 export function DiscoverFeed() {
-  const [config, setConfig] = useState<BuilderConfig | null>(null);
+  const [config, setConfig] = useState<DiscoverConfig | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedCityId, setSelectedCityId] = useState<string | null>(null);
   const [profileTab, setProfileTab] = useState<ProfileTab>("tours");
@@ -64,11 +65,10 @@ export function DiscoverFeed() {
 
   useEffect(() => {
     useBuilderStore.persist.rehydrate();
-    fetchBuilderConfig()
+    fetchDiscoverConfig()
       .then((data) => {
         setConfig(data);
-        const active = data.cities.filter((c) => c.is_active !== false);
-        if (active[0]) setSelectedCityId(active[0].id);
+        if (data.cities[0]) setSelectedCityId(data.cities[0].id);
       })
       .catch(() => setConfig(null))
       .finally(() => setLoading(false));
@@ -89,16 +89,11 @@ export function DiscoverFeed() {
     setModalSlide(null);
   }, [profileTab]);
 
-  const cities = useMemo(
-    () => (config?.cities ?? []).filter((c) => c.is_active !== false),
-    [config]
-  );
+  const cities = useMemo(() => config?.cities ?? [], [config]);
 
   const cityTours = useMemo(() => {
     if (!selectedCityId || !config) return [];
-    return config.tours.filter(
-      (t) => t.city_id === selectedCityId && t.is_active !== false
-    );
+    return config.tours.filter((t) => t.city_id === selectedCityId);
   }, [config, selectedCityId]);
 
   /** Guided tours vs activities for Discover tabs */
@@ -229,7 +224,7 @@ export function DiscoverFeed() {
               selectedCity.collectionId,
               selectedCity.id,
               filename,
-              "200x200"
+              PB_THUMBS.chip
             )
           : "";
       })()
@@ -479,13 +474,10 @@ function TourThumb({
 }) {
   const isVideo = tourMediaType(tour) === "Video";
   const thumbFile = tourPhoto(tour);
-  const mediaFile = tour.media_file || tour.cover_photo || tour.image || "";
   const thumbUrl =
     thumbFile && tour.collectionId
-      ? pbFileUrl(tour.collectionId, tour.id, thumbFile, "600x400")
-      : mediaFile && tour.collectionId && !isVideo
-        ? pbFileUrl(tour.collectionId, tour.id, mediaFile, "600x400")
-        : "";
+      ? pbFileUrl(tour.collectionId, tour.id, thumbFile, PB_THUMBS.card)
+      : "";
 
   return (
     <button
@@ -499,18 +491,11 @@ function TourThumb({
         <img
           src={thumbUrl}
           alt=""
+          width={400}
+          height={400}
           loading="lazy"
           decoding="async"
           className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.03] group-hover:opacity-90"
-        />
-      ) : isVideo && mediaFile && tour.collectionId ? (
-        /* Target: 1080p · ~1.5Mbps · mp4/webm · <5MB (see lib/mediaStandards.ts) */
-        <video
-          src={pbFileUrl(tour.collectionId, tour.id, mediaFile)}
-          muted
-          playsInline
-          preload="metadata"
-          className="h-full w-full object-cover"
         />
       ) : (
         <div className="flex h-full w-full items-end bg-gradient-to-br from-[#1a3355] to-[#0B1F3A] p-2">
@@ -539,7 +524,6 @@ function TourThumb({
           Added
         </span>
       ) : null}
-      {/* Subtle glass title — reveals on hover */}
       <div className="pointer-events-none absolute inset-x-3 bottom-3 z-20 translate-y-2 opacity-0 transition-all duration-300 group-hover:translate-y-0 group-hover:opacity-100">
         <div className="flex items-center justify-center rounded-lg border border-amber-500/30 bg-zinc-950/75 px-3 py-1.5 shadow-2xl backdrop-blur-md">
           <span className="truncate text-center text-[10px] font-bold uppercase tracking-widest text-amber-300">
@@ -566,7 +550,7 @@ function CityStory({
   const filename = cityPhoto(city);
   const src =
     filename && city.collectionId
-      ? pbFileUrl(city.collectionId, city.id, filename, "120x120")
+      ? pbFileUrl(city.collectionId, city.id, filename, PB_THUMBS.pill)
       : "";
 
   return (
