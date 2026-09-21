@@ -74,14 +74,19 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
   },
   {
     id: "admin",
-    href: "/team-access",
+    href: "/admin",
     label: "Team Access / Admin",
     icon: Settings,
   },
 ];
 
+function isAdminPath(pathname: string): boolean {
+  return pathname === "/admin" || pathname.startsWith("/admin/");
+}
+
 function isNavActive(pathname: string, item: AppNavItem): boolean {
   if (!item.href) return false;
+  if (item.id === "admin") return isAdminPath(pathname) || pathname.startsWith("/team-access");
   if (item.href === "/builder") return pathname === "/builder";
   if (item.href === "/discover") return pathname.startsWith("/discover");
   if (item.href === "/budget-planner")
@@ -216,12 +221,18 @@ function NavLinkList({
                   }`
             }
           >
-            <Icon
-              className={`h-5 w-5 shrink-0 ${
-                active ? "text-[#D9BB96]" : "text-zinc-500"
-              }`}
-              aria-hidden
-            />
+            {item.id === "admin" ? (
+              <span className="text-base leading-none" aria-hidden>
+                ⚙️
+              </span>
+            ) : (
+              <Icon
+                className={`h-5 w-5 shrink-0 ${
+                  active ? "text-[#D9BB96]" : "text-zinc-500"
+                }`}
+                aria-hidden
+              />
+            )}
             {variant === "drawer" ? (
               <span className={active ? "font-semibold" : ""}>{label}</span>
             ) : (
@@ -304,7 +315,7 @@ function AccountFooter({
           </div>
         </button>
         <Link
-          href="/team-access"
+          href="/admin"
           className="mt-3 flex items-center justify-between px-1 py-2 text-xs text-zinc-400 transition hover:text-white"
         >
           <span>Team Access</span>
@@ -384,13 +395,13 @@ function AccountFooter({
         </NavLabel>
       </button>
       <Link
-        href="/team-access"
-        title="Team sign-in"
+        href="/admin"
+        title="Team Access / Admin"
         className={`mt-1 flex items-center gap-2 rounded-xl py-2 text-sm text-zinc-400 transition hover:bg-zinc-900 hover:text-white ${railBtnLayout}`}
       >
         <Settings className="h-4 w-4 shrink-0" aria-hidden />
         <NavLabel rail={rail} expanded={expanded}>
-          Team sign-in
+          Team Access / Admin
         </NavLabel>
       </Link>
     </div>

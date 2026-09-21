@@ -35,6 +35,8 @@ RUN addgroup --system --gid 1001 nodejs \
 COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+# Writable team email settings (SMTP / BCC / templates)
+COPY --from=builder --chown=nextjs:nodejs /app/config ./config
 
 USER nextjs
 

@@ -50,7 +50,7 @@ export default function HomePage() {
             Open Trip Builder
           </Link>
           <Link
-            href="/team-access"
+            href="/admin"
             className="rounded-full border border-[#0B1F3A]/30 px-8 py-3.5 text-sm font-semibold tracking-[0.12em] text-[#0B1F3A] uppercase transition hover:border-[#B85304] hover:text-[#B85304]"
           >
             Team Access

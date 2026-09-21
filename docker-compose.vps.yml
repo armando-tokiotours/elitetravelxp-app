@@ -20,6 +20,9 @@ services:
       POCKETBASE_URL: http://pocketbase:8090
     ports:
       - "3200:3000"
+    volumes:
+      # Persist Team Email Settings across rebuilds
+      - ./config/emailConfig.json:/app/config/emailConfig.json
     depends_on:
       - pocketbase
     networks:

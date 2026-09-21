@@ -133,7 +133,10 @@ export function TravelDossierView({
   };
 
   return (
-    <div className="w-full space-y-0 overflow-hidden px-0">
+    <div
+      id="itinerary-dossier-view"
+      className="w-full space-y-0 overflow-hidden px-0"
+    >
       <section className="overflow-hidden rounded-2xl bg-[#0B1F3A] text-white shadow-[0_12px_40px_rgba(11,31,58,0.25)]">
         <div className="border-b border-dashed border-white/20 px-4 py-4 sm:px-5">
           <div className="min-w-0 overflow-hidden">

@@ -1,5 +1,10 @@
 import { Resend } from "resend";
 import nodemailer from "nodemailer";
+import {
+  getActiveEmailConfig,
+  resolveTeamBcc,
+  resolveTeamMailFrom,
+} from "@/lib/emailConfigStore";
 import { resolveResendApiKey } from "@/lib/email";
 
 export type SendMailAttachment = {
@@ -18,65 +23,33 @@ export type SendMailInput = {
   bcc?: string | string[];
 };
 
-/** Always notified on client quotation emails. */
+/** Always notified on client quotation emails (from active team config). */
 export const TOKIO_TOURS_QUOTE_BCC = "armando@tokiotours.nl";
-
-/** Strip accidental surrounding quotes from .env values. */
-function envVal(key: string): string | undefined {
-  const raw = process.env[key]?.trim();
-  if (!raw) return undefined;
-  if (
-    (raw.startsWith('"') && raw.endsWith('"')) ||
-    (raw.startsWith("'") && raw.endsWith("'"))
-  ) {
-    return raw.slice(1, -1).trim() || undefined;
-  }
-  return raw;
-}
-
-function mailFrom(): string {
-  return (
-    envVal("MAIL_FROM") ||
-    envVal("SMTP_FROM") ||
-    "TokioTours <noreply@tokiotours.nl>"
-  );
-}
-
-/**
- * BCC list: always include armando@tokiotours.nl, plus optional env /
- * per-call extras (BUSINESS_CONCIERGE_EMAIL or QUOTE_BCC_EMAIL).
- */
-function resolveBcc(extra?: string | string[]): string[] {
-  const set = new Set<string>();
-  set.add(TOKIO_TOURS_QUOTE_BCC.toLowerCase());
-
-  const fromEnv = envVal("QUOTE_BCC_EMAIL") || envVal("BUSINESS_CONCIERGE_EMAIL");
-  if (fromEnv) set.add(fromEnv.toLowerCase());
-
-  for (const addr of Array.isArray(extra) ? extra : extra ? [extra] : []) {
-    const t = addr.trim().toLowerCase();
-    if (t) set.add(t);
-  }
-
-  return Array.from(set);
-}
 
 function resolveBccForRecipients(
   to: string[],
   extra?: string | string[]
 ): string[] {
+  const cfg = getActiveEmailConfig();
+  const base = resolveTeamBcc(to, cfg);
+  const set = new Set(base);
   const toLower = new Set(to.map((a) => a.trim().toLowerCase()).filter(Boolean));
-  return resolveBcc(extra).filter((b) => !toLower.has(b));
+  for (const addr of Array.isArray(extra) ? extra : extra ? [extra] : []) {
+    const t = addr.trim().toLowerCase();
+    if (t && !toLower.has(t)) set.add(t);
+  }
+  return Array.from(set);
 }
 
 /**
- * Prefer Resend SDK when RESEND_API_KEY is set; otherwise SMTP.
+ * Prefer Resend SDK when RESEND_API_KEY is set; otherwise SMTP from team config.
  * Client receives the PDF; TokioTours team gets an automatic BCC.
  */
 export async function sendTransactionalMail(
   input: SendMailInput
 ): Promise<{ sent: boolean; reason?: string; id?: string; bcc?: string[] }> {
-  const from = mailFrom();
+  const cfg = getActiveEmailConfig();
+  const from = resolveTeamMailFrom(cfg);
   const to = Array.isArray(input.to) ? input.to : [input.to];
   const bcc = resolveBccForRecipients(to, input.bcc);
   const resendKey = resolveResendApiKey();
@@ -102,21 +75,13 @@ export async function sendTransactionalMail(
     return { sent: true, id: data?.id, bcc };
   }
 
-  const smtpHost = envVal("SMTP_HOST");
-  if (smtpHost) {
-    const port = Number(process.env.SMTP_PORT || 587);
-    const secure = process.env.SMTP_SECURE === "true" || port === 465;
+  const { host, port, user, pass, secure } = cfg.smtp;
+  if (host && user && pass) {
     const transporter = nodemailer.createTransport({
-      host: smtpHost,
+      host,
       port,
       secure,
-      auth:
-        envVal("SMTP_USER") && envVal("SMTP_PASS")
-          ? {
-              user: envVal("SMTP_USER")!,
-              pass: envVal("SMTP_PASS")!,
-            }
-          : undefined,
+      auth: { user, pass },
     });
 
     await transporter.sendMail({
@@ -138,7 +103,7 @@ export async function sendTransactionalMail(
   return {
     sent: false,
     reason:
-      "Mail not configured. Set RESEND_API_KEY (or SMTP_HOST + SMTP_USER/SMTP_PASS).",
+      "Mail not configured. Check Team Email Settings / SMTP_* env or RESEND_API_KEY.",
   };
 }
 

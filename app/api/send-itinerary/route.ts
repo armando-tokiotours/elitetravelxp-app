@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
+import { TEAM_EMAIL_CONFIG } from "@/lib/emailConfigStore";
 import {
   MailDispatchError,
-  resolveResendApiKey,
+  resolveMailConfigured,
   sendItineraryEmail,
 } from "@/lib/email";
 import { handleSendItinerary } from "@/lib/sendItinerary";
@@ -9,11 +10,9 @@ import { handleSendItinerary } from "@/lib/sendItinerary";
 /**
  * POST /api/send-itinerary
  *
- * Mode A (spec): { email, bookingRef, pdfBase64?, customerName? }
- *   → email PDF via Resend (BCC armando@tokiotours.nl)
- *
- * Mode B (builder): { contactEmail, state, quote, … }
- *   → save PNR, generate PDF server-side, then email
+ * Mode A: { email, bookingRef, pdfBase64?, customerName? } → Hostinger SMTP / Resend
+ * Mode B: { contactEmail, state, quote, pdfBase64?, … } → save PNR + email
+ * Credentials / templates / BCC from config/emailConfig.json (Team Email Settings).
  */
 export async function POST(req: Request) {
   const contentType = req.headers.get("content-type") || "";
@@ -31,7 +30,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
   }
 
-  // Mode B: full builder save + server PDF (PrintRequestModal)
+  // Mode B: full builder save + email (PrintRequestModal / SendPdfModal)
   if (body.state && typeof body.state === "object") {
     return handleSendItinerary(
       new Request(req.url, {
@@ -44,10 +43,12 @@ export async function POST(req: Request) {
 
   // Mode A: direct email dispatch with client-supplied PDF
   try {
-    const apiKey = resolveResendApiKey();
-    if (!apiKey || !apiKey.startsWith("re_")) {
+    if (!resolveMailConfigured()) {
       return NextResponse.json(
-        { error: "Resend API Key missing on server environment." },
+        {
+          error:
+            "Mail not configured. Check TEAM_EMAIL_CONFIG / SMTP_* env or RESEND_API_KEY.",
+        },
         { status: 401 }
       );
     }
@@ -57,13 +58,19 @@ export async function POST(req: Request) {
       .toLowerCase();
     const bookingRef = String(body.bookingRef || "").trim();
     const customerName = String(
-      body.customerName || body.contactName || ""
+      body.customerName || body.contactName || body.fullName || ""
     ).trim();
     const pdfBase64 = String(body.pdfBase64 || "").trim();
 
-    if (!email || !bookingRef) {
+    if (!email) {
       return NextResponse.json(
-        { error: "Missing required parameters: email or bookingRef" },
+        { error: "Email address is required" },
+        { status: 400 }
+      );
+    }
+    if (!bookingRef) {
+      return NextResponse.json(
+        { error: "Missing required parameter: bookingRef" },
         { status: 400 }
       );
     }
@@ -81,19 +88,17 @@ export async function POST(req: Request) {
 
     return NextResponse.json({
       success: true,
-      message: "Itinerary sent successfully",
+      message: `Proposal emailed successfully to guest & team (${TEAM_EMAIL_CONFIG.routing.bccRecipient})!`,
       id: result.id,
     });
   } catch (err: unknown) {
-    console.error("Server Email Dispatch Failure:", err);
+    console.error("Hostinger SMTP Dispatch Error:", err);
     if (err instanceof MailDispatchError) {
-      console.error("Resend API Error:", err.message);
       return NextResponse.json({ error: err.message }, { status: err.status });
     }
     const message =
-      err instanceof Error ? err.message : "Failed to send email";
-    console.error("Resend API Error:", message);
-    const status = /auth|api key|unauthorized|forbidden/i.test(message)
+      err instanceof Error ? err.message : "Failed to dispatch email";
+    const status = /auth|api key|unauthorized|forbidden|smtp/i.test(message)
       ? 401
       : 500;
     return NextResponse.json({ error: message }, { status });

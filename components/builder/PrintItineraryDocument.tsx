@@ -109,6 +109,7 @@ export function PrintItineraryDocument({
 
   return (
     <div
+      id="itinerary-dossier-view"
       className={`print-document text-[#0B1F3A] ${
         embedded ? "" : "min-h-screen bg-[#F5F0E8]"
       }`}

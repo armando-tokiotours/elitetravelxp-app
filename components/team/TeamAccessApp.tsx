@@ -1,6 +1,7 @@
 "use client";
 
 import type PocketBase from "pocketbase";
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import {
   COLLECTIONS,
@@ -29,6 +30,7 @@ import { SiteBrandingPanel } from "@/components/team/SiteBrandingPanel";
 import { HotelRatesUploader } from "@/components/team/HotelRatesUploader";
 import { SeasonalityPanel } from "@/components/team/SeasonalityPanel";
 import { ToursCsvSync } from "@/components/team/ToursCsvSync";
+import { TeamConfigDashboard } from "@/components/team/TeamConfigDashboard";
 import { formatTourTierSummary } from "@/lib/tourPricing";
 import { optimizeFileForUpload } from "@/lib/optimizeUploadClient";
 
@@ -71,7 +73,12 @@ function TeamShell({
 export function TeamAccessApp() {
   const [ready, setReady] = useState(false);
   const [tab, setTab] = useState<
-    "truth" | "rules" | "seasonality" | "users" | "branding"
+    | "truth"
+    | "rules"
+    | "seasonality"
+    | "users"
+    | "branding"
+    | "email_settings"
   >("truth");
   const isAuthenticated = useTeamAuth((s) => s.isAuthenticated);
   const email = useTeamAuth((s) => s.email);
@@ -176,20 +183,39 @@ export function TeamAccessApp() {
   return (
     <TeamShell title="Admin">
       <main className="mx-auto max-w-5xl px-4 py-6 sm:px-6">
-        <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-          <p className="text-sm text-zinc-400">
-            Signed in as <span className="text-zinc-100">{email}</span>
-          </p>
-          <button
-            type="button"
-            onClick={logout}
-            className="rounded-full border border-zinc-700 px-4 py-1.5 text-sm text-zinc-300 transition hover:border-zinc-500 hover:text-white"
-          >
-            Sign out
-          </button>
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-zinc-800/80 pb-4">
+          <div className="flex flex-wrap items-center gap-3">
+            <Link
+              href="/admin"
+              className="flex items-center gap-1.5 rounded-xl border border-zinc-800 bg-[#1C1C1E] px-3.5 py-1.5 text-xs font-bold text-zinc-300 transition hover:border-[#B85304] hover:text-white"
+            >
+              <span aria-hidden>←</span>
+              <span>Back to Leads / Admin</span>
+            </Link>
+            <Link
+              href="/builder"
+              className="flex items-center gap-1.5 rounded-xl border border-zinc-800 bg-[#1C1C1E] px-3.5 py-1.5 text-xs font-bold text-zinc-400 transition hover:border-[#B85304] hover:text-white"
+            >
+              <span aria-hidden>🏠</span>
+              <span>Exit to Trip Builder</span>
+            </Link>
+          </div>
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="text-xs text-zinc-400">
+              Signed in as{" "}
+              <strong className="text-white">{email}</strong>
+            </span>
+            <button
+              type="button"
+              onClick={logout}
+              className="rounded-xl border border-zinc-800 bg-[#1C1C1E] px-3 py-1.5 text-xs font-bold text-zinc-300 transition hover:text-red-400"
+            >
+              Sign out
+            </button>
+          </div>
         </div>
 
-        <div className="mb-6 inline-flex flex-wrap gap-1.5 rounded-2xl border border-zinc-800 bg-zinc-900/60 p-1.5">
+        <div className="mb-6 flex flex-wrap gap-2">
           <TabButton active={tab === "truth"} onClick={() => setTab("truth")}>
             Source of Truth
           </TabButton>
@@ -211,6 +237,13 @@ export function TeamAccessApp() {
           <TabButton active={tab === "users"} onClick={() => setTab("users")}>
             Users
           </TabButton>
+          <TabButton
+            active={tab === "email_settings"}
+            onClick={() => setTab("email_settings")}
+          >
+            <span aria-hidden>✉️</span>
+            <span>Email Settings</span>
+          </TabButton>
         </div>
 
         {tab === "truth" ? (
@@ -221,6 +254,8 @@ export function TeamAccessApp() {
           <SeasonalityPanel getClient={getClient} />
         ) : tab === "branding" ? (
           <SiteBrandingPanel getClient={getClient} />
+        ) : tab === "email_settings" ? (
+          <TeamConfigDashboard />
         ) : (
           <UsersPanel getClient={getClient} currentEmail={email} />
         )}
@@ -242,10 +277,10 @@ function TabButton({
     <button
       type="button"
       onClick={onClick}
-      className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${
+      className={`flex items-center gap-2 rounded-xl border px-4 py-2 text-xs font-bold transition ${
         active
-          ? "bg-accent-500 font-bold text-zinc-950"
-          : "border border-zinc-800 bg-zinc-900/80 text-zinc-400 hover:text-white"
+          ? "border-[#B85304] bg-[#B85304] text-white shadow-md"
+          : "border-zinc-800 bg-[#1C1C1E] text-zinc-300 hover:bg-[#1C1C1E] hover:text-white"
       }`}
     >
       {children}

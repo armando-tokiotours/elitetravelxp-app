@@ -153,8 +153,8 @@ export function BuilderApp() {
         brandTitle="Builder"
         expandOnHover
       />
-      <div className={`${APP_SIDEBAR_RAIL_PAD} min-h-screen bg-[#000000]`}>
-        <div className="builder-theme relative min-h-screen bg-[#000000] text-white [color-scheme:dark]">
+      <div className={`${APP_SIDEBAR_RAIL_PAD} min-h-screen bg-[#121212]`}>
+        <div className="builder-theme relative min-h-screen bg-[#121212] text-white [color-scheme:dark]">
           {/* Mobile-only top chrome — never shown on md+ (sidebar is primary) */}
           <header className="absolute inset-x-0 top-0 z-40 flex items-center gap-2 border-b border-white/10 bg-[#000000]/70 px-4 py-3 backdrop-blur-md lg:hidden">
             <MobileAppNav
@@ -174,14 +174,14 @@ export function BuilderApp() {
             </button>
           </header>
 
-          <div className="relative">
+          <div className="relative bg-[#121212]">
             <BuilderHero branding={config?.branding ?? null} />
 
-            {/* Full-width Jet Black shell — masks any hero photo leak past card margins */}
-            <div className="relative z-20 w-full bg-[#000000]">
-              <div className="-mt-14 px-3 pb-8 sm:-mt-16 sm:px-4">
-                <div className="mx-auto max-w-3xl rounded-t-3xl border border-[#2C2C2E] border-b-0 bg-[#1C1C1E]/45 shadow-[0_-8px_40px_rgba(0,0,0,0.55)]">
-                  <div className="overflow-hidden rounded-t-3xl border-b border-[#2C2C2E] px-5 py-5 sm:px-6">
+            {/* Transparent overlap — sits in the soft gradient (no solid edge / hard cut) */}
+            <div className="relative z-20 -mt-20 w-full bg-transparent sm:-mt-28">
+              <div className="px-3 pb-8 sm:px-4">
+                <div className="mx-auto max-w-3xl rounded-t-3xl border-x border-b border-zinc-800/80 bg-[#1C1C1E]/90 shadow-2xl">
+                  <div className="overflow-hidden rounded-t-3xl px-5 py-5 sm:px-6">
                     <div>
                       <p className="text-[10px] font-bold uppercase tracking-widest text-[#E2C498]">
                         Your Trip Builder

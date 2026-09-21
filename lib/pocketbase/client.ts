@@ -574,9 +574,8 @@ export function brandingGoogleFontsUrl(b: PbSiteBranding | null): string {
 /** Default navbar logo (used until an admin uploads one in Site Branding). */
 export const DEFAULT_LOGO_IMAGE = "/brand/elite-travel-logo.png";
 
-/** Fallback Fuji/pagoda hero when no upload is set (public Unsplash). */
-export const DEFAULT_HERO_IMAGE =
-  "https://images.unsplash.com/photo-1493976040374-85c8e12f0c0e?auto=format&fit=crop&w=2000&q=80";
+/** Fallback Chureito / Fuji hero when no upload is set (ships in public/brand). */
+export const DEFAULT_HERO_IMAGE = "/brand/hero-background.jpg";
 
 /** Paths written by Team Access → “save to public/brand”. */
 export type PublicBrandAssets = {

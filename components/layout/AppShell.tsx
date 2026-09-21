@@ -11,7 +11,7 @@ const LINKS = [
   { href: "/discover", label: "Discover Experiences" },
   { href: "/budget-planner", label: "Budget Planner" },
   { href: "/builder/itinerary", label: "My Saved Itineraries" },
-  { href: "/team-access", label: "Team Access (Admin)" },
+  { href: "/admin", label: "⚙️ Team Access / Admin" },
 ] as const;
 
 export function AppShell({
@@ -235,7 +235,11 @@ export function AppShell({
               const active =
                 link.href === "/builder"
                   ? pathname === "/builder"
-                  : pathname.startsWith(link.href);
+                  : link.href === "/admin"
+                    ? pathname === "/admin" ||
+                      pathname.startsWith("/admin/") ||
+                      pathname.startsWith("/team-access")
+                    : pathname.startsWith(link.href);
               return (
                 <Link
                   key={link.href}
