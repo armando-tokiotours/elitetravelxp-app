@@ -273,7 +273,7 @@ export function ExplainerModal({
                     {mediaUrl && mediaType === "Video" ? (
                       /* Target: 1080p · ~1.5Mbps · mp4/webm · <5MB (see lib/mediaStandards.ts) */
                       <video
-                        key={mediaUrl}
+                        key={mediaUrl || "explainer-video"}
                         src={mediaUrl}
                         autoPlay
                         muted

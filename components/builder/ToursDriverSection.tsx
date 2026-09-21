@@ -346,7 +346,7 @@ function SelectionSummaryWidget({
             <ul className="flex flex-wrap gap-1.5">
               {cityBreakdown.map((c) => (
                 <li
-                  key={c.cityId}
+                  key={c.cityId || `city-${c.name}`}
                   className="rounded-full border border-zinc-700 bg-zinc-950 px-2.5 py-1 text-xs text-zinc-300"
                 >
                   {c.name} · {c.count}

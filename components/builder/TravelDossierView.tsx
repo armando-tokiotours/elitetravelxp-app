@@ -38,6 +38,7 @@ import { formatHotelRoomsSummary } from "@/lib/hotelCalculator";
 import { sortSelectedToursChronologically } from "@/lib/selectedTours";
 import { travelPaceLabel } from "@/lib/travelPace";
 import { BookingRefBadge } from "@/components/builder/BookingRefBadge";
+import { NewBookingResetButton } from "@/components/builder/NewBookingResetButton";
 import { type TransitTicketType } from "@/lib/transitTickets";
 import {
   InterCityTransitModal,
@@ -143,12 +144,15 @@ export function TravelDossierView({
               Elite Travel Experiences
             </p>
           </div>
-          <div className="mt-3 w-full">
-            <BookingRefBadge
-              tempBookingRef={state.tempBookingRef}
-              confirmedBookingRef={state.confirmedBookingRef}
-              bookingStatus={state.bookingStatus}
-            />
+          <div className="mt-3 flex w-full items-stretch gap-2">
+            <div className="min-w-0 flex-1">
+              <BookingRefBadge
+                tempBookingRef={state.tempBookingRef}
+                confirmedBookingRef={state.confirmedBookingRef}
+                bookingStatus={state.bookingStatus}
+              />
+            </div>
+            <NewBookingResetButton />
           </div>
         </div>
 

@@ -362,8 +362,8 @@ function HotelsSummaryWidget({
               pref.standardOccupancy
             );
             return (
-              <li
-                key={id}
+            <li
+                key={id || `hotel-city-${cityName(id)}`}
                 className="flex items-center gap-3 rounded-xl border border-zinc-800 bg-zinc-950/80 px-3 py-2"
               >
                 <span className="h-10 w-10 shrink-0 overflow-hidden rounded-lg">

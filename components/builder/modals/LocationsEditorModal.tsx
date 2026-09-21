@@ -222,7 +222,7 @@ export function LocationsEditorModal({
                     const range = dateByKey[loc.key];
                     return (
                       <CityAccordionItem
-                        key={loc.key}
+                        key={loc.key || `loc-${index}`}
                         loc={loc}
                         city={cityMap[loc.cityId]}
                         dateLabel={range?.label ?? ""}
@@ -300,7 +300,7 @@ export function LocationsEditorModal({
               {cities.map((city) => {
                 const disabled = !canAppendCity(locations, city.id);
                 return (
-                  <li key={city.id}>
+                  <li key={city.id || `pick-${city.name}`}>
                     <button
                       type="button"
                       disabled={disabled}

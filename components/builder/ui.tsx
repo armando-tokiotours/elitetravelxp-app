@@ -337,9 +337,11 @@ export function SelectField({
       onChange={(e) => onChange(e.target.value)}
       className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-950 px-4 py-3 text-sm text-white outline-none transition focus:border-[#B85304] focus:ring-2 focus:ring-[#B85304]/25"
     >
-      <option value="">{placeholder}</option>
-      {options.map((o) => (
-        <option key={o.value} value={o.value}>
+      <option key="__placeholder__" value="">
+        {placeholder}
+      </option>
+      {options.map((o, i) => (
+        <option key={o.value || `__opt-${i}`} value={o.value}>
           {o.label}
         </option>
       ))}

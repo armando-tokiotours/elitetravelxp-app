@@ -79,7 +79,7 @@ export function coerceTransitType(
 }
 
 function normalizeLocation(
-  l: Partial<LocationStop> & { cityId: string; key: string },
+  l: Partial<LocationStop> & { cityId: string; key?: string },
   index = 0,
   length = 1
 ): LocationStop {
@@ -109,9 +109,11 @@ function normalizeLocation(
             (ticketType === "ic_card" ? 28 : 115)
         )
       : 0;
+  const rawKey = typeof l.key === "string" ? l.key.trim() : "";
   return {
-    key: l.key,
-    cityId: l.cityId,
+    // Never persist/render empty keys — duplicates become React `` key warnings
+    key: rawKey || uid(),
+    cityId: String(l.cityId || ""),
     visitType,
     nights,
     transitType,
@@ -486,9 +488,16 @@ export function mergePersistedBuilderState(
   current: BuilderState
 ): BuilderState {
   const p = pickBuilderPayload(persisted);
-  const raw = (p.locations ?? current.locations).map((l) =>
-    normalizeLocation(l)
-  );
+  const rawLocs = p.locations ?? current.locations;
+  const seenKeys = new Set<string>();
+  const raw = rawLocs.map((l, i) => {
+    let loc = normalizeLocation(l, i, rawLocs.length);
+    if (!loc.key || seenKeys.has(loc.key)) {
+      loc = { ...loc, key: uid() };
+    }
+    seenKeys.add(loc.key);
+    return loc;
+  });
   const locations = correctLocationVisitTypes(raw);
   const selectedToursRaw: SelectedToursByCity =
     p.selectedTours && Object.keys(p.selectedTours).length > 0

@@ -110,7 +110,7 @@ export function ActivityMatchReelModal({
             <div className="absolute left-3 right-3 top-3 z-20 flex gap-1">
               {slides.map((s, i) => (
                 <div
-                  key={s.id}
+                  key={s.id || `slide-progress-${i}`}
                   className="h-0.5 flex-1 overflow-hidden rounded-full bg-white/25"
                 >
                   <div

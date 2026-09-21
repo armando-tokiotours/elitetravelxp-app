@@ -196,7 +196,7 @@ export function DriversTransportSection({
 
             return (
               <button
-                key={stop.key}
+                key={stop.key || `driver-${stop.cityId}-${name}`}
                 type="button"
                 onClick={() => setActiveCityId(stop.cityId)}
                 className="flex w-full items-center gap-3 rounded-2xl border border-zinc-800 bg-zinc-900 p-3 text-left transition hover:border-[#B85304]/40 hover:bg-zinc-800/80 sm:p-4"

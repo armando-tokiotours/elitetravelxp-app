@@ -338,9 +338,12 @@ function TransitOption({
           <p className="text-sm font-bold text-white">{title}</p>
           <p className="mt-1 text-xs leading-relaxed text-zinc-400">{body}</p>
           <div className="mt-2.5 flex flex-wrap gap-1.5">
-            {meta.map((m) => (
+            {meta
+              .map((m) => String(m).trim())
+              .filter(Boolean)
+              .map((m, i) => (
               <span
-                key={m}
+                key={`${m}-${i}`}
                 className="rounded-full border border-zinc-700 bg-zinc-950 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-zinc-300"
               >
                 {m}

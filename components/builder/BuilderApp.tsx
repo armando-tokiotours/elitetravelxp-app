@@ -31,6 +31,7 @@ import { ToursDriverSection } from "./ToursDriverSection";
 import { DriversTransportSection } from "./DriversTransportSection";
 import { TripDurationSection } from "./TripDurationSection";
 import { BookingRefBadge } from "./BookingRefBadge";
+import { NewBookingResetButton } from "./NewBookingResetButton";
 
 export function BuilderApp() {
   const [config, setConfig] = useState<BuilderConfig | null>(null);
@@ -189,12 +190,15 @@ export function BuilderApp() {
                         JAPAN
                       </h2>
                     </div>
-                    <div className="mt-3 w-full">
-                      <BookingRefBadge
-                        tempBookingRef={state.tempBookingRef}
-                        confirmedBookingRef={state.confirmedBookingRef}
-                        bookingStatus={state.bookingStatus}
-                      />
+                    <div className="mt-3 flex w-full items-stretch gap-2">
+                      <div className="min-w-0 flex-1">
+                        <BookingRefBadge
+                          tempBookingRef={state.tempBookingRef}
+                          confirmedBookingRef={state.confirmedBookingRef}
+                          bookingStatus={state.bookingStatus}
+                        />
+                      </div>
+                      <NewBookingResetButton />
                     </div>
                   </div>
 
@@ -209,7 +213,10 @@ export function BuilderApp() {
                         <p className="mt-2 text-zinc-400">{error}</p>
                       </div>
                     ) : config ? (
-                      <BuilderAccordionProvider defaultOpen={1}>
+                      <BuilderAccordionProvider
+                        key={state.tempBookingRef || "draft"}
+                        defaultOpen={1}
+                      >
                         <ProgressBar />
                         <div className="space-y-4 px-4 pt-4 sm:px-6">
                           <TripDurationSection

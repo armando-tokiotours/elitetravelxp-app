@@ -308,7 +308,7 @@ function RouteSummaryWidget({
                   ? "dep"
                   : `${loc.nights}n`;
             return (
-              <span key={loc.key} className="inline-flex items-center gap-1.5">
+              <span key={loc.key || `chip-${loc.cityId}-${i}`} className="inline-flex items-center gap-1.5">
                 {i > 0 ? (
                   <span className="text-zinc-600" aria-hidden>
                     →

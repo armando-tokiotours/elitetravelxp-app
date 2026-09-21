@@ -278,7 +278,7 @@ export function PrintItineraryDocument({
                       left={`${cityName(loc.cityId)} (${loc.nights} Night${
                         loc.nights === 1 ? "" : "s"
                       })`}
-                      right="Accommodation Self-Arranged (No Hotel Required)"
+                      right="Self-arranged (no hotel)"
                     />
                   );
                 }
@@ -375,7 +375,7 @@ export function PrintItineraryDocument({
 
             {breakdown ? (
               <SectionSubtotal
-                label="Experiences & Transport Subtotal"
+                label={["Experiences", "Transport", "Subtotal"]}
                 min={breakdown.experiences.min}
                 max={breakdown.experiences.max}
               />
@@ -674,12 +674,12 @@ function InvoiceCard({
 
 function DetailRow({ left, right }: { left: string; right: string }) {
   return (
-    <div className="flex w-full items-center justify-between gap-4 border-b border-[#F0EBE3] py-2 text-sm last:border-b-0">
-      <span className="min-w-0 shrink-0 leading-tight text-[#5C6570] sm:shrink">
+    <div className="detail-row flex w-full items-center justify-between gap-3 border-b border-[#F0EBE3] py-1.5 last:border-b-0 sm:gap-4 sm:py-2">
+      <span className="detail-row-label min-w-0 shrink-0 leading-tight text-[#5C6570] sm:shrink">
         {left}
       </span>
       {right ? (
-        <span className="min-w-0 flex-1 break-words text-right font-semibold leading-tight text-[#0B1F3A]">
+        <span className="detail-row-value min-w-0 flex-1 break-words text-right font-semibold leading-tight text-[#0B1F3A]">
           {right}
         </span>
       ) : null}
@@ -692,29 +692,42 @@ function SectionSubtotal({
   min,
   max,
 }: {
-  label: string;
+  label: string | string[];
   min: number;
   max: number;
 }) {
   const isZero = min <= 0 && max <= 0;
-  const isExperiences = /experiences/i.test(label);
+  const labelText = Array.isArray(label) ? label.join(" ") : label;
+  const isExperiences = /experiences/i.test(labelText);
+  const labelNode = Array.isArray(label) ? (
+    <>
+      {label.map((line, i) => (
+        <span key={line}>
+          {i > 0 ? <br /> : null}
+          {line}
+        </span>
+      ))}
+    </>
+  ) : (
+    label
+  );
 
   if (isZero && isExperiences) {
     return (
       <div className="mt-4 border-t border-zinc-200 pt-4 font-bold text-[#0B1F3A]">
         <span className="text-xs uppercase tracking-wider text-zinc-500">
-          {label}: €0 (Self-Arranged)
+          {labelNode}: €0 (Self-Arranged)
         </span>
       </div>
     );
   }
 
   return (
-    <div className="mt-4 flex items-center justify-between border-t border-zinc-200 pt-4 font-bold text-[#0B1F3A]">
+    <div className="mt-4 flex items-start justify-between gap-3 border-t border-zinc-200 pt-4 font-bold text-[#0B1F3A]">
       <span className="text-xs uppercase tracking-wider text-zinc-500">
-        {label}
+        {labelNode}
       </span>
-      <span className="text-sm">
+      <span className="shrink-0 text-sm">
         {isZero
           ? "—"
           : `Est. ${formatUsd(min)} – ${formatUsd(Math.max(max, min))}`}

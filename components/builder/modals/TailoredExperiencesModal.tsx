@@ -555,7 +555,7 @@ export function TailoredExperiencesModal({
 
                       return (
                         <CityExperienceAccordion
-                          key={stop.key}
+                          key={stop.key || `stay-${stop.cityId}-${name}`}
                           city={city}
                           cityName={name}
                           expanded={expandedKey === stop.key}

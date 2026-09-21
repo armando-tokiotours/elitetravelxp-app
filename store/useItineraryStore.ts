@@ -328,6 +328,13 @@ export const useItineraryStore = create<ItineraryState & ItineraryActions>()(
       reset: () =>
         set({
           ...initialState,
+          cityNights: [],
+          selectedTours: [],
+          privateChauffeur: false,
+          hasEliteConcierge: false,
+          pickupTransfer: false,
+          dropoffTransfer: false,
+          needHotels: false,
           tempBookingRef: generateTempPNR(),
           confirmedBookingRef: null,
           bookingStatus: "draft",

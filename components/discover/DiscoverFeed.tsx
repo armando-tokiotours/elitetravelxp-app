@@ -281,7 +281,7 @@ export function DiscoverFeed() {
         ) : (
           cities.map((city, i) => (
             <CityStory
-              key={city.id}
+              key={city.id || `city-${i}`}
               city={city}
               active={city.id === selectedCityId}
               onSelect={() => setSelectedCityId(city.id)}
@@ -397,7 +397,7 @@ export function DiscoverFeed() {
                   <div className="grid grid-cols-3 gap-1">
                     {gridTours.map((tour, index) => (
                       <TourThumb
-                        key={tour.id}
+                        key={tour.id || `tour-${index}`}
                         tour={tour}
                         booked={selectedTours.some((t) => t.tourId === tour.id)}
                         recommended={isBestMatchTour(tour, experienceProfile)}
@@ -517,16 +517,17 @@ function TourThumb({
           height={400}
           loading="lazy"
           decoding="async"
-          className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.03] group-hover:opacity-90"
+          className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
         />
       ) : (
-        <div className="flex h-full w-full items-end bg-gradient-to-br from-[#1a3355] to-[#0B1F3A] p-2">
-          <span className="line-clamp-3 text-left text-[10px] font-medium text-white/90">
-            {tour.title}
-          </span>
-        </div>
+        <div className="h-full w-full bg-gradient-to-br from-[#1a3355] to-[#0B1F3A]" />
       )}
-      <span className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent opacity-0 transition duration-300 group-hover:opacity-100" />
+      {/* Sand-gold title — hidden until hover / touch-press */}
+      <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center bg-black/60 p-2 text-center opacity-0 backdrop-blur-[2px] transition-opacity duration-300 group-hover:opacity-100 group-active:opacity-100">
+        <h4 className="line-clamp-3 break-words text-[10px] font-extrabold uppercase leading-tight tracking-wider text-[#D9BB96] drop-shadow-lg whitespace-normal sm:text-xs">
+          {tour.title}
+        </h4>
+      </div>
       {recommended ? (
         <span className="absolute left-1 top-1 z-20 flex items-center gap-1 rounded-full bg-accent-500/90 px-2 py-0.5 text-[10px] font-bold text-zinc-950 shadow-md">
           ⭐ Match
@@ -539,20 +540,13 @@ function TourThumb({
       ) : null}
       {booked ? (
         <span
-          className={`absolute z-20 rounded bg-black/60 px-1 text-[9px] font-semibold text-[#F3D9C4] ${
+          className={`absolute z-20 rounded bg-[#B85304] px-1.5 py-0.5 text-[8px] font-bold text-white shadow ${
             recommended ? "left-1 top-7" : "left-1 top-1"
           }`}
         >
           Added
         </span>
       ) : null}
-      <div className="pointer-events-none absolute inset-x-3 bottom-3 z-20 translate-y-2 opacity-0 transition-all duration-300 group-hover:translate-y-0 group-hover:opacity-100">
-        <div className="flex items-center justify-center rounded-lg border border-[#B85304]/40 bg-zinc-950/75 px-3 py-1.5 shadow-2xl backdrop-blur-md">
-          <span className="truncate text-center text-[10px] font-bold uppercase tracking-widest text-accent-500">
-            {tour.title}
-          </span>
-        </div>
-      </div>
     </button>
   );
 }

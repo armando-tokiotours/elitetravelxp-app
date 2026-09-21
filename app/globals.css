@@ -187,6 +187,27 @@ h3,
   animation: fade-up 0.65s ease-out both;
 }
 
+/* Invoice DetailRow — 15% smaller type/padding on mobile */
+.detail-row-label,
+.detail-row-value {
+  font-size: 0.875rem;
+}
+@media (max-width: 639px) {
+  .detail-row {
+    align-items: flex-start;
+    gap: 0.5rem;
+    padding-top: 0.425rem !important;
+    padding-bottom: 0.425rem !important;
+  }
+  .detail-row-label {
+    max-width: 40%;
+    font-size: 0.74375rem !important; /* text-sm − 15% */
+  }
+  .detail-row-value {
+    font-size: 0.74375rem !important; /* text-sm − 15% */
+  }
+}
+
 /* Keep dark form fields readable when browsers force light autofill */
 input:-webkit-autofill,
 input:-webkit-autofill:hover,

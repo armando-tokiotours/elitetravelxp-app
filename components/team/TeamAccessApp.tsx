@@ -1513,8 +1513,12 @@ function RecordEditModal({
                     onChange={(e) => set(f.key, e.target.value)}
                     className="w-full rounded-xl border border-[#2C2C2E] bg-[#121212] px-3 py-2 text-sm text-white placeholder-zinc-500 outline-none [color-scheme:dark] focus:border-[#B85304] focus:ring-1 focus:ring-[#B85304]"
                   >
-                    <option value="">Select…</option>
-                    {(f.options || []).map((o) => (
+                    <option key="__select_empty__" value="">
+                      Select…
+                    </option>
+                    {(f.options || [])
+                      .filter((o) => String(o).length > 0)
+                      .map((o) => (
                       <option key={o} value={o}>
                         {o.charAt(0).toUpperCase() + o.slice(1)}
                       </option>
