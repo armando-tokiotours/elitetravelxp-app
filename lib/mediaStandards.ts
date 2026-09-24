@@ -1,5 +1,5 @@
 /**
- * VPS / content media standards for Elite Travel XP.
+ * VPS / content media standards for TOKIOTOURS.
  *
  * Prefer PocketBase `?thumb=` sizes from PB_THUMBS (lib/imageProcessor.ts).
  * Admin uploads are auto-compressed to WebP ≤1920×1080 via /api/admin/optimize-upload.

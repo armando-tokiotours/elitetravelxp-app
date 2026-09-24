@@ -21,7 +21,7 @@ function renderBodyBlocks(body: string) {
           {bullets.map((line, j) => (
             <li key={j} className="flex gap-2">
               <Check
-                className="mt-0.5 h-4 w-4 shrink-0 text-[#B85304]"
+                className="mt-0.5 h-4 w-4 shrink-0 text-[#075473]"
                 aria-hidden
               />
               <span>{line.replace(/^[•\-\*]\s+/, "")}</span>
@@ -149,7 +149,7 @@ export function ConciergeEditorModal({
       {open ? (
         <motion.div
           key="concierge-editor"
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 backdrop-blur-sm"
+          className="fixed inset-0 z-50 flex items-center justify-center tokio-modal-backdrop bg-[#05080C]/55 backdrop-blur-sm"
           role="dialog"
           aria-modal="true"
           aria-label="Elite Concierge"
@@ -159,47 +159,53 @@ export function ConciergeEditorModal({
           transition={{ duration: 0.2 }}
         >
           <motion.div
-            className="relative flex h-[100dvh] w-full flex-col overflow-hidden bg-[#0a0a0a] md:h-[85vh] md:max-w-2xl md:rounded-2xl md:border md:border-zinc-800"
+            className="tokio-modal-content relative flex h-[100dvh] max-h-[100dvh] w-full flex-col overflow-hidden border border-white/10 md:h-[85vh] md:max-h-[85vh] md:max-w-2xl md:rounded-2xl"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 20 }}
             transition={{ duration: 0.25, ease: "easeOut" }}
           >
-            <div className="flex flex-shrink-0 items-center gap-4 border-b border-zinc-800 bg-[#0a0a0a] p-4 pt-[max(1rem,env(safe-area-inset-top))]">
-              <button
-                type="button"
-                onClick={onClose}
-                aria-label="Back"
-                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-zinc-700 bg-zinc-900 text-white transition hover:border-zinc-500"
-              >
-                <ArrowLeft className="h-5 w-5" />
-              </button>
-              <div className="min-w-0 flex-1">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#B85304]">
-                  Configure
-                </p>
-                <h3 className="truncate font-display text-2xl text-white">
-                  Elite Concierge
-                </h3>
+            {/* 1. Sticky top: chrome + media banner */}
+            <div className="flex shrink-0 flex-col border-b border-white/10">
+              <div className="tokio-modal-chrome flex items-center gap-4 p-4 pt-[max(1rem,env(safe-area-inset-top))]">
+                <button
+                  type="button"
+                  onClick={onClose}
+                  aria-label="Back"
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-zinc-700 bg-zinc-900 text-white transition hover:border-zinc-500"
+                >
+                  <ArrowLeft className="h-5 w-5" />
+                </button>
+                <div className="min-w-0 flex-1">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#F6A724]">
+                    Configure
+                  </p>
+                  <h3 className="truncate font-display text-2xl text-white">
+                    Elite Concierge
+                  </h3>
+                </div>
+              </div>
+
+              <div className="px-4 pb-4">
+                <div className="relative h-40 w-full overflow-hidden rounded-2xl border border-white/10 bg-zinc-950 shadow-lg sm:h-52">
+                  <LazyVideo
+                    src={videoSrc}
+                    poster={posterSrc}
+                    autoPlay
+                    loop
+                    muted
+                    playsInline
+                    aria-label="Elite Concierge preview"
+                    className="pointer-events-none h-full w-full object-cover"
+                  />
+                </div>
               </div>
             </div>
 
-            <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4 pb-12">
-              <div className="relative mb-1 aspect-video w-full overflow-hidden rounded-2xl border border-zinc-800/80 bg-zinc-950 shadow-2xl">
-                <LazyVideo
-                  src={videoSrc}
-                  poster={posterSrc}
-                  autoPlay
-                  loop
-                  muted
-                  playsInline
-                  aria-label="Elite Concierge preview"
-                  className="pointer-events-none h-full w-full object-cover"
-                />
-              </div>
-
+            {/* 2. Scrollable body */}
+            <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain px-4 py-4">
               <div className="px-0.5">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#B85304]">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#F6A724]">
                   Premium
                 </p>
                 <h4 className="mt-1 font-display text-xl text-white sm:text-2xl">
@@ -211,7 +217,7 @@ export function ConciergeEditorModal({
               <div className="overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-900/80">
                 <div className="flex items-center gap-2 border-b border-zinc-800 px-4 py-3">
                   <Sparkles
-                    className="h-4 w-4 shrink-0 text-[#B85304]"
+                    className="h-4 w-4 shrink-0 text-[#F6A724]"
                     aria-hidden
                   />
                   <h5 className="text-sm font-semibold text-white">
@@ -223,9 +229,9 @@ export function ConciergeEditorModal({
                 </div>
               </div>
 
-              <div className="overflow-hidden rounded-2xl border border-[#B85304]/35 bg-gradient-to-br from-zinc-950 to-zinc-900">
-                <div className="border-b border-[#B85304]/20 px-4 py-3">
-                  <h5 className="text-sm font-semibold text-[#B85304]">
+              <div className="overflow-hidden rounded-2xl border border-[#075473]/35 bg-gradient-to-br from-zinc-950 to-zinc-900">
+                <div className="border-b border-[#075473]/20 px-4 py-3">
+                  <h5 className="text-sm font-semibold text-[#075473]">
                     {creditTitle}
                   </h5>
                 </div>
@@ -234,7 +240,7 @@ export function ConciergeEditorModal({
                 </div>
               </div>
 
-              <div className="pt-1 text-center">
+              <div className="pb-2 text-center">
                 <button
                   type="button"
                   onClick={() => setIsPolicyModalOpen(true)}
@@ -245,11 +251,12 @@ export function ConciergeEditorModal({
               </div>
             </div>
 
-            <div className="flex flex-shrink-0 flex-col gap-3 border-t border-zinc-800 bg-[#0a0a0a]/90 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] backdrop-blur-md">
+            {/* 3. Sticky bottom CTA */}
+            <div className="tokio-modal-chrome flex shrink-0 flex-col gap-3 border-t border-white/10 p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
               <button
                 type="button"
                 onClick={onSelectClick}
-                className="w-full rounded-full bg-[#0B1F3A] py-3 text-sm font-semibold text-white transition hover:bg-[#143052]"
+                className="w-full rounded-full bg-[#F6A724] py-3 text-sm font-semibold text-white transition hover:bg-[#E0951A]"
               >
                 {selected
                   ? "Elite Concierge selected · Done"
@@ -276,7 +283,7 @@ export function ConciergeEditorModal({
           />
 
           {confirmOpen ? (
-            <div className="absolute inset-0 z-[60] flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm">
+            <div className="absolute inset-0 z-[60] flex items-center justify-center tokio-modal-backdrop bg-[#05080C]/50 p-4 backdrop-blur-sm">
               <div className="w-full max-w-md rounded-2xl border border-zinc-700 bg-zinc-950 p-5 shadow-2xl sm:p-6">
                 <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-accent-500">
                   Confirm switch
@@ -291,7 +298,7 @@ export function ConciergeEditorModal({
                   every tour, driver, and dining reservation directly with you.
                 </p>
                 {hasAlaCartePicks ? (
-                  <p className="mt-3 rounded-xl border border-[#B85304]/40 bg-[#B85304]/15 px-3 py-2 text-xs text-accent-200">
+                  <p className="mt-3 rounded-xl border border-[#075473]/40 bg-[#075473]/15 px-3 py-2 text-xs text-accent-200">
                     Your current tour and private driver selections will be
                     cleared when you confirm.
                   </p>
@@ -300,7 +307,7 @@ export function ConciergeEditorModal({
                   <button
                     type="button"
                     onClick={applyConcierge}
-                    className="w-full rounded-xl bg-accent-500 py-3 text-sm font-bold text-zinc-950 transition hover:bg-[#9C4203] sm:flex-1"
+                    className="w-full rounded-xl bg-accent-500 py-3 text-sm font-bold text-zinc-950 transition hover:bg-[#05384c] sm:flex-1"
                   >
                     Confirm &amp; Apply Concierge
                   </button>

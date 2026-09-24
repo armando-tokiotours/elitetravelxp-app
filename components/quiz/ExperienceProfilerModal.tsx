@@ -16,6 +16,7 @@ import {
 } from "@/lib/experienceProfiler";
 import { useBuilderStore } from "@/store/useBuilderStore";
 import { useItineraryStore } from "@/store/useItineraryStore";
+import { useQuizStore } from "@/store/useQuizStore";
 import { useSiteBrandingStore } from "@/store/useSiteBrandingStore";
 
 const STEPS: QuizStepId[] = ["vibe", "pace", "crowd"];
@@ -29,8 +30,12 @@ export function ExperienceProfilerModal({
 }) {
   const setExperienceProfile = useBuilderStore((s) => s.setExperienceProfile);
   const setTravelPace = useBuilderStore((s) => s.setTravelPace);
-  const existing = useBuilderStore((s) => s.experienceProfile);
   const setUserProfile = useItineraryStore((s) => s.setUserProfile);
+  const clearUserProfile = useItineraryStore((s) => s.clearUserProfile);
+  const isQuizCompleted = useQuizStore((s) => s.isQuizCompleted);
+  const savedProfile = useQuizStore((s) => s.travelProfile);
+  const completeQuiz = useQuizStore((s) => s.completeQuiz);
+  const clearQuiz = useQuizStore((s) => s.clearQuiz);
   const ensureBrandingLoaded = useSiteBrandingStore((s) => s.ensureLoaded);
   const brandingItems = useSiteBrandingStore((s) => s.itemsByKey);
   const quizVibe = useSiteBrandingStore((s) => s.getQuizVibe)();
@@ -39,7 +44,8 @@ export function ExperienceProfilerModal({
   void brandingItems;
 
   const [mounted, setMounted] = useState(false);
-  const [step, setStep] = useState(0);
+  /** -1 = intro / take quiz screen; 0–2 = questions; 3 = summary */
+  const [step, setStep] = useState(-1);
   const [vibe, setVibe] = useState<ProfilerVibe | null>(null);
   const [pace, setPace] = useState<ProfilerPace | null>(null);
   const [crowd, setCrowd] = useState<ProfilerCrowdStyle | null>(null);
@@ -53,28 +59,35 @@ export function ExperienceProfilerModal({
   useEffect(() => {
     if (!open) return;
     void ensureBrandingLoaded();
-    setVibe(existing?.vibe ?? null);
-    setPace(existing?.pace ?? null);
-    setCrowd(existing?.crowdStyle ?? null);
-    if (existing) {
-      setDraft(existing);
+    // Only hydrate completed Match Quiz answers — never Pre-Elite leftovers
+    if (isQuizCompleted && savedProfile) {
+      setVibe(savedProfile.vibe);
+      setPace(savedProfile.pace);
+      setCrowd(savedProfile.crowdStyle);
+      setDraft(savedProfile);
       setStep(3);
     } else {
+      setVibe(null);
+      setPace(null);
+      setCrowd(null);
       setDraft(null);
-      setStep(0);
+      setStep(-1);
     }
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     return () => {
       document.body.style.overflow = prev;
     };
-  }, [open, existing, ensureBrandingLoaded]);
+  }, [open, isQuizCompleted, savedProfile, ensureBrandingLoaded]);
 
   if (!mounted) return null;
 
+  const showingIntro = step < 0 && !draft;
   const showingSummary = step >= 3 && draft;
-  const stepId = STEPS[Math.min(step, 2)];
-  const progress = ((showingSummary ? 4 : step + 1) / 4) * 100;
+  const stepId = STEPS[Math.min(Math.max(step, 0), 2)];
+  const progress = showingIntro
+    ? 0
+    : ((showingSummary ? 4 : step + 1) / 4) * 100;
 
   const selectVibe = (id: ProfilerVibe) => {
     setVibe(id);
@@ -93,6 +106,7 @@ export function ExperienceProfilerModal({
 
   const applyProfile = () => {
     if (!draft) return;
+    completeQuiz(draft);
     setExperienceProfile(draft);
     setUserProfile(experienceToUserTravelProfile(draft));
     setTravelPace(
@@ -106,11 +120,22 @@ export function ExperienceProfilerModal({
   };
 
   const retake = () => {
+    clearQuiz();
+    setExperienceProfile(null);
+    clearUserProfile();
     setDraft(null);
-    setStep(0);
+    setStep(-1);
     setVibe(null);
     setPace(null);
     setCrowd(null);
+  };
+
+  const startFresh = () => {
+    setDraft(null);
+    setVibe(null);
+    setPace(null);
+    setCrowd(null);
+    setStep(0);
   };
 
   const vibeLabel =
@@ -129,7 +154,7 @@ export function ExperienceProfilerModal({
       {open ? (
         <motion.div
           key="experience-profiler"
-          className="fixed inset-0 z-[110] flex items-end justify-center bg-black/75 sm:items-center sm:p-4"
+          className="tokio-modal-backdrop fixed inset-0 z-[110] flex items-end justify-center bg-[#05080C]/55 sm:items-center sm:p-4"
           role="dialog"
           aria-modal="true"
           aria-label="Experience Profiler Quiz"
@@ -144,14 +169,14 @@ export function ExperienceProfilerModal({
             onClick={onClose}
           />
           <motion.div
-            className="relative z-[1] flex max-h-[min(92dvh,40rem)] w-full max-w-md flex-col overflow-hidden rounded-t-3xl border border-zinc-800 bg-zinc-950 shadow-2xl sm:rounded-3xl"
+            className="tokio-modal-content relative z-[1] flex max-h-[min(92dvh,40rem)] w-full max-w-md flex-col overflow-hidden rounded-t-3xl border border-white/10 sm:rounded-3xl"
             initial={{ opacity: 0, y: 28 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 28 }}
             transition={{ duration: 0.22, ease: "easeOut" }}
           >
             <div className="flex shrink-0 items-center gap-3 border-b border-zinc-800 px-4 py-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
-              {step > 0 && !showingSummary ? (
+              {step > 0 && !showingSummary && !showingIntro ? (
                 <button
                   type="button"
                   onClick={() => setStep((s) => Math.max(0, s - 1))}
@@ -161,12 +186,12 @@ export function ExperienceProfilerModal({
                   <ArrowLeft className="h-4 w-4" />
                 </button>
               ) : (
-                <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#B85304]/15 text-[#B85304]">
+                <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#DC6E8A]/15 text-[#DC6E8A]">
                   <Sparkles className="h-4 w-4" />
                 </span>
               )}
               <div className="min-w-0 flex-1">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#B85304]">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#E60F43]">
                   30-Second Style Quiz
                 </p>
                 <h2 className="truncate text-base font-bold text-white">
@@ -185,13 +210,35 @@ export function ExperienceProfilerModal({
 
             <div className="h-1 w-full bg-zinc-900">
               <div
-                className="h-full bg-[#B85304] transition-all duration-300"
+                className="h-full bg-[#075473] transition-all duration-300"
                 style={{ width: `${Math.min(100, progress)}%` }}
               />
             </div>
 
             <div className="min-h-0 flex-1 overflow-y-auto px-4 py-5 pb-[max(1.25rem,env(safe-area-inset-bottom))]">
-              {showingSummary && draft ? (
+              {showingIntro ? (
+                <div className="flex flex-col items-center gap-5 py-6 text-center">
+                  <span className="flex h-14 w-14 items-center justify-center rounded-full bg-[#DC6E8A]/15 text-[#DC6E8A]">
+                    <Sparkles className="h-7 w-7" />
+                  </span>
+                  <div>
+                    <h3 className="font-godiva text-xl uppercase tracking-wider text-white">
+                      Take 30-Second Match Quiz
+                    </h3>
+                    <p className="mt-2 text-sm leading-relaxed text-zinc-400">
+                      No profile yet. Answer three quick questions to unlock
+                      ★ Match badges — nothing is pre-selected.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={startFresh}
+                    className="w-full rounded-full bg-[#DC6E8A] py-3.5 text-sm font-semibold text-white ring-1 ring-[#DC6E8A]/40 transition hover:bg-[#D9718C]"
+                  >
+                    Start fresh →
+                  </button>
+                </div>
+              ) : showingSummary && draft ? (
                 <div className="space-y-4">
                   <div>
                     <h3 className="font-display text-xl text-white">
@@ -208,11 +255,11 @@ export function ExperienceProfilerModal({
                     <SummaryRow label="Access Style" value={crowdLabel} />
                   </div>
 
-                  <div className="rounded-2xl border border-[#B85304]/35 bg-[#B85304]/10 p-4">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#B85304]">
+                  <div className="rounded-2xl border border-[#075473]/35 bg-[#075473]/10 p-4">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#1BA58A]">
                       Your Travel Profile
                     </p>
-                    <p className="mt-2 font-mono text-xs text-[#F3D9C4]">
+                    <p className="mt-2 font-mono text-[0.8625rem] text-[#F6A724]">
                       {draft.userProfileTag}
                     </p>
                     <p className="mt-2 text-sm leading-relaxed text-zinc-200">
@@ -224,7 +271,7 @@ export function ExperienceProfilerModal({
                   <button
                     type="button"
                     onClick={applyProfile}
-                    className="w-full rounded-full bg-[#0B1F3A] py-3 text-sm font-semibold text-white ring-1 ring-[#B85304]/40 transition hover:bg-[#143052]"
+                    className="w-full rounded-full bg-[#DC6E8A] py-3 text-sm font-semibold text-white ring-1 ring-[#DC6E8A]/40 transition hover:bg-[#D9718C]"
                   >
                     Apply Profile &amp; View Matches
                   </button>
@@ -324,7 +371,7 @@ function QuizChoice({
       aria-pressed={selected}
       className={`w-full rounded-2xl border px-4 py-3.5 text-left transition ${
         selected
-          ? "border-[#B85304] bg-[#B85304]/12"
+          ? "border-[#075473] bg-[#075473]/12"
           : "border-zinc-800 bg-zinc-900 hover:border-zinc-600"
       }`}
     >

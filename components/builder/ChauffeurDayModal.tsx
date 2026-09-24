@@ -107,7 +107,7 @@ export function ChauffeurDayModal({
             <div className="sticky top-0 z-20 shrink-0 border-b border-[#EEE8DF] bg-white px-4 pb-4 pt-6 sm:px-5">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#B85304]">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#075473]">
                     Private chauffeur
                   </p>
                   <h3 className="font-display text-2xl text-[#0B1F3A]">

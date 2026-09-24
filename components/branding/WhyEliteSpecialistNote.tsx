@@ -28,7 +28,7 @@ export function WhyEliteSpecialistNote({
   return (
     <>
       <div className="mt-3 rounded-xl border border-[#E8E2D9] bg-[#FBF8F2] px-3 py-2.5">
-        <p className="text-[10px] font-bold uppercase tracking-widest text-[#B85304]">
+        <p className="text-[10px] font-bold uppercase tracking-widest text-[#075473]">
           {title}
         </p>
         <p className="mt-1 text-xs leading-relaxed text-[#5C6570]">{body}</p>

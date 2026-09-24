@@ -21,13 +21,13 @@ export function TeamConfigModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby="team-config-title"
-        className="flex max-h-[92vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-[#2C2C2E] bg-[#121212] shadow-2xl"
+        className="tokio-modal-content flex max-h-[92vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-white/10"
       >
         <div className="flex items-center justify-between border-b border-[#2C2C2E] px-4 py-3 sm:px-5">
           <h2 id="team-config-title" className="sr-only">
             Team Email Settings
           </h2>
-          <p className="text-[0.65rem] font-semibold uppercase tracking-[0.28em] text-[#B85304]">
+          <p className="text-[0.65rem] font-semibold uppercase tracking-[0.28em] text-[#075473]">
             ⚙️ Team Email Settings
           </p>
           <button

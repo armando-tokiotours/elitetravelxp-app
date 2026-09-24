@@ -27,7 +27,7 @@ export default function PrintPageClient() {
       {printResult ? (
         <div className="fixed inset-0 z-[80] flex items-end justify-center bg-black/45 p-4 sm:items-center">
           <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
-            <p className="text-[0.65rem] font-semibold uppercase tracking-[0.3em] text-[#B85304]">
+            <p className="text-[0.65rem] font-semibold uppercase tracking-[0.3em] text-[#075473]">
               Itinerary saved
             </p>
             <h2 className="mt-2 font-display text-2xl text-[#0B1F3A]">

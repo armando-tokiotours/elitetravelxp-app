@@ -13,11 +13,12 @@ const EXT_BY_MIME: Record<string, string> = {
   "image/gif": "gif",
 };
 
-type AssetKind = "hero" | "logo";
+type AssetKind = "hero" | "logo" | "hero_single";
 
 const BASENAME: Record<AssetKind, string> = {
   hero: "hero-background",
   logo: "site-logo",
+  hero_single: "hero-single-day",
 };
 
 function uploadsAllowed() {
@@ -37,9 +38,17 @@ async function readMeta(): Promise<Record<string, string>> {
   }
 }
 
+function parseKind(raw: string): AssetKind {
+  if (raw === "logo") return "logo";
+  if (raw === "hero_single" || raw === "hero-single" || raw === "hero_single_day") {
+    return "hero_single";
+  }
+  return "hero";
+}
+
 /**
  * Saves a branding image into `public/brand/` so it ships with the project.
- * Body: multipart form with `file` + `kind` (`hero` | `logo`).
+ * Body: multipart form with `file` + `kind` (`hero` | `logo` | `hero_single`).
  */
 export async function POST(request: Request) {
   if (!uploadsAllowed()) {
@@ -55,8 +64,7 @@ export async function POST(request: Request) {
   try {
     const form = await request.formData();
     const file = form.get("file");
-    const kindRaw = String(form.get("kind") || "hero");
-    const kind: AssetKind = kindRaw === "logo" ? "logo" : "hero";
+    const kind = parseKind(String(form.get("kind") || "hero"));
 
     if (!(file instanceof File)) {
       return NextResponse.json({ error: "Missing image file." }, { status: 400 });

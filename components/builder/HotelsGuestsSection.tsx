@@ -271,7 +271,7 @@ export function HotelsGuestsSection({
         type="button"
         onClick={openEditor}
         disabled={orderedCityIds.length === 0 || hotelsLoading}
-        className="mt-3 flex w-full items-center justify-center gap-2 rounded-full border border-[#B85304]/50 bg-zinc-950 py-2.5 text-sm font-semibold text-white transition hover:border-[#B85304] hover:bg-[#0B1F3A] disabled:cursor-not-allowed disabled:opacity-40"
+        className="mt-3 flex w-full items-center justify-center gap-2 rounded-full border border-[#075473]/50 bg-zinc-950 py-2.5 text-sm font-semibold text-white transition hover:border-[#075473] hover:bg-[#0B1F3A] disabled:cursor-not-allowed disabled:opacity-40"
       >
         <Pencil className="h-3.5 w-3.5" aria-hidden />
         {orderedCityIds.length === 0
@@ -332,7 +332,7 @@ function HotelsSummaryWidget({
       type="button"
       onClick={onClick}
       disabled={orderedCityIds.length === 0}
-      className="group w-full rounded-[1.35rem] border border-zinc-800 bg-[#1C1C1E] p-4 text-left transition hover:border-[#B85304]/45 hover:bg-[#222226] disabled:cursor-not-allowed disabled:opacity-60 sm:p-5"
+      className="group w-full rounded-[1.35rem] border border-zinc-800 bg-[#1C1C1E] p-4 text-left transition hover:border-[#075473]/45 hover:bg-[#222226] disabled:cursor-not-allowed disabled:opacity-60 sm:p-5"
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
@@ -345,7 +345,7 @@ function HotelsSummaryWidget({
               : `${orderedCityIds.length} cit${orderedCityIds.length === 1 ? "y" : "ies"}`}
           </p>
         </div>
-        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#D9BB96]/15 text-[#D9BB96]">
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#075473]/15 text-[#075473]">
           <BedDouble className="h-4 w-4" aria-hidden />
         </span>
       </div>
@@ -411,7 +411,7 @@ function HotelsSummaryWidget({
             : overallAllocation.label}
         </p>
         <ChevronRight
-          className="h-4 w-4 shrink-0 text-zinc-600 transition group-hover:text-[#B85304]"
+          className="h-4 w-4 shrink-0 text-zinc-600 transition group-hover:text-[#075473]"
           aria-hidden
         />
       </div>

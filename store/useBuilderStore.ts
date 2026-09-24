@@ -7,6 +7,13 @@ import {
   hasConsecutiveDuplicateCities,
 } from "@/lib/locationRules";
 import {
+  distributeStayNights,
+  isTransitHubStop,
+  pinTransitHubs,
+  syncTransitHubLocations,
+} from "@/lib/transitHubs";
+import type { PbCity, PbHub } from "@/lib/pocketbase/client";
+import {
   chauffeurDaysFromSelections,
   countBillableChauffeurDays,
   emptyChauffeurSelection,
@@ -30,10 +37,12 @@ import {
 } from "@/lib/builderSteps";
 import type { ExperienceProfile } from "@/lib/experienceProfiler";
 import { coerceExperienceProfile } from "@/lib/experienceProfiler";
+import { useItineraryStore } from "@/store/useItineraryStore";
 import {
   generateTempPNR,
   isValidBookingPNR,
   normalizeBookingPNR,
+  normalizeBookingStatus,
   promoteTempToOfficial,
   resolveOfficialPNR,
   type BookingStatus,
@@ -55,7 +64,7 @@ export type TransitTicketType = "ic_card" | "shinkansen_reserved" | "none";
 export interface LocationStop {
   /** Unique instance id for the itinerary array (DnD / React key) */
   key: string;
-  /** PocketBase cities collection id */
+  /** PocketBase cities collection id (or hub id fallback for transit nodes) */
   cityId: string;
   nights: number;
   /** Stay nights vs 0-night arrival/departure waypoint */
@@ -67,6 +76,10 @@ export interface LocationStop {
   ticketType?: TransitTicketType;
   /** Estimated € per passenger for pre-booked tickets */
   ticketPricePerPax?: number;
+  /** Step 2 airport/port auto-inserted into the route (locked, 0 nights) */
+  isTransitHub?: boolean;
+  /** PocketBase hubs id when this stop is an arrival/departure transit point */
+  hubId?: string;
 }
 
 export function coerceTransitType(
@@ -83,10 +96,20 @@ function normalizeLocation(
   index = 0,
   length = 1
 ): LocationStop {
-  const visitType = coerceVisitTypeForPosition(l.visitType, index, length);
+  const isHub = Boolean(
+    l.isTransitHub ||
+      l.hubId ||
+      l.key === "__transit_arrival__" ||
+      l.key === "__transit_departure__"
+  );
+  const visitType = isHub
+    ? l.visitType === "departure"
+      ? "departure"
+      : "arrival"
+    : coerceVisitTypeForPosition(l.visitType, index, length);
   const transitType = coerceTransitType(l.transitType);
   const nights =
-    visitType === "stay"
+    visitType === "stay" && !isHub
       ? Math.max(1, Math.min(90, Math.round(Number(l.nights) || 1)))
       : 0;
   const needsTicket =
@@ -120,6 +143,9 @@ function normalizeLocation(
     needsTicket,
     ticketType,
     ticketPricePerPax,
+    ...(isHub
+      ? { isTransitHub: true, hubId: l.hubId || undefined }
+      : { isTransitHub: false }),
   };
 }
 
@@ -128,7 +154,7 @@ export type TravelPace = "fast" | "moderate" | "relaxed" | null;
 /** Step 5 pathway: full concierge package vs self-selected experiences */
 export type ExperienceService = "concierge" | "tailored" | null;
 
-export type HotelStarRating = 4 | 5;
+export type HotelStarRating = 3 | 4 | 5;
 export type HotelRoomType = "Standard" | "Twin" | "Superior";
 export type SeasonTierName = "Low" | "Mid" | "High";
 
@@ -218,6 +244,8 @@ export interface BuilderState {
   highestUnlockedStep: number;
   /** Preferred itinerary intensity */
   travelPace: TravelPace;
+  /** City-level preferred guided language code (EN, JA, …) for Experiences */
+  preferredTourLanguage: string;
   /** Non-AI Experience Profiler quiz result (activity matcher) */
   experienceProfile: ExperienceProfile | null;
   /** Resolved from season_tiers for the chosen arrival date */
@@ -226,23 +254,40 @@ export interface BuilderState {
   /**
    * Dual-stage booking reference lifecycle:
    * - draft: tempBookingRef (TMP-…) while building
-   * - requested / deposit_paid / confirmed: confirmedBookingRef (JPN-…) locked
+   * - in_progress / confirmed: confirmedBookingRef (JPN-…) locked
    */
   tempBookingRef: string;
   confirmedBookingRef: string | null;
   bookingStatus: BookingStatus;
   /** Client-stated target trip budget in EUR (Custom Budget Matcher) */
   customBudgetTarget: number | null;
+  /** Pre-Elite Builder travel style — drives hotel / chauffeur filtering */
+  preEliteTravelStyle:
+    | "classic_explorer"
+    | "premium_comfort"
+    | "vip_bespoke"
+    | null;
+  /** Free-text timing from the pre-elite brief */
+  preEliteDatesLabel: string | null;
+  preEliteInterests: string[];
+  preEliteMotivation: string | null;
+  preElitePainPoints: string[];
+  /** Multi-day builder vs single-day hour-by-hour builder */
+  tripMode: "multi_day" | "single_day";
 }
 
 export interface BuilderActions {
   setDurationDays: (days: number) => void;
   setDurationCustom: (v: boolean) => void;
+  /** Re-split stay nights so they sum exactly to durationDays. */
+  redistributeStayNights: (totalNights?: number) => void;
   setArrivalDate: (iso: string | null) => void;
   setArrivalMode: (mode: HubTravelMode) => void;
   setDepartureMode: (mode: HubTravelMode) => void;
   setArrivalTransferId: (id: string | null) => void;
   setDepartureTransferId: (id: string | null) => void;
+  /** Sync Step 2 hubs into locked 0-night route endpoints (needs hub/city catalogs). */
+  syncRouteTransitHubs: (hubs: import("@/lib/pocketbase/client").PbHub[], cities: import("@/lib/pocketbase/client").PbCity[]) => void;
   setAirportPickup: (v: boolean) => void;
   setAirportDropoff: (v: boolean) => void;
   setNeedHotels: (v: boolean) => void;
@@ -315,6 +360,8 @@ export interface BuilderActions {
     note: ActiveSeasonNote | null
   ) => void;
   setTravelPace: (pace: TravelPace) => void;
+  setPreferredTourLanguage: (code: string) => void;
+  setTripMode: (mode: "multi_day" | "single_day") => void;
   setExperienceProfile: (profile: ExperienceProfile | null) => void;
   setCustomBudgetTarget: (amount: number | null) => void;
   /** Unlock up to `step` after Continue validation (never decreases). */
@@ -332,7 +379,7 @@ export interface BuilderActions {
   ensureTempBookingRef: () => string;
   /**
    * Lock an official JPN- PNR after Print/Request or Revolut deposit.
-   * Status: requested | deposit_paid | confirmed.
+   * Status: in_progress | confirmed (confirmed = admin only on PB leads).
    */
   confirmBookingRef: (
     ref: string,
@@ -357,8 +404,8 @@ const initialState: BuilderState = {
   departureMode: "airport",
   arrivalTransferId: null,
   departureTransferId: null,
-  airportPickup: true,
-  airportDropoff: true,
+  airportPickup: false,
+  airportDropoff: false,
   needHotels: false,
   hotelTier: "5-star",
   roomCount: 1,
@@ -382,6 +429,7 @@ const initialState: BuilderState = {
   needDriver: false,
   highestUnlockedStep: 1,
   travelPace: null,
+  preferredTourLanguage: "EN",
   experienceProfile: null,
   activeSeasonTier: null,
   activeSeasonNote: null,
@@ -389,6 +437,12 @@ const initialState: BuilderState = {
   confirmedBookingRef: null,
   bookingStatus: "draft",
   customBudgetTarget: null,
+  preEliteTravelStyle: null,
+  preEliteDatesLabel: null,
+  preEliteInterests: [],
+  preEliteMotivation: null,
+  preElitePainPoints: [],
+  tripMode: "multi_day",
 };
 
 function syncChauffeurDerived(selections: ChauffeurSelections) {
@@ -434,11 +488,18 @@ const BUILDER_PERSIST_KEYS = [
   "needDriver",
   "highestUnlockedStep",
   "travelPace",
+  "preferredTourLanguage",
   "experienceProfile",
   "tempBookingRef",
   "confirmedBookingRef",
   "bookingStatus",
   "customBudgetTarget",
+  "preEliteTravelStyle",
+  "preEliteDatesLabel",
+  "preEliteInterests",
+  "preEliteMotivation",
+  "preElitePainPoints",
+  "tripMode",
 ] as const satisfies readonly (keyof BuilderState)[];
 
 function pickBuilderPayload(raw: unknown): Partial<BuilderState> {
@@ -468,14 +529,10 @@ function pickBuilderPayload(raw: unknown): Partial<BuilderState> {
     if (locked && isValidBookingPNR(locked)) {
       out.confirmedBookingRef = normalizeBookingPNR(locked);
       const ps = nested.bookingStatus;
-      if (
-        ps === "requested" ||
-        ps === "deposit_paid" ||
-        ps === "confirmed"
-      ) {
-        out.bookingStatus = ps;
+      if (ps) {
+        out.bookingStatus = normalizeBookingStatus(ps);
       } else if (!out.bookingStatus || out.bookingStatus === "draft") {
-        out.bookingStatus = "requested";
+        out.bookingStatus = "in_progress";
       }
     }
   }
@@ -608,20 +665,14 @@ export function mergePersistedBuilderState(
       return current.confirmedBookingRef;
     })(),
     bookingStatus: (() => {
-      const s = p.bookingStatus;
-      if (
-        s === "draft" ||
-        s === "requested" ||
-        s === "deposit_paid" ||
-        s === "confirmed"
-      ) {
-        return s;
+      if (p.bookingStatus != null) {
+        return normalizeBookingStatus(p.bookingStatus);
       }
       return p.confirmedBookingRef || current.confirmedBookingRef
         ? current.bookingStatus === "draft"
-          ? "confirmed"
-          : current.bookingStatus
-        : current.bookingStatus || "draft";
+          ? ("in_progress" as const)
+          : normalizeBookingStatus(current.bookingStatus)
+        : normalizeBookingStatus(current.bookingStatus || "draft");
     })(),
     customBudgetTarget: (() => {
       if (!("customBudgetTarget" in p)) return current.customBudgetTarget;
@@ -629,6 +680,42 @@ export function mergePersistedBuilderState(
       const n = Number(p.customBudgetTarget);
       return Number.isFinite(n) && n > 0 ? Math.round(n) : null;
     })(),
+    preEliteTravelStyle: (() => {
+      const v = p.preEliteTravelStyle;
+      if (
+        v === "classic_explorer" ||
+        v === "premium_comfort" ||
+        v === "vip_bespoke"
+      ) {
+        return v;
+      }
+      if ("preEliteTravelStyle" in p && p.preEliteTravelStyle == null) {
+        return null;
+      }
+      return current.preEliteTravelStyle;
+    })(),
+    preEliteDatesLabel:
+      typeof p.preEliteDatesLabel === "string"
+        ? p.preEliteDatesLabel
+        : "preEliteDatesLabel" in p && p.preEliteDatesLabel == null
+          ? null
+          : current.preEliteDatesLabel,
+    preEliteInterests: Array.isArray(p.preEliteInterests)
+      ? p.preEliteInterests.map(String)
+      : current.preEliteInterests,
+    preEliteMotivation:
+      typeof p.preEliteMotivation === "string"
+        ? p.preEliteMotivation
+        : "preEliteMotivation" in p && p.preEliteMotivation == null
+          ? null
+          : current.preEliteMotivation,
+    preElitePainPoints: Array.isArray(p.preElitePainPoints)
+      ? p.preElitePainPoints.map(String)
+      : current.preElitePainPoints,
+    tripMode:
+      p.tripMode === "single_day" || p.tripMode === "multi_day"
+        ? p.tripMode
+        : current.tripMode ?? "multi_day",
   };
 }
 
@@ -723,7 +810,8 @@ export function normalizeCityHotelPref(
       })();
 
   const starRaw = Number(raw.starRating);
-  const starRating: HotelStarRating = starRaw === 5 ? 5 : 4;
+  const starRating: HotelStarRating =
+    starRaw === 3 || starRaw === 5 ? (starRaw as HotelStarRating) : 4;
   const occRaw = Number(raw.standardOccupancy);
   const standardOccupancy: 1 | 2 = occRaw === 1 ? 1 : 2;
 
@@ -743,8 +831,24 @@ export const useBuilderStore = create<BuilderState & BuilderActions>()(
       ...initialState,
 
       setDurationDays: (days) =>
-        set({ durationDays: Math.max(1, Math.round(days) || 1) }),
+        set((s) => {
+          const durationDays = Math.max(1, Math.round(days) || 1);
+          return {
+            durationDays,
+            locations: distributeStayNights(s.locations, durationDays),
+          };
+        }),
       setDurationCustom: (v) => set({ durationCustom: v }),
+      redistributeStayNights: (totalNights) =>
+        set((s) => {
+          const target = Math.max(
+            1,
+            Math.round(totalNights ?? s.durationDays) || 1
+          );
+          return {
+            locations: distributeStayNights(s.locations, target),
+          };
+        }),
       setArrivalDate: (iso) => set({ arrivalDate: iso }),
       setArrivalMode: (mode) =>
         set((s) => ({
@@ -756,8 +860,24 @@ export const useBuilderStore = create<BuilderState & BuilderActions>()(
           departureMode: mode,
           departureTransferId: s.departureTransferId,
         })),
-      setArrivalTransferId: (id) => set({ arrivalTransferId: id }),
-      setDepartureTransferId: (id) => set({ departureTransferId: id }),
+      setArrivalTransferId: (id) =>
+        set((s) => ({
+          arrivalTransferId: id,
+          // Hubs catalog applied via syncRouteTransitHubs from Step 3 mount / Step 2 UI
+        })),
+      setDepartureTransferId: (id) =>
+        set((s) => ({
+          departureTransferId: id,
+        })),
+      syncRouteTransitHubs: (hubs: PbHub[], cities: PbCity[]) =>
+        set((s) => ({
+          locations: syncTransitHubLocations(s.locations, {
+            arrivalTransferId: s.arrivalTransferId,
+            departureTransferId: s.departureTransferId,
+            hubs,
+            cities,
+          }),
+        })),
       setAirportPickup: (v) => set({ airportPickup: v }),
       setAirportDropoff: (v) => set({ airportDropoff: v }),
       setNeedHotels: (v) => set({ needHotels: v }),
@@ -791,9 +911,16 @@ export const useBuilderStore = create<BuilderState & BuilderActions>()(
         set((s) => {
           const next = { ...s.cityHotels };
           let changed = false;
+          const style = s.preEliteTravelStyle;
+          const defaultStar: HotelStarRating =
+            style === "classic_explorer"
+              ? 3
+              : style === "vip_bespoke"
+                ? 5
+                : 4;
           for (const id of cityIds) {
             if (!next[id]) {
-              next[id] = defaultCityHotel(id);
+              next[id] = { ...defaultCityHotel(id), starRating: defaultStar };
               changed = true;
             }
           }
@@ -802,25 +929,33 @@ export const useBuilderStore = create<BuilderState & BuilderActions>()(
 
       addLocation: (cityId) => {
         const s = get();
-        if (!canAppendCity(s.locations, cityId)) return false;
+        const middle = s.locations.filter((l) => !isTransitHubStop(l));
+        if (!canAppendCity(middle, cityId)) return false;
+        const arrival = s.locations.find((l) => l.key === "__transit_arrival__");
+        const departure = s.locations.find(
+          (l) => l.key === "__transit_departure__"
+        );
+        const nextLocations = pinTransitHubs([
+          ...(arrival ? [arrival] : []),
+          ...middle,
+          normalizeLocation(
+            {
+              key: uid(),
+              cityId,
+              nights: 1,
+              visitType: "stay",
+              transitType: "unset",
+              needsTicket: false,
+              ticketType: "none",
+              ticketPricePerPax: 0,
+            },
+            middle.length,
+            middle.length + 1
+          ),
+          ...(departure ? [departure] : []),
+        ]);
         set({
-          locations: correctLocationVisitTypes([
-            ...s.locations,
-            normalizeLocation(
-              {
-                key: uid(),
-                cityId,
-                nights: 1,
-                visitType: "stay",
-                transitType: "unset",
-                needsTicket: false,
-                ticketType: "none",
-                ticketPricePerPax: 0,
-              },
-              s.locations.length,
-              s.locations.length + 1
-            ),
-          ]),
+          locations: distributeStayNights(nextLocations, s.durationDays),
           cityHotels: {
             ...s.cityHotels,
             [cityId]: s.cityHotels[cityId] || defaultCityHotel(cityId),
@@ -832,14 +967,22 @@ export const useBuilderStore = create<BuilderState & BuilderActions>()(
       removeLocation: (key) =>
         set((s) => {
           const removed = s.locations.find((l) => l.key === key);
-          const locations = correctLocationVisitTypes(
-            s.locations.filter((l) => l.key !== key)
+          if (removed && isTransitHubStop(removed)) return s;
+          const locations = distributeStayNights(
+            pinTransitHubs(
+              correctLocationVisitTypes(
+                s.locations.filter((l) => l.key !== key)
+              )
+            ),
+            s.durationDays
           );
           const stillUsed = removed
             ? locations.some((l) => l.cityId === removed.cityId)
             : true;
           const cityHotels = { ...s.cityHotels };
-          if (removed && !stillUsed) delete cityHotels[removed.cityId];
+          if (removed && !stillUsed && !removed.isTransitHub) {
+            delete cityHotels[removed.cityId];
+          }
           return { locations, cityHotels };
         }),
 
@@ -847,7 +990,9 @@ export const useBuilderStore = create<BuilderState & BuilderActions>()(
         set((s) => ({
           locations: s.locations.map((l) => {
             if (l.key !== key) return l;
-            if (l.visitType !== "stay") return { ...l, nights: 0 };
+            if (isTransitHubStop(l) || l.visitType !== "stay") {
+              return { ...l, nights: 0 };
+            }
             return {
               ...l,
               nights: Math.max(1, Math.min(90, Math.round(nights) || 1)),
@@ -859,6 +1004,8 @@ export const useBuilderStore = create<BuilderState & BuilderActions>()(
         set((s) => {
           const index = s.locations.findIndex((l) => l.key === key);
           if (index < 0) return s;
+          const current = s.locations[index];
+          if (isTransitHubStop(current)) return s;
           const coerced = coerceVisitTypeForPosition(
             visitType,
             index,
@@ -872,17 +1019,21 @@ export const useBuilderStore = create<BuilderState & BuilderActions>()(
             return s;
           }
           return {
-            locations: s.locations.map((l) => {
-              if (l.key !== key) return l;
-              if (coerced === "stay") {
-                return {
-                  ...l,
-                  visitType: "stay" as const,
-                  nights: l.nights > 0 ? l.nights : 1,
-                };
-              }
-              return { ...l, visitType: coerced, nights: 0 };
-            }),
+            locations: pinTransitHubs(
+              s.locations.map((l) => {
+                if (l.key !== key) return l;
+                if (coerced === "stay") {
+                  return {
+                    ...l,
+                    visitType: "stay" as const,
+                    nights: l.nights > 0 ? l.nights : 1,
+                    isTransitHub: false,
+                    hubId: undefined,
+                  };
+                }
+                return { ...l, visitType: coerced, nights: 0 };
+              })
+            ),
           };
         }),
 
@@ -982,14 +1133,24 @@ export const useBuilderStore = create<BuilderState & BuilderActions>()(
         }),
 
       reorderLocations: (locations) => {
-        if (hasConsecutiveDuplicateCities(locations)) return false;
-        set({
-          locations: correctLocationVisitTypes(
-            locations.map((l, i) =>
-              normalizeLocation(l, i, locations.length)
-            )
+        const arrival = get().locations.find(
+          (l) => l.key === "__transit_arrival__" || (l.isTransitHub && l.visitType === "arrival")
+        );
+        const departure = get().locations.find(
+          (l) =>
+            l.key === "__transit_departure__" ||
+            (l.isTransitHub && l.visitType === "departure")
+        );
+        const middle = locations.filter((l) => !isTransitHubStop(l));
+        if (hasConsecutiveDuplicateCities(middle)) return false;
+        const rebuilt = pinTransitHubs([
+          ...(arrival ? [arrival] : []),
+          ...middle.map((l, i) =>
+            normalizeLocation(l, i, middle.length)
           ),
-        });
+          ...(departure ? [departure] : []),
+        ]);
+        set({ locations: rebuilt });
         return true;
       },
 
@@ -1112,7 +1273,7 @@ export const useBuilderStore = create<BuilderState & BuilderActions>()(
 
       setSelectedTourIds: (ids) => set({ selectedTourIds: ids }),
 
-      setEliteConcierge: (v) =>
+      setEliteConcierge: (v) => {
         set(
           v
             ? {
@@ -1125,9 +1286,11 @@ export const useBuilderStore = create<BuilderState & BuilderActions>()(
                 isEliteConcierge: false,
                 experienceService: null,
               }
-        ),
+        );
+        useItineraryStore.getState().setHasEliteConcierge(v);
+      },
 
-      setExperienceService: (service) =>
+      setExperienceService: (service) => {
         set(() => {
           if (service === "concierge") {
             return {
@@ -1147,7 +1310,11 @@ export const useBuilderStore = create<BuilderState & BuilderActions>()(
             experienceService: null,
             isEliteConcierge: false,
           };
-        }),
+        });
+        useItineraryStore
+          .getState()
+          .setHasEliteConcierge(service === "concierge");
+      },
 
       setNeedDriver: (v) =>
         set((s) => {
@@ -1260,6 +1427,17 @@ export const useBuilderStore = create<BuilderState & BuilderActions>()(
               : null,
         }),
 
+      setPreferredTourLanguage: (code) =>
+        set({ preferredTourLanguage: String(code || "EN").trim() || "EN" }),
+
+      setTripMode: (mode) =>
+        set({
+          tripMode: mode === "single_day" ? "single_day" : "multi_day",
+          ...(mode === "single_day"
+            ? { durationDays: 1, durationCustom: true, needHotels: false }
+            : {}),
+        }),
+
       setExperienceProfile: (profile) =>
         set({ experienceProfile: profile }),
 
@@ -1315,8 +1493,8 @@ export const useBuilderStore = create<BuilderState & BuilderActions>()(
                   confirmedBookingRef: locked,
                   bookingStatus:
                     merged.bookingStatus === "draft"
-                      ? ("confirmed" as const)
-                      : merged.bookingStatus,
+                      ? ("in_progress" as const)
+                      : normalizeBookingStatus(merged.bookingStatus),
                 }
               : {}),
           };
@@ -1341,13 +1519,13 @@ export const useBuilderStore = create<BuilderState & BuilderActions>()(
         return next;
       },
 
-      confirmBookingRef: (ref, status = "confirmed") => {
+      confirmBookingRef: (ref, status = "in_progress") => {
         const official = isValidBookingPNR(ref)
           ? normalizeBookingPNR(ref)
           : promoteTempToOfficial(ref);
         set({
           confirmedBookingRef: official,
-          bookingStatus: status,
+          bookingStatus: normalizeBookingStatus(status),
         });
       },
 

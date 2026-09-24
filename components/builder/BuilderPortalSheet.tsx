@@ -44,10 +44,8 @@ export function BuilderPortalSheet({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[100] flex items-end justify-center bg-black/40 sm:items-center sm:p-4"
-      role="dialog"
-      aria-modal="true"
-      aria-label={title}
+      className="tokio-modal-backdrop fixed inset-0 z-[100] flex items-end justify-center sm:items-center sm:p-4"
+      role="presentation"
     >
       <button
         type="button"
@@ -56,7 +54,10 @@ export function BuilderPortalSheet({
         onClick={onClose}
       />
       <div
-        className={`relative z-[1] max-h-[min(90vh,40rem)] w-full overflow-y-auto rounded-t-3xl bg-zinc-900 p-6 pb-32 shadow-xl sm:rounded-3xl sm:pb-8 ${maxWidthClass}`}
+        className={`tokio-modal-content relative z-[1] max-h-[min(90vh,40rem)] w-full overflow-y-auto rounded-t-3xl border border-white/10 p-6 pb-32 sm:rounded-3xl sm:pb-8 ${maxWidthClass}`}
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
       >
         <div className="mb-5 flex items-center justify-between gap-3">
           <h3 className="font-display text-2xl text-white">{title}</h3>

@@ -7,10 +7,12 @@ import type {
   RoomType,
   TransitMode,
 } from "@/config/pricing-data";
+import { ELITE_CONCIERGE_FEE } from "@/lib/eliteConcierge";
 import {
   generateTempPNR,
   promoteTempToOfficial,
   resolveOfficialPNR,
+  normalizeBookingStatus,
   type BookingStatus,
 } from "@/utils/pnr";
 
@@ -145,20 +147,16 @@ const initialState: ItineraryState = {
   children: 0,
   arrivalHub: "narita",
   departureHub: "haneda",
-  pickupTransfer: true,
-  dropoffTransfer: true,
+  pickupTransfer: false,
+  dropoffTransfer: false,
   needHotels: false,
   hotelTier: "5-star",
   rooms: defaultRooms,
-  cityNights: [
-    { cityId: "tokyo", nights: 4 },
-    { cityId: "kyoto", nights: 3 },
-    { cityId: "osaka", nights: 3 },
-  ],
+  cityNights: [],
   selectedTours: [],
   privateChauffeur: false,
   hasEliteConcierge: false,
-  eliteConciergeFee: 50,
+  eliteConciergeFee: ELITE_CONCIERGE_FEE,
   userProfileTag: null,
   userProfile: null,
   transitMode: "shinkansen",
@@ -187,7 +185,7 @@ function coerceUserProfile(raw: unknown): UserTravelProfile | null {
     vibe: p.vibe,
     pace: p.pace,
     crowdStyle: p.crowdStyle,
-    isCompleted: Boolean(p.isCompleted ?? true),
+    isCompleted: p.isCompleted === true,
   };
 }
 
@@ -278,7 +276,11 @@ export const useItineraryStore = create<ItineraryState & ItineraryActions>()(
         })),
 
       setPrivateChauffeur: (v) => set({ privateChauffeur: v }),
-      setHasEliteConcierge: (v) => set({ hasEliteConcierge: v }),
+      setHasEliteConcierge: (v) =>
+        set({
+          hasEliteConcierge: v,
+          eliteConciergeFee: v ? ELITE_CONCIERGE_FEE : get().eliteConciergeFee,
+        }),
       setUserProfileTag: (tag) => set({ userProfileTag: tag }),
       setUserProfile: (profile) =>
         set({
@@ -307,10 +309,10 @@ export const useItineraryStore = create<ItineraryState & ItineraryActions>()(
         return next;
       },
 
-      confirmBookingRef: (ref, status = "confirmed") => {
+      confirmBookingRef: (ref, status = "in_progress") => {
         set({
           confirmedBookingRef: promoteTempToOfficial(ref),
-          bookingStatus: status,
+          bookingStatus: normalizeBookingStatus(status),
         });
       },
 
@@ -345,9 +347,31 @@ export const useItineraryStore = create<ItineraryState & ItineraryActions>()(
       partialize: (s) => ({
         userProfile: s.userProfile,
         userProfileTag: s.userProfileTag,
+        adults: s.adults,
+        children: s.children,
+        totalGuests: s.totalGuests,
+        hotelTier: s.hotelTier,
+        privateChauffeur: s.privateChauffeur,
+        transitMode: s.transitMode,
+        clientName: s.clientName,
+        clientEmail: s.clientEmail,
+        confirmedBookingRef: s.confirmedBookingRef,
+        tempBookingRef: s.tempBookingRef,
+        bookingStatus: s.bookingStatus,
       }),
       merge: (persisted, current) => {
-        const p = (persisted ?? {}) as Partial<ItineraryState>;
+        const raw = (persisted ?? {}) as Record<string, unknown>;
+        const p = (
+          raw.state && typeof raw.state === "object"
+            ? raw.state
+            : raw
+        ) as Partial<ItineraryState>;
+        const adults =
+          typeof p.adults === "number" && p.adults >= 0 ? p.adults : current.adults;
+        const children =
+          typeof p.children === "number" && p.children >= 0
+            ? p.children
+            : current.children;
         return {
           ...current,
           userProfile: coerceUserProfile(p.userProfile) ?? current.userProfile,
@@ -355,6 +379,44 @@ export const useItineraryStore = create<ItineraryState & ItineraryActions>()(
             typeof p.userProfileTag === "string" || p.userProfileTag === null
               ? p.userProfileTag
               : current.userProfileTag,
+          adults,
+          children,
+          totalGuests:
+            typeof p.totalGuests === "number" && p.totalGuests > 0
+              ? p.totalGuests
+              : Math.max(1, adults + children),
+          hotelTier:
+            p.hotelTier === "4-star" || p.hotelTier === "5-star"
+              ? p.hotelTier
+              : current.hotelTier,
+          privateChauffeur:
+            typeof p.privateChauffeur === "boolean"
+              ? p.privateChauffeur
+              : current.privateChauffeur,
+          transitMode:
+            p.transitMode === "shinkansen" || p.transitMode === "private-car"
+              ? p.transitMode
+              : current.transitMode,
+          clientName:
+            typeof p.clientName === "string" && p.clientName.trim()
+              ? p.clientName.trim()
+              : current.clientName,
+          clientEmail:
+            typeof p.clientEmail === "string" && p.clientEmail.trim()
+              ? p.clientEmail.trim().toLowerCase()
+              : current.clientEmail,
+          confirmedBookingRef:
+            typeof p.confirmedBookingRef === "string" || p.confirmedBookingRef === null
+              ? p.confirmedBookingRef
+              : current.confirmedBookingRef,
+          tempBookingRef:
+            typeof p.tempBookingRef === "string"
+              ? p.tempBookingRef
+              : current.tempBookingRef,
+          bookingStatus:
+            p.bookingStatus != null
+              ? normalizeBookingStatus(p.bookingStatus)
+              : current.bookingStatus,
         };
       },
     }

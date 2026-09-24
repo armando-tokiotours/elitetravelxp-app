@@ -108,18 +108,18 @@ export function HubConfigModal({
           <button
             type="button"
             aria-label="Close"
-            className="absolute inset-0 cursor-default bg-black/70"
+            className="tokio-modal-backdrop absolute inset-0 cursor-default"
             onClick={onClose}
           />
 
           <motion.div
-            className="relative z-[1] flex h-[100dvh] max-h-[100dvh] w-full flex-col overflow-hidden bg-[#0a0a0a] sm:h-[min(90dvh,40rem)] sm:max-h-[min(90dvh,40rem)] sm:max-w-lg sm:rounded-3xl sm:border sm:border-zinc-800"
+            className="tokio-modal-content relative z-[1] flex h-[100dvh] max-h-[100dvh] w-full flex-col overflow-hidden border border-white/10 sm:h-[min(90dvh,40rem)] sm:max-h-[min(90dvh,40rem)] sm:max-w-lg sm:rounded-3xl"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 20 }}
             transition={{ duration: 0.25, ease: "easeOut" }}
           >
-            <div className="flex shrink-0 items-center gap-3 border-b border-zinc-800/80 px-4 pb-4 pt-[max(1rem,env(safe-area-inset-top))] sm:px-5 sm:pt-5">
+            <div className="tokio-modal-chrome flex shrink-0 items-center gap-3 border-b px-4 pb-4 pt-[max(1rem,env(safe-area-inset-top))] sm:px-5 sm:pt-5">
               <button
                 type="button"
                 onClick={onClose}
@@ -129,7 +129,7 @@ export function HubConfigModal({
                 <ArrowLeft className="h-5 w-5" />
               </button>
               <div className="min-w-0 flex-1">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#D9BB96]">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#075473]">
                   Configure
                 </p>
                 <h3 className="truncate font-display text-2xl text-white">
@@ -193,7 +193,7 @@ export function HubConfigModal({
               </div>
 
               <div>
-                <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#D9BB96]">
+                <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#075473]">
                   How it works
                 </p>
                 <ExplainerTriggerButton
@@ -209,11 +209,11 @@ export function HubConfigModal({
               </div>
             </div>
 
-            <div className="shrink-0 border-t border-zinc-800 bg-[#0a0a0a] px-4 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:px-5">
+            <div className="tokio-modal-chrome shrink-0 border-t px-4 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:px-5">
               <button
                 type="button"
                 onClick={onClose}
-                className="w-full rounded-full bg-[#0B1F3A] py-3 text-sm font-semibold text-white transition hover:bg-[#143052]"
+                className="w-full rounded-full bg-[#1BA58A] py-3 text-sm font-semibold text-white transition hover:bg-[#159377]"
               >
                 Done
               </button>

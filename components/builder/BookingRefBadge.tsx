@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import {
   activeBookingRef,
+  bookingRefBadgeLabel,
+  normalizeBookingStatus,
   type BookingStatus,
 } from "@/utils/pnr";
 
@@ -27,14 +29,34 @@ export function BookingRefBadge({
     setReady(true);
   }, []);
 
-  const isConfirmed = bookingStatus !== "draft";
+  const status = normalizeBookingStatus(bookingStatus);
   const code = ready
     ? activeBookingRef({
         tempBookingRef,
         confirmedBookingRef,
-        bookingStatus,
+        bookingStatus: status,
       })
     : "";
+
+  const badgeTone =
+    status === "confirmed"
+      ? "border-emerald-500/60 bg-emerald-950/40 text-emerald-400 shadow-[0_0_10px_rgba(16,185,129,0.2)]"
+      : status === "in_progress"
+        ? "border-[#075473]/50 bg-[#075473]/15 text-[#075473]"
+        : "border-[#075473]/50 bg-[#075473]/20 text-[#075473]";
+
+  const label =
+    status === "draft" ? (
+      <>
+        Draft
+        <br />
+        (Not Confirmed)
+      </>
+    ) : status === "confirmed" ? (
+      "✓ Confirmed"
+    ) : (
+      "In Progress"
+    );
 
   if (variant === "inline") {
     return (
@@ -51,21 +73,17 @@ export function BookingRefBadge({
           </span>
         </div>
         <div
-          className={`col-span-1 flex items-center justify-center rounded-xl border p-1.5 text-center transition-all duration-300 ${
-            isConfirmed
-              ? "border-emerald-500/60 bg-emerald-950/40 text-emerald-400 shadow-[0_0_10px_rgba(16,185,129,0.2)]"
-              : "border-[#B85304]/50 bg-[#B85304]/20 text-[#D9BB96]"
-          }`}
+          className={`col-span-1 flex items-center justify-center rounded-xl border p-1.5 text-center transition-all duration-300 ${badgeTone}`}
         >
           <span className="text-[9px] font-bold uppercase leading-tight tracking-wider sm:text-[10px]">
-            {isConfirmed ? (
-              "✓ Confirmed"
-            ) : (
+            {status === "draft" ? (
               <>
                 Draft
                 <br />
                 (Not Confirmed)
               </>
+            ) : (
+              bookingRefBadgeLabel(status)
             )}
           </span>
         </div>
@@ -80,29 +98,17 @@ export function BookingRefBadge({
           Booking Ref
         </span>
         <span
-          className="truncate text-xs font-extrabold tracking-widest text-white sm:text-sm"
+          className="truncate font-mono text-xs font-extrabold tracking-widest text-[#F6A724] sm:text-sm"
           suppressHydrationWarning
         >
           {code || "······"}
         </span>
       </div>
       <div
-        className={`col-span-1 flex items-center justify-center rounded-xl border p-1.5 text-center transition-all duration-300 ${
-          isConfirmed
-            ? "border-emerald-500/60 bg-emerald-950/40 text-emerald-400 shadow-[0_0_10px_rgba(16,185,129,0.2)]"
-            : "border-[#B85304]/50 bg-[#B85304]/20 text-[#D9BB96]"
-        }`}
+        className={`col-span-1 flex items-center justify-center rounded-xl border p-1.5 text-center transition-all duration-300 ${badgeTone}`}
       >
         <span className="text-[9px] font-bold uppercase leading-tight tracking-wider sm:text-[10px]">
-          {isConfirmed ? (
-            "✓ Confirmed"
-          ) : (
-            <>
-              Draft
-              <br />
-              (Not Confirmed)
-            </>
-          )}
+          {label}
         </span>
       </div>
     </div>

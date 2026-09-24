@@ -250,7 +250,7 @@ export function ExplainerModal({
             transition={{ type: "spring", damping: 28, stiffness: 320 }}
           >
             <div className="sticky top-0 z-20 flex shrink-0 items-center justify-between gap-3 border-b border-[#EEE8DF] bg-white px-4 pb-4 pt-6 sm:px-5">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#B85304]">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#075473]">
                 How it works
               </p>
               <button
@@ -385,7 +385,7 @@ function TransferLine({
   return (
     <div className="flex items-start justify-between gap-3">
       <div className="min-w-0">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#B85304]">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#075473]">
           {label}
         </p>
         {hubName ? (

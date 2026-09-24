@@ -3,26 +3,21 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
-import { ArrowLeft, CalendarDays, Check, Info } from "lucide-react";
+import { ArrowLeft, Check } from "lucide-react";
 import type { PbSeasonTier } from "@/lib/pocketbase/client";
 import { resolveSeasonInsight } from "@/lib/seasonality";
-import {
-  useBuilderStore,
-  type SeasonTierName,
-  type TravelPace,
-} from "@/store/useBuilderStore";
+import { useSeasonalFxStore } from "@/store/useSeasonalFxStore";
+import { SeasonalityCard } from "@/components/builder/SeasonalityCard";
+import { DatePickerField } from "@/components/ui/CalendarModal";
+import { LazyVideo } from "@/components/ui/LazyVideo";
+import { useBuilderStore } from "@/store/useBuilderStore";
 import { ChoicePill, FieldLabel } from "../ui";
 import { type PaceId } from "@/lib/travelPace";
-import { paceBrandingKey } from "@/lib/brandingUi";
 import { useSiteBrandingStore } from "@/store/useSiteBrandingStore";
-import { LazyVideo } from "@/components/ui/LazyVideo";
+import { PaceDetailModal } from "@/components/builder/modals/PaceDetailModal";
+import { SeasonalityDetailModal } from "@/components/builder/modals/SeasonalityDetailModal";
 
 const PRESETS = [10, 14, 21] as const;
-const SEASON_IMAGES: Record<SeasonTierName, string> = {
-  Low: "/photo/season-low.jpg",
-  Mid: "/photo/season-mid.jpg",
-  High: "/photo/season-high.jpg",
-};
 
 export function DurationEditorModal({
   open,
@@ -136,7 +131,7 @@ export function DurationEditorModal({
       {open ? (
         <motion.div
           key="duration-editor"
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 backdrop-blur-sm"
+          className="fixed inset-0 z-50 flex items-center justify-center tokio-modal-backdrop bg-[#05080C]/55 backdrop-blur-sm"
           role="dialog"
           aria-modal="true"
           aria-label="Configure trip details"
@@ -146,13 +141,13 @@ export function DurationEditorModal({
           transition={{ duration: 0.2 }}
         >
           <motion.div
-            className="relative flex h-[100dvh] w-full flex-col overflow-hidden bg-[#0a0a0a] md:h-[85vh] md:max-w-2xl md:rounded-2xl md:border md:border-zinc-800"
+            className="tokio-modal-content relative flex h-[100dvh] w-full flex-col overflow-hidden border border-white/10 md:h-[85vh] md:max-w-2xl md:rounded-2xl"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 20 }}
             transition={{ duration: 0.25, ease: "easeOut" }}
           >
-            <div className="flex flex-shrink-0 items-center gap-4 border-b border-zinc-800 bg-[#0a0a0a] p-4 pt-[max(1rem,env(safe-area-inset-top))]">
+            <div className="tokio-modal-chrome flex flex-shrink-0 items-center gap-4 border-b p-4 pt-[max(1rem,env(safe-area-inset-top))]">
               <button
                 type="button"
                 onClick={onClose}
@@ -162,7 +157,7 @@ export function DurationEditorModal({
                 <ArrowLeft className="h-5 w-5" />
               </button>
               <div className="min-w-0 flex-1">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#D9BB96]">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#075473]">
                   Configure
                 </p>
                 <h3 className="truncate font-display text-2xl text-white">
@@ -173,7 +168,11 @@ export function DurationEditorModal({
 
             <div className="flex min-h-0 flex-1 flex-col gap-8 overflow-y-auto p-4 pb-12">
               <div>
-                <FieldLabel>Trip duration days</FieldLabel>
+                <FieldLabel>How many total days will you spend in Japan?</FieldLabel>
+                <p className="mt-1 text-xs text-zinc-500">
+                  Set the full trip length first — then distribute nights across
+                  cities in Locations.
+                </p>
                 <div className="mt-2 flex flex-wrap gap-2">
                   {PRESETS.map((days) => (
                     <ChoicePill
@@ -207,7 +206,7 @@ export function DurationEditorModal({
                         onChange={(e) => applyCustom(e.target.value)}
                         onBlur={commitCustom}
                         placeholder="e.g. 1, 2, 3, 7"
-                        className="w-36 rounded-xl border border-zinc-700 bg-zinc-900 px-3 py-2.5 text-sm text-white outline-none focus:border-[#B85304]"
+                        className="w-36 rounded-xl border border-zinc-700 bg-zinc-900 px-3 py-2.5 text-sm text-white outline-none focus:border-[#075473]"
                       />
                       <span className="text-sm text-zinc-400">
                         Minimum 1 day · Step 3 nights must total{" "}
@@ -220,81 +219,29 @@ export function DurationEditorModal({
                 ) : null}
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div className="flex flex-col justify-center rounded-xl border border-zinc-800 bg-zinc-900 p-3">
-                  <FieldLabel>Arrival date</FieldLabel>
-                  <label className="relative mt-1 block">
-                    <input
-                      type="date"
-                      value={arrivalDate ?? ""}
-                      onChange={(e) => setArrivalDate(e.target.value || null)}
-                      className="w-full bg-transparent py-1.5 text-sm text-white outline-none [color-scheme:dark] focus:outline-none"
-                    />
-                    <CalendarDays
-                      className="pointer-events-none absolute right-0 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-zinc-500"
-                      aria-hidden
-                    />
-                  </label>
-                </div>
+              <div className="flex flex-col gap-4 sm:grid sm:grid-cols-2 sm:gap-3">
+                <DatePickerField
+                  value={arrivalDate}
+                  onChange={(next) => {
+                    setArrivalDate(next);
+                    if (next) {
+                      useSeasonalFxStore.getState().triggerFromDate(next);
+                    }
+                  }}
+                  label="Arrival date"
+                />
 
-                <button
-                  type="button"
-                  onClick={() => {
+                <SeasonalityCard
+                  arrivalDate={arrivalDate}
+                  tier={activeSeasonTier}
+                  crowds={activeSeasonNote?.crowds}
+                  note={activeSeasonNote?.note}
+                  onOpenExplain={() => {
                     if (activeSeasonTier && activeSeasonNote) {
                       setSeasonModalOpen(true);
                     }
                   }}
-                  disabled={!activeSeasonTier || !activeSeasonNote}
-                  className={`flex flex-col justify-center rounded-xl border border-[#B85304]/40 bg-zinc-900 p-3 text-left transition-all ${
-                    activeSeasonTier && activeSeasonNote
-                      ? "cursor-pointer hover:bg-zinc-800"
-                      : "cursor-default opacity-80"
-                  }`}
-                >
-                  <p className="text-[10px] font-medium uppercase tracking-[0.14em] text-zinc-500">
-                    Seasonality
-                  </p>
-                  <AnimatePresence mode="wait">
-                    {activeSeasonTier && activeSeasonNote ? (
-                      <motion.div
-                        key={`${activeSeasonTier}-${activeSeasonNote.note.slice(0, 24)}`}
-                        initial={{ opacity: 0, y: 4 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0 }}
-                        transition={{ duration: 0.2 }}
-                        className="mt-1.5"
-                      >
-                        <p className="flex items-center gap-1.5 text-sm font-semibold leading-snug text-white">
-                          <SeasonLeafIcon />
-                          <span>{activeSeasonTier} Season</span>
-                        </p>
-                        {activeSeasonNote.crowds ? (
-                          <p className="mt-0.5 text-xs text-zinc-400">
-                            {activeSeasonNote.crowds}
-                          </p>
-                        ) : null}
-                        {activeSeasonNote.note ? (
-                          <p className="mt-2 hidden text-xs leading-relaxed text-zinc-500 md:block">
-                            {activeSeasonNote.note}
-                          </p>
-                        ) : null}
-                        <p className="mt-2 flex items-center gap-1 text-[10px] font-medium text-[#B85304]">
-                          <Info className="h-3 w-3 shrink-0" aria-hidden />
-                          Tap to learn more
-                        </p>
-                      </motion.div>
-                    ) : (
-                      <motion.p
-                        key="empty-season"
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        className="mt-1.5 text-xs text-zinc-500"
-                      >
-                        Select a date for insights
-                      </motion.p>
-                    )}
-                  </AnimatePresence>
-                </button>
+                />
               </div>
 
               <div>
@@ -307,7 +254,7 @@ export function DurationEditorModal({
                     const isSelected = travelPace === pace.id;
                     const hasSelection = travelPace !== null;
                     const cardClass = isSelected
-                      ? "border-2 border-[#B85304] opacity-100 scale-100 z-10"
+                      ? "border-2 border-[#075473] opacity-100 scale-100 z-10"
                       : hasSelection
                         ? "border border-zinc-800 opacity-40 grayscale-[50%] scale-95"
                         : "border border-zinc-800 opacity-100 hover:border-accent-500/40 scale-100";
@@ -343,7 +290,7 @@ export function DurationEditorModal({
                             aria-hidden
                           />
                           {isSelected ? (
-                            <span className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-full bg-[#D9BB96] text-[#0B1F3A]">
+                            <span className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-full bg-[#D9718C] text-white">
                               <Check className="h-3.5 w-3.5" strokeWidth={3} />
                             </span>
                           ) : null}
@@ -384,19 +331,19 @@ export function DurationEditorModal({
               </div>
             </div>
 
-            <div className="flex flex-shrink-0 border-t border-zinc-800 bg-[#0a0a0a]/90 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] backdrop-blur-md">
+            <div className="tokio-modal-chrome flex flex-shrink-0 border-t p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
               <button
                 type="button"
                 onClick={onClose}
                 disabled={!canDone}
-                className="w-full rounded-full bg-[#0B1F3A] py-3 text-sm font-semibold text-white transition hover:bg-[#143052] disabled:cursor-not-allowed disabled:opacity-40"
+                className="w-full rounded-full bg-[#1CA67F] py-3 text-sm font-semibold text-white transition hover:bg-[#178f6d] disabled:cursor-not-allowed disabled:opacity-40"
               >
                 Done
               </button>
             </div>
           </motion.div>
 
-          <TravelPaceModal
+          <PaceDetailModal
             paceId={paceModal}
             selected={travelPace}
             onClose={() => setPaceModal(null)}
@@ -406,267 +353,13 @@ export function DurationEditorModal({
             }}
           />
 
-          <SeasonalityExplainerModal
+          <SeasonalityDetailModal
             open={seasonModalOpen}
             onClose={() => setSeasonModalOpen(false)}
             tier={activeSeasonTier}
             crowds={activeSeasonNote?.crowds ?? ""}
             note={activeSeasonNote?.note ?? ""}
           />
-        </motion.div>
-      ) : null}
-    </AnimatePresence>,
-    document.body
-  );
-}
-
-function SeasonalityExplainerModal({
-  open,
-  onClose,
-  tier,
-  crowds,
-  note,
-}: {
-  open: boolean;
-  onClose: () => void;
-  tier: SeasonTierName | null;
-  crowds: string;
-  note: string;
-}) {
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  useEffect(() => {
-    if (!open) return;
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = prev;
-    };
-  }, [open]);
-
-  if (!mounted || !tier) return null;
-
-  const image = SEASON_IMAGES[tier] || SEASON_IMAGES.Mid;
-
-  return createPortal(
-    <AnimatePresence>
-      {open ? (
-        <motion.div
-          key="season-explainer"
-          className="fixed inset-0 z-[100] flex items-end justify-center sm:items-center sm:p-4"
-          role="dialog"
-          aria-modal="true"
-          aria-label={`${tier} Season`}
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-        >
-          <button
-            type="button"
-            aria-label="Close"
-            className="absolute inset-0 cursor-default bg-black/55"
-            onClick={onClose}
-          />
-          <motion.div
-            className="relative z-[1] flex h-[90dvh] max-h-[90dvh] w-full max-w-lg flex-col overflow-hidden rounded-t-3xl bg-[#FBF8F2] shadow-2xl sm:h-[min(90dvh,52rem)] sm:max-h-[min(90dvh,52rem)] sm:rounded-3xl"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 20 }}
-            transition={{ duration: 0.25, ease: "easeOut" }}
-          >
-            <div className="sticky top-0 z-20 flex shrink-0 items-center justify-between gap-3 border-b border-[#EEE8DF] bg-white px-4 pb-4 pt-6 sm:px-5">
-              <div className="min-w-0">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#B85304]">
-                  Seasonality
-                </p>
-                <h3 className="truncate font-display text-2xl text-[#0B1F3A]">
-                  {tier} Season
-                </h3>
-              </div>
-              <button
-                type="button"
-                onClick={onClose}
-                className="shrink-0 rounded-full bg-[#0B1F3A] px-4 py-1.5 text-sm font-semibold text-white"
-              >
-                Close
-              </button>
-            </div>
-
-            <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 pb-[max(7rem,env(safe-area-inset-bottom))] sm:px-5">
-              <article className="overflow-hidden rounded-2xl border border-[#EEE8DF] bg-white shadow-[0_4px_20px_rgba(11,31,58,0.06)]">
-                <div className="relative aspect-[4/5] max-h-[45dvh] w-full bg-[#0B1F3A] sm:max-h-[50dvh]">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={image}
-                    alt=""
-                    className="h-full w-full object-cover"
-                  />
-                </div>
-                <div className="px-4 py-4 sm:px-5">
-                  {crowds ? (
-                    <p className="text-sm font-semibold text-[#B85304]">
-                      {crowds}
-                    </p>
-                  ) : null}
-                  <p className="mt-2 text-sm leading-relaxed text-[#5C6570]">
-                    {note ||
-                      "Seasonal conditions for your arrival date will appear here once configured in Team Access."}
-                  </p>
-                </div>
-              </article>
-            </div>
-
-            <div className="shrink-0 border-t border-[#EEE8DF] bg-white px-4 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:px-5">
-              <button
-                type="button"
-                onClick={onClose}
-                className="w-full rounded-full border border-[#D9D2C7] bg-white py-3.5 text-sm font-semibold text-[#0B1F3A] transition hover:bg-[#F7F3EB]"
-              >
-                Close
-              </button>
-            </div>
-          </motion.div>
-        </motion.div>
-      ) : null}
-    </AnimatePresence>,
-    document.body
-  );
-}
-
-function TravelPaceModal({
-  paceId,
-  selected,
-  onClose,
-  onSelect,
-}: {
-  paceId: PaceId | null;
-  selected: TravelPace;
-  onClose: () => void;
-  onSelect: (id: PaceId) => void;
-}) {
-  const [mounted, setMounted] = useState(false);
-  const brandingItems = useSiteBrandingStore((s) => s.itemsByKey);
-  const getItem = useSiteBrandingStore((s) => s.getItem);
-  const pace = paceId
-    ? { id: paceId, ...getItem(paceBrandingKey(paceId)) }
-    : null;
-  void brandingItems;
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  useEffect(() => {
-    if (!paceId) return;
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = prev;
-    };
-  }, [paceId]);
-
-  if (!mounted) return null;
-
-  return createPortal(
-    <AnimatePresence>
-      {pace ? (
-        <motion.div
-          key="pace-explainer"
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm"
-          role="dialog"
-          aria-modal="true"
-          aria-label={pace.title}
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-        >
-          <button
-            type="button"
-            aria-label="Close"
-            className="absolute inset-0 cursor-default"
-            onClick={onClose}
-          />
-          <motion.div
-            className="relative z-[1] flex max-h-[90dvh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-950 shadow-2xl"
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 16 }}
-            transition={{ duration: 0.22, ease: "easeOut" }}
-          >
-            <div className="sticky top-0 z-20 flex shrink-0 items-center justify-between gap-3 border-b border-zinc-800 bg-zinc-950 px-4 pb-4 pt-5 sm:px-5">
-              <div className="min-w-0">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#D9BB96]">
-                  Travel pace
-                </p>
-                <h3 className="truncate font-display text-2xl text-white">
-                  {pace.title}
-                </h3>
-              </div>
-              <button
-                type="button"
-                onClick={onClose}
-                className="shrink-0 rounded-lg border border-zinc-700 px-3 py-1.5 text-sm font-semibold text-zinc-300 transition hover:border-zinc-500"
-              >
-                Close
-              </button>
-            </div>
-
-            <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-5">
-              <article className="overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900">
-                <div className="relative aspect-[4/5] max-h-[42dvh] w-full bg-zinc-950 sm:max-h-[48dvh]">
-                  {pace.isVideo && pace.mediaUrl ? (
-                    <LazyVideo
-                      src={pace.mediaUrl}
-                      poster={pace.posterUrl || undefined}
-                      muted
-                      loop
-                      playsInline
-                      autoPlay
-                      className="h-full w-full object-cover"
-                    />
-                  ) : pace.mediaUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={pace.mediaUrl}
-                      alt=""
-                      className="h-full w-full object-cover"
-                    />
-                  ) : null}
-                </div>
-                <div className="px-4 py-4 sm:px-5">
-                  <p className="text-sm font-semibold text-white">
-                    {pace.subtitle}
-                  </p>
-                  <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-zinc-400">
-                    {pace.description}
-                  </p>
-                </div>
-              </article>
-            </div>
-
-            <div className="flex shrink-0 flex-col gap-2 border-t border-zinc-800 bg-zinc-950 px-4 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:flex-row-reverse sm:px-5">
-              <button
-                type="button"
-                onClick={() => onSelect(pace.id)}
-                className="w-full rounded-xl bg-accent-500 py-3 text-sm font-bold text-[#D9BB96] transition hover:bg-[#9C4203] sm:flex-1"
-              >
-                {selected === pace.id
-                  ? "✓ Selected — keep this pace"
-                  : "Confirm Selection"}
-              </button>
-              <button
-                type="button"
-                onClick={onClose}
-                className="w-full rounded-xl border border-zinc-700 py-3 text-sm font-semibold text-zinc-300 transition hover:border-zinc-500 sm:flex-1"
-              >
-                Close
-              </button>
-            </div>
-          </motion.div>
         </motion.div>
       ) : null}
     </AnimatePresence>,
@@ -710,25 +403,5 @@ function GuestStepper({
         </button>
       </div>
     </div>
-  );
-}
-
-function SeasonLeafIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
-      <path
-        d="M12 3c4 2 7 6 7 10a7 7 0 11-14 0c0-4 3-8 7-10z"
-        stroke="#B85304"
-        strokeWidth="1.6"
-        fill="#B85304"
-        fillOpacity="0.25"
-      />
-      <path
-        d="M12 7v10"
-        stroke="#B85304"
-        strokeWidth="1.4"
-        strokeLinecap="round"
-      />
-    </svg>
   );
 }

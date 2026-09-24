@@ -152,6 +152,8 @@ export interface PbCity {
   base_price?: number;
   /** Multiplier applied to base_price for city difficulty / cost index */
   base_price_modifier?: number;
+  /** Guided languages available in this city (Builder language dropdown). */
+  available_languages?: string[];
   is_active?: boolean;
   sort_order?: number;
   collectionId: string;
@@ -359,7 +361,11 @@ export type BrandingUiCategory =
   | "quiz_pace"
   | "quiz_crowd"
   | "concierge"
-  | "matcher";
+  | "matcher"
+  | "planner"
+  | "value"
+  | "builder"
+  | "pre_elite";
 
 export interface PbBrandingUiItem {
   id: string;
@@ -483,6 +489,18 @@ export interface PbTour {
   languages?: string[];
   /** Tailor-made: guest can override duration at booking time */
   is_customizable_duration?: boolean;
+  /**
+   * Catalog kind for Builder S / Discover Places:
+   * experience (default) | place (landmark / stop)
+   */
+  entry_type?: "experience" | "place" | string;
+  /** Google Maps coords for future routing */
+  google_location?: {
+    lat?: number;
+    lng?: number;
+    place_id?: string;
+    address?: string;
+  } | null;
   is_active?: boolean;
   collectionId?: string;
   /** @deprecated legacy */
@@ -558,11 +576,10 @@ export const DEFAULT_SITE_BRANDING = {
   hero_title_main: "Build Your",
   hero_title_highlight: "Perfect Japan Trip",
   hero_subtitle: "Design every detail we'll take care of the rest.",
-  font_h1: "Montserrat ExtraBold",
-  font_h2: "Century Gothic",
-  font_body: "Poppins",
-  google_fonts_url:
-    "https://fonts.googleapis.com/css2?family=Montserrat:wght@100;400;500;700;800;900&display=swap",
+  font_h1: "Godiva-Regular",
+  font_h2: "Hanson-Bold",
+  font_body: "Futura-Medium",
+  google_fonts_url: "",
 } as const;
 
 export function brandingGoogleFontsUrl(b: PbSiteBranding | null): string {
@@ -572,7 +589,7 @@ export function brandingGoogleFontsUrl(b: PbSiteBranding | null): string {
 }
 
 /** Default navbar logo (used until an admin uploads one in Site Branding). */
-export const DEFAULT_LOGO_IMAGE = "/brand/elite-travel-logo.png";
+export const DEFAULT_LOGO_IMAGE = "/images/tokiotours-logo.png";
 
 /** Fallback Chureito / Fuji hero when no upload is set (ships in public/brand). */
 export const DEFAULT_HERO_IMAGE = "/brand/hero-background.jpg";
@@ -581,6 +598,8 @@ export const DEFAULT_HERO_IMAGE = "/brand/hero-background.jpg";
 export type PublicBrandAssets = {
   hero?: string;
   logo?: string;
+  /** Builder S single-day hero still (Site Branding → SINGLE-DAY HERO). */
+  hero_single?: string;
 };
 
 export async function fetchPublicBrandAssets(): Promise<PublicBrandAssets> {
@@ -870,6 +889,90 @@ export interface DiscoverConfig {
   tours: PbTour[];
 }
 
+/** Landmark / place rows from the parallel `experiences_and_places` collection. */
+export interface PbExperienceOrPlace {
+  id: string;
+  title: string;
+  city_id?: string;
+  city_name?: string;
+  type?: "experience" | "place" | string;
+  duration_hours?: number;
+  vibe_tags?: string[];
+  description?: string;
+  google_location?: {
+    lat?: number;
+    lng?: number;
+    place_id?: string;
+    address?: string;
+  } | null;
+  cover_photo?: string;
+  is_active?: boolean;
+  sort_order?: number;
+  collectionId?: string;
+}
+
+/** Map EAP records into PbTour-shaped catalog items for shared UI. */
+export function mapEapToTour(
+  row: PbExperienceOrPlace,
+  cities: PbCity[] = []
+): PbTour {
+  const city =
+    cities.find((c) => c.id === row.city_id) ||
+    cities.find(
+      (c) =>
+        c.name.trim().toLowerCase() ===
+        String(row.city_name || "").trim().toLowerCase()
+    );
+  return {
+    id: row.id,
+    city_id: row.city_id || city?.id || "",
+    title: row.title,
+    description: row.description,
+    category: row.type === "place" ? "place" : "activity",
+    entry_type: row.type === "place" ? "place" : "experience",
+    duration_hours: Number(row.duration_hours) || 0,
+    vibe_tags: row.vibe_tags,
+    google_location: row.google_location ?? null,
+    cover_photo: row.cover_photo,
+    is_active: row.is_active !== false,
+    collectionId: row.collectionId,
+    expand: city ? { city_id: city } : undefined,
+  };
+}
+
+export async function fetchExperiencesAndPlaces(): Promise<
+  PbExperienceOrPlace[]
+> {
+  try {
+    return await getPocketBase()
+      .collection("experiences_and_places")
+      .getFullList<PbExperienceOrPlace>({
+        sort: "sort_order,title",
+        filter: "is_active != false",
+      });
+  } catch {
+    return [];
+  }
+}
+
+/** Merge tours + EAP places into one city-scoped catalog. */
+export async function fetchMergedExperiencesPlacesCatalog(
+  cities: PbCity[] = []
+): Promise<PbTour[]> {
+  const pb = getPocketBase();
+  const [tours, eap] = await Promise.all([
+    pb
+      .collection("tours")
+      .getFullList<PbTour>({ sort: "title", expand: "city_id" })
+      .catch(() => [] as PbTour[]),
+    fetchExperiencesAndPlaces(),
+  ]);
+  const fromEap = eap.map((r) => mapEapToTour(r, cities));
+  const tourIds = new Set(tours.map((t) => t.id));
+  return [...tours, ...fromEap.filter((r) => !tourIds.has(r.id))];
+}
+
+
 /** Lightweight tours list for Budget Planner (price-asc friendly). */
 export async function fetchBudgetPlannerTours(): Promise<PbTour[]> {
   const pb = getPocketBase();
@@ -899,13 +1002,20 @@ export async function fetchBudgetPlannerTours(): Promise<PbTour[]> {
 
 export async function fetchDiscoverConfig(): Promise<DiscoverConfig> {
   const pb = getPocketBase();
-  const [citiesRaw, toursRaw] = await Promise.all([
+  const [citiesRaw, toursRaw, eapRaw] = await Promise.all([
     pb.collection("cities").getFullList<PbCity>({ sort: "sort_order,name" }),
     pb.collection("tours").getFullList<PbTour>({ sort: "title" }),
+    fetchExperiencesAndPlaces(),
   ]);
+  const cities = citiesRaw.filter((c) => c.is_active !== false);
+  const tours = toursRaw.filter((t) => t.is_active !== false);
+  const fromEap = eapRaw
+    .filter((r) => r.is_active !== false)
+    .map((r) => mapEapToTour(r, cities));
+  const ids = new Set(tours.map((t) => t.id));
   return {
-    cities: citiesRaw.filter((c) => c.is_active !== false),
-    tours: toursRaw.filter((t) => t.is_active !== false),
+    cities,
+    tours: [...tours, ...fromEap.filter((r) => !ids.has(r.id))],
   };
 }
 

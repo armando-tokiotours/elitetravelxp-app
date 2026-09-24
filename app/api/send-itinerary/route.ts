@@ -79,12 +79,32 @@ export async function POST(req: Request) {
       ? Buffer.from(pdfBase64, "base64")
       : Buffer.from("");
 
+    const tourTypeRaw = String(body.tourType || body.tripMode || "")
+      .trim()
+      .toLowerCase();
+    const tourType =
+      tourTypeRaw === "single_day" || tourTypeRaw === "single-day"
+        ? ("single_day" as const)
+        : tourTypeRaw === "multi_day" || tourTypeRaw === "multi-day"
+          ? ("multi_day" as const)
+          : undefined;
+
     const result = await sendItineraryEmail({
       to: email,
       bookingRef,
       pdfBuffer,
       customerName: customerName || undefined,
+      tourType,
+      tourDate: String(body.tourDate || body.arrivalDate || "").trim() || null,
+      adults: Number(body.adults) || undefined,
+      children: Number(body.children ?? body.kids) || undefined,
     });
+
+    // Lead lifecycle: proposal email ⇒ in_progress
+    const { advanceBookingToInProgress } = await import(
+      "@/lib/bookingLifecycle"
+    );
+    await advanceBookingToInProgress(bookingRef);
 
     return NextResponse.json({
       success: true,

@@ -56,7 +56,7 @@ function AdminDashboardInner() {
   return (
     <>
       <AppSidebar
-        brandEyebrow="Elite Travel"
+        brandEyebrow="TOKIOTOURS"
         brandTitle="Admin"
         expandOnHover
       />
@@ -64,10 +64,10 @@ function AdminDashboardInner() {
         className={`${APP_SIDEBAR_RAIL_PAD} min-h-screen bg-[#121212] text-white`}
       >
         <header className="sticky top-0 z-40 flex items-center gap-3 border-b border-[#2C2C2E] bg-[#121212]/95 px-4 py-3 backdrop-blur lg:hidden">
-          <MobileAppNav brandEyebrow="Elite Travel" brandTitle="Admin" />
+          <MobileAppNav brandEyebrow="TOKIOTOURS" brandTitle="Admin" />
           <div className="min-w-0">
-            <p className="text-[0.6rem] font-semibold uppercase tracking-[0.28em] text-[#B85304]">
-              Elite Travel
+            <p className="text-[0.6rem] font-semibold uppercase tracking-[0.28em] text-[#075473]">
+              TOKIOTOURS
             </p>
             <h1 className="font-display text-lg leading-tight text-white">
               Team Access & Admin
@@ -108,7 +108,7 @@ function AdminDashboardInner() {
                   value={emailInput}
                   onChange={(e) => setEmailInput(e.target.value)}
                   placeholder="Admin email"
-                  className="w-full rounded-xl border border-[#2C2C2E] bg-[#121212] px-3 py-2.5 text-sm text-white outline-none focus:border-[#B85304]"
+                  className="w-full rounded-xl border border-[#2C2C2E] bg-[#121212] px-3 py-2.5 text-sm text-white outline-none focus:border-[#075473]"
                 />
                 <input
                   type="password"
@@ -116,7 +116,7 @@ function AdminDashboardInner() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="Password"
-                  className="w-full rounded-xl border border-[#2C2C2E] bg-[#121212] px-3 py-2.5 text-sm text-white outline-none focus:border-[#B85304]"
+                  className="w-full rounded-xl border border-[#2C2C2E] bg-[#121212] px-3 py-2.5 text-sm text-white outline-none focus:border-[#075473]"
                 />
                 {authError ? (
                   <p className="text-xs text-amber-300">{authError}</p>
@@ -124,7 +124,7 @@ function AdminDashboardInner() {
                 <button
                   type="submit"
                   disabled={authLoading}
-                  className="w-full rounded-full bg-[#B85304] py-2.5 text-sm font-semibold text-white disabled:opacity-60"
+                  className="w-full rounded-full bg-[#075473] py-2.5 text-sm font-semibold text-white disabled:opacity-60"
                 >
                   {authLoading ? "Signing in…" : "Sign in"}
                 </button>
@@ -134,7 +134,7 @@ function AdminDashboardInner() {
             <>
               <div className="mb-6 flex flex-wrap items-center justify-between gap-3 border-b border-zinc-800 pb-6">
                 <div>
-                  <span className="block text-[10px] font-bold uppercase tracking-widest text-[#B85304]">
+                  <span className="block text-[10px] font-bold uppercase tracking-widest text-[#075473]">
                     PRIVATE MANAGEMENT PORTAL
                   </span>
                   <h1 className="mt-1 text-2xl font-black text-white">
@@ -147,14 +147,14 @@ function AdminDashboardInner() {
                   <div className="mt-3 flex flex-wrap items-center gap-2">
                     <Link
                       href="/team-access"
-                      className="flex items-center gap-1.5 rounded-xl border border-zinc-800 bg-[#1C1C1E] px-3.5 py-1.5 text-xs font-bold text-zinc-300 transition hover:border-[#B85304] hover:text-white"
+                      className="flex items-center gap-1.5 rounded-xl border border-zinc-800 bg-[#1C1C1E] px-3.5 py-1.5 text-xs font-bold text-zinc-300 transition hover:border-[#075473] hover:text-white"
                     >
                       <span aria-hidden>←</span>
                       <span>Content Admin</span>
                     </Link>
                     <Link
                       href="/builder"
-                      className="flex items-center gap-1.5 rounded-xl border border-zinc-800 bg-[#1C1C1E] px-3.5 py-1.5 text-xs font-bold text-zinc-400 transition hover:border-[#B85304] hover:text-white"
+                      className="flex items-center gap-1.5 rounded-xl border border-zinc-800 bg-[#1C1C1E] px-3.5 py-1.5 text-xs font-bold text-zinc-400 transition hover:border-[#075473] hover:text-white"
                     >
                       <span aria-hidden>🏠</span>
                       <span>Exit to Trip Builder</span>
@@ -176,7 +176,7 @@ function AdminDashboardInner() {
                   onClick={() => setActiveAdminTab("bookings")}
                   className={`flex items-center gap-2 border-b-2 px-2 pb-3 text-xs font-bold transition ${
                     activeAdminTab === "bookings"
-                      ? "border-[#B85304] text-[#D9BB96]"
+                      ? "border-[#075473] text-[#075473]"
                       : "border-transparent text-zinc-400 hover:text-white"
                   }`}
                 >
@@ -188,7 +188,7 @@ function AdminDashboardInner() {
                   onClick={() => setActiveAdminTab("email")}
                   className={`flex items-center gap-2 border-b-2 px-2 pb-3 text-xs font-bold transition ${
                     activeAdminTab === "email"
-                      ? "border-[#B85304] text-[#D9BB96]"
+                      ? "border-[#075473] text-[#075473]"
                       : "border-transparent text-zinc-400 hover:text-white"
                   }`}
                 >

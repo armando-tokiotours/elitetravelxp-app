@@ -1,6 +1,6 @@
-# Elite Travel XP — Trip Builder + PocketBase Admin
+# TOKIOTOURS — Trip Builder + PocketBase Admin
 
-Mobile-first Japan trip builder for [travelexperiencesgroup.com](https://travelexperiencesgroup.com).
+Mobile-first Japan trip builder for [tokiotours-app.com](https://tokiotours-app.com).
 
 ## Architecture
 

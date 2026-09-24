@@ -1,6 +1,46 @@
 @import "tailwindcss";
 
-/* Self-hosted faces under friendly CSS family names (admin typography) */
+/* Self-hosted faces under friendly CSS family names */
+@font-face {
+  font-family: "Godiva";
+  src: url("/fonts/Godiva-Regular.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Hanson";
+  src: url("/fonts/Hanson-Bold.otf") format("opentype");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Futura";
+  src: url("/fonts/Futura-Medium.ttf") format("truetype");
+  font-weight: 400 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "GeosansLight";
+  src: url("/fonts/GeosansLight-Regular.ttf") format("truetype");
+  font-weight: 300 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Beauty";
+  src: url("/fonts/BeautyDemo.otf") format("opentype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
 @font-face {
   font-family: "Momo Trust Display";
   src: url("/fonts/MomoTrustDisplay-Regular.ttf") format("truetype");
@@ -42,37 +82,48 @@
 }
 
 :root {
-  --background: #000000;
+  --background: #05080c;
   --foreground: #ffffff;
-  --navy: #1e2d4a;
-  --imperial-navy: #1e2d4a;
-  /* Burnt Copper core CTA accent */
-  --gold: #e2c498;
-  --sand: #e2c498;
-  --copper: #b85304;
-  --accent: #b85304;
-  --accent-50: #fdf7f3;
-  --accent-100: #faf0e6;
-  --accent-200: #f3d9c4;
-  --accent-300: #ebbd9b;
-  --accent-400: #d9894e;
-  --accent-500: #b85304;
-  --accent-600: #9c4203;
-  --accent-700: #7e3202;
-  --accent-800: #632502;
-  --accent-900: #481901;
-  --accent-950: #2a0c00;
+  --navy: #004b6e;
+  --imperial-navy: #004b6e;
+  /* TOKIOTOURS accents — deep blue */
+  --gold: #075473;
+  --sand: #e0f7fa;
+  --copper: #075473;
+  --accent: #075473;
+  --accent-50: #e8f4f8;
+  --accent-100: #d1e9f1;
+  --accent-200: #a3d3e3;
+  --accent-300: #6bb3cd;
+  --accent-400: #3a91b0;
+  --accent-500: #075473;
+  --accent-600: #06465f;
+  --accent-700: #05384c;
+  --accent-800: #042a39;
+  --accent-900: #031c26;
+  --accent-950: #020e13;
   --charcoal: #1c1c1e;
   --charcoal-elevated: #2c2c2e;
   --card: #121212;
-  --ivory: #f5efe6;
-  --cream: #f5efe6;
-  --font-h1: "Montserrat", system-ui, sans-serif;
-  --font-h2: "Century Gothic", CenturyGothic, AppleGothic, sans-serif;
-  --font-body: "Poppins", var(--font-poppins), system-ui, sans-serif;
+  --ivory: #e0f7fa;
+  --cream: #fce7f3;
+  /* Palette tokens */
+  --tokio-black: #05080c;
+  --tokio-ice: #e0f7fa;
+  --tokio-deepblue: #004b6e;
+  --tokio-amber: #075473;
+  --tokio-crimson: #e11d48;
+  --tokio-softpink: #fce7f3;
+  --tokio-rose: #e11d48;
+  --tokio-teal: #0d9488;
+  /* Type roles — Godiva / Hanson / Futura / Geosans / Beauty */
+  --font-h1: var(--font-godiva-face), "Godiva", Georgia, serif;
+  --font-h2: var(--font-hanson-face), "Hanson", "Anton", Impact, sans-serif;
+  --font-body: var(--font-futura-face), "Futura", "Trebuchet MS", system-ui, sans-serif;
+  --font-caption: var(--font-geosans-face), "GeosansLight", system-ui, sans-serif;
   --font-display: var(--font-h1);
-  --font-h1-weight: 800;
-  --font-h2-weight: 400;
+  --font-h1-weight: 400;
+  --font-h2-weight: 700;
 }
 
 @theme inline {
@@ -98,8 +149,23 @@
   --color-accent-900: var(--accent-900);
   --color-accent-950: var(--accent-950);
   --color-accent: var(--accent-500);
+  --color-tokio-black: var(--tokio-black);
+  --color-tokio-ice: var(--tokio-ice);
+  --color-tokio-deepblue: var(--tokio-deepblue);
+  --color-tokio-amber: var(--tokio-amber);
+  --color-tokio-crimson: var(--tokio-crimson);
+  --color-tokio-softpink: var(--tokio-softpink);
+  --color-tokio-rose: var(--tokio-rose);
+  --color-tokio-teal: var(--tokio-teal);
   --font-sans: var(--font-body);
   --font-display: var(--font-h1);
+  --font-godiva: var(--font-godiva-face), "Godiva", Georgia, serif;
+  --font-h2: var(--font-hanson-face), "Hanson", "Anton", Impact, sans-serif;
+  --font-anton: var(--font-hanson-face), "Hanson", "Anton", Impact, sans-serif;
+  --font-hanson: var(--font-hanson-face), "Hanson", Impact, sans-serif;
+  --font-futura: var(--font-futura-face), "Futura", "Trebuchet MS", system-ui, sans-serif;
+  --font-geosans: var(--font-geosans-face), "GeosansLight", system-ui, sans-serif;
+  --font-beauty: var(--font-beauty-face), "Beauty", cursive, serif;
 }
 
 body {
@@ -109,12 +175,145 @@ body {
   font-weight: 400;
 }
 
+/**
+ * Ambient luxury lighting — pinned while content scrolls.
+ * Upper-center: soft teal → deep blue spotlight.
+ * Lower-right: warm amber-gold glow.
+ */
+.tokio-ambient-bg {
+  background-color: #05080c;
+  background-image:
+    radial-gradient(
+      ellipse 90% 60% at 50% 0%,
+      rgba(13, 148, 136, 0.15) 0%,
+      rgba(7, 84, 115, 0.14) 32%,
+      transparent 68%
+    ),
+    radial-gradient(
+      ellipse 75% 60% at 90% 85%,
+      rgba(245, 158, 11, 0.12) 0%,
+      transparent 55%
+    );
+  background-attachment: fixed;
+  background-repeat: no-repeat;
+  background-size: 100% 100%;
+}
+
+/**
+ * Universal sub-page / modal / drawer glass —
+ * heavy frosting so page text/cards behind are illegible,
+ * while ambient teal + amber glow still bleeds through.
+ */
+.tokio-modal-backdrop {
+  background-color: rgba(5, 8, 12, 0.55) !important;
+  backdrop-filter: blur(40px) saturate(1.15);
+  -webkit-backdrop-filter: blur(40px) saturate(1.15);
+}
+
+.tokio-modal-content,
+.tokio-drawer-content,
+.tokio-glass-sheet {
+  background-color: rgba(5, 8, 12, 0.88) !important;
+  background-image:
+    radial-gradient(
+      ellipse 90% 60% at 50% 0%,
+      rgba(13, 148, 136, 0.14) 0%,
+      rgba(7, 84, 115, 0.12) 32%,
+      transparent 68%
+    ),
+    radial-gradient(
+      ellipse 75% 60% at 90% 85%,
+      rgba(245, 158, 11, 0.1) 0%,
+      transparent 55%
+    ) !important;
+  background-attachment: fixed;
+  background-repeat: no-repeat;
+  background-size: 100% 100%;
+  backdrop-filter: blur(48px) saturate(1.2) !important;
+  -webkit-backdrop-filter: blur(48px) saturate(1.2) !important;
+  border-color: rgba(255, 255, 255, 0.1);
+  border-top-color: rgba(255, 255, 255, 0.12);
+  box-shadow:
+    0 25px 50px -12px rgba(0, 0, 0, 0.65),
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.06);
+}
+
+/* Opt-in glass sheet classes — apply to modal/drawer content panels. */
+
+/**
+ * Full-screen / slide-over nav drawer —
+ * near-opaque frosting so builder page copy is fully obscured;
+ * ambient teal + amber still pass through as soft glow only.
+ */
+.tokio-nav-drawer {
+  background-color: rgba(5, 8, 12, 0.96) !important;
+  background-image:
+    radial-gradient(
+      ellipse 90% 55% at 50% 0%,
+      rgba(13, 148, 136, 0.1) 0%,
+      rgba(7, 84, 115, 0.08) 30%,
+      transparent 65%
+    ),
+    radial-gradient(
+      ellipse 70% 55% at 92% 88%,
+      rgba(245, 158, 11, 0.07) 0%,
+      transparent 55%
+    ) !important;
+  background-attachment: fixed;
+  background-repeat: no-repeat;
+  background-size: 100% 100%;
+  backdrop-filter: blur(60px) saturate(1.2) !important;
+  -webkit-backdrop-filter: blur(60px) saturate(1.2) !important;
+  border-color: rgba(255, 255, 255, 0.1);
+  box-shadow:
+    0 25px 50px -12px rgba(0, 0, 0, 0.8),
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.06);
+}
+
+.tokio-modal-chrome {
+  background-color: rgba(5, 8, 12, 0.82) !important;
+  backdrop-filter: blur(32px) saturate(1.1);
+  -webkit-backdrop-filter: blur(32px) saturate(1.1);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+/* Seasonal ambient particles (sakura / snow / momiji) */
+@keyframes tokio-seasonal-fall {
+  0% {
+    transform: translate3d(0, -10vh, 0) rotate(0deg);
+    opacity: 0;
+  }
+  8% {
+    opacity: 1;
+  }
+  100% {
+    transform: translate3d(var(--tokio-drift, 40px), 110vh, 0)
+      rotate(var(--tokio-spin, 180deg));
+    opacity: 0;
+  }
+}
+
+.tokio-seasonal-particle {
+  pointer-events: none !important;
+  animation-name: tokio-seasonal-fall;
+  animation-timing-function: linear;
+  animation-fill-mode: both;
+  will-change: transform, opacity;
+  transform: translate3d(0, 0, 0);
+  -webkit-transform: translate3d(0, 0, 0);
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+/* Global Typography Override for H1 Titles — always ALL CAPS */
 h1,
-.text-h1 {
+.text-h1,
+.font-godiva-h1,
+.h1-title {
   font-family: var(--font-h1);
   font-weight: var(--font-h1-weight, 800);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
+  text-transform: uppercase !important;
+  letter-spacing: 0.05em;
 }
 
 h2,
@@ -128,16 +327,61 @@ h3,
   font-family: var(--font-h2);
 }
 
+/* Mandatory Uppercase Transformation for Godiva Font */
+.font-godiva,
+.font-godiva-h1,
 .font-display,
-.font-momo {
+.font-momo,
+[class*="font-godiva"] {
   font-family: var(--font-h1);
-  font-weight: var(--font-h1-weight, 800);
-  letter-spacing: -0.01em;
+  font-weight: var(--font-h1-weight, 600);
+  text-transform: uppercase !important;
+  letter-spacing: 0.05em;
 }
 
 .font-sans,
-.font-poppins {
+.font-poppins,
+.font-futura {
   font-family: var(--font-body);
+}
+
+.font-anton,
+.font-hanson,
+.font-h2 {
+  font-family: var(--font-h2);
+  font-weight: var(--font-h2-weight, 700);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.font-geosans {
+  font-family: var(--font-caption);
+  font-weight: 300;
+}
+
+.font-beauty {
+  font-family: var(--font-beauty-face), "Beauty", cursive, serif;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0.01em;
+}
+
+/* Special keyword styling for “Japan” — title case only (Beauty script) */
+.japan-keyword {
+  font-family: var(--font-beauty-face), "Beauty", cursive, serif !important;
+  font-weight: 400 !important;
+  text-transform: none !important;
+  letter-spacing: 0.02em;
+  color: var(--tokio-crimson);
+}
+
+/* Keep Beauty “Japan” as Japan — do not inherit H1 ALL CAPS */
+h1 .japan-keyword,
+h1 .font-beauty,
+.text-h1 .japan-keyword,
+.h1-title .japan-keyword,
+.font-godiva-h1 .japan-keyword {
+  text-transform: none !important;
 }
 
 /* Hero mockup title — Montserrat Black; escapes DynamicTypography h1 rules */
@@ -226,18 +470,50 @@ select:-webkit-autofill:focus {
 }
 
 @media print {
+  /* Isolate full itemized invoice — hide modals, nav, chrome */
+  body * {
+    visibility: hidden !important;
+  }
+
+  #itinerary-invoice-content,
+  #itinerary-invoice-content *,
+  #itinerary-dossier-view,
+  #itinerary-dossier-view *,
+  #itinerary-print-view,
+  #itinerary-print-view *,
+  .print-document,
+  .print-document * {
+    visibility: visible !important;
+  }
+
+  #itinerary-invoice-content {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 20px !important;
+    background: #ffffff !important;
+    color: #121212 !important;
+    box-shadow: none !important;
+    border: none !important;
+  }
+
   nav,
   .no-print,
   .sticky-action-bar,
   header.sticky,
   .builder-theme > header.no-print,
-  aside {
+  aside,
+  [role="dialog"],
+  .fixed.inset-0 {
     display: none !important;
+    visibility: hidden !important;
   }
 
   body {
     background: white !important;
-    color: #0b1f3a !important;
+    color: #121212 !important;
   }
 
   .print-document {
@@ -254,4 +530,156 @@ select:-webkit-autofill:focus {
   a[href]::after {
     content: none !important;
   }
+
+  /* Executive luxury ticket — force dark type on light paper */
+  #itinerary-invoice-content,
+  #itinerary-invoice-content *,
+  #itinerary-dossier-view,
+  #itinerary-dossier-view *,
+  #itinerary-print-view,
+  #itinerary-print-view *,
+  .print-document,
+  .print-document * {
+    color: #121212 !important;
+    text-shadow: none !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  #itinerary-invoice-content,
+  #itinerary-dossier-view,
+  #itinerary-print-view,
+  .print-document,
+  #itinerary-invoice-content .bg-card,
+  #itinerary-invoice-content .dark-card,
+  #itinerary-dossier-view .bg-card,
+  #itinerary-dossier-view .dark-card,
+  #itinerary-invoice-content [class*="bg-[#0"],
+  #itinerary-invoice-content [class*="bg-[#1"],
+  #itinerary-dossier-view [class*="bg-[#0"],
+  #itinerary-dossier-view [class*="bg-[#1"],
+  #itinerary-dossier-view section,
+  #itinerary-invoice-content section,
+  #itinerary-invoice-content .rounded-2xl,
+  #itinerary-dossier-view .rounded-2xl {
+    background: #ffffff !important;
+    background-color: #ffffff !important;
+    background-image: none !important;
+    box-shadow: none !important;
+  }
+
+  #itinerary-invoice-content .rounded-2xl,
+  #itinerary-dossier-view .rounded-2xl,
+  #itinerary-invoice-content .bg-card,
+  #itinerary-invoice-content .dark-card {
+    border: 1px solid #d4d4d8 !important;
+  }
+
+  #itinerary-invoice-content .accent-title,
+  #itinerary-invoice-content h3,
+  #itinerary-dossier-view .accent-title,
+  #itinerary-dossier-view [class*="tracking"][class*="uppercase"],
+  #itinerary-invoice-content [class*="text-[#075473]"],
+  #itinerary-dossier-view [class*="text-[#075473]"] {
+    color: #075473 !important;
+  }
+
+  /* Single-Day timeline — keep stop numbers + time slots in print */
+  #single-day-invoice-content,
+  #single-day-invoice-content *,
+  #single-day-dossier-view,
+  #single-day-dossier-view * {
+    visibility: visible !important;
+  }
+
+  #single-day-invoice-content {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    background: #ffffff !important;
+  }
+
+  .sd-timeline--print,
+  .sd-timeline--print .sd-timeline-card,
+  .sd-timeline--print .sd-timeline-item {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .sd-timeline--print .sd-timeline-line {
+    background: #075473 !important;
+    background-image: none !important;
+  }
+
+  .sd-timeline--print [class*="text-[#F6A724]"],
+  .sd-timeline--print [class*="text-[#B45309]"],
+  .sd-timeline--print .font-mono {
+    color: #b45309 !important;
+  }
+
+  .sd-timeline--print .font-godiva {
+    color: #0b1f3a !important;
+  }
+
+  .sd-timeline--print span[class*="bg-[#0B1F3A]"],
+  .sd-timeline--print span[class*="bg-[#E60F43]"] {
+    background: #0b1f3a !important;
+    color: #ffffff !important;
+  }
+}
+
+/* Hide modal overlays while html2canvas / print runs */
+body.print-capturing [role="dialog"],
+body.print-capturing .fixed.inset-0 {
+  display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+/*
+ * html2canvas ignores @media print — mirror high-contrast ticket styling
+ * while body.print-capturing is set during PDF export.
+ */
+body.print-capturing #itinerary-invoice-content,
+body.print-capturing #itinerary-invoice-content *,
+body.print-capturing #itinerary-dossier-view,
+body.print-capturing #itinerary-dossier-view *,
+body.print-capturing #itinerary-print-view,
+body.print-capturing #itinerary-print-view *,
+body.print-capturing .print-document,
+body.print-capturing .print-document * {
+  color: #121212 !important;
+  text-shadow: none !important;
+}
+
+body.print-capturing #itinerary-invoice-content,
+body.print-capturing #itinerary-dossier-view,
+body.print-capturing #itinerary-print-view,
+body.print-capturing .print-document,
+body.print-capturing #itinerary-invoice-content .rounded-2xl,
+body.print-capturing #itinerary-dossier-view .rounded-2xl,
+body.print-capturing #itinerary-invoice-content section,
+body.print-capturing #itinerary-dossier-view section,
+body.print-capturing #itinerary-invoice-content [class*="bg-[#0"],
+body.print-capturing #itinerary-invoice-content [class*="bg-[#1"],
+body.print-capturing #itinerary-dossier-view [class*="bg-[#0"],
+body.print-capturing #itinerary-dossier-view [class*="bg-[#1"] {
+  background: #ffffff !important;
+  background-color: #ffffff !important;
+  background-image: none !important;
+  box-shadow: none !important;
+}
+
+body.print-capturing #itinerary-invoice-content .rounded-2xl,
+body.print-capturing #itinerary-dossier-view .rounded-2xl {
+  border: 1px solid #d4d4d8 !important;
+}
+
+body.print-capturing #itinerary-invoice-content .accent-title,
+body.print-capturing #itinerary-invoice-content h3,
+body.print-capturing #itinerary-dossier-view .accent-title,
+body.print-capturing #itinerary-invoice-content [class*="text-[#075473]"],
+body.print-capturing #itinerary-dossier-view [class*="text-[#075473]"] {
+  color: #075473 !important;
 }

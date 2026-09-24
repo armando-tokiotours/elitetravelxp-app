@@ -1,6 +1,6 @@
 /// <reference path="../pb_data/types.d.ts" />
 /**
- * Exact Source of Truth schema for Elite Travel XP.
+ * Exact Source of Truth schema for TOKIOTOURS.
  * Adds app_settings + new field names on existing collections.
  * Legacy fields are left in place; app reads new names with fallbacks.
  */

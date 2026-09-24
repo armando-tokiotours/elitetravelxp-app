@@ -56,7 +56,7 @@ export function RefundPolicyModal({
             exit={{ opacity: 0, y: 24 }}
             transition={{ duration: 0.22, ease: "easeOut" }}
           >
-            <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[#B85304]">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[#F6A724]">
               Elite Concierge
             </p>
             <h2
@@ -68,7 +68,7 @@ export function RefundPolicyModal({
 
             <ul className="mt-4 space-y-4 text-sm leading-relaxed text-zinc-300">
               <li>
-                <p className="font-semibold text-accent-500">
+                <p className="font-semibold text-[#F6A724]">
                   €{ELITE_CONCIERGE_FEE} Tour Credit
                 </p>
                 <p className="mt-1 text-zinc-400">
@@ -78,7 +78,7 @@ export function RefundPolicyModal({
                 </p>
               </li>
               <li>
-                <p className="font-semibold text-accent-500">
+                <p className="font-semibold text-[#F6A724]">
                   Concierge Guarantee
                 </p>
                 <p className="mt-1 text-zinc-400">
@@ -88,7 +88,7 @@ export function RefundPolicyModal({
                 </p>
               </li>
               <li>
-                <p className="font-semibold text-accent-500">Cancellation</p>
+                <p className="font-semibold text-[#DC6E8A]">Cancellation</p>
                 <p className="mt-1 text-zinc-400">
                   If you decide to cancel your trip design before booking, the
                   €{ELITE_CONCIERGE_FEE} covers the custom day-by-day research
@@ -100,7 +100,7 @@ export function RefundPolicyModal({
             <button
               type="button"
               onClick={onClose}
-              className="mt-6 w-full rounded-full bg-[#0B1F3A] py-3 text-sm font-semibold text-white transition hover:bg-[#143052]"
+              className="mt-6 w-full rounded-full bg-[#F6A724] py-3 text-sm font-semibold text-white transition hover:bg-[#E0951A]"
             >
               I Understand
             </button>

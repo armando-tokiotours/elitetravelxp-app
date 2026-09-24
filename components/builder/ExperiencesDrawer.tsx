@@ -19,8 +19,10 @@ import {
   rankToursByProfile,
 } from "@/lib/experienceProfiler";
 import { useBuilderStore } from "@/store/useBuilderStore";
+import { useActiveMatchProfile } from "@/store/useQuizStore";
 import { TravelProfileBadge } from "@/components/quiz/TravelProfileBadge";
 import { ExperienceProfilerModal } from "@/components/quiz/ExperienceProfilerModal";
+import { CityLanguageSelect } from "@/components/builder/CityLanguageSelect";
 
 function tourCategory(tour: PbTour): "tour" | "activity" {
   const cat = String(tour.category || "tour").toLowerCase();
@@ -36,6 +38,7 @@ export function ExperiencesDrawer({
   selectedTours,
   dayOptions,
   guests,
+  availableLanguages,
   onAddTour,
   onRemoveTour,
 }: {
@@ -47,6 +50,7 @@ export function ExperiencesDrawer({
   selectedTours: SelectedTour[];
   dayOptions: ChauffeurDayOption[];
   guests: { adults: number; children: number };
+  availableLanguages?: unknown;
   onAddTour: (
     tour: PbTour,
     scheduledDate: string,
@@ -62,6 +66,10 @@ export function ExperiencesDrawer({
     "tours"
   );
   const [quizOpen, setQuizOpen] = useState(false);
+  const preferredTourLanguage = useBuilderStore((s) => s.preferredTourLanguage);
+  const setPreferredTourLanguage = useBuilderStore(
+    (s) => s.setPreferredTourLanguage
+  );
 
   useEffect(() => {
     setMounted(true);
@@ -92,7 +100,7 @@ export function ExperiencesDrawer({
     [selectedTours]
   );
 
-  const experienceProfile = useBuilderStore((s) => s.experienceProfile);
+  const experienceProfile = useActiveMatchProfile();
 
   const filteredTours = useMemo(() => {
     const list = tours.filter((t) => {
@@ -114,7 +122,7 @@ export function ExperiencesDrawer({
     <AnimatePresence>
       {open ? (
         <div
-          className="fixed inset-0 z-[100] flex items-end justify-center sm:items-center sm:p-4"
+          className="tokio-modal-opaque fixed inset-0 z-[100] flex items-end justify-center sm:items-center sm:p-4"
           role="dialog"
           aria-modal="true"
           aria-label={`${cityName} experiences`}
@@ -138,7 +146,7 @@ export function ExperiencesDrawer({
             <div className="sticky top-0 z-20 shrink-0 border-b border-[#EEE8DF] bg-white px-4 pb-3 pt-6 sm:px-5">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#B85304]">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#075473]">
                     Browse
                   </p>
                   <h3 className="font-display text-2xl text-[#0B1F3A]">
@@ -202,13 +210,19 @@ export function ExperiencesDrawer({
             {toast ? (
               <div
                 role="status"
-                className="mx-4 mt-3 rounded-xl border border-[#B85304]/50 bg-[#FAF0E6] px-3.5 py-2.5 text-sm text-[#632502]"
+                className="mx-4 mt-3 rounded-xl border border-[#075473]/50 bg-[#FAF0E6] px-3.5 py-2.5 text-sm text-[#632502]"
               >
                 ⚠️ {toast}
               </div>
             ) : null}
 
             <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-4 py-4 pb-[max(7rem,env(safe-area-inset-bottom))]">
+              <CityLanguageSelect
+                cityName={cityName}
+                availableLanguages={availableLanguages}
+                value={preferredTourLanguage}
+                onChange={setPreferredTourLanguage}
+              />
               {filteredTours.length === 0 ? (
                 <p className="py-12 text-center text-sm text-[#8A8278]">
                   {activeTab === "tours"
@@ -235,13 +249,16 @@ export function ExperiencesDrawer({
                           : null
                       }
                       bookedLanguage={booked?.selectedLanguage || null}
+                      defaultLanguage={preferredTourLanguage}
                       selected={Boolean(booked)}
                       onAdd={(lang) => {
                         if (booked) {
                           onRemoveTour(tour.id);
                           return;
                         }
-                        if (!lang) {
+                        const resolved =
+                          lang || preferredTourLanguage || "EN";
+                        if (!resolved) {
                           setToast(
                             "Select a preferred language before adding this experience."
                           );
@@ -264,13 +281,13 @@ export function ExperiencesDrawer({
                             setToast(TOUR_DAY_PACKED_MESSAGE);
                             return;
                           }
-                          const result = onAddTour(tour, day.date, lang);
+                          const result = onAddTour(tour, day.date, resolved);
                           if (!result.ok && result.message) {
                             setToast(result.message);
                           }
                           return;
                         }
-                        setPendingLanguage(lang);
+                        setPendingLanguage(resolved);
                         setPickingTourId(tour.id);
                       }}
                     />

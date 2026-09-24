@@ -6,6 +6,7 @@ import {
   type BookingStatus,
 } from "@/utils/pnr";
 import { getAdminPocketBase } from "@/lib/pocketbase/admin";
+import { advanceBookingToInProgress } from "@/lib/bookingLifecycle";
 import { buildItineraryPdf } from "@/lib/itineraryPdf";
 import { sendItineraryEmail, resolveMailConfigured } from "@/lib/email";
 import { TEAM_EMAIL_CONFIG } from "@/lib/emailConfigStore";
@@ -110,7 +111,7 @@ export async function handleSendItinerary(
     const depositMin = quote ? Math.round(quote.min * 0.1) : 0;
     const depositMax = quote ? Math.round(quote.max * 0.1) : 0;
 
-    const storeStatus: BookingStatus = "requested";
+    const storeStatus: BookingStatus = "in_progress";
     const payload = {
       ...state,
       departureDate,
@@ -188,6 +189,45 @@ export async function handleSendItinerary(
       }
     }
 
+    // Lightweight bookings_and_leads snapshot (IDs / keys only)
+    try {
+      const {
+        upsertBookingsAndLeads,
+        buildMultiDaySelections,
+        primaryCityFromMultiDay,
+      } = await import("@/lib/bookingsAndLeads");
+      await upsertBookingsAndLeads({
+        bookingRef,
+        email: contactEmail,
+        type: state.tripMode === "single_day" ? "single_day" : "multi_day",
+        status: "quoted",
+        primaryCity: primaryCityFromMultiDay(state, cityNames),
+        tourDate: state.arrivalDate,
+        guests: {
+          adults: state.adults ?? 0,
+          kids: state.children ?? 0,
+        },
+        durationValue:
+          state.tripMode === "single_day"
+            ? undefined
+            : state.durationDays ?? 0,
+        selections: buildMultiDaySelections(state),
+        dossierPdfUrl: null,
+      });
+    } catch (err) {
+      console.warn("[send-itinerary] bookings_and_leads skipped:", err);
+    }
+
+    // Lead lifecycle: draft → in_progress (never confirmed here)
+    const leadRefs = new Set(
+      [bookingRef, draftRef, state.confirmedBookingRef, state.tempBookingRef]
+        .map((r) => String(r || "").trim().toUpperCase())
+        .filter(Boolean)
+    );
+    for (const ref of leadRefs) {
+      await advanceBookingToInProgress(ref);
+    }
+
     // Prefer client-rendered PDF; fall back to pdfkit only when needed
     let pdf: Buffer;
     if (pdfBase64) {
@@ -213,6 +253,19 @@ export async function handleSendItinerary(
         bookingRef,
         pdfBuffer: pdf,
         customerName: contactName || undefined,
+        tourType:
+          state.tripMode === "single_day" ? "single_day" : "multi_day",
+        tourDate:
+          state.tripMode === "single_day"
+            ? // Prefer single-day tour date if present on state payload
+              String(
+                (state as { tourDate?: string | null }).tourDate ||
+                  state.arrivalDate ||
+                  ""
+              ) || null
+            : state.arrivalDate,
+        adults: state.adults,
+        children: state.children,
       });
       mailSent = true;
       mailId = result.id;

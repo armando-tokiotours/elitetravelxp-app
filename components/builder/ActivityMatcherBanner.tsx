@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import { Play, Sparkles, Target } from "lucide-react";
-import { useBuilderStore } from "@/store/useBuilderStore";
+import { useActiveMatchProfile } from "@/store/useQuizStore";
 import { useSiteBrandingStore } from "@/store/useSiteBrandingStore";
 import { TravelProfileBadge } from "@/components/quiz/TravelProfileBadge";
 
@@ -13,12 +13,18 @@ import { TravelProfileBadge } from "@/components/quiz/TravelProfileBadge";
 export function ActivityMatcherBanner({
   onOpenQuiz,
   onWatch,
+  onDiscover,
+  showProfile = true,
 }: {
   onOpenQuiz: () => void;
   /** Opens Activity Match Reel */
   onWatch?: () => void;
+  /** Navigate to Discover Activities */
+  onDiscover?: () => void;
+  /** When false, Travel Profile badge is rendered by the parent */
+  showProfile?: boolean;
 }) {
-  const profile = useBuilderStore((s) => s.experienceProfile);
+  const profile = useActiveMatchProfile();
   const ensureLoaded = useSiteBrandingStore((s) => s.ensureLoaded);
   const brandingItems = useSiteBrandingStore((s) => s.itemsByKey);
   const banner = useSiteBrandingStore((s) => s.getActivityMatcherBanner)();
@@ -40,10 +46,12 @@ export function ActivityMatcherBanner({
 
   return (
     <div className="space-y-2.5">
-      {profile ? <TravelProfileBadge onRetake={onOpenQuiz} tone="dark" /> : null}
+      {showProfile && profile ? (
+        <TravelProfileBadge onRetake={onOpenQuiz} tone="dark" />
+      ) : null}
 
       <div className="overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-950 shadow-lg">
-        <div className="relative aspect-[21/9] min-h-[7rem] w-full sm:aspect-[2.4/1]">
+        <div className="relative aspect-[21/9] min-h-[7.5rem] w-full sm:aspect-[2.4/1] sm:min-h-[8.5rem]">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={imageSrc}
@@ -55,31 +63,44 @@ export function ActivityMatcherBanner({
           <div className="absolute inset-0 bg-gradient-to-r from-black/90 via-black/60 to-black/30" />
           <div className="absolute inset-0 flex flex-col justify-center gap-3 px-4 py-3 sm:px-5">
             <div>
-              <p className="text-[8px] font-semibold uppercase tracking-[0.2em] text-[#B85304] sm:text-[10px]">
+              <p className="text-[8px] font-semibold uppercase tracking-[0.2em] text-[#D9718C] sm:text-[10px]">
                 {eyebrow}
               </p>
               <p className="mt-0.5 text-[11px] font-semibold leading-snug text-white sm:text-base">
                 {headline}
               </p>
             </div>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <button
                 type="button"
                 onClick={onWatch ?? onOpenQuiz}
-                className="flex items-center gap-1.5 rounded-xl border border-[#B85304]/40 bg-zinc-900/90 px-3 py-1.5 text-[11px] font-semibold text-accent-500 shadow-lg transition-all hover:border-accent-500/40 sm:gap-2 sm:px-4 sm:py-2 sm:text-xs"
+                className="flex items-center gap-1.5 rounded-lg border border-[#F6A724]/40 bg-black/60 px-3 py-1.5 text-[11px] font-bold text-[#F6A724] shadow-md backdrop-blur-md transition-all hover:bg-black/80 sm:text-xs"
               >
-                <Play className="h-3.5 w-3.5 fill-accent-400 sm:h-4 sm:w-4" aria-hidden />
+                <Play
+                  className="h-3.5 w-3.5 fill-[#F6A724]"
+                  aria-hidden
+                />
                 <span>{primaryCta}</span>
               </button>
+              {onDiscover ? (
+                <button
+                  type="button"
+                  onClick={onDiscover}
+                  className="flex items-center gap-1.5 rounded-lg border border-[#F6A724]/60 bg-[#F6A724]/20 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-[#F6A724] shadow-md backdrop-blur-md transition-all hover:bg-[#F6A724]/30 sm:text-[11px]"
+                >
+                  <Sparkles className="h-3.5 w-3.5 text-[#F6A724]" aria-hidden />
+                  Discover Activities
+                </button>
+              ) : null}
               <button
                 type="button"
                 onClick={onOpenQuiz}
-                className="inline-flex items-center gap-1 rounded-full border border-[#B85304]/50 bg-[#B85304]/15 px-2.5 py-1 text-[10px] font-semibold text-[#F3D9C4] transition hover:bg-[#B85304]/25 sm:gap-1.5 sm:px-3 sm:py-1.5 sm:text-[11px]"
+                className="inline-flex items-center gap-1.5 rounded-lg border border-white/20 bg-black/60 px-2.5 py-1.5 text-[10px] font-medium text-zinc-300 backdrop-blur-md transition hover:bg-black/80 sm:px-3 sm:text-[11px]"
               >
                 {profile ? (
-                  <Sparkles className="h-2.5 w-2.5 sm:h-3 sm:w-3" aria-hidden />
+                  <Sparkles className="h-3 w-3" aria-hidden />
                 ) : (
-                  <Target className="h-2.5 w-2.5 sm:h-3 sm:w-3" aria-hidden />
+                  <Target className="h-3 w-3" aria-hidden />
                 )}
                 {secondaryCta}
               </button>

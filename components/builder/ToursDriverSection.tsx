@@ -93,7 +93,7 @@ export function ToursDriverSection({
       summary={summary}
     >
       {conciergeLocked ? (
-        <div className="mb-4 rounded-2xl border border-[#B85304]/40 bg-[#B85304]/15 px-4 py-3">
+        <div className="mb-4 rounded-2xl border border-[#075473]/40 bg-[#075473]/15 px-4 py-3">
           <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-accent-500">
             ✨ Elite Concierge Active
           </p>
@@ -218,8 +218,8 @@ function PathwayCard({
         disabled && kind === "tailored"
           ? "cursor-not-allowed border-zinc-800 bg-zinc-950 opacity-45"
           : selected
-            ? "border-[#B85304] bg-[#1C1C1E] ring-1 ring-[#B85304]/40"
-            : "border-zinc-800 bg-[#1C1C1E] hover:border-[#B85304]/45 hover:bg-[#222226]"
+            ? "border-[#075473] bg-[#1C1C1E] ring-1 ring-[#075473]/40"
+            : "border-zinc-800 bg-[#1C1C1E] hover:border-[#075473]/45 hover:bg-[#222226]"
       }`}
     >
       <div className="flex items-start justify-between gap-2">
@@ -229,7 +229,7 @@ function PathwayCard({
         <span
           className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full sm:h-8 sm:w-8 ${
             kind === "concierge"
-              ? "bg-[#B85304]/15 text-[#B85304]"
+              ? "bg-[#F6A724]/15 text-[#F6A724]"
               : "bg-sky-500/15 text-sky-400"
           }`}
           aria-hidden
@@ -260,7 +260,7 @@ function PathwayCard({
               onLearnMore(e as unknown as MouseEvent);
             }
           }}
-          className="mt-2 block cursor-pointer text-xs font-semibold text-[#B85304] underline transition hover:text-white"
+          className="mt-2 block cursor-pointer text-xs font-semibold text-[#075473] underline transition hover:text-white"
         >
           Learn More
         </span>
@@ -269,7 +269,7 @@ function PathwayCard({
       <div className="mt-3 flex items-center justify-between gap-2 border-t border-zinc-800/80 pt-3 sm:mt-4">
         <span
           className={`text-xs font-medium ${
-            selected ? "text-[#B85304]" : "text-zinc-500"
+            selected ? "text-[#075473]" : "text-zinc-500"
           }`}
         >
           {selected
@@ -277,7 +277,7 @@ function PathwayCard({
             : actionLabel ?? "Open"}
         </span>
         <ChevronRight
-          className="h-4 w-4 shrink-0 text-zinc-600 transition group-hover:text-[#B85304]"
+          className="h-4 w-4 shrink-0 text-zinc-600 transition group-hover:text-[#075473]"
           aria-hidden
         />
       </div>
@@ -303,7 +303,7 @@ function SelectionSummaryWidget({
       type="button"
       onClick={onEdit}
       disabled={!hasSelection}
-      className="group w-full rounded-[1.35rem] border border-zinc-800 bg-zinc-900 p-4 text-left transition hover:border-[#B85304]/45 hover:bg-zinc-800/80 disabled:cursor-default disabled:opacity-70 sm:p-5"
+      className="group w-full rounded-[1.35rem] border border-zinc-800 bg-zinc-900 p-4 text-left transition hover:border-[#075473]/45 hover:bg-zinc-800/80 disabled:cursor-default disabled:opacity-70 sm:p-5"
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
@@ -359,7 +359,7 @@ function SelectionSummaryWidget({
 
       {hasSelection ? (
         <div className="mt-4 flex items-center justify-end border-t border-zinc-800/80 pt-3">
-          <span className="inline-flex items-center gap-1 text-xs font-medium text-zinc-500 transition group-hover:text-[#B85304]">
+          <span className="inline-flex items-center gap-1 text-xs font-medium text-zinc-500 transition group-hover:text-[#075473]">
             Edit
             <ChevronRight className="h-3.5 w-3.5" aria-hidden />
           </span>

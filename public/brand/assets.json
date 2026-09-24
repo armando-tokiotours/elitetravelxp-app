@@ -1,3 +1,5 @@
 {
-  "hero": "/brand/hero-background.jpg"
+  "hero": "/brand/hero-background.jpg",
+  "logo": "/brand/site-logo.png",
+  "hero_single": "/brand/hero-single-day.jpg"
 }

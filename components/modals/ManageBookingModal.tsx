@@ -2,30 +2,205 @@
 
 import { useEffect, useState, type FormEvent } from "react";
 import { createPortal } from "react-dom";
+import { useRouter } from "next/navigation";
 import { useBuilderStore } from "@/store/useBuilderStore";
+import { usePreBuilderStore } from "@/store/usePreBuilderStore";
 import {
   bookingStatusFromPbRecord,
+  normalizeBookingPNR,
   type BookingStatus,
 } from "@/utils/pnr";
+import { LOCAL_LEADS_STORAGE_KEYS } from "@/lib/syncBookingLead";
+import type { BookingLeadType } from "@/lib/bookingsAndLeads";
+import {
+  emptyTiming,
+  parseItineraryData,
+  type PreEliteBookingPayload,
+} from "@/lib/preEliteBuilder";
 
 export interface ManageBookingModalProps {
   open: boolean;
   onClose: () => void;
-  /** Fired after a successful retrieve (parent may show a toast). */
   onSuccess?: (bookingRef: string) => void;
+  initialPnr?: string;
+  initialEmail?: string;
+  /** Default `/pre-build`. Pass `null` to skip auto-navigation. */
+  successHref?: string | null;
 }
 
 const ERROR_MSG =
-  "No matching booking found. Please check your reference code and email.";
+  "No itinerary found for that email and booking PNR. Check both and try again.";
+
+type LocalLead = {
+  booking_ref?: string;
+  email?: string;
+  type?: BookingLeadType | string;
+  status?: string;
+  selections?: Record<string, unknown>;
+  primary_city?: string;
+  tour_date?: string;
+  guests?: { adults?: number; kids?: number };
+  duration_value?: number;
+};
+
+function findLocalLead(cleanPnr: string, cleanEmail: string): LocalLead | null {
+  if (typeof window === "undefined") return null;
+  for (const key of LOCAL_LEADS_STORAGE_KEYS) {
+    try {
+      const raw = localStorage.getItem(key);
+      if (!raw) continue;
+      const parsed = JSON.parse(raw) as unknown;
+      const list = Array.isArray(parsed) ? parsed : [];
+      for (const item of list) {
+        if (!item || typeof item !== "object") continue;
+        const row = item as LocalLead;
+        const ref = String(row.booking_ref || "")
+          .trim()
+          .toUpperCase();
+        const mail = String(row.email || "")
+          .trim()
+          .toLowerCase();
+        if (ref === cleanPnr && mail === cleanEmail) return row;
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+  return null;
+}
+
+function restorePreBuilderFromBrief(opts: {
+  bookingRef: string;
+  fullName: string;
+  email: string;
+  itineraryData: string;
+}) {
+  const parsed = parseItineraryData(opts.itineraryData);
+  const payload: PreEliteBookingPayload = {
+    bookingRef: opts.bookingRef,
+    fullName: opts.fullName || "Guest",
+    email: opts.email,
+    status: "draft",
+    itineraryData: opts.itineraryData,
+  };
+
+  usePreBuilderStore.setState({
+    ...(parsed
+      ? {
+          travelStyle: parsed.travelStyle,
+          interests: parsed.interests,
+          tripMotivation: parsed.tripMotivation,
+          painPoints: parsed.painPoints,
+          tripType: parsed.tripType,
+          timing: parsed.timing || emptyTiming(),
+          adults: parsed.groupSize.adults,
+          children: parsed.groupSize.children,
+          whatsapp: parsed.whatsapp || "",
+        }
+      : {}),
+    fullName: opts.fullName,
+    email: opts.email,
+    bookingRef: opts.bookingRef,
+    submittedAt: new Date().toISOString(),
+    lastPayload: payload,
+    step: 5,
+  });
+}
+
+async function hydrateFromLead(opts: {
+  bookingRef: string;
+  email?: string;
+  type: string;
+  status?: string;
+  selections?: Record<string, unknown>;
+  primary_city?: string;
+  tour_date?: string;
+  guests?: { adults?: number; kids?: number };
+  duration_value?: number;
+  loadSavedItinerary: (patch: Record<string, unknown>) => void;
+}) {
+  const {
+    expandMultiDaySelectionsToState,
+    expandSingleDaySelectionsToState,
+  } = await import("@/lib/bookingsAndLeads");
+
+  const lead = {
+    id: `local-${opts.bookingRef}`,
+    booking_ref: opts.bookingRef,
+    email: opts.email || "",
+    type: (opts.type === "single_day" ? "single_day" : "multi_day") as BookingLeadType,
+    status: (opts.status as "lead") || "lead",
+    primary_city: opts.primary_city,
+    tour_date: opts.tour_date,
+    guests: {
+      adults: opts.guests?.adults ?? 2,
+      kids: opts.guests?.kids ?? 0,
+    },
+    duration_value: opts.duration_value,
+    selections: (opts.selections || {}) as never,
+  };
+
+  if (lead.type === "single_day") {
+    const singleDay = expandSingleDaySelectionsToState(lead);
+    const { useSingleDayBuilderStore } = await import(
+      "@/store/useSingleDayBuilderStore"
+    );
+    useSingleDayBuilderStore.setState({
+      ...useSingleDayBuilderStore.getState(),
+      ...singleDay,
+    });
+    opts.loadSavedItinerary({
+      tripMode: "single_day",
+      ...singleDay,
+      confirmedBookingRef: opts.bookingRef,
+      bookingStatus: bookingStatusFromPbRecord(opts.status),
+    });
+  } else {
+    const state = expandMultiDaySelectionsToState(lead);
+    opts.loadSavedItinerary({
+      ...state,
+      confirmedBookingRef: opts.bookingRef,
+      bookingStatus: bookingStatusFromPbRecord(
+        opts.status,
+        (state as { bookingStatus?: BookingStatus }).bookingStatus
+      ),
+    });
+  }
+
+  const embedded =
+    typeof opts.selections?.preEliteBrief === "string"
+      ? opts.selections.preEliteBrief
+      : typeof opts.selections?.itineraryData === "string"
+        ? opts.selections.itineraryData
+        : "";
+  if (embedded) {
+    const fullName =
+      typeof opts.selections?.fullName === "string"
+        ? opts.selections.fullName
+        : typeof opts.selections?.full_name === "string"
+          ? opts.selections.full_name
+          : "";
+    restorePreBuilderFromBrief({
+      bookingRef: opts.bookingRef,
+      fullName,
+      email: opts.email || "",
+      itineraryData: embedded,
+    });
+  }
+}
 
 export function ManageBookingModal({
   open,
   onClose,
   onSuccess,
+  initialPnr = "",
+  initialEmail = "",
+  successHref = "/pre-build",
 }: ManageBookingModalProps) {
+  const router = useRouter();
   const [mounted, setMounted] = useState(false);
-  const [pnr, setPnr] = useState("");
-  const [email, setEmail] = useState("");
+  const [pnr, setPnr] = useState(initialPnr);
+  const [email, setEmail] = useState(initialEmail);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const loadSavedItinerary = useBuilderStore((s) => s.loadSavedItinerary);
@@ -36,8 +211,8 @@ export function ManageBookingModal({
 
   useEffect(() => {
     if (!open) return;
-    setPnr("");
-    setEmail("");
+    setPnr(normalizeBookingPNR(initialPnr));
+    setEmail(initialEmail.trim().toLowerCase());
     setBusy(false);
     setError(null);
     const prev = document.body.style.overflow;
@@ -45,17 +220,23 @@ export function ManageBookingModal({
     return () => {
       document.body.style.overflow = prev;
     };
-  }, [open]);
+  }, [open, initialPnr, initialEmail]);
+
+  const finishSuccess = (ref: string) => {
+    onSuccess?.(ref);
+    onClose();
+    if (successHref) router.push(successHref);
+  };
 
   async function handleRetrieve(e: FormEvent) {
     e.preventDefault();
-    const bookingRef = pnr.trim().toUpperCase();
-    const emailNorm = email.trim().toLowerCase();
-    if (!bookingRef || !emailNorm) {
+    const cleanPnr = normalizeBookingPNR(pnr);
+    const cleanEmail = email.trim().toLowerCase();
+    if (!cleanPnr || !cleanEmail) {
       setError(ERROR_MSG);
       return;
     }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailNorm)) {
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
       setError(ERROR_MSG);
       return;
     }
@@ -67,8 +248,8 @@ export function ManageBookingModal({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          email: emailNorm,
-          pnr: bookingRef,
+          email: cleanEmail,
+          pnr: cleanPnr,
         }),
       });
       const data = (await res.json().catch(() => ({}))) as {
@@ -77,28 +258,94 @@ export function ManageBookingModal({
         state?: Record<string, unknown>;
         status?: string;
         error?: string;
+        singleDay?: Record<string, unknown> | null;
+        preElite?: {
+          bookingRef?: string;
+          fullName?: string;
+          email?: string;
+          itineraryData?: string;
+          status?: string;
+        } | null;
       };
 
-      if (!res.ok || !data.ok || !data.state) {
-        setError(data.error || ERROR_MSG);
+      if (res.ok && data.ok && data.state) {
+        const payloadStatus = data.state.bookingStatus as
+          | BookingStatus
+          | undefined;
+        const lockedRef = data.bookingRef || cleanPnr;
+        loadSavedItinerary({
+          ...data.state,
+          confirmedBookingRef: lockedRef,
+          bookingStatus: bookingStatusFromPbRecord(
+            data.status,
+            payloadStatus
+          ),
+        });
+
+        if (data.singleDay && typeof data.singleDay === "object") {
+          const { useSingleDayBuilderStore } = await import(
+            "@/store/useSingleDayBuilderStore"
+          );
+          useSingleDayBuilderStore.setState({
+            ...useSingleDayBuilderStore.getState(),
+            ...data.singleDay,
+          });
+        }
+
+        if (data.preElite?.itineraryData) {
+          restorePreBuilderFromBrief({
+            bookingRef: data.preElite.bookingRef || lockedRef,
+            fullName: data.preElite.fullName || "",
+            email: data.preElite.email || cleanEmail,
+            itineraryData: data.preElite.itineraryData,
+          });
+        }
+
+        finishSuccess(lockedRef);
         return;
       }
 
-      const payloadStatus = data.state.bookingStatus as
-        | BookingStatus
-        | undefined;
-      const lockedRef = data.bookingRef || bookingRef;
-      loadSavedItinerary({
-        ...data.state,
-        confirmedBookingRef: lockedRef,
-        bookingStatus: bookingStatusFromPbRecord(
-          data.status,
-          payloadStatus
-        ),
-      });
-      onSuccess?.(data.bookingRef || bookingRef);
-      onClose();
+      const match = findLocalLead(cleanPnr, cleanEmail);
+      if (match) {
+        await hydrateFromLead({
+          bookingRef: cleanPnr,
+          email: cleanEmail,
+          type: String(match.type || "multi_day"),
+          status: match.status,
+          selections: match.selections,
+          primary_city: match.primary_city,
+          tour_date: match.tour_date,
+          guests: match.guests,
+          duration_value: match.duration_value,
+          loadSavedItinerary,
+        });
+        finishSuccess(cleanPnr);
+        return;
+      }
+
+      setError(data.error || ERROR_MSG);
     } catch {
+      const match = findLocalLead(cleanPnr, cleanEmail);
+      if (match) {
+        try {
+          await hydrateFromLead({
+            bookingRef: cleanPnr,
+            email: cleanEmail,
+            type: String(match.type || "multi_day"),
+            status: match.status,
+            selections: match.selections,
+            primary_city: match.primary_city,
+            tour_date: match.tour_date,
+            guests: match.guests,
+            duration_value: match.duration_value,
+            loadSavedItinerary,
+          });
+          finishSuccess(cleanPnr);
+          return;
+        } catch {
+          /* fall through */
+        }
+      }
       setError(ERROR_MSG);
     } finally {
       setBusy(false);
@@ -109,10 +356,8 @@ export function ManageBookingModal({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/55 p-4 backdrop-blur-sm"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="manage-booking-title"
+      className="tokio-modal-backdrop fixed inset-0 z-[100] flex items-center justify-center p-4"
+      role="presentation"
     >
       <button
         type="button"
@@ -120,7 +365,12 @@ export function ManageBookingModal({
         className="absolute inset-0 cursor-default"
         onClick={onClose}
       />
-      <div className="relative z-[1] w-full max-w-md rounded-2xl border border-zinc-800 bg-zinc-950 p-6 text-white shadow-2xl">
+      <div
+        className="tokio-modal-content relative z-[1] w-full max-w-md rounded-2xl border border-white/10 p-6 text-white"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="manage-booking-title"
+      >
         <h2
           id="manage-booking-title"
           className="mb-1 text-xl font-bold text-white"
@@ -128,7 +378,7 @@ export function ManageBookingModal({
           Manage My Booking
         </h2>
         <p className="mb-6 text-sm text-zinc-400">
-          Enter your details to view or modify your itinerary.
+          Enter your details to reopen your Pre-Build brief and itinerary.
         </p>
 
         <form onSubmit={handleRetrieve}>
@@ -163,7 +413,7 @@ export function ManageBookingModal({
           <button
             type="submit"
             disabled={busy}
-            className="w-full rounded-xl bg-accent-500 py-3 font-bold text-black transition-all hover:bg-[#9C4203] disabled:cursor-wait disabled:opacity-70"
+            className="w-full rounded-xl bg-accent-500 py-3 font-bold text-white transition-all hover:bg-[#05384c] disabled:cursor-wait disabled:opacity-70"
           >
             {busy ? "Retrieving…" : "Retrieve Itinerary"}
           </button>

@@ -31,7 +31,7 @@ export async function getAdminPocketBase(): Promise<PocketBase> {
     "http://pocketbase:8090";
 
   const email =
-    envVal("PB_ADMIN_EMAIL") || "admin@travelexperiencesgroup.com";
+    envVal("PB_ADMIN_EMAIL") || "admin@tokiotours-app.com";
   const password =
     envVal("PB_ADMIN_PASSWORD") || "EliteTravelAdmin2026!";
 

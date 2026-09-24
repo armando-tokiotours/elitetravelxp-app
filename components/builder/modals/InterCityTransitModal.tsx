@@ -119,10 +119,8 @@ export function InterCityTransitModal({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[100] flex items-end justify-center bg-black/55 p-4 backdrop-blur-sm sm:items-center"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="intercity-transit-title"
+      className="tokio-modal-backdrop fixed inset-0 z-[100] flex items-end justify-center p-4 sm:items-center"
+      role="presentation"
     >
       <button
         type="button"
@@ -130,10 +128,15 @@ export function InterCityTransitModal({
         className="absolute inset-0 cursor-default"
         onClick={onClose}
       />
-      <div className="relative z-[1] w-full max-w-md overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-950 text-white shadow-2xl">
+      <div
+        className="tokio-modal-content relative z-[1] w-full max-w-md overflow-hidden rounded-2xl border border-white/10 text-white"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="intercity-transit-title"
+      >
         <div className="flex items-start justify-between gap-3 border-b border-zinc-800 px-5 py-4">
           <div className="min-w-0">
-            <p className="text-[0.65rem] font-semibold uppercase tracking-[0.28em] text-[#B85304]">
+            <p className="text-[0.65rem] font-semibold uppercase tracking-[0.28em] text-[#075473]">
               Inter-city transit
             </p>
             <h2
@@ -236,7 +239,7 @@ export function InterCityTransitModal({
           <button
             type="button"
             onClick={save}
-            className="w-full rounded-xl bg-accent-500 py-3 text-sm font-bold text-black transition hover:bg-[#9C4203]"
+            className="w-full rounded-xl bg-accent-500 py-3 text-sm font-bold text-black transition hover:bg-[#05384c]"
           >
             Save Transport Choice
           </button>
@@ -265,7 +268,7 @@ function TicketRadio({
       aria-pressed={selected}
       className={`flex w-full items-center justify-between gap-3 rounded-xl border px-3 py-2.5 text-left transition ${
         selected
-          ? "border-[#B85304]/40 bg-[#B85304]/15"
+          ? "border-[#075473]/40 bg-[#075473]/15"
           : "border-zinc-700 bg-zinc-950 hover:border-zinc-500"
       }`}
     >
@@ -288,7 +291,7 @@ function TicketRadio({
       <span
         className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
           selected
-            ? "bg-[#B85304]/15 text-accent-500"
+            ? "bg-[#075473]/15 text-accent-500"
             : "bg-zinc-800 text-zinc-400"
         }`}
       >
@@ -320,7 +323,7 @@ function TransitOption({
       aria-pressed={selected}
       className={`w-full rounded-2xl border p-4 text-left transition ${
         selected
-          ? "border-[#B85304] bg-[#B85304]/10 shadow-[0_0_0_1px_rgba(184, 83, 4,0.35)]"
+          ? "border-[#075473] bg-[#075473]/10 shadow-[0_0_0_1px_rgba(7, 84, 115,0.35)]"
           : "border-zinc-800 bg-zinc-900 hover:border-zinc-600"
       }`}
     >
@@ -328,7 +331,7 @@ function TransitOption({
         <span
           className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${
             selected
-              ? "bg-[#B85304]/20 text-[#B85304]"
+              ? "bg-[#075473]/20 text-[#075473]"
               : "bg-zinc-800 text-zinc-300"
           }`}
         >

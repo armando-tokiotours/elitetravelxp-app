@@ -14,6 +14,10 @@ interface SendItineraryParams {
   bookingRef: string;
   pdfBuffer: Buffer;
   customerName?: string;
+  tourType?: "single_day" | "multi_day" | null;
+  tourDate?: string | null;
+  adults?: number;
+  children?: number;
 }
 
 /** Strip accidental quotes from .env values (common Docker/dotenv pitfall). */
@@ -62,6 +66,10 @@ async function sendViaSmtp({
   bookingRef,
   pdfBuffer,
   customerName,
+  tourType,
+  tourDate,
+  adults,
+  children,
 }: SendItineraryParams): Promise<{ id?: string }> {
   const cfg = getActiveEmailConfig();
   const { host, port, user, pass, secure } = cfg.smtp;
@@ -92,6 +100,11 @@ async function sendViaSmtp({
     html: buildProposalHtml(cfg, {
       fullName: customerName || "Valued Guest",
       bookingRef,
+      customerEmail: to,
+      tourType: tourType ?? "multi_day",
+      tourDate: tourDate ?? null,
+      adults: adults ?? 2,
+      children: children ?? 0,
     }),
     attachments:
       pdfBuffer && pdfBuffer.length > 0
@@ -113,6 +126,10 @@ async function sendViaResend({
   bookingRef,
   pdfBuffer,
   customerName,
+  tourType,
+  tourDate,
+  adults,
+  children,
 }: SendItineraryParams): Promise<{ id?: string }> {
   const RESEND_KEY = resolveResendApiKey();
   if (!RESEND_KEY) {
@@ -143,6 +160,11 @@ async function sendViaResend({
     html: buildProposalHtml(cfg, {
       fullName: customerName || "Valued Guest",
       bookingRef,
+      customerEmail: to,
+      tourType: tourType ?? "multi_day",
+      tourDate: tourDate ?? null,
+      adults: adults ?? 2,
+      children: children ?? 0,
     }),
     attachments:
       pdfBuffer && pdfBuffer.length > 0

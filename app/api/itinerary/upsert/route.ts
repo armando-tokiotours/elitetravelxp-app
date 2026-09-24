@@ -57,9 +57,7 @@ export async function POST(request: Request) {
       }
     }
 
-    const storeStatus: BookingStatus = payment?.amountPaid
-      ? "deposit_paid"
-      : "requested";
+    const storeStatus: BookingStatus = "in_progress";
 
     const fields = {
       reference,
@@ -120,6 +118,104 @@ export async function POST(request: Request) {
       });
     } catch {
       record = await pb.collection("booking_requests").create(fields);
+    }
+
+    // Lead lifecycle: payment / upsert ⇒ in_progress on bookings lead
+    try {
+      const { advanceBookingToInProgress } = await import(
+        "@/lib/bookingLifecycle"
+      );
+      await advanceBookingToInProgress(reference);
+      if (state.confirmedBookingRef) {
+        await advanceBookingToInProgress(String(state.confirmedBookingRef));
+      }
+    } catch {
+      /* non-blocking */
+    }
+
+    // Lightweight bookings_and_leads snapshot (IDs only)
+    try {
+      const {
+        upsertBookingsAndLeads,
+        buildMultiDaySelections,
+        buildSingleDaySelections,
+        primaryCityFromMultiDay,
+      } = await import("@/lib/bookingsAndLeads");
+
+      const singleDay = body?.singleDay as
+        | {
+            cityFocus?: string;
+            cityId?: string;
+            tourDate?: string | null;
+            adults?: number;
+            children?: number;
+            tourHours?: number;
+            startTime?: string;
+            travelPace?: string | null;
+            guidePreference?: string;
+            selectedExperiences?: Array<{ tourId: string }>;
+            transitOption?: string;
+          }
+        | undefined;
+
+      if (state.tripMode === "single_day" && singleDay) {
+        await upsertBookingsAndLeads({
+          bookingRef: reference,
+          email: contactEmail,
+          type: "single_day",
+          status: payment?.amountPaid ? "quoted" : "in_progress",
+          primaryCity: singleDay.cityFocus || "",
+          tourDate: singleDay.tourDate ?? null,
+          guests: {
+            adults: Number(singleDay.adults) || 0,
+            kids: Number(singleDay.children) || 0,
+          },
+          durationValue: Number(singleDay.tourHours) || 0,
+          selections: buildSingleDaySelections({
+            cityFocus: singleDay.cityFocus || "",
+            cityId: singleDay.cityId,
+            startTime: singleDay.startTime || "09:00",
+            travelPace:
+              singleDay.travelPace === "fast" ||
+              singleDay.travelPace === "moderate" ||
+              singleDay.travelPace === "relaxed"
+                ? singleDay.travelPace
+                : null,
+            guidePreference:
+              (singleDay.guidePreference as
+                | "private_guide"
+                | "local_host"
+                | "self_paced") || "private_guide",
+            selectedExperiences: (singleDay.selectedExperiences || []).map(
+              (e) => ({
+                tourId: e.tourId,
+                title: "",
+                selectedLanguage: "",
+                duration_hours: 0,
+              })
+            ),
+            tourHours: Number(singleDay.tourHours) || 6,
+            transitOption: singleDay.transitOption,
+          }),
+        });
+      } else {
+        await upsertBookingsAndLeads({
+          bookingRef: reference,
+          email: contactEmail,
+          type: "multi_day",
+          status: payment?.amountPaid ? "quoted" : "in_progress",
+          primaryCity: primaryCityFromMultiDay(state),
+          tourDate: state.arrivalDate,
+          guests: {
+            adults: state.adults ?? 0,
+            kids: state.children ?? 0,
+          },
+          durationValue: state.durationDays ?? 0,
+          selections: buildMultiDaySelections(state),
+        });
+      }
+    } catch (err) {
+      console.warn("[itinerary-upsert] bookings_and_leads skipped:", err);
     }
 
     return NextResponse.json({

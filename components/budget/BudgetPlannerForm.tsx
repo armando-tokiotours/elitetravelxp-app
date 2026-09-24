@@ -191,7 +191,7 @@ export function BudgetPlannerForm() {
         />
         <div className="absolute inset-0 bg-gradient-to-r from-zinc-950 via-zinc-950/85 to-zinc-950/40" />
         <div className="relative px-4 py-8 sm:px-8 sm:py-14">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[#B85304] sm:text-[11px]">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[#075473] sm:text-[11px]">
             {eyebrow}
           </p>
           <h1 className="mt-2 max-w-2xl font-display text-2xl leading-tight text-white sm:text-4xl">
@@ -224,7 +224,7 @@ export function BudgetPlannerForm() {
                 }}
                 className={`rounded-lg px-3 py-1.5 transition ${
                   currency === c
-                    ? "bg-[#B85304] text-zinc-950"
+                    ? "bg-[#075473] text-zinc-950"
                     : "text-zinc-400 hover:text-white"
                 }`}
               >
@@ -268,7 +268,7 @@ export function BudgetPlannerForm() {
                 onClick={() => applyPreset(p.id)}
                 className={`rounded-full border px-3 py-1.5 text-xs transition ${
                   preset === p.id
-                    ? "border-[#B85304] bg-[#B85304]/15 text-[#B85304]"
+                    ? "border-[#075473] bg-[#075473]/15 text-[#075473]"
                     : "border-zinc-700 text-zinc-400 hover:border-zinc-500"
                 }`}
               >
@@ -370,7 +370,7 @@ export function BudgetPlannerForm() {
                 onClick={() => setStayStrategy(opt.id)}
                 className={`rounded-xl border px-4 py-3 text-left transition ${
                   stayStrategy === opt.id
-                    ? "border-[#B85304] bg-[#B85304]/10"
+                    ? "border-[#075473] bg-[#075473]/10"
                     : "border-zinc-700 hover:border-zinc-500"
                 }`}
               >
@@ -385,7 +385,7 @@ export function BudgetPlannerForm() {
           type="button"
           onClick={runPlan}
           disabled={loading}
-          className="mt-6 w-full rounded-xl bg-[#B85304] px-4 py-3 text-sm font-semibold text-zinc-950 transition hover:bg-[#d4b56a] disabled:opacity-50 sm:w-auto"
+          className="mt-6 w-full rounded-xl bg-[#075473] px-4 py-3 text-sm font-semibold text-zinc-950 transition hover:bg-[#d4b56a] disabled:opacity-50 sm:w-auto"
         >
           {loading ? "Loading tours…" : "Curate affordable options"}
         </button>
@@ -462,7 +462,7 @@ export function BudgetPlannerForm() {
                     key={s.tour.id}
                     className={`flex gap-3 rounded-xl border p-3 transition ${
                       selected
-                        ? "border-[#B85304] bg-[#B85304]/10"
+                        ? "border-[#075473] bg-[#075473]/10"
                         : s.fitsBudget
                           ? "border-zinc-800 bg-zinc-900/40"
                           : "border-zinc-800/60 bg-zinc-950/40 opacity-70"
@@ -504,7 +504,7 @@ export function BudgetPlannerForm() {
                           : " · Tour"}
                         {s.isSelfGuided ? " · Self-guided" : ""}
                       </p>
-                      <p className="mt-1 text-sm text-[#B85304]">
+                      <p className="mt-1 text-sm text-[#075473]">
                         {s.partyPrice === 0 ||
                         (s.isSelfGuided && s.partyPrice === 0)
                           ? "Free / self-guided"
@@ -521,7 +521,7 @@ export function BudgetPlannerForm() {
                       onClick={() => toggleTour(s.tour.id)}
                       className={`shrink-0 self-center rounded-lg border px-3 py-2 text-xs font-medium transition ${
                         selected
-                          ? "border-[#B85304] bg-[#B85304] text-zinc-950"
+                          ? "border-[#075473] bg-[#075473] text-zinc-950"
                           : "border-zinc-600 text-zinc-300 hover:border-zinc-400"
                       }`}
                     >
@@ -537,7 +537,7 @@ export function BudgetPlannerForm() {
             <div>
               <p className="text-sm text-white">
                 Selected experiences:{" "}
-                <span className="font-semibold text-[#B85304]">
+                <span className="font-semibold text-[#075473]">
                   {formatMoney(selectedSpend, currency)}
                 </span>
                 <span className="text-zinc-500">
@@ -564,7 +564,7 @@ export function BudgetPlannerForm() {
               <Link
                 href="/builder"
                 onClick={syncToBuilder}
-                className="rounded-xl bg-[#B85304] px-4 py-2.5 text-sm font-semibold text-zinc-950 hover:bg-[#d4b56a]"
+                className="rounded-xl bg-[#075473] px-4 py-2.5 text-sm font-semibold text-zinc-950 hover:bg-[#d4b56a]"
               >
                 Continue in Builder
               </Link>

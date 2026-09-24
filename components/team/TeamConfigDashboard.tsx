@@ -18,7 +18,7 @@ import {
 type TabId = "smtp" | "routing" | "template";
 
 const TABS: { id: TabId; label: string }[] = [
-  { id: "smtp", label: "Hostinger SMTP" },
+  { id: "smtp", label: "SMTP Configuration" },
   { id: "routing", label: "Team Routing" },
   { id: "template", label: "Email Template" },
 ];
@@ -34,7 +34,7 @@ function Field({
 }) {
   return (
     <label className="block">
-      <span className="text-[0.65rem] font-semibold uppercase tracking-[0.18em] text-[#D9BB96]/80">
+      <span className="text-[0.65rem] font-semibold uppercase tracking-[0.18em] text-[#075473]/80">
         {label}
       </span>
       <div className="mt-1.5">{children}</div>
@@ -44,7 +44,7 @@ function Field({
 }
 
 const inputClass =
-  "w-full rounded-xl border border-[#2C2C2E] bg-[#121212] px-3 py-2.5 text-sm text-white outline-none transition placeholder:text-zinc-600 focus:border-[#B85304]";
+  "w-full rounded-xl border border-[#2C2C2E] bg-[#121212] px-3 py-2.5 text-sm text-white outline-none transition placeholder:text-zinc-600 focus:border-[#075473]";
 
 /**
  * Visual Team Email Configuration panel — SMTP, BCC routing, live HTML template.
@@ -148,7 +148,7 @@ export function TeamConfigDashboard({
   if (loading) {
     return (
       <div className="flex items-center justify-center gap-2 py-16 text-sm text-zinc-400">
-        <Loader2 className="h-4 w-4 animate-spin text-[#B85304]" />
+        <Loader2 className="h-4 w-4 animate-spin text-[#075473]" />
         Loading team email settings…
       </div>
     );
@@ -158,7 +158,7 @@ export function TeamConfigDashboard({
     <div className={compact ? "space-y-4" : "space-y-6"}>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <p className="inline-flex items-center gap-1.5 text-[0.65rem] font-semibold uppercase tracking-[0.28em] text-[#B85304]">
+          <p className="inline-flex items-center gap-1.5 text-[0.65rem] font-semibold uppercase tracking-[0.28em] text-[#075473]">
             <Settings2 className="h-3.5 w-3.5" />
             Team Email Settings
           </p>
@@ -166,16 +166,16 @@ export function TeamConfigDashboard({
             Visual configuration
           </h2>
           <p className="mt-1 max-w-xl text-sm text-zinc-400">
-            Edit Hostinger SMTP, team BCC alerts, and proposal email copy. Saves
-            to <code className="text-[#D9BB96]">config/emailConfig.json</code>{" "}
-            and feeds <code className="text-[#D9BB96]">/api/send-itinerary</code>.
+            Edit SMTP (mail.tokiotours.com), team BCC alerts, and proposal email copy. Saves
+            to <code className="text-[#075473]">config/emailConfig.json</code>{" "}
+            and feeds <code className="text-[#075473]">/api/send-itinerary</code>.
           </p>
         </div>
         <button
           type="button"
           disabled={saving}
           onClick={() => void handleSave()}
-          className="inline-flex items-center gap-2 rounded-full bg-[#B85304] px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-[#a04903] disabled:opacity-60"
+          className="inline-flex items-center gap-2 rounded-full bg-[#075473] px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-[#a04903] disabled:opacity-60"
         >
           {saving ? (
             <Loader2 className="h-4 w-4 animate-spin" />
@@ -206,7 +206,7 @@ export function TeamConfigDashboard({
             onClick={() => setTab(t.id)}
             className={`rounded-full px-4 py-2 text-xs font-semibold uppercase tracking-wider transition ${
               tab === t.id
-                ? "bg-[#D9BB96] text-[#121212]"
+                ? "bg-[#075473] text-[#121212]"
                 : "bg-[#1C1C1E] text-zinc-400 hover:text-white"
             }`}
           >
@@ -228,7 +228,7 @@ export function TeamConfigDashboard({
                     smtp: { ...c.smtp, host: e.target.value },
                   }))
                 }
-                placeholder="smtp.hostinger.com"
+                placeholder="mail.tokiotours.com"
               />
             </Field>
             <Field label="SMTP Port">
@@ -290,7 +290,7 @@ export function TeamConfigDashboard({
             type="button"
             disabled={testing}
             onClick={() => void handleTestSmtp()}
-            className="mt-5 inline-flex items-center gap-2 rounded-full border border-[#D9BB96]/40 bg-[#121212] px-4 py-2.5 text-sm font-semibold text-[#D9BB96] transition hover:border-[#D9BB96] disabled:opacity-60"
+            className="mt-5 inline-flex items-center gap-2 rounded-full border border-[#075473]/40 bg-[#121212] px-4 py-2.5 text-sm font-semibold text-[#075473] transition hover:border-[#075473] disabled:opacity-60"
           >
             {testing ? (
               <Loader2 className="h-4 w-4 animate-spin" />
@@ -348,9 +348,9 @@ export function TeamConfigDashboard({
             </Field>
           </div>
           <p className="mt-4 inline-flex items-start gap-2 rounded-xl border border-[#2C2C2E] bg-[#121212] px-3 py-2.5 text-xs text-zinc-400">
-            <Mail className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#B85304]" />
+            <Mail className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#075473]" />
             Guest receives the proposal; BCC goes to{" "}
-            <span className="text-[#D9BB96]">
+            <span className="text-[#075473]">
               {config.routing.bccRecipient || "armando@tokiotours.nl"}
             </span>
             .
@@ -427,7 +427,7 @@ export function TeamConfigDashboard({
             </Field>
           </div>
           <div className="overflow-hidden rounded-2xl border border-[#2C2C2E] bg-[#1C1C1E]">
-            <div className="border-b border-[#2C2C2E] px-4 py-2.5 text-[0.65rem] font-semibold uppercase tracking-[0.2em] text-[#D9BB96]">
+            <div className="border-b border-[#2C2C2E] px-4 py-2.5 text-[0.65rem] font-semibold uppercase tracking-[0.2em] text-[#075473]">
               Live preview
             </div>
             <iframe

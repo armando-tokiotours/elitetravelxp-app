@@ -22,6 +22,7 @@ import {
   tourDurationHours,
 } from "@/lib/tourValidator";
 import { useBuilderStore } from "@/store/useBuilderStore";
+import { useActiveMatchProfile } from "@/store/useQuizStore";
 import { BottomNav } from "@/components/builder/BottomNav";
 import { ExperienceProfilerModal } from "@/components/quiz/ExperienceProfilerModal";
 import { ScheduleTourDaySheet } from "@/components/builder/ScheduleTourDaySheet";
@@ -39,7 +40,7 @@ import {
   MobileAppNav,
 } from "@/components/navigation/AppSidebar";
 
-type ProfileTab = "tours" | "experiences" | "matches";
+type ProfileTab = "tours" | "experiences" | "matches" | "places";
 
 export function DiscoverFeed() {
   const [config, setConfig] = useState<DiscoverConfig | null>(null);
@@ -59,7 +60,7 @@ export function DiscoverFeed() {
   const addCityTour = useBuilderStore((s) => s.addCityTour);
   const removeCityTour = useBuilderStore((s) => s.removeCityTour);
   const isEliteConcierge = useBuilderStore((s) => s.isEliteConcierge);
-  const experienceProfile = useBuilderStore((s) => s.experienceProfile);
+  const experienceProfile = useActiveMatchProfile();
   const userProfile = useItineraryStore((s) => s.userProfile);
   const adults = useBuilderStore((s) => s.adults);
   const children = useBuilderStore((s) => s.children);
@@ -101,21 +102,32 @@ export function DiscoverFeed() {
     return config.tours.filter((t) => t.city_id === selectedCityId);
   }, [config, selectedCityId]);
 
-  /** Guided tours vs activities for Discover tabs */
+  /** Guided tours vs activities vs landmark places for Discover tabs */
   const tourItems = useMemo(() => {
     const list = cityTours.filter((t) => {
+      const et = String(t.entry_type || "").toLowerCase();
+      if (et === "place") return false;
       const cat = String(t.category || "tour").toLowerCase();
-      return cat !== "activity";
+      return cat !== "activity" && cat !== "place";
     });
     return rankToursByProfile(list, experienceProfile);
   }, [cityTours, experienceProfile]);
   const experienceTours = useMemo(() => {
     const list = cityTours.filter((t) => {
+      const et = String(t.entry_type || "").toLowerCase();
+      if (et === "place") return false;
       const cat = String(t.category || "").toLowerCase();
       return cat === "activity";
     });
     return rankToursByProfile(list, experienceProfile);
   }, [cityTours, experienceProfile]);
+  const placeItems = useMemo(() => {
+    return cityTours.filter((t) => {
+      const et = String(t.entry_type || "").toLowerCase();
+      if (et === "place") return true;
+      return String(t.category || "").toLowerCase() === "place";
+    });
+  }, [cityTours]);
 
   const selectedCity = cities.find((c) => c.id === selectedCityId);
   const cityName = selectedCity?.name ?? "City";
@@ -127,7 +139,11 @@ export function DiscoverFeed() {
     : [];
 
   const gridTours =
-    profileTab === "experiences" ? experienceTours : tourItems;
+    profileTab === "experiences"
+      ? experienceTours
+      : profileTab === "places"
+        ? placeItems
+        : tourItems;
 
   const reelSlides = useMemo(
     () =>
@@ -238,24 +254,24 @@ export function DiscoverFeed() {
   const cityBio = (selectedCity?.description ?? "").trim();
 
   return (
-    <div className="builder-theme relative min-h-[100dvh] bg-black text-white">
+    <div className="builder-theme tokio-ambient-bg relative min-h-[100dvh] bg-transparent text-white">
       <AppSidebar
-        brandEyebrow="Elite Travel"
+        brandEyebrow="TOKIOTOURS"
         brandTitle="Discover"
         expandOnHover
       />
 
-      <div className={`${APP_SIDEBAR_RAIL_PAD} min-h-[100dvh] bg-black`}>
-        <header className="sticky top-0 z-40 border-b border-zinc-800 bg-black/95 text-white backdrop-blur-md lg:hidden">
+      <div className={`${APP_SIDEBAR_RAIL_PAD} min-h-[100dvh] bg-transparent`}>
+        <header className="sticky top-0 z-40 border-b border-white/10 bg-[#0D1117]/70 text-white backdrop-blur-md lg:hidden">
           <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
             <div className="flex min-w-0 items-center gap-3">
               <MobileAppNav
-                brandEyebrow="Elite Travel"
+                brandEyebrow="TOKIOTOURS"
                 brandTitle="Discover"
               />
               <div className="min-w-0">
-                <p className="text-[0.6rem] font-semibold uppercase tracking-[0.28em] text-[#B85304]">
-                  Elite Travel
+                <p className="text-[0.6rem] font-semibold uppercase tracking-[0.28em] text-[#075473]">
+                  TOKIOTOURS
                 </p>
                 <h1 className="font-display text-xl leading-tight">Discover</h1>
               </div>
@@ -270,7 +286,7 @@ export function DiscoverFeed() {
         </header>
 
         <div
-          className="mx-auto flex max-w-6xl snap-x snap-mandatory gap-4 overflow-x-auto border-b border-zinc-800 bg-black px-4 py-4 [-ms-overflow-style:none] [scrollbar-width:none] lg:px-8 [&::-webkit-scrollbar]:hidden"
+          className="mx-auto flex max-w-6xl snap-x snap-mandatory gap-4 overflow-x-auto border-b border-white/10 bg-[#0D1117]/50 px-4 py-4 backdrop-blur-md [-ms-overflow-style:none] [scrollbar-width:none] lg:px-8 [&::-webkit-scrollbar]:hidden"
           role="tablist"
           aria-label="Cities"
         >
@@ -294,13 +310,13 @@ export function DiscoverFeed() {
       {toast ? (
         <div
           role="status"
-          className="fixed left-1/2 top-[7.5rem] z-50 max-w-[90vw] -translate-x-1/2 rounded-xl border border-[#B85304]/50 bg-[#FAF0E6] px-3.5 py-2.5 text-center text-sm text-[#632502] shadow-lg"
+          className="fixed left-1/2 top-[7.5rem] z-50 max-w-[90vw] -translate-x-1/2 rounded-xl border border-[#075473]/50 bg-[#FAF0E6] px-3.5 py-2.5 text-center text-sm text-[#632502] shadow-lg"
         >
           ⚠️ {toast}
         </div>
       ) : null}
 
-      <main className="mx-auto max-w-6xl bg-black px-4 pb-32 md:pb-12 lg:px-8">
+      <main className="mx-auto max-w-6xl bg-transparent px-4 pb-32 md:pb-12 lg:px-8">
         {loading || !selectedCity ? (
           <p className="py-16 text-center text-sm text-zinc-500">
             {loading ? "Loading…" : "Select a city"}
@@ -308,18 +324,20 @@ export function DiscoverFeed() {
         ) : (
           <>
             {/* Destination header */}
-            <div className="mx-auto flex max-w-lg items-center gap-6 p-4 text-white lg:max-w-none">
+            <div className="mx-auto mt-3 flex max-w-lg items-center gap-6 rounded-2xl border border-zinc-800/80 bg-[#0D1117]/60 p-4 text-white backdrop-blur-md lg:max-w-none">
               {cityImg ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={cityImg}
-                  alt=""
-                  loading="lazy"
-                  decoding="async"
-                  className="h-20 w-20 shrink-0 rounded-full border border-zinc-700 object-cover"
-                />
+                <div className="h-24 w-24 flex-shrink-0 overflow-hidden rounded-2xl border-2 border-[#075473] shadow-xl sm:h-28 sm:w-28">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={cityImg}
+                    alt=""
+                    loading="lazy"
+                    decoding="async"
+                    className="h-full w-full object-cover"
+                  />
+                </div>
               ) : (
-                <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-full border border-zinc-700 bg-zinc-900 font-display text-2xl text-[#B85304]">
+                <div className="flex h-24 w-24 flex-shrink-0 items-center justify-center overflow-hidden rounded-2xl border-2 border-[#075473] bg-zinc-900/80 font-display text-2xl text-[#075473] shadow-xl backdrop-blur-sm sm:h-28 sm:w-28">
                   {cityName.slice(0, 1)}
                 </div>
               )}
@@ -338,6 +356,12 @@ export function DiscoverFeed() {
                     </span>{" "}
                     <span className="text-zinc-400">Experiences</span>
                   </span>
+                  <span>
+                    <span className="font-semibold text-white">
+                      {placeItems.length}
+                    </span>{" "}
+                    <span className="text-zinc-400">Places</span>
+                  </span>
                 </div>
                 {cityBio ? (
                   <p className="mt-2 line-clamp-2 text-sm text-zinc-400">
@@ -348,11 +372,12 @@ export function DiscoverFeed() {
             </div>
 
             {/* Tabs */}
-            <div className="sticky top-0 z-30 flex justify-around border-b border-t border-zinc-800 bg-black py-3">
+            <div className="sticky top-0 z-30 mt-3 flex justify-around border-b border-t border-white/10 bg-[#0D1117]/70 py-3 backdrop-blur-md">
               {(
                 [
                   { id: "tours" as const, label: "Tours" },
                   { id: "experiences" as const, label: "Experiences" },
+                  { id: "places" as const, label: "Places" },
                   { id: "matches" as const, label: "Your Matches" },
                 ] as const
               ).map((tab) => {
@@ -434,6 +459,7 @@ export function DiscoverFeed() {
         tours={gridTours}
         initialSlide={modalSlide ?? 0}
         guests={guests}
+        hidePrice
         isTourSelected={(id) => selectedTours.some((t) => t.tourId === id)}
         scheduledLabelFor={(id) => {
           const row = selectedTours.find((t) => t.tourId === id);
@@ -506,7 +532,7 @@ function TourThumb({
       type="button"
       onClick={onClick}
       aria-label={tour.title}
-      className="group relative aspect-square cursor-pointer overflow-hidden bg-zinc-900"
+      className="group relative aspect-square cursor-pointer overflow-hidden rounded-sm border border-zinc-800/60 bg-[#0D1117]/60 backdrop-blur-sm"
     >
       {thumbUrl ? (
         // eslint-disable-next-line @next/next/no-img-element
@@ -517,19 +543,30 @@ function TourThumb({
           height={400}
           loading="lazy"
           decoding="async"
-          className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+          className="h-full w-full object-cover transition-all duration-300 group-hover:scale-105 group-hover:brightness-90"
         />
       ) : (
-        <div className="h-full w-full bg-gradient-to-br from-[#1a3355] to-[#0B1F3A]" />
+        <div className="h-full w-full bg-gradient-to-br from-[#1a3355] to-[#0B1F3A] transition-all duration-300 group-hover:brightness-90" />
       )}
-      {/* Sand-gold title — hidden until hover / touch-press */}
-      <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center bg-black/60 p-2 text-center opacity-0 backdrop-blur-[2px] transition-opacity duration-300 group-hover:opacity-100 group-active:opacity-100">
-        <h4 className="line-clamp-3 break-words text-[10px] font-extrabold uppercase leading-tight tracking-wider text-[#D9BB96] drop-shadow-lg whitespace-normal sm:text-xs">
+
+      {/* Base dim + bottom scrim for title contrast; +10% darken on hover */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 z-[5] bg-black/20 transition-all duration-300 group-hover:bg-black/30 group-active:bg-black/30"
+      />
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-x-0 bottom-0 z-[6] h-2/3 bg-gradient-to-t from-black/80 via-black/40 to-transparent transition-opacity duration-300"
+      />
+
+      {/* Pure white title — high contrast on hover / touch */}
+      <div className="pointer-events-none absolute inset-0 z-10 flex items-end justify-center p-2.5 pb-3 text-center opacity-0 transition-all duration-300 group-hover:opacity-100 group-active:opacity-100 sm:items-center sm:pb-2.5">
+        <h4 className="line-clamp-3 break-words text-[10px] font-extrabold uppercase leading-tight tracking-wider text-white drop-shadow-md whitespace-normal [text-shadow:0_1px_3px_rgba(0,0,0,0.85),0_2px_8px_rgba(0,0,0,0.55)] sm:text-xs">
           {tour.title}
         </h4>
       </div>
       {recommended ? (
-        <span className="absolute left-1 top-1 z-20 flex items-center gap-1 rounded-full bg-accent-500/90 px-2 py-0.5 text-[10px] font-bold text-zinc-950 shadow-md">
+        <span className="absolute left-1 top-1 z-20 flex items-center gap-1 rounded-full bg-accent-500/90 px-2 py-0.5 text-[10px] font-bold text-white shadow-md">
           ⭐ Match
         </span>
       ) : null}
@@ -540,7 +577,7 @@ function TourThumb({
       ) : null}
       {booked ? (
         <span
-          className={`absolute z-20 rounded bg-[#B85304] px-1.5 py-0.5 text-[8px] font-bold text-white shadow ${
+          className={`absolute z-20 rounded bg-[#075473] px-1.5 py-0.5 text-[8px] font-bold text-white shadow ${
             recommended ? "left-1 top-7" : "left-1 top-1"
           }`}
         >
@@ -583,11 +620,11 @@ function CityStory({
       <span
         className={`rounded-full p-[2px] ${
           active
-            ? "bg-gradient-to-tr from-[#B85304] via-[#F3D9C4] to-[#B85304]"
+            ? "bg-gradient-to-tr from-[#075473] via-[#F3D9C4] to-[#075473]"
             : "bg-white/25"
         }`}
       >
-        <span className="block rounded-full bg-black p-[2px]">
+        <span className="block rounded-full bg-[#05080C]/90 p-[2px] backdrop-blur-sm">
           {src ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
@@ -601,7 +638,7 @@ function CityStory({
               className="h-16 w-16 rounded-full object-cover"
             />
           ) : (
-            <span className="flex h-16 w-16 items-center justify-center rounded-full bg-[#1a3355] font-display text-lg text-[#B85304]">
+            <span className="flex h-16 w-16 items-center justify-center rounded-full bg-[#1a3355] font-display text-lg text-[#075473]">
               {city.name.slice(0, 1)}
             </span>
           )}

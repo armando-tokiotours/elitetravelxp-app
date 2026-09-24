@@ -7,10 +7,12 @@ import { ArrowLeft, Lock } from "lucide-react";
 import type { PbAccommodation, PbCity } from "@/lib/pocketbase/client";
 import {
   normalizeCityHotelPref,
+  useBuilderStore,
   type CityHotelPref,
   type HotelRoomType,
   type HotelStarRating,
 } from "@/store/useBuilderStore";
+import { travelStyleTierRules } from "@/lib/preEliteHydrate";
 import {
   adjustHotelRoomCount,
   calculateRoomRequirements,
@@ -170,10 +172,10 @@ export function cityPreviewUrl(city: PbCity | undefined): string {
 
 function coerceStarRating(raw: unknown): HotelStarRating {
   const n = Number(raw);
-  if (n === 5) return 5;
-  if (n === 4) return 4;
+  if (n === 3 || n === 4 || n === 5) return n as HotelStarRating;
   const fromStr = normalizeStar(raw);
   if (fromStr === "5-star") return 5;
+  if (fromStr === "3-star") return 3;
   return 4;
 }
 
@@ -248,7 +250,7 @@ export function HotelsEditorModal({
       {open ? (
         <motion.div
           key="hotels-editor"
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 backdrop-blur-sm"
+          className="fixed inset-0 z-50 flex items-center justify-center tokio-modal-backdrop bg-[#05080C]/55 backdrop-blur-sm"
           role="dialog"
           aria-modal="true"
           aria-label="Edit hotels"
@@ -258,13 +260,13 @@ export function HotelsEditorModal({
           transition={{ duration: 0.2 }}
         >
           <motion.div
-            className="relative flex h-[100dvh] w-full flex-col overflow-hidden bg-[#0a0a0a] md:h-[85vh] md:max-w-2xl md:rounded-2xl md:border md:border-zinc-800"
+            className="tokio-modal-content relative flex h-[100dvh] w-full flex-col overflow-hidden border border-white/10 md:h-[85vh] md:max-w-2xl md:rounded-2xl"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 20 }}
             transition={{ duration: 0.25, ease: "easeOut" }}
           >
-            <div className="flex flex-shrink-0 items-center gap-4 border-b border-zinc-800 bg-[#0a0a0a] p-4 pt-[max(1rem,env(safe-area-inset-top))]">
+            <div className="tokio-modal-chrome flex flex-shrink-0 items-center gap-4 border-b p-4 pt-[max(1rem,env(safe-area-inset-top))]">
               <button
                 type="button"
                 onClick={onClose}
@@ -274,7 +276,7 @@ export function HotelsEditorModal({
                 <ArrowLeft className="h-5 w-5" />
               </button>
               <div className="min-w-0 flex-1">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#D9BB96]">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#075473]">
                   Configure
                 </p>
                 <h3 className="truncate font-display text-2xl text-white">
@@ -299,7 +301,7 @@ export function HotelsEditorModal({
                   <>
                     {" "}
                     Suggested:{" "}
-                    <span className="font-medium text-[#B85304]">
+                    <span className="font-medium text-[#075473]">
                       {roomReq.breakdownText}
                     </span>
                   </>
@@ -348,7 +350,7 @@ export function HotelsEditorModal({
               )}
             </div>
 
-            <div className="flex flex-shrink-0 flex-col gap-3 border-t border-zinc-800 bg-[#0a0a0a]/90 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] backdrop-blur-md">
+            <div className="tokio-modal-chrome flex flex-shrink-0 flex-col gap-3 border-t p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
               <div
                 className={`rounded-xl px-4 py-3 text-sm font-medium ${
                   overallAllocation.covered
@@ -401,7 +403,14 @@ function CityHotelCard({
   onChange: (patch: Partial<CityHotelPref>) => void;
 }) {
   const needsHotel = pref?.needsHotel ?? false;
-  const starRating = coerceStarRating(pref?.starRating);
+  const preEliteTravelStyle = useBuilderStore((s) => s.preEliteTravelStyle);
+  const tierRules = travelStyleTierRules(preEliteTravelStyle);
+  const starRating = (() => {
+    const coerced = coerceStarRating(pref?.starRating);
+    return tierRules.allowedHotelStars.includes(coerced)
+      ? coerced
+      : tierRules.defaultHotelStar;
+  })();
   const rooms: HotelRoomCounts = pref?.rooms ?? {
     standard: 0,
     twin: 0,
@@ -516,7 +525,7 @@ function CityHotelCard({
             aria-checked={needsHotel}
             onClick={() => onChange({ needsHotel: !needsHotel })}
             className={`relative h-7 w-12 shrink-0 rounded-full transition ${
-              needsHotel ? "bg-[#B85304]" : "bg-zinc-700"
+              needsHotel ? "bg-[#075473]" : "bg-zinc-700"
             }`}
           >
             <span
@@ -532,17 +541,35 @@ function CityHotelCard({
         <div className="space-y-5 border-t border-zinc-800 px-4 py-4">
           <div>
             <FieldLabel>Star rating</FieldLabel>
+            {tierRules.vipHighlight ? (
+              <p className="mt-1 text-xs text-[#075473]">
+                VIP Bespoke · exclusive 5-star luxury ryokans & hotels
+              </p>
+            ) : preEliteTravelStyle === "classic_explorer" ? (
+              <p className="mt-1 text-xs text-zinc-400">
+                Classic Explorer · 3–4★ boutique stays and authentic ryokans
+              </p>
+            ) : null}
             <div className="mt-1 flex items-center gap-1.5">
               {([1, 2, 3, 4, 5] as const).map((n) => {
-                const locked = n <= 3;
-                const selected = starRating >= n && n >= 4;
-                if (locked) {
+                const allowed = tierRules.allowedHotelStars.includes(
+                  n as HotelStarRating
+                );
+                const selected =
+                  allowed && starRating >= n && n >= Math.min(...tierRules.allowedHotelStars);
+                if (!allowed) {
                   return (
                     <span
                       key={n}
-                      title="Luxury Tier: Minimum 4-Star"
+                      title={
+                        n === 5 && preEliteTravelStyle === "classic_explorer"
+                          ? "Hidden for Classic Explorer — choose 3 or 4★"
+                          : n <= 3 && preEliteTravelStyle !== "classic_explorer"
+                            ? "Luxury Tier: Minimum 4-Star"
+                            : `${n}-star not available for this travel style`
+                      }
                       className="relative inline-flex cursor-not-allowed p-0.5 opacity-30"
-                      aria-label={`${n}-star locked — Luxury Tier: Minimum 4-Star`}
+                      aria-label={`${n}-star locked`}
                     >
                       <StarIcon filled={false} />
                       <Lock
@@ -660,7 +687,7 @@ function CityHotelCard({
                             }
                             className={`rounded-full px-2.5 py-1 text-xs font-medium transition ${
                               standardOccupancy === occ
-                                ? "bg-[#0B1F3A] text-white ring-1 ring-[#B85304]/40"
+                                ? "bg-[#0B1F3A] text-white ring-1 ring-[#075473]/40"
                                 : "bg-zinc-900 text-zinc-400 ring-1 ring-zinc-700 hover:ring-zinc-500"
                             }`}
                           >

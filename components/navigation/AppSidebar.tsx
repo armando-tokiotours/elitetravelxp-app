@@ -1,17 +1,18 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import {
   Bookmark,
+  ClipboardList,
   Compass,
   Home,
   LogOut,
   Settings,
   Ticket,
   User,
-  Wallet,
+  Wrench,
 } from "lucide-react";
 import {
   brandingLogoUrl,
@@ -20,12 +21,14 @@ import {
   fetchSiteBranding,
 } from "@/lib/pocketbase/client";
 import { useTeamAuth } from "@/store/useTeamAuth";
+import { useBuilderStore } from "@/store/useBuilderStore";
 import { ManageBookingModal } from "@/components/modals/ManageBookingModal";
 
 export type AppNavId =
+  | "home"
+  | "preElite"
   | "builder"
   | "discover"
-  | "budget"
   | "manage"
   | "itinerary"
   | "admin";
@@ -47,18 +50,24 @@ export const APP_SIDEBAR_FULL_PAD = "lg:pl-16";
 
 /** Canonical app nav — labels can be overridden via `labelOverrides`. */
 export const APP_NAV_ITEMS: AppNavItem[] = [
-  { id: "builder", href: "/builder", label: "Home / Builder", icon: Home },
+  { id: "home", href: "/", label: "Home", icon: Home },
+  {
+    id: "preElite",
+    href: "/pre-elite-builder",
+    label: "Pre-Elite Qualification",
+    icon: ClipboardList,
+  },
+  {
+    id: "builder",
+    href: "/builder",
+    label: "Trip Builder",
+    icon: Wrench,
+  },
   {
     id: "discover",
     href: "/discover",
     label: "Discover Experiences",
     icon: Compass,
-  },
-  {
-    id: "budget",
-    href: "/budget-planner",
-    label: "Budget Planner",
-    icon: Wallet,
   },
   {
     id: "manage",
@@ -86,11 +95,23 @@ function isAdminPath(pathname: string): boolean {
 
 function isNavActive(pathname: string, item: AppNavItem): boolean {
   if (!item.href) return false;
-  if (item.id === "admin") return isAdminPath(pathname) || pathname.startsWith("/team-access");
-  if (item.href === "/builder") return pathname === "/builder";
+  if (item.id === "home") return pathname === "/";
+  if (item.id === "admin")
+    return isAdminPath(pathname) || pathname.startsWith("/team-access");
+  if (item.id === "builder")
+    return (
+      pathname === "/builder" ||
+      (pathname.startsWith("/builder-single") &&
+        !pathname.startsWith("/builder-single/itinerary"))
+    );
+  if (item.id === "itinerary")
+    return (
+      pathname.startsWith("/builder/itinerary") ||
+      pathname.startsWith("/builder-single/itinerary")
+    );
+  if (item.id === "preElite")
+    return pathname.startsWith("/pre-elite-builder");
   if (item.href === "/discover") return pathname.startsWith("/discover");
-  if (item.href === "/budget-planner")
-    return pathname.startsWith("/budget-planner");
   return pathname.startsWith(item.href);
 }
 
@@ -157,15 +178,39 @@ function NavLinkList({
   rail?: boolean;
   expanded?: boolean;
 }) {
+  const tripMode = useBuilderStore((s) => s.tripMode);
+
   return (
     <nav className="flex flex-1 flex-col gap-1" aria-label="Main">
       {APP_NAV_ITEMS.map((item) => {
         const Icon = item.icon;
-        const label = labelOverrides?.[item.id] ?? item.label;
+        const label =
+          item.id === "builder"
+            ? tripMode === "single_day" ||
+              pathname.startsWith("/builder-single")
+              ? "Single-Day Builder"
+              : (labelOverrides?.[item.id] ?? item.label)
+            : item.id === "itinerary" &&
+                (tripMode === "single_day" ||
+                  pathname.startsWith("/builder-single"))
+              ? "Single-Day Itinerary"
+              : (labelOverrides?.[item.id] ?? item.label);
+        const href =
+          item.id === "builder"
+            ? tripMode === "single_day" ||
+              pathname.startsWith("/builder-single")
+              ? "/builder-single"
+              : "/builder"
+            : item.id === "itinerary"
+              ? tripMode === "single_day" ||
+                pathname.startsWith("/builder-single")
+                ? "/builder-single/itinerary"
+                : "/builder/itinerary"
+              : item.href!;
         const active = isNavActive(pathname, item);
 
         const railItemClass = active
-          ? "border-r-2 border-[#D9BB96]/40 bg-[#D9BB96]/15 text-[#D9BB96]"
+          ? "border-r-2 border-[#075473]/40 bg-[#075473]/15 text-[#075473]"
           : "border-r-2 border-transparent text-zinc-300 hover:bg-zinc-900 hover:text-white";
 
         const railLayout = rail
@@ -191,7 +236,7 @@ function NavLinkList({
               }`}
             >
               <Icon
-                className="h-5 w-5 shrink-0 text-[#B85304]"
+                className="h-5 w-5 shrink-0 text-[#075473]"
                 aria-hidden
               />
               {variant === "drawer" ? (
@@ -208,7 +253,7 @@ function NavLinkList({
         return (
           <Link
             key={item.id}
-            href={item.href!}
+            href={href}
             title={label}
             onClick={onNavigate}
             className={
@@ -216,7 +261,7 @@ function NavLinkList({
                 ? `flex items-center gap-3 rounded-xl py-2.5 text-sm transition-all duration-300 ${railItemClass} ${railLayout}`
                 : `flex items-center gap-3 rounded-xl px-4 py-3.5 text-sm tracking-wide transition ${
                     active
-                      ? "bg-[#B85304]/20 text-[#B85304]"
+                      ? "bg-[#075473]/20 text-[#075473]"
                       : "text-white/85 hover:bg-white/8"
                   }`
             }
@@ -228,7 +273,7 @@ function NavLinkList({
             ) : (
               <Icon
                 className={`h-5 w-5 shrink-0 ${
-                  active ? "text-[#D9BB96]" : "text-zinc-500"
+                  active ? "text-[#075473]" : "text-zinc-500"
                 }`}
                 aria-hidden
               />
@@ -275,7 +320,7 @@ function AccountFooter({
       return (
         <div className="mt-auto shrink-0 border-t border-zinc-800/80 pb-32 pt-6">
           <div className="flex items-center gap-3 rounded-xl border border-zinc-800 bg-zinc-900 p-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[#B85304]/15 text-accent-500">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[#075473]/15 text-accent-500">
               <User className="h-5 w-5" aria-hidden />
             </div>
             <div className="min-w-0 flex-1">
@@ -304,7 +349,7 @@ function AccountFooter({
           onClick={onManage}
           className="flex w-full items-center gap-3 rounded-xl border border-zinc-800 bg-zinc-900 p-3 text-left transition hover:border-zinc-700"
         >
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[#B85304]/15 text-accent-500">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[#075473]/15 text-accent-500">
             <Ticket className="h-5 w-5" aria-hidden />
           </div>
           <div className="min-w-0">
@@ -343,7 +388,7 @@ function AccountFooter({
         className={`border-t border-zinc-800 ${compact ? "px-4 py-3" : "pt-4"}`}
       >
         <div className={`flex items-center gap-3 rounded-xl py-2 ${railLayout}`}>
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-zinc-900 text-[#B85304]">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-zinc-900 text-[#075473]">
             <User className="h-4 w-4" aria-hidden />
           </span>
           <NavLabel rail={rail} expanded={expanded}>
@@ -382,7 +427,7 @@ function AccountFooter({
         onClick={onManage}
         className={`flex w-full items-center gap-3 rounded-xl py-2 text-left transition hover:bg-zinc-900 ${railLayout}`}
       >
-        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-zinc-900 text-[#B85304]">
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-zinc-900 text-[#075473]">
           <Ticket className="h-4 w-4" aria-hidden />
         </span>
         <NavLabel rail={rail} expanded={expanded}>
@@ -443,9 +488,15 @@ function FullScreenNavOverlay({
       role="dialog"
       aria-modal="true"
       aria-label="Main menu"
-      className="fixed inset-0 z-[80] flex h-[100dvh] min-h-screen w-screen flex-col bg-[#000000] text-white opacity-100 lg:hidden"
+      className="tokio-nav-drawer fixed inset-0 z-[80] flex h-[100dvh] min-h-screen w-screen flex-col border-r border-white/10 text-white opacity-100 lg:hidden"
     >
-      <div className="relative z-[81] flex shrink-0 items-center justify-between border-b border-[#2C2C2E] bg-[#000000] px-4 py-3">
+      {/* Solid tint scrim — kills text bleed from the builder behind */}
+      <div
+        className="pointer-events-none absolute inset-0 z-0 bg-[#05080C]/85"
+        aria-hidden
+      />
+
+      <div className="tokio-modal-chrome relative z-[81] flex shrink-0 items-center justify-between border-b border-white/10 px-4 py-3">
         <div className="flex min-w-0 items-center gap-2">
           <button
             type="button"
@@ -458,10 +509,10 @@ function FullScreenNavOverlay({
             </span>
           </button>
           <div className="min-w-0">
-            <p className="text-[0.55rem] font-semibold uppercase tracking-[0.28em] text-[#E2C498]">
+            <p className="text-[0.55rem] font-semibold uppercase tracking-[0.28em] text-white">
               {brandEyebrow}
             </p>
-            <p className="text-xs font-bold uppercase tracking-widest text-[#E2C498]">
+            <p className="text-xs font-bold uppercase tracking-widest text-[#075473]">
               Menu
             </p>
           </div>
@@ -475,7 +526,7 @@ function FullScreenNavOverlay({
         </button>
       </div>
 
-      <div className="relative z-[81] mx-auto flex w-full max-w-lg flex-1 flex-col overflow-y-auto overscroll-contain bg-[#000000] px-6 py-6 pb-32">
+      <div className="relative z-[81] mx-auto flex w-full max-w-lg flex-1 flex-col overflow-y-auto overscroll-contain bg-transparent px-6 py-6 pb-32">
         <div className="mb-6 flex shrink-0 items-center gap-3">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
@@ -516,7 +567,7 @@ function FullScreenNavOverlay({
  * expands to `w-64` on hover to reveal labels. Never opens a full-screen overlay.
  */
 export function AppSidebar({
-  brandEyebrow = "Elite Travel",
+  brandEyebrow = "TOKIOTOURS",
   brandTitle = "Discover",
   labelOverrides,
   expandOnHover = true,
@@ -530,7 +581,6 @@ export function AppSidebar({
   void brandEyebrow;
   void brandTitle;
   const pathname = usePathname();
-  const router = useRouter();
   const logoSrc = useBrandLogo();
   const [manageOpen, setManageOpen] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
@@ -548,7 +598,7 @@ export function AppSidebar({
   return (
     <>
       <aside
-        className={`fixed bottom-0 left-0 top-0 z-50 hidden flex-col border-r border-[#2C2C2E] bg-[#000000] transition-[width] duration-200 ease-in-out lg:flex ${
+        className={`tokio-glass-sheet fixed bottom-0 left-0 top-0 z-50 hidden flex-col border-r border-white/10 transition-[width] duration-200 ease-in-out lg:flex ${
           showLabels ? "w-64" : "w-16"
         }`}
         onMouseEnter={() => {
@@ -567,13 +617,13 @@ export function AppSidebar({
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={logoSrc}
-            alt="Elite Travel Experiences"
+            alt="TOKIOTOURS"
             className="h-9 w-9 shrink-0 object-contain"
           />
           <NavLabel rail expanded={showLabels}>
             <div className="min-w-0">
-              <p className="text-[0.55rem] font-semibold uppercase tracking-[0.2em] text-[#E2C498]">
-                Elite Travel
+              <p className="text-[0.55rem] font-semibold uppercase tracking-[0.2em] text-[#075473]">
+                TOKIOTOURS
               </p>
               <p className="truncate text-xs font-bold text-[#F5EFE6]">Menu</p>
             </div>
@@ -602,13 +652,12 @@ export function AppSidebar({
         onClose={() => setManageOpen(false)}
         onSuccess={(ref) => {
           setToast(`Itinerary ${ref} loaded successfully`);
-          router.push("/builder");
         }}
       />
       {toast ? (
         <div
           role="status"
-          className="fixed bottom-8 left-1/2 z-[110] hidden w-[min(92vw,28rem)] -translate-x-1/2 rounded-xl border border-[#B85304]/50 bg-[#1a1510] px-4 py-3 text-center text-sm text-[#F3D9C4] shadow-lg lg:block"
+          className="fixed bottom-8 left-1/2 z-[110] hidden w-[min(92vw,28rem)] -translate-x-1/2 rounded-xl border border-[#075473]/50 bg-[#1a1510] px-4 py-3 text-center text-sm text-[#F3D9C4] shadow-lg lg:block"
         >
           {toast}
         </div>
@@ -621,7 +670,7 @@ export function AppSidebar({
  * Mobile/tablet hamburger → full-screen solid menu. Strictly `< lg` only.
  */
 export function MobileAppNav({
-  brandEyebrow = "Elite Travel",
+  brandEyebrow = "TOKIOTOURS",
   brandTitle = "Discover",
   labelOverrides,
 }: {
@@ -630,7 +679,6 @@ export function MobileAppNav({
   labelOverrides?: Partial<Record<AppNavId, string>>;
 }) {
   const pathname = usePathname();
-  const router = useRouter();
   const logoSrc = useBrandLogo();
   const [open, setOpen] = useState(false);
   const [manageOpen, setManageOpen] = useState(false);
@@ -662,7 +710,7 @@ export function MobileAppNav({
         aria-label="Open menu"
         aria-expanded={open}
         onClick={() => setOpen(true)}
-        className="flex h-10 w-10 items-center justify-center rounded-xl border border-zinc-700 bg-zinc-900 text-white transition hover:border-[#B85304] lg:hidden"
+        className="flex h-10 w-10 items-center justify-center rounded-xl border border-zinc-700 bg-zinc-900 text-white transition hover:border-[#075473] lg:hidden"
       >
         <HamburgerIcon />
       </button>
@@ -685,13 +733,12 @@ export function MobileAppNav({
         onClose={() => setManageOpen(false)}
         onSuccess={(ref) => {
           setToast(`Itinerary ${ref} loaded successfully`);
-          router.push("/builder");
         }}
       />
       {toast ? (
         <div
           role="status"
-          className="fixed bottom-[7.5rem] left-1/2 z-[110] w-[min(92vw,28rem)] -translate-x-1/2 rounded-xl border border-[#B85304]/50 bg-[#1a1510] px-4 py-3 text-center text-sm text-[#F3D9C4] shadow-lg lg:hidden"
+          className="fixed bottom-[7.5rem] left-1/2 z-[110] w-[min(92vw,28rem)] -translate-x-1/2 rounded-xl border border-[#075473]/50 bg-[#1a1510] px-4 py-3 text-center text-sm text-[#F3D9C4] shadow-lg lg:hidden"
         >
           {toast}
         </div>

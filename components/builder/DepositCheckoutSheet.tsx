@@ -77,7 +77,7 @@ export function DepositCheckoutSheet({
 
             <div className="flex items-start justify-between gap-3 px-5 pb-3 pt-4 sm:pt-5">
               <div className="min-w-0">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#B85304]">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#075473]">
                   Secure your journey
                 </p>
                 <h3 className="mt-1 font-display text-2xl text-[#0B1F3A]">
@@ -107,10 +107,10 @@ export function DepositCheckoutSheet({
                 </p>
               </div>
 
-              <div className="rounded-2xl border border-[#B85304]/40 bg-[#FDF7F3] px-4 py-3.5">
+              <div className="rounded-2xl border border-[#075473]/40 bg-[#FDF7F3] px-4 py-3.5">
                 <div className="flex items-center gap-2">
-                  <Lock className="h-4 w-4 text-[#B85304]" aria-hidden />
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#B85304]">
+                  <Lock className="h-4 w-4 text-[#075473]" aria-hidden />
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#075473]">
                     Today&apos;s 10% deposit
                   </p>
                 </div>

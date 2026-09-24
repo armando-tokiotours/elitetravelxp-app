@@ -1,6 +1,7 @@
 "use client";
 
 import { create } from "zustand";
+import { SINGLE_DAY_BUILDER_CONFIG } from "@/config/mediaConfig";
 import {
   brandingUiMediaUrl,
   brandingUiPosterUrl,
@@ -78,9 +79,11 @@ function resolveItem(
     pbPoster ||
     (key === "elite_concierge_modal" || key === "concierge_preview"
       ? CONCIERGE_POSTER_FALLBACK
-      : isVideo
-        ? ""
-        : mediaUrl);
+      : key === "single_day_builder_hero"
+        ? SINGLE_DAY_BUILDER_CONFIG.hero.fallbackImage
+        : isVideo
+          ? ""
+          : mediaUrl);
 
   return {
     key,

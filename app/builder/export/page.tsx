@@ -13,6 +13,7 @@ import {
   type PrintRequestResult,
 } from "@/components/checkout/PrintRequestModal";
 import { RetrieveItineraryModal } from "@/components/checkout/RetrieveItineraryModal";
+import { PrintItineraryDocument } from "@/components/builder/PrintItineraryDocument";
 
 export default function ExportPage() {
   const state = useBuilderStore();
@@ -59,7 +60,7 @@ export default function ExportPage() {
   return (
     <div className="builder-theme min-h-screen bg-[#F5F0E8] pb-28 text-[#0B1F3A]">
       <header className="border-b border-[#E8E2D9] bg-[#FBF8F2] px-4 py-5">
-        <p className="text-[0.65rem] font-semibold uppercase tracking-[0.35em] text-[#B85304]">
+        <p className="text-[0.65rem] font-semibold uppercase tracking-[0.35em] text-[#075473]">
           Save / Export
         </p>
         <h1 className="mt-1 font-display text-3xl">Export Your Trip</h1>
@@ -71,9 +72,17 @@ export default function ExportPage() {
           with a booking PNR, or copy the JSON payload for your concierge team.
         </p>
 
+        {/* Off-screen full invoice for PDF capture / print */}
+        <div
+          className="invoice-capture-offscreen pointer-events-none fixed left-[-10000px] top-0 z-[-1] w-[800px] bg-white"
+          aria-hidden
+        >
+          <PrintItineraryDocument embedded showToolbar={false} />
+        </div>
+
         {quote ? (
           <div className="rounded-2xl border border-[#E8E2D9] bg-white p-5">
-            <p className="text-xs uppercase tracking-[0.2em] text-[#B85304]">
+            <p className="text-xs uppercase tracking-[0.2em] text-[#075473]">
               Estimated range
             </p>
             <p className="mt-1 font-display text-3xl">
@@ -124,7 +133,7 @@ export default function ExportPage() {
       {printResult ? (
         <div className="fixed inset-0 z-[80] flex items-end justify-center bg-black/45 p-4 sm:items-center">
           <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
-            <p className="text-[0.65rem] font-semibold uppercase tracking-[0.3em] text-[#B85304]">
+            <p className="text-[0.65rem] font-semibold uppercase tracking-[0.3em] text-[#075473]">
               Itinerary saved
             </p>
             <h2 className="mt-2 font-display text-2xl text-[#0B1F3A]">

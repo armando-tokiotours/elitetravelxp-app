@@ -14,11 +14,11 @@ import { LazyVideo } from "@/components/ui/LazyVideo";
 function conciergeAdvice(
   cityName: string,
   profile: ExperienceProfile | null,
-  userProfile: UserTravelProfile | null
+  _userProfile: UserTravelProfile | null
 ): string {
-  const vibe = profile?.vibe ?? userProfile?.vibe;
-  const pace = profile?.pace ?? userProfile?.pace;
-  const crowd = profile?.crowdStyle ?? userProfile?.crowdStyle;
+  const vibe = profile?.vibe ?? null;
+  const pace = profile?.pace ?? null;
+  const crowd = profile?.crowdStyle ?? null;
 
   if (!vibe) {
     return `Take the 30-second Style Quiz to unlock tailored ${cityName} picks — we will highlight Best Match tours and pace-friendly booking tips here.`;
@@ -69,9 +69,10 @@ export function DiscoverMatchesPanel({
   onRetakeQuiz: () => void;
   onPlayReel?: () => void;
 }) {
-  const vibe = experienceProfile?.vibe ?? userProfile?.vibe;
-  const pace = experienceProfile?.pace ?? userProfile?.pace;
-  const crowd = experienceProfile?.crowdStyle ?? userProfile?.crowdStyle;
+  // Match Quiz only — ignore leftover itinerary userProfile when quiz incomplete
+  const vibe = experienceProfile?.vibe ?? null;
+  const pace = experienceProfile?.pace ?? null;
+  const crowd = experienceProfile?.crowdStyle ?? null;
 
   const vibeLabel = vibe
     ? QUIZ_VIBE.find((o) => o.id === vibe)?.label ?? vibe
@@ -85,16 +86,18 @@ export function DiscoverMatchesPanel({
     ? tours.filter((t) => isBestMatchTour(t, experienceProfile)).slice(0, 6)
     : [];
 
+  const hasProfile = Boolean(experienceProfile);
+
   return (
     <div className="space-y-4 px-4 py-6">
       <div className="space-y-4 rounded-2xl border border-zinc-800 bg-zinc-900/50 p-4">
-        <div className="flex items-center justify-between gap-3 rounded-xl border border-[#B85304]/40 bg-[#B85304]/15 p-3">
+        <div className="flex items-center justify-between gap-3 rounded-xl border border-[#075473]/40 bg-[#075473]/15 p-3">
           <div className="min-w-0">
             <span className="text-[10px] font-bold uppercase tracking-wider text-accent-500">
               Active Match Profile
             </span>
             <p className="mt-0.5 text-xs font-semibold text-zinc-200">
-              {vibe
+              {hasProfile
                 ? `${vibeLabel} · ${paceLabel} · ${crowdLabel}`
                 : "Take the Style Quiz to unlock matches"}
             </p>
@@ -102,13 +105,13 @@ export function DiscoverMatchesPanel({
           <button
             type="button"
             onClick={onRetakeQuiz}
-            className="shrink-0 rounded-lg bg-accent-500 px-3 py-1.5 text-xs font-bold text-zinc-950 transition-colors hover:bg-[#9C4203]"
+            className="shrink-0 rounded-lg bg-accent-500 px-3 py-1.5 text-xs font-bold text-zinc-950 transition-colors hover:bg-[#05384c]"
           >
-            {vibe ? "Retake Quiz" : "Take Quiz"}
+            {hasProfile ? "Retake Quiz" : "Take Quiz"}
           </button>
         </div>
 
-        <div className="rounded-xl border border-zinc-800 bg-zinc-950 p-3 text-xs leading-relaxed text-zinc-300">
+        <div className="rounded-xl border border-zinc-800/80 bg-[#0D1117]/60 p-3 text-xs leading-relaxed text-zinc-300 backdrop-blur-md">
           <h4 className="mb-1 flex items-center gap-1.5 font-bold text-accent-500">
             ✨ Tailored Suggestions for {cityName}
           </h4>
@@ -117,14 +120,14 @@ export function DiscoverMatchesPanel({
 
         {matched.length > 0 ? (
           <div>
-            <p className="mb-2 text-[10px] font-bold uppercase tracking-wider text-[#B85304]">
+            <p className="mb-2 text-[10px] font-bold uppercase tracking-wider text-[#075473]">
               ⭐ Recommended for your vibe
             </p>
             <ul className="space-y-1.5">
               {matched.map((t) => (
                 <li
                   key={t.id}
-                  className="rounded-lg border border-zinc-800 bg-black/40 px-3 py-2 text-xs text-zinc-200"
+                  className="rounded-lg border border-zinc-800/80 bg-[#0D1117]/60 px-3 py-2 text-xs text-zinc-200 backdrop-blur-sm"
                 >
                   {t.title}
                 </li>
@@ -137,7 +140,7 @@ export function DiscoverMatchesPanel({
           <button
             type="button"
             onClick={onPlayReel}
-            className="flex w-full items-center justify-center gap-2 rounded-xl border border-[#B85304]/40 bg-[#B85304]/15 py-3 text-sm font-semibold text-[#F3D9C4] transition hover:bg-[#B85304]/25"
+            className="flex w-full items-center justify-center gap-2 rounded-xl border border-[#075473]/40 bg-[#075473]/15 py-3 text-sm font-semibold text-[#F3D9C4] transition hover:bg-[#075473]/25"
           >
             ▶ Play Match Reel
           </button>

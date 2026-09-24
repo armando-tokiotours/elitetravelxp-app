@@ -1,0 +1,9 @@
+TOKIOTOURS brand typefaces (source: Downloads/1 assets)
+
+- Godiva-Regular.ttf  — brand logo + H1 (from Godiva-Reguler.ttf)
+- Hanson-Bold.otf     — H2 / H3 section titles
+- Futura-Medium.ttf   — body / paragraphs (extracted from Futura.ttc face 0)
+- GeosansLight-Regular.ttf — captions / helper text
+- BeautyDemo.otf      — “Japan” keyword only
+
+Futura.ttc is kept as the source collection; the app loads Futura-Medium.ttf.

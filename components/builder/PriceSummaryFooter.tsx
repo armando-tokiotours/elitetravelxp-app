@@ -3,7 +3,8 @@
 import { useState } from "react";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
-import { formatUsd } from "@/lib/builder-pricing";
+import { formatEstimateSummary, formatUsd } from "@/lib/builder-pricing";
+import { ELITE_CONCIERGE_FEE } from "@/lib/eliteConcierge";
 import { useBuilderStore } from "@/store/useBuilderStore";
 import { ExplainerModal } from "./ExplainerModal";
 
@@ -33,7 +34,21 @@ export function PriceSummaryFooter({
     isEliteConcierge || experienceService === "concierge";
 
   const zeroAddOns =
-    quoteMin != null && quoteMax != null && quoteMin <= 0 && quoteMax <= 0;
+    !conciergeActive &&
+    quoteMin != null &&
+    quoteMax != null &&
+    quoteMin <= 0 &&
+    quoteMax <= 0;
+
+  const estimateLabel =
+    quoteMin != null && quoteMax != null
+      ? formatEstimateSummary({
+          min: quoteMin,
+          max: quoteMax,
+          conciergeActive,
+          conciergeFee: ELITE_CONCIERGE_FEE,
+        })
+      : "Calculating…";
 
   return (
     <div className="no-print sticky-action-bar fixed inset-x-0 bottom-16 z-30 mb-2 w-full overflow-x-hidden md:bottom-4 lg:left-16 lg:pl-0">
@@ -44,16 +59,16 @@ export function PriceSummaryFooter({
               type="button"
               onClick={() => setConciergeVideoOpen(true)}
               aria-label="Watch: How Your Dedicated Concierge Works"
-              className="group mx-2 flex w-auto items-center gap-3 rounded-xl border border-[#B85304]/50 bg-[#121212] p-3 text-left shadow-md transition hover:border-[#B85304] sm:mx-4"
+              className="group mx-2 flex w-auto items-center gap-3 rounded-xl border border-[#075473]/50 bg-[#121212] p-3 text-left shadow-md transition hover:border-[#075473] sm:mx-4"
             >
               <span
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#B85304] text-white shadow-lg transition-transform group-hover:scale-105"
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#075473] text-white shadow-lg transition-transform group-hover:scale-105"
                 aria-hidden
               >
                 <span className="ml-0.5 text-xs">▶</span>
               </span>
               <span className="min-w-0 flex-1">
-                <span className="block text-[9px] font-bold uppercase tracking-wider text-[#B85304]">
+                <span className="block text-[9px] font-bold uppercase tracking-wider text-[#075473]">
                   ✨ Elite Concierge Service
                 </span>
                 <span className="block text-xs font-bold leading-tight text-white sm:text-sm">
@@ -75,28 +90,34 @@ export function PriceSummaryFooter({
         {/* Equal-width 50/50 dual grid — both cards always visible */}
         <div className="grid w-full min-w-0 grid-cols-2 gap-2.5 px-2 py-2 sm:gap-4 sm:px-4 [grid-template-columns:minmax(0,1fr)_minmax(0,1fr)]">
           {/* Card 1 — Experience Japan Range */}
-          <div className="flex w-full min-w-0 max-w-full flex-col justify-between overflow-hidden rounded-xl border border-cyan-500/30 bg-[#1E2D4A] p-2.5 shadow-lg sm:p-4">
+          <div className="flex w-full min-w-0 max-w-full flex-col justify-between overflow-hidden rounded-xl border border-[#075473]/50 bg-[#1C1C1E] p-2.5 shadow-lg sm:p-4">
             <div className="min-w-0 overflow-hidden">
-              <p className="mb-0.5 block text-[8px] font-bold uppercase tracking-wider text-[#38BDF8] sm:text-[10px]">
+              <p className="mb-0.5 block text-[8px] font-bold uppercase tracking-wider text-[#075473] sm:text-[10px]">
                 Experience Japan Range
               </p>
               <p className="break-words text-xs font-extrabold leading-tight text-white sm:text-lg">
-                {quoteMin != null && quoteMax != null
-                  ? zeroAddOns
-                    ? `Est. ${formatUsd(0)} · No add-ons selected`
-                    : `Est. ${formatUsd(quoteMin)} – ${formatUsd(quoteMax)}`
-                  : "Calculating…"}
+                {estimateLabel}
               </p>
-              <p className="mt-0.5 break-words text-[9px] leading-snug text-zinc-300 sm:text-[11px]">
+              <p className="mt-0.5 break-words text-[9px] leading-snug text-[#075473]/80 sm:text-[11px]">
                 {zeroAddOns ? (
                   "Self-arranged · add experiences for a range"
+                ) : conciergeActive &&
+                  quoteMin != null &&
+                  quoteMax != null &&
+                  quoteMin === quoteMax &&
+                  quoteMin <= ELITE_CONCIERGE_FEE ? (
+                  `Design deposit · credited 100% toward your final trip`
                 ) : minPerPerson != null && maxPerPerson != null ? (
                   <>
                     {formatUsd(minPerPerson)} – {formatUsd(maxPerPerson)} / pax
                     {totalGuests > 0 ? ` · ${totalGuests} guests` : ""}
                     <br />
-                    Selected options and experiences
+                    {conciergeActive
+                      ? "Elite Concierge design deposit included"
+                      : "Selected options and experiences"}
                   </>
+                ) : conciergeActive ? (
+                  "Elite Concierge design deposit included"
                 ) : (
                   "Selected options and experiences"
                 )}
@@ -106,7 +127,7 @@ export function PriceSummaryFooter({
               type="button"
               disabled={requestDisabled || quoteMin == null}
               onClick={onRequestPay}
-              className="mt-2 flex w-full shrink-0 items-center justify-center gap-1 rounded-lg bg-[#D9BB96] px-2 py-2 text-center text-[10px] font-bold text-[#0B1F3A] transition hover:bg-[#c9ab86] disabled:opacity-60 sm:py-2.5 sm:text-xs"
+              className="mt-2 flex w-full shrink-0 items-center justify-center gap-1 rounded-lg bg-[#075473] px-2 py-2 text-center text-[10px] font-bold text-[#121212] transition hover:bg-[#c9ab86] disabled:opacity-60 sm:py-2.5 sm:text-xs"
             >
               Request & Pay
               <ArrowRight className="h-3 w-3 sm:h-3.5 sm:w-3.5" aria-hidden />

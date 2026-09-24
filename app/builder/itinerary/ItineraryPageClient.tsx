@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { FileText, Plane, Ticket } from "lucide-react";
+import { FileText, Plane } from "lucide-react";
 import {
   fetchBuilderConfig,
   type BuilderConfig,
@@ -19,7 +19,7 @@ import {
   PrintRequestModal,
   type PrintRequestResult,
 } from "@/components/checkout/PrintRequestModal";
-import { ManageBookingModal } from "@/components/modals/ManageBookingModal";
+import { BookingTermsModal } from "@/components/checkout/BookingTermsModal";
 import { PrintItineraryDocument } from "@/components/builder/PrintItineraryDocument";
 import {
   TravelDossierView,
@@ -47,27 +47,54 @@ export default function ItineraryPageClient() {
   const [isCheckoutModalOpen, setIsCheckoutModalOpen] = useState(false);
   const [checkoutRef, setCheckoutRef] = useState("");
   const [printOpen, setPrintOpen] = useState(false);
-  const [retrieveOpen, setRetrieveOpen] = useState(false);
+  const [printSkipTerms, setPrintSkipTerms] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submittedRef, setSubmittedRef] = useState<string | null>(null);
   const [printResult, setPrintResult] = useState<PrintRequestResult | null>(
     null
   );
+  const [termsOpen, setTermsOpen] = useState(false);
+  const [termsIntent, setTermsIntent] = useState<"invoice" | "print" | null>(
+    null
+  );
 
   useEffect(() => {
-    useBuilderStore.persist.rehydrate();
-    ensureTempBookingRef();
-    fetchBuilderConfig({ includeAccommodations: true })
-      .then(setConfig)
-      .catch(() => setConfig(null));
+    let cancelled = false;
+    void (async () => {
+      await useBuilderStore.persist.rehydrate();
+      if (cancelled) return;
+      ensureTempBookingRef();
+      try {
+        const cfg = await fetchBuilderConfig({ includeAccommodations: true });
+        if (!cancelled) setConfig(cfg);
+      } catch {
+        if (!cancelled) setConfig(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [ensureTempBookingRef]);
 
   useEffect(() => {
     const v = searchParams.get("view");
     if (v === "invoice" || v === "print") setActiveView("invoice");
     if (v === "dossier") setActiveView("dossier");
-    if (searchParams.get("retrieve") === "1") setRetrieveOpen(true);
   }, [searchParams]);
+
+  // Keep multi-day itinerary isolated — send Builder S traffic to its own dossier.
+  useEffect(() => {
+    if (state.tripMode === "single_day") {
+      const view = searchParams.get("view");
+      const q =
+        view === "invoice" || view === "print"
+          ? "?view=invoice"
+          : view === "dossier"
+            ? "?view=dossier"
+            : "";
+      router.replace(`/builder-single/itinerary${q}`);
+    }
+  }, [state.tripMode, router, searchParams]);
 
   const quote = useMemo(
     () => (config ? calculateBuilderQuote(state, config) : null),
@@ -107,6 +134,36 @@ export default function ItineraryPageClient() {
     router.replace(`/builder/itinerary?${params.toString()}`, {
       scroll: false,
     });
+  };
+
+  const requestInvoiceView = () => {
+    if (activeView === "invoice") return;
+    setTermsIntent("invoice");
+    setTermsOpen(true);
+  };
+
+  const requestSendPdf = () => {
+    setTermsIntent("print");
+    setTermsOpen(true);
+  };
+
+  const handleTermsConfirm = () => {
+    const intent = termsIntent;
+    setTermsOpen(false);
+    setTermsIntent(null);
+    if (intent === "invoice") {
+      setMode("invoice");
+      return;
+    }
+    if (intent === "print") {
+      setPrintSkipTerms(true);
+      setPrintOpen(true);
+    }
+  };
+
+  const handleTermsCancel = () => {
+    setTermsOpen(false);
+    setTermsIntent(null);
   };
 
   const handleRequestPay = () => {
@@ -151,10 +208,40 @@ export default function ItineraryPageClient() {
           orderId: paymentDetails.orderId,
         },
       });
-      confirmBookingRef(result.reference, "deposit_paid");
+      confirmBookingRef(result.reference, "in_progress");
       setSubmittedRef(result.reference);
+
+      const email = String(paymentDetails.customerEmail || "")
+        .trim()
+        .toLowerCase();
+      if (email && result.reference) {
+        void import("@/lib/syncBookingLead").then(
+          ({ syncMultiDayBookingLead, syncSingleDayBookingLead }) => {
+            if (state.tripMode === "single_day") {
+              void import("@/store/useSingleDayBuilderStore").then(
+                ({ useSingleDayBuilderStore }) =>
+                  syncSingleDayBookingLead({
+                    bookingRef: result.reference,
+                    email,
+                    state: useSingleDayBuilderStore.getState(),
+                    status: "quoted",
+                    quote: quote ? { min: quote.min, max: quote.max } : null,
+                  })
+              );
+            } else {
+              void syncMultiDayBookingLead({
+                bookingRef: result.reference,
+                email,
+                state,
+                status: "quoted",
+                quote: quote ? { min: quote.min, max: quote.max } : null,
+              });
+            }
+          }
+        );
+      }
     } catch (e) {
-      confirmBookingRef(paymentDetails.bookingRef, "deposit_paid");
+      confirmBookingRef(paymentDetails.bookingRef, "in_progress");
       setSubmitError(
         e instanceof Error
           ? e.message
@@ -167,7 +254,7 @@ export default function ItineraryPageClient() {
   return (
     <div className="builder-theme min-h-screen overflow-x-hidden bg-[#F5F0E8] pb-44 text-[#0B1F3A] md:pb-36">
       <AppSidebar
-        brandEyebrow="Elite Travel"
+        brandEyebrow="TOKIOTOURS"
         brandTitle="Itinerary"
         expandOnHover
       />
@@ -176,7 +263,7 @@ export default function ItineraryPageClient() {
         <header className="no-print border-b border-[#E8E2D9] bg-[#FBF8F2] px-4 py-5">
           <div className="mb-3 flex items-center gap-3 lg:hidden">
             <MobileAppNav
-              brandEyebrow="Elite Travel"
+              brandEyebrow="TOKIOTOURS"
               brandTitle="Itinerary"
             />
           </div>
@@ -201,7 +288,7 @@ export default function ItineraryPageClient() {
           />
           <ToggleBtn
             active={activeView === "invoice"}
-            onClick={() => setMode("invoice")}
+            onClick={requestInvoiceView}
             icon={<FileText className="h-3.5 w-3.5" />}
             label="Invoice / Print"
           />
@@ -217,18 +304,10 @@ export default function ItineraryPageClient() {
             </Link>
             <button
               type="button"
-              onClick={() => setPrintOpen(true)}
+              onClick={requestSendPdf}
               className="rounded-full bg-[#0B1F3A] px-5 py-2 text-sm font-semibold text-white"
             >
               Send / Save PDF
-            </button>
-            <button
-              type="button"
-              onClick={() => setRetrieveOpen(true)}
-              className="inline-flex items-center gap-1.5 rounded-full border border-[#D9D2C7] bg-white px-4 py-2 text-sm font-semibold text-[#0B1F3A]"
-            >
-              <Ticket className="h-3.5 w-3.5" />
-              Manage Booking
             </button>
           </div>
         ) : (
@@ -239,14 +318,6 @@ export default function ItineraryPageClient() {
             >
               Continue editing
             </Link>
-            <button
-              type="button"
-              onClick={() => setRetrieveOpen(true)}
-              className="inline-flex items-center gap-1.5 rounded-full border border-[#D9D2C7] bg-white px-4 py-2.5 text-sm font-semibold text-[#0B1F3A]"
-            >
-              <Ticket className="h-3.5 w-3.5" />
-              Manage Booking
-            </button>
           </div>
         )}
       </header>
@@ -262,15 +333,23 @@ export default function ItineraryPageClient() {
             arrivalHub={arrivalHub}
             departureHub={departureHub}
           />
-        ) : (
-          <div className="print-document rounded-2xl border border-[#E8E2D9] bg-white px-4 py-6 sm:px-6">
-            <PrintItineraryDocument
-              embedded
-              showToolbar={false}
-              onPrintRequest={() => setPrintOpen(true)}
-            />
-          </div>
-        )}
+        ) : null}
+
+        {/* Always mount full itemized invoice for PDF/print capture (off-screen on dossier). */}
+        <div
+          className={
+            activeView === "invoice"
+              ? "print-document rounded-2xl border border-[#E8E2D9] bg-white px-4 py-6 sm:px-6"
+              : "invoice-capture-offscreen pointer-events-none fixed left-[-10000px] top-0 z-[-1] w-[800px] bg-white"
+          }
+          aria-hidden={activeView !== "invoice"}
+        >
+          <PrintItineraryDocument
+            embedded
+            showToolbar={false}
+            onPrintRequest={requestSendPdf}
+          />
+        </div>
       </main>
       </div>
 
@@ -296,18 +375,22 @@ export default function ItineraryPageClient() {
         onPaymentError={setSubmitError}
       />
 
+      <BookingTermsModal
+        open={termsOpen}
+        onConfirm={handleTermsConfirm}
+        onCancel={handleTermsCancel}
+      />
+
       <PrintRequestModal
         isOpen={printOpen}
-        onClose={() => setPrintOpen(false)}
+        skipTerms={printSkipTerms}
+        onClose={() => {
+          setPrintOpen(false);
+          setPrintSkipTerms(false);
+        }}
         onSuccess={(result) => {
           setPrintResult(result);
         }}
-      />
-
-      <ManageBookingModal
-        open={retrieveOpen}
-        onClose={() => setRetrieveOpen(false)}
-        onSuccess={(ref) => confirmBookingRef(ref, "confirmed")}
       />
 
       {submitError && !isCheckoutModalOpen ? (
@@ -321,7 +404,7 @@ export default function ItineraryPageClient() {
       {printResult ? (
         <div className="no-print fixed inset-0 z-[80] flex items-end justify-center bg-black/45 p-4 sm:items-center">
           <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
-            <p className="text-[0.65rem] font-semibold uppercase tracking-[0.3em] text-[#B85304]">
+            <p className="text-[0.65rem] font-semibold uppercase tracking-[0.3em] text-[#075473]">
               Itinerary saved
             </p>
             <h2 className="mt-2 font-display text-2xl text-[#0B1F3A]">
@@ -342,7 +425,7 @@ export default function ItineraryPageClient() {
       {submittedRef ? (
         <div className="no-print fixed inset-0 z-[80] flex items-end justify-center bg-black/45 p-4 sm:items-center">
           <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
-            <p className="text-[0.65rem] font-semibold uppercase tracking-[0.3em] text-[#B85304]">
+            <p className="text-[0.65rem] font-semibold uppercase tracking-[0.3em] text-[#075473]">
               Payment received
             </p>
             <h2 className="mt-2 font-display text-2xl text-[#0B1F3A]">

@@ -11,7 +11,7 @@ const nextConfig: NextConfig = {
     remotePatterns: [
       {
         protocol: "https",
-        hostname: "travelexperiencesgroup.com",
+        hostname: "tokiotours-app.com",
         pathname: "/api/files/**",
       },
       {

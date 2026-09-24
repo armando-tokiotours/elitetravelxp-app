@@ -169,7 +169,7 @@ export function StickyProgressBar() {
                 <span
                   className={`max-w-full pt-1 text-[11px] font-semibold leading-tight tracking-tight ${
                     sec.kind === "current"
-                      ? "text-[#E2C498]"
+                      ? "text-[#075473]"
                       : sec.kind === "done"
                         ? "text-white"
                         : "text-zinc-400"
@@ -214,7 +214,7 @@ function Node({ kind }: { kind: "done" | "current" | "upcoming" }) {
   if (kind === "current") {
     return (
       <span
-        className="flex h-7 w-7 items-center justify-center rounded-full bg-[#E2C498] text-[#000000] shadow-[0_0_10px_rgba(226,196,152,0.4)]"
+        className="flex h-7 w-7 items-center justify-center rounded-full bg-[#075473] text-[#000000] shadow-[0_0_10px_rgba(226,196,152,0.4)]"
         aria-label="Current step"
       >
         <span className="h-2 w-2 rounded-full bg-[#000000]" />

@@ -40,13 +40,96 @@ export function RetrieveItineraryModal({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          email: email.trim(),
+          email: email.trim().toLowerCase(),
           pnr: normalizeBookingPNR(pnr),
         }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        throw new Error(data?.error || "Could not find that itinerary.");
+        // Local cache fallback (dual-write from Builder save)
+        const { LOCAL_LEADS_STORAGE_KEYS } = await import(
+          "@/lib/syncBookingLead"
+        );
+        const cleanPnr = normalizeBookingPNR(pnr);
+        const cleanEmail = email.trim().toLowerCase();
+        let matched: Record<string, unknown> | null = null;
+        for (const key of LOCAL_LEADS_STORAGE_KEYS) {
+          try {
+            const list = JSON.parse(
+              localStorage.getItem(key) || "[]"
+            ) as unknown[];
+            if (!Array.isArray(list)) continue;
+            matched =
+              (list.find((item) => {
+                if (!item || typeof item !== "object") return false;
+                const r = item as Record<string, unknown>;
+                return (
+                  String(r.booking_ref || "")
+                    .trim()
+                    .toUpperCase() === cleanPnr &&
+                  String(r.email || "")
+                    .trim()
+                    .toLowerCase() === cleanEmail
+                );
+              }) as Record<string, unknown> | undefined) || null;
+            if (matched) break;
+          } catch {
+            /* ignore */
+          }
+        }
+        if (!matched) {
+          throw new Error(data?.error || "Could not find that itinerary.");
+        }
+        const {
+          expandMultiDaySelectionsToState,
+          expandSingleDaySelectionsToState,
+        } = await import("@/lib/bookingsAndLeads");
+        const lead = {
+          id: `local-${cleanPnr}`,
+          booking_ref: cleanPnr,
+          email: cleanEmail,
+          type: (matched.type === "single_day"
+            ? "single_day"
+            : "multi_day") as "single_day" | "multi_day",
+          status: "lead" as const,
+          primary_city: String(matched.primary_city || ""),
+          tour_date: matched.tour_date ? String(matched.tour_date) : undefined,
+          guests: (matched.guests as { adults: number; kids: number }) || {
+            adults: 2,
+            kids: 0,
+          },
+          duration_value:
+            typeof matched.duration_value === "number"
+              ? matched.duration_value
+              : undefined,
+          selections: (matched.selections || {}) as never,
+        };
+        if (lead.type === "single_day") {
+          const singleDay = expandSingleDaySelectionsToState(lead);
+          const { useSingleDayBuilderStore } = await import(
+            "@/store/useSingleDayBuilderStore"
+          );
+          useSingleDayBuilderStore.setState({
+            ...useSingleDayBuilderStore.getState(),
+            ...singleDay,
+          });
+          loadSavedItinerary({
+            tripMode: "single_day",
+            ...singleDay,
+            confirmedBookingRef: cleanPnr,
+            bookingStatus: bookingStatusFromPbRecord(String(matched.status)),
+          });
+        } else {
+          loadSavedItinerary({
+            ...expandMultiDaySelectionsToState(lead),
+            confirmedBookingRef: cleanPnr,
+            bookingStatus: bookingStatusFromPbRecord(String(matched.status)),
+          });
+        }
+        onSuccess?.(cleanPnr);
+        onClose();
+        router.push("/builder/itinerary?view=dossier");
+        return;
       }
       const st = (data.state || {}) as Record<string, unknown>;
       const payloadStatus = st.bookingStatus as BookingStatus | undefined;
@@ -58,6 +141,15 @@ export function RetrieveItineraryModal({
           payloadStatus
         ),
       });
+      if (data.singleDay && typeof data.singleDay === "object") {
+        const { useSingleDayBuilderStore } = await import(
+          "@/store/useSingleDayBuilderStore"
+        );
+        useSingleDayBuilderStore.setState({
+          ...useSingleDayBuilderStore.getState(),
+          ...data.singleDay,
+        });
+      }
       onSuccess?.(data.bookingRef);
       onClose();
       router.push("/builder/itinerary?view=dossier");
@@ -78,7 +170,7 @@ export function RetrieveItineraryModal({
       >
         <div className="flex items-start justify-between gap-3">
           <div>
-            <p className="text-[0.65rem] font-semibold uppercase tracking-[0.3em] text-[#B85304]">
+            <p className="text-[0.65rem] font-semibold uppercase tracking-[0.3em] text-[#075473]">
               Retrieve itinerary
             </p>
             <h2
@@ -112,7 +204,7 @@ export function RetrieveItineraryModal({
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="mt-1 w-full rounded-xl border border-[#E8E2D9] bg-[#FBF8F2] px-3 py-2.5 text-sm text-[#0B1F3A] outline-none focus:border-[#B85304]"
+              className="mt-1 w-full rounded-xl border border-[#E8E2D9] bg-[#FBF8F2] px-3 py-2.5 text-sm text-[#0B1F3A] outline-none focus:border-[#075473]"
               placeholder="you@example.com"
               autoComplete="email"
             />
@@ -126,7 +218,7 @@ export function RetrieveItineraryModal({
               required
               value={pnr}
               onChange={(e) => setPnr(e.target.value.toUpperCase())}
-              className="mt-1 w-full rounded-xl border border-[#E8E2D9] bg-[#FBF8F2] px-3 py-2.5 font-mono text-sm tracking-wider text-[#0B1F3A] outline-none focus:border-[#B85304]"
+              className="mt-1 w-full rounded-xl border border-[#E8E2D9] bg-[#FBF8F2] px-3 py-2.5 font-mono text-sm tracking-wider text-[#0B1F3A] outline-none focus:border-[#075473]"
               placeholder="JPN-7K9P2X"
               autoComplete="off"
               spellCheck={false}

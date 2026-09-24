@@ -98,11 +98,16 @@ export function BrandingUiCardsAdmin({
       const list = await pb
         .collection("branding_ui_items")
         .getFullList<PbBrandingUiItem>({ sort: "sort_order,key" });
-      // Prefer elite_concierge_modal over legacy concierge_preview in the UI
+      // Prefer elite_concierge_modal over legacy concierge_preview in the UI.
+      // Builder S hero is edited in SiteBrandingPanel (not Quiz & UI Cards).
       const hasElite = list.some((r) => r.key === "elite_concierge_modal");
-      const visible = hasElite
-        ? list.filter((r) => r.key !== "concierge_preview")
-        : list;
+      const visible = list.filter((r) => {
+        if (r.key === "single_day_builder_hero") return false;
+        if (r.category === "pre_elite" || r.key.startsWith("pre_elite_"))
+          return false;
+        if (hasElite && r.key === "concierge_preview") return false;
+        return true;
+      });
       setRows(visible);
       const next: Record<string, Draft> = {};
       for (const row of visible) {
@@ -207,7 +212,7 @@ export function BrandingUiCardsAdmin({
       <div className="mt-6 space-y-8">
         {byCategory.map((group) => (
           <section key={group.cat}>
-            <h3 className="text-xs font-semibold uppercase tracking-[0.2em] text-[#B85304]">
+            <h3 className="text-xs font-semibold uppercase tracking-[0.2em] text-[#075473]">
               {group.label}
             </h3>
             <div className="mt-3 grid gap-4 lg:grid-cols-2">

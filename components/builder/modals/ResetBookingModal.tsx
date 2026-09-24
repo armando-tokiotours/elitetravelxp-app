@@ -12,20 +12,22 @@ export function ResetBookingModal({
   bookingRef,
   onClose,
   onConfirm,
+  busy = false,
 }: {
   open: boolean;
   bookingRef: string;
   onClose: () => void;
   onConfirm: () => void;
+  busy?: boolean;
 }) {
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape" && !busy) onClose();
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [open, onClose]);
+  }, [open, onClose, busy]);
 
   if (!open || typeof document === "undefined") return null;
 
@@ -33,14 +35,14 @@ export function ResetBookingModal({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-center justify-center tokio-modal-backdrop bg-[#05080C]/50 p-4 backdrop-blur-sm"
       role="dialog"
       aria-modal="true"
       aria-labelledby="reset-booking-title"
-      onClick={onClose}
+      onClick={() => (!busy ? onClose() : undefined)}
     >
       <div
-        className="relative w-full max-w-sm rounded-2xl border border-red-500/40 bg-[#121212] p-5 text-center shadow-2xl"
+        className="tokio-modal-content relative w-full max-w-sm rounded-2xl border border-red-500/40 p-5 text-center"
         onClick={(e) => e.stopPropagation()}
       >
         <AlertTriangle
@@ -54,23 +56,26 @@ export function ResetBookingModal({
           Start a New Booking?
         </h2>
         <p className="mb-5 mt-1 text-xs text-zinc-400">
-          This will permanently erase your current itinerary setup and booking
-          reference ({refLabel}). This action cannot be undone.
+          We&apos;ll erase this itinerary, create a fresh booking reference, and
+          email you a Manage Booking link for the new PNR (when your email is on
+          file). Current ref: ({refLabel}). This cannot be undone.
         </p>
         <div className="flex gap-2">
           <button
             type="button"
+            disabled={busy}
             onClick={onClose}
-            className="flex-1 rounded-xl bg-[#1C1C1E] py-2.5 px-4 text-xs font-bold text-zinc-300 transition hover:bg-[#2C2C2E]"
+            className="flex-1 rounded-xl bg-[#1C1C1E] py-2.5 px-4 text-xs font-bold text-zinc-300 transition hover:bg-[#2C2C2E] disabled:opacity-50"
           >
             Keep Current
           </button>
           <button
             type="button"
+            disabled={busy}
             onClick={onConfirm}
-            className="flex-1 rounded-xl bg-red-600 py-2.5 px-4 text-xs font-bold text-white shadow-lg shadow-red-900/30 transition hover:bg-red-700"
+            className="flex-1 rounded-xl bg-red-600 py-2.5 px-4 text-xs font-bold text-white shadow-lg shadow-red-900/30 transition hover:bg-red-700 disabled:opacity-50"
           >
-            Yes, Reset All
+            {busy ? "Resetting…" : "Yes, Reset All"}
           </button>
         </div>
       </div>

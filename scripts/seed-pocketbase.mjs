@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 /**
- * Seeds PocketBase with Elite Travel config "truth" data.
+ * Seeds PocketBase with TOKIOTOURS config "truth" data.
  * Requires PocketBase running and a superuser account.
  *
  * Usage:
  *   PB_URL=http://127.0.0.1:8090 \
- *   PB_ADMIN_EMAIL=admin@travelexperiencesgroup.com \
+ *   PB_ADMIN_EMAIL=admin@tokiotours-app.com \
  *   PB_ADMIN_PASSWORD=changeme123 \
  *   node scripts/seed-pocketbase.mjs
  */
@@ -16,7 +16,7 @@ import { fileURLToPath } from "url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PB_URL = process.env.PB_URL || "http://127.0.0.1:8090";
-const EMAIL = process.env.PB_ADMIN_EMAIL || "admin@travelexperiencesgroup.com";
+const EMAIL = process.env.PB_ADMIN_EMAIL || "admin@tokiotours-app.com";
 const PASSWORD = process.env.PB_ADMIN_PASSWORD || "EliteTravelAdmin2026!";
 
 const pb = new PocketBase(PB_URL);

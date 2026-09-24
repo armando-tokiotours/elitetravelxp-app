@@ -48,14 +48,45 @@ export function correctLocationVisitTypes(
 ): LocationStop[] {
   const len = locations.length;
   return locations.map((loc, index) => {
+    const isHub = Boolean(
+      loc.isTransitHub ||
+        loc.hubId ||
+        loc.key === "__transit_arrival__" ||
+        loc.key === "__transit_departure__"
+    );
+    if (isHub) {
+      const visitType =
+        loc.key === "__transit_departure__" || loc.visitType === "departure"
+          ? ("departure" as const)
+          : ("arrival" as const);
+      return {
+        ...loc,
+        isTransitHub: true,
+        visitType,
+        nights: 0,
+        transitType: coerceTransitType(loc.transitType),
+      };
+    }
     const visitType = coerceVisitTypeForPosition(loc.visitType, index, len);
+    // Overnight cities in the middle of a hub-pinned route stay as stay
+    const forcedStay =
+      locations.some(
+        (l) =>
+          l.isTransitHub ||
+          l.key === "__transit_arrival__" ||
+          l.key === "__transit_departure__"
+      ) && visitType !== "stay"
+        ? ("stay" as const)
+        : visitType;
     const nights =
-      visitType === "stay"
+      forcedStay === "stay"
         ? Math.max(1, Math.min(90, Math.round(Number(loc.nights) || 1)))
         : 0;
     return {
       ...loc,
-      visitType,
+      isTransitHub: false,
+      hubId: undefined,
+      visitType: forcedStay,
       nights,
       transitType: coerceTransitType(loc.transitType),
     };

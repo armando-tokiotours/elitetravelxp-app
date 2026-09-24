@@ -1,84 +1,168 @@
 "use client";
 
 /**
- * Client-side itinerary PDF — captures #itinerary-dossier-view via html2canvas + jsPDF.
- * Used for instant download and as fallback when server email/PDF fails.
+ * Client-side itinerary PDF via html2pdf.js —
+ * always targets #itinerary-invoice-content (never the Send PDF modal).
  */
 
-export async function captureItineraryPdfBlob(
-  elementId = "itinerary-dossier-view"
-): Promise<Blob> {
-  const element =
-    document.getElementById(elementId) ||
+const INVOICE_ID = "itinerary-invoice-content";
+
+function resolveInvoiceElement(): HTMLElement | null {
+  return (
+    document.getElementById(INVOICE_ID) ||
+    document.getElementById("itinerary-dossier-view") ||
     document.getElementById("itinerary-print-view") ||
-    document.querySelector(".print-document");
-  if (!element) {
-    throw new Error(
-      "Itinerary view not found on the page. Open the Invoice / Print tab first."
-    );
+    (document.querySelector(".print-document") as HTMLElement | null)
+  );
+}
+
+/** Temporarily bring off-screen invoice into layout for capture. */
+function prepareOffscreenCapture(element: HTMLElement): () => void {
+  const wrappers: HTMLElement[] = [];
+  let node: HTMLElement | null = element;
+  while (node && node !== document.body) {
+    const style = window.getComputedStyle(node);
+    const left = parseFloat(style.left);
+    if (style.position === "fixed" || style.position === "absolute") {
+      if (
+        (Number.isFinite(left) && left < -500) ||
+        node.classList.contains("invoice-capture-offscreen")
+      ) {
+        wrappers.push(node);
+      }
+    }
+    node = node.parentElement;
   }
 
-  const [{ default: html2canvas }, { jsPDF }] = await Promise.all([
-    import("html2canvas"),
-    import("jspdf"),
-  ]);
+  const snapshots = wrappers.map((el) => ({
+    el,
+    cssText: el.style.cssText,
+  }));
 
-  const canvas = await html2canvas(element, {
-    scale: 2,
-    useCORS: true,
-    allowTaint: true,
-    backgroundColor: "#ffffff",
-    logging: false,
-    windowWidth: element.scrollWidth,
-    // html2canvas runtime supports these; @types may lag
-  } as never);
-
-  const imgData = canvas.toDataURL("image/jpeg", 0.92);
-  const pdf = new jsPDF({
-    orientation: "portrait",
-    unit: "mm",
-    format: "a4",
-  });
-
-  const pageWidth = pdf.internal.pageSize.getWidth();
-  const pageHeight = pdf.internal.pageSize.getHeight();
-  const imgWidth = pageWidth;
-  const imgHeight = (canvas.height * imgWidth) / canvas.width;
-
-  let heightLeft = imgHeight;
-  let position = 0;
-
-  pdf.addImage(imgData, "JPEG", 0, position, imgWidth, imgHeight);
-  heightLeft -= pageHeight;
-
-  while (heightLeft > 0) {
-    position = heightLeft - imgHeight;
-    pdf.addPage();
-    pdf.addImage(imgData, "JPEG", 0, position, imgWidth, imgHeight);
-    heightLeft -= pageHeight;
+  for (const el of wrappers) {
+    el.style.left = "0px";
+    el.style.top = "0px";
+    el.style.right = "auto";
+    el.style.bottom = "auto";
+    el.style.opacity = "1";
+    el.style.visibility = "visible";
+    el.style.pointerEvents = "none";
+    el.style.zIndex = "-1";
+    el.style.position = "fixed";
   }
 
-  return pdf.output("blob");
+  return () => {
+    for (const { el, cssText } of snapshots) {
+      el.style.cssText = cssText;
+    }
+  };
+}
+
+function pdfFilename(bookingRef: string): string {
+  const safe = (bookingRef || "draft").replace(/[^\w.-]+/g, "_");
+  return `Japan_Itinerary_${safe}.pdf`;
+}
+
+function html2pdfOptions(bookingRef: string) {
+  return {
+    margin: 10,
+    filename: pdfFilename(bookingRef),
+    image: { type: "jpeg" as const, quality: 0.95 },
+    html2canvas: {
+      scale: 2,
+      useCORS: true,
+      allowTaint: true,
+      backgroundColor: "#ffffff",
+      logging: false,
+    },
+    jsPDF: {
+      unit: "mm" as const,
+      format: "a4" as const,
+      orientation: "portrait" as const,
+    },
+    pagebreak: { mode: ["avoid-all", "css", "legacy"] as string[] },
+  };
+}
+
+async function loadHtml2Pdf(): Promise<
+  (el?: HTMLElement) => {
+    set: (opts: unknown) => {
+      from: (src: HTMLElement) => {
+        save: () => Promise<void>;
+        outputPdf: (type: string) => Promise<Blob | string>;
+      };
+    };
+  }
+> {
+  const mod = await import("html2pdf.js");
+  return (mod.default || mod) as never;
+}
+
+export async function captureItineraryPdfBlob(
+  bookingRef = "draft"
+): Promise<Blob> {
+  document.body.classList.add("print-capturing");
+  let restoreOffscreen: (() => void) | null = null;
+
+  try {
+    const element = resolveInvoiceElement();
+    if (!element) {
+      throw new Error(
+        "Itemized invoice not found (#itinerary-invoice-content). Open Invoice / Print first."
+      );
+    }
+
+    restoreOffscreen = prepareOffscreenCapture(element);
+    await new Promise((r) => requestAnimationFrame(() => r(undefined)));
+    await new Promise((r) => setTimeout(r, 50));
+
+    const html2pdf = await loadHtml2Pdf();
+    const blob = (await html2pdf()
+      .set(html2pdfOptions(bookingRef))
+      .from(element)
+      .outputPdf("blob")) as Blob;
+
+    if (!(blob instanceof Blob) || blob.size === 0) {
+      throw new Error("html2pdf produced an empty PDF.");
+    }
+    return blob;
+  } finally {
+    restoreOffscreen?.();
+    document.body.classList.remove("print-capturing");
+  }
 }
 
 export async function downloadItineraryPdf(bookingRef: string): Promise<void> {
-  const blob = await captureItineraryPdfBlob();
-  const safe = (bookingRef || "draft").replace(/[^\w.-]+/g, "_");
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `Japan_Itinerary_${safe}.pdf`;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  URL.revokeObjectURL(url);
+  document.body.classList.add("print-capturing");
+  let restoreOffscreen: (() => void) | null = null;
+
+  try {
+    const element = resolveInvoiceElement();
+    if (!element) {
+      throw new Error(
+        "Itemized invoice not found (#itinerary-invoice-content). Open Invoice / Print first."
+      );
+    }
+
+    restoreOffscreen = prepareOffscreenCapture(element);
+    await new Promise((r) => requestAnimationFrame(() => r(undefined)));
+    await new Promise((r) => setTimeout(r, 50));
+
+    const html2pdf = await loadHtml2Pdf();
+    await html2pdf()
+      .set(html2pdfOptions(bookingRef))
+      .from(element)
+      .save();
+  } finally {
+    restoreOffscreen?.();
+    document.body.classList.remove("print-capturing");
+  }
 }
 
 export async function itineraryPdfToBase64(
   bookingRef?: string
 ): Promise<string> {
-  void bookingRef;
-  const blob = await captureItineraryPdfBlob();
+  const blob = await captureItineraryPdfBlob(bookingRef || "draft");
   const buffer = await blob.arrayBuffer();
   let binary = "";
   const bytes = new Uint8Array(buffer);
@@ -89,6 +173,20 @@ export async function itineraryPdfToBase64(
   return btoa(binary);
 }
 
-export function printItineraryLocally(): void {
-  window.print();
+/** Local save — prefers html2pdf.js; falls back to print isolation CSS. */
+export async function printItineraryLocally(
+  bookingRef = "draft"
+): Promise<void> {
+  try {
+    await downloadItineraryPdf(bookingRef);
+  } catch {
+    document.body.classList.add("print-capturing");
+    const cleanup = () => {
+      document.body.classList.remove("print-capturing");
+      window.removeEventListener("afterprint", cleanup);
+    };
+    window.addEventListener("afterprint", cleanup);
+    window.setTimeout(cleanup, 3000);
+    window.print();
+  }
 }

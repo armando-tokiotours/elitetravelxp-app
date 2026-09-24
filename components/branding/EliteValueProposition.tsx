@@ -16,7 +16,7 @@ function parseBullets(raw: string): string[] {
     .filter((line) => line.length > 0);
 }
 
-/** Compact “Elite Travel Difference” banner for Builder / Budget surfaces. */
+/** Compact “TOKIOTOURS Difference” banner for Builder / Budget surfaces. */
 export function EliteValuePropositionBanner({
   tone = "dark",
   compact = false,
@@ -42,7 +42,7 @@ export function EliteValuePropositionBanner({
       ? "border-zinc-800 bg-zinc-950/80 text-white"
       : "border-[#E8E2D9] bg-[#FBF8F2] text-[#0B1F3A]";
   const muted = tone === "dark" ? "text-zinc-400" : "text-[#5C6570]";
-  const accent = tone === "dark" ? "text-accent-500" : "text-[#B85304]";
+  const accent = tone === "dark" ? "text-accent-500" : "text-[#075473]";
 
   return (
     <aside
@@ -53,7 +53,7 @@ export function EliteValuePropositionBanner({
       <p
         className={`text-[10px] font-bold uppercase tracking-[0.2em] ${accent}`}
       >
-        {vp.title || "The Elite Travel Difference"}
+        {vp.title || "The TOKIOTOURS Difference"}
       </p>
       <h3
         className={`mt-1 font-display ${
@@ -71,7 +71,7 @@ export function EliteValuePropositionBanner({
             const rest = colon > 0 ? line.slice(colon + 1).trim() : line;
             return (
               <li key={`vp-bullet-${i}`} className="flex gap-2">
-                <span className={`mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full ${accent === "text-accent-500" ? "bg-accent-500" : "bg-[#B85304]"}`} />
+                <span className={`mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full ${accent === "text-accent-500" ? "bg-accent-500" : "bg-[#075473]"}`} />
                 <span>
                   {label ? (
                     <>
@@ -132,8 +132,8 @@ export function SelfGuidedEliteCompareCallout({
 
   const shell =
     tone === "dark"
-      ? "border-[#B85304]/40 bg-[#B85304]/15 text-zinc-400"
-      : "border-[#B85304]/35 bg-[#B85304]/8 text-[#5C6570]";
+      ? "border-[#075473]/40 bg-[#075473]/15 text-zinc-400"
+      : "border-[#075473]/35 bg-[#075473]/8 text-[#5C6570]";
 
   return (
     <div className={`mt-2 rounded-lg border px-2.5 py-2 text-[10px] leading-relaxed ${shell}`}>

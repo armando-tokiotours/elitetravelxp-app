@@ -21,6 +21,8 @@ export type SendMailInput = {
   attachments?: SendMailAttachment[];
   /** Extra BCC recipients (merged with TokioTours team notify). */
   bcc?: string | string[];
+  /** When true, do not auto-BCC the concierge team (caller handles team notify). */
+  skipTeamBcc?: boolean;
 };
 
 /** Always notified on client quotation emails (from active team config). */
@@ -28,12 +30,15 @@ export const TOKIO_TOURS_QUOTE_BCC = "armando@tokiotours.nl";
 
 function resolveBccForRecipients(
   to: string[],
-  extra?: string | string[]
+  extra?: string | string[],
+  skipTeamBcc?: boolean
 ): string[] {
-  const cfg = getActiveEmailConfig();
-  const base = resolveTeamBcc(to, cfg);
-  const set = new Set(base);
   const toLower = new Set(to.map((a) => a.trim().toLowerCase()).filter(Boolean));
+  const set = new Set<string>();
+  if (!skipTeamBcc) {
+    const cfg = getActiveEmailConfig();
+    for (const b of resolveTeamBcc(to, cfg)) set.add(b);
+  }
   for (const addr of Array.isArray(extra) ? extra : extra ? [extra] : []) {
     const t = addr.trim().toLowerCase();
     if (t && !toLower.has(t)) set.add(t);
@@ -51,7 +56,7 @@ export async function sendTransactionalMail(
   const cfg = getActiveEmailConfig();
   const from = resolveTeamMailFrom(cfg);
   const to = Array.isArray(input.to) ? input.to : [input.to];
-  const bcc = resolveBccForRecipients(to, input.bcc);
+  const bcc = resolveBccForRecipients(to, input.bcc, input.skipTeamBcc);
   const resendKey = resolveResendApiKey();
 
   if (resendKey) {

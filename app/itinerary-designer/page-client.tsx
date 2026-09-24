@@ -34,17 +34,17 @@ export default function ItineraryDesignerPage() {
         <div className="mx-auto flex max-w-7xl items-center justify-between px-5 py-5 sm:px-8">
           <a href="/" className="group">
             <p className="text-[0.6rem] uppercase tracking-[0.4em] text-[#D4AF37] transition group-hover:text-[#e0c04a]">
-              Elite Travel Experiences
+              TOKIOTOURS
             </p>
             <p className="mt-1 font-display text-lg tracking-wide text-white sm:text-xl">
               Itinerary Designer
             </p>
           </a>
           <a
-            href="https://travelexperiencesgroup.com"
+            href="https://tokiotours-app.com"
             className="hidden text-xs tracking-[0.2em] text-white/40 uppercase transition hover:text-[#D4AF37] sm:block"
           >
-            travelexperiencesgroup.com
+            tokiotours-app.com
           </a>
         </div>
       </header>
@@ -87,7 +87,7 @@ export default function ItineraryDesignerPage() {
       </main>
 
       <footer className="relative z-10 border-t border-white/10 py-8 text-center text-xs tracking-wider text-white/30">
-        © {new Date().getFullYear()} Elite Travel Experiences · Private
+        © {new Date().getFullYear()} TOKIOTOURS · Private
         &amp; Confidential
       </footer>
     </div>

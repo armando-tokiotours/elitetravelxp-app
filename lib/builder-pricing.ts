@@ -24,6 +24,7 @@ import {
 } from "@/lib/chauffeurSelections";
 import { sumTransitTicketCosts } from "@/lib/transitTickets";
 import { ELITE_CONCIERGE_FEE } from "@/lib/eliteConcierge";
+import { normalizeBookingStatus } from "@/utils/pnr";
 
 function eliteConciergeFeeAmount(rules: SystemRulesMap): number {
   const fromRules = ruleNumber(rules, "elite_concierge_fee", ELITE_CONCIERGE_FEE);
@@ -31,10 +32,20 @@ function eliteConciergeFeeAmount(rules: SystemRulesMap): number {
   return fromRules > 0 && fromRules <= 500 ? fromRules : ELITE_CONCIERGE_FEE;
 }
 
-/** Credit the design deposit once the guest has requested / paid / confirmed. */
-function shouldApplyConciergeTourCredit(state: BuilderState): boolean {
-  const s = state.bookingStatus;
-  return s === "requested" || s === "deposit_paid" || s === "confirmed";
+/**
+ * Net the design deposit as tour credit only on confirmed bookings when the
+ * trip total already exceeds the deposit. Never wipe a concierge-only estimate
+ * to €0 (that produced "Est. €0 · No add-ons selected" while Elite Concierge
+ * was active).
+ */
+function shouldApplyConciergeTourCredit(
+  state: BuilderState,
+  amountBeforeCredit: number,
+  fee: number
+): boolean {
+  if (normalizeBookingStatus(state.bookingStatus) !== "confirmed") return false;
+  if (fee <= 0) return false;
+  return amountBeforeCredit > fee;
 }
 
 function isConciergeMode(state: BuilderState): boolean {
@@ -381,7 +392,7 @@ export function calculateBuilderQuote(
     const fee = eliteConciergeFeeAmount(rules);
     min += fee;
     max += fee;
-    if (shouldApplyConciergeTourCredit(state)) {
+    if (shouldApplyConciergeTourCredit(state, min, fee)) {
       min -= fee;
       max -= fee;
     }
@@ -724,7 +735,7 @@ export function calculateInvoiceBreakdown(
     conciergeFee = eliteConciergeFeeAmount(rules);
     expMin += conciergeFee;
     expMax += conciergeFee;
-    if (shouldApplyConciergeTourCredit(state)) {
+    if (shouldApplyConciergeTourCredit(state, expMin, conciergeFee)) {
       conciergeCredit = conciergeFee;
       expMin -= conciergeCredit;
       expMax -= conciergeCredit;
@@ -816,6 +827,46 @@ export function formatUsd(n: number): string {
     currency: "EUR",
     maximumFractionDigits: 0,
   }).format(n);
+}
+
+/**
+ * Compact estimate label for sticky CTAs / summary cards.
+ * Concierge-only selections must never read as "No add-ons selected".
+ */
+export function formatEstimateSummary(opts: {
+  min: number;
+  max: number;
+  conciergeActive: boolean;
+  conciergeFee?: number;
+}): string {
+  const fee = Math.max(0, opts.conciergeFee ?? ELITE_CONCIERGE_FEE);
+  const min = Math.max(0, Math.round(opts.min));
+  const max = Math.max(0, Math.round(opts.max));
+
+  if (opts.conciergeActive && min <= 0 && max <= 0) {
+    // Defensive: calculator should already include the fee
+    return `Est. ${formatUsd(fee)} · Elite Concierge Included`;
+  }
+
+  if (min <= 0 && max <= 0) {
+    return `Est. ${formatUsd(0)} · No add-ons selected`;
+  }
+
+  if (opts.conciergeActive && min === max && min === fee) {
+    return `Est. ${formatUsd(min)} · Elite Concierge Included`;
+  }
+
+  if (opts.conciergeActive) {
+    if (min === max) {
+      return `Est. ${formatUsd(min)} · Elite Concierge + Add-ons`;
+    }
+    return `Est. ${formatUsd(min)}–${formatUsd(max)} · Elite Concierge + Add-ons`;
+  }
+
+  if (min === max) {
+    return `Est. ${formatUsd(min)} · Selected Add-ons`;
+  }
+  return `Est. ${formatUsd(min)}–${formatUsd(max)}`;
 }
 
 /** Suggested rooms from max_occupancy rules */

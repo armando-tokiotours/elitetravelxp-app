@@ -11,6 +11,8 @@ import {
 } from "react";
 import { useBuilderStore } from "@/store/useBuilderStore";
 import { canOpenBuilderStep } from "@/lib/builderSteps";
+import { getSingleDayHighestUnlocked } from "@/lib/singleDaySteps";
+import { useSingleDayBuilderStore } from "@/store/useSingleDayBuilderStore";
 
 type AccordionCtx = {
   openSection: number | null;
@@ -18,8 +20,15 @@ type AccordionCtx = {
   toggleSection: (n: number) => void;
   /** Open a section and collapse others (used by progress bar / Continue). */
   openOnly: (n: number) => void;
+  /**
+   * After Save & Continue: collapse current and open `n` without re-checking
+   * unlock (caller already validated + unlocked; avoids stale-context race).
+   */
+  advanceTo: (n: number) => void;
   /** Attempt to open; returns false when locked. */
   tryOpenSection: (n: number) => boolean;
+  /** Effective unlock ceiling for this builder (M or S). */
+  highestUnlockedStep: number;
   toast: string | null;
   showToast: (message: string) => void;
   clearToast: () => void;
@@ -29,14 +38,54 @@ const BuilderAccordionContext = createContext<AccordionCtx | null>(null);
 
 export function BuilderAccordionProvider({
   children,
-  defaultOpen = 1,
+  defaultOpen = null,
+  unlockAll = false,
 }: {
   children: ReactNode;
-  defaultOpen?: number;
+  /** Step number to open on mount, or null for all collapsed */
+  defaultOpen?: number | null;
+  /**
+   * Builder S: ignore multi-day unlock and use Single-Day completion rules.
+   * Does NOT mean every step is open — only steps earned by S criteria.
+   */
+  unlockAll?: boolean;
 }) {
   const [openSection, setOpenSection] = useState<number | null>(defaultOpen);
   const [toast, setToast] = useState<string | null>(null);
-  const highestUnlockedStep = useBuilderStore((s) => s.highestUnlockedStep);
+  const multiDayUnlocked = useBuilderStore((s) => s.highestUnlockedStep);
+
+  const tourDate = useSingleDayBuilderStore((s) => s.tourDate);
+  const tourHours = useSingleDayBuilderStore((s) => s.tourHours);
+  const adults = useSingleDayBuilderStore((s) => s.adults);
+  const cityFocus = useSingleDayBuilderStore((s) => s.cityFocus);
+  const selectedExperienceCount = useSingleDayBuilderStore(
+    (s) => s.selectedExperiences.length
+  );
+  const experiencesStepDone = useSingleDayBuilderStore(
+    (s) => s.experiencesStepDone
+  );
+
+  const singleDayUnlocked = useMemo(
+    () =>
+      getSingleDayHighestUnlocked({
+        tourDate,
+        tourHours,
+        adults,
+        cityFocus,
+        selectedExperienceCount,
+        experiencesStepDone,
+      }),
+    [
+      tourDate,
+      tourHours,
+      adults,
+      cityFocus,
+      selectedExperienceCount,
+      experiencesStepDone,
+    ]
+  );
+
+  const effectiveUnlocked = unlockAll ? singleDayUnlocked : multiDayUnlocked;
 
   const showToast = useCallback((message: string) => {
     setToast(message);
@@ -53,32 +102,32 @@ export function BuilderAccordionProvider({
   // If unlock clamps down, close a locked-open section
   useEffect(() => {
     setOpenSection((cur) => {
-      if (cur != null && cur > highestUnlockedStep) return highestUnlockedStep;
+      if (cur != null && cur > effectiveUnlocked) return effectiveUnlocked;
       return cur;
     });
-  }, [highestUnlockedStep]);
+  }, [effectiveUnlocked]);
 
   const tryOpenSection = useCallback(
     (n: number) => {
-      if (!canOpenBuilderStep(n, highestUnlockedStep)) {
+      if (!canOpenBuilderStep(n, effectiveUnlocked)) {
         showToast("Complete the previous steps before unlocking this section.");
         return false;
       }
       setOpenSection(n);
       return true;
     },
-    [highestUnlockedStep, showToast]
+    [effectiveUnlocked, showToast]
   );
 
   const toggleSection = useCallback(
     (n: number) => {
-      if (!canOpenBuilderStep(n, highestUnlockedStep)) {
+      if (!canOpenBuilderStep(n, effectiveUnlocked)) {
         showToast("Complete the previous steps before unlocking this section.");
         return;
       }
       setOpenSection((cur) => (cur === n ? null : n));
     },
-    [highestUnlockedStep, showToast]
+    [effectiveUnlocked, showToast]
   );
 
   const openOnly = useCallback(
@@ -88,13 +137,20 @@ export function BuilderAccordionProvider({
     [tryOpenSection]
   );
 
+  /** Force-open next step after Save & Continue (skips stale unlock check). */
+  const advanceTo = useCallback((n: number) => {
+    setOpenSection(n);
+  }, []);
+
   const value = useMemo(
     () => ({
       openSection,
       setOpenSection,
       toggleSection,
       openOnly,
+      advanceTo,
       tryOpenSection,
+      highestUnlockedStep: effectiveUnlocked,
       toast,
       showToast,
       clearToast,
@@ -103,7 +159,9 @@ export function BuilderAccordionProvider({
       openSection,
       toggleSection,
       openOnly,
+      advanceTo,
       tryOpenSection,
+      effectiveUnlocked,
       toast,
       showToast,
       clearToast,
@@ -116,7 +174,7 @@ export function BuilderAccordionProvider({
       {toast ? (
         <div
           role="status"
-          className="fixed bottom-[7.5rem] left-1/2 z-[60] w-[min(92vw,28rem)] -translate-x-1/2 rounded-xl border border-[#B85304]/50 bg-[#1a1510] px-4 py-3 text-center text-sm text-[#F3D9C4] shadow-lg md:bottom-28"
+          className="fixed bottom-[7.5rem] left-1/2 z-[60] w-[min(92vw,28rem)] -translate-x-1/2 rounded-xl border border-[#075473]/50 bg-[#1a1510] px-4 py-3 text-center text-sm text-[#F3D9C4] shadow-lg md:bottom-28"
         >
           ⚠️ {toast}
         </div>

@@ -51,14 +51,17 @@ export function TripDurationSection({
 
   const totalGuests = adults + children;
   const paceLabel = travelPaceLabel(travelPace);
+  const nights = Math.max(0, durationDays - 1);
 
   const hasBasics = durationDays > 0 && Boolean(arrivalDate);
   const row1 = hasBasics
     ? `${durationDays} Days · Arriving ${formatDisplayDate(arrivalDate)}`
-    : "Set duration and date";
+    : durationDays > 0
+      ? `${durationDays} Days · Set arrival date`
+      : "Set duration and date";
   const row2 = `${totalGuests} Guest${totalGuests === 1 ? "" : "s"}${
     paceLabel ? ` · ${paceLabel} Pace` : ""
-  }`;
+  }${hasBasics ? ` · ${nights} Night${nights === 1 ? "" : "s"}` : ""}`;
 
   const openEditor = () => setIsDurationModalOpen(true);
 
@@ -77,11 +80,11 @@ export function TripDurationSection({
       <button
         type="button"
         onClick={openEditor}
-        className="w-full cursor-pointer rounded-2xl border border-zinc-800 bg-zinc-900 p-5 text-left transition-all hover:bg-zinc-800/80"
+        className="w-full cursor-pointer rounded-2xl border border-white/10 bg-[#0D1117]/70 p-5 text-left backdrop-blur-md transition-all hover:border-[#075473]/40 hover:bg-[#0D1117]/90"
       >
         <div className="flex items-start justify-between gap-3">
           <h3 className="text-sm font-semibold uppercase tracking-wider text-zinc-400">
-            Trip Details
+            Trip overview
           </h3>
           <Pencil className="h-4 w-4 shrink-0 text-zinc-500" aria-hidden />
         </div>
@@ -92,7 +95,7 @@ export function TripDurationSection({
       <button
         type="button"
         onClick={openEditor}
-        className="mt-3 flex w-full items-center justify-center gap-2 rounded-full border border-[#B85304]/50 bg-zinc-950 py-2.5 text-sm font-semibold text-white transition hover:border-[#B85304] hover:bg-[#0B1F3A]"
+        className="mt-3 flex w-full items-center justify-center gap-2 rounded-full border border-[#075473]/50 bg-[#05080C]/60 py-2.5 text-sm font-semibold text-white backdrop-blur-md transition hover:border-[#075473] hover:bg-[#075473]/20"
       >
         <Pencil className="h-3.5 w-3.5" aria-hidden />
         Edit Trip Details

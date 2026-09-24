@@ -8,6 +8,8 @@ import {
   isBuilderStepComplete,
 } from "@/lib/builderSteps";
 import { useBuilderStore } from "@/store/useBuilderStore";
+import { useItineraryStore } from "@/store/useItineraryStore";
+import { usePreBuilderStore } from "@/store/usePreBuilderStore";
 import { useBuilderAccordionOptional } from "./BuilderAccordion";
 
 /** Advances accordion to the next section after validating the current step. */
@@ -62,12 +64,37 @@ export function SectionContinue({
       return;
     }
     unlockBuilderStep(next);
+
+    // Final "Save & View Itinerary" — dual-write bookings_and_leads + local cache
     if (href) {
+      const builder = useBuilderStore.getState();
+      const email = String(
+        useItineraryStore.getState().clientEmail ||
+          usePreBuilderStore.getState().email ||
+          usePreBuilderStore.getState().lastPayload?.email ||
+          ""
+      )
+        .trim()
+        .toLowerCase();
+      const ref =
+        builder.confirmedBookingRef || builder.tempBookingRef || "";
+      if (email && ref) {
+        void import("@/lib/syncBookingLead").then(({ syncMultiDayBookingLead }) =>
+          syncMultiDayBookingLead({
+            bookingRef: ref,
+            email,
+            state: builder,
+            status: "lead",
+          })
+        );
+      }
       router.push(href);
       return;
     }
     if (next > BUILDER_STEP_COUNT) return;
-    accordion.openOnly(next);
+    // advanceTo bypasses unlock check — unlockBuilderStep already ran; openOnly
+    // would fail on stale highestUnlockedStep from the same render tick.
+    accordion.advanceTo(next);
     const id = BUILDER_SECTION_IDS[next];
     if (id) {
       requestAnimationFrame(() => {
@@ -92,7 +119,7 @@ export function SectionContinue({
               : "w-full rounded-xl border border-cyan-500/40 bg-[#1E2D4A] py-3 px-6 text-xs font-bold text-white shadow-lg transition hover:bg-[#0A4074] sm:text-sm"
             : isSaved
               ? "rounded-full border border-blue-400/40 bg-[#1E2D4A] px-5 py-2.5 text-sm font-bold text-white transition hover:bg-[#243656]"
-              : "rounded-full border border-zinc-700 bg-[#1C1C1E] px-5 py-2.5 text-sm font-semibold text-zinc-200 transition hover:border-[#B85304]"
+              : "rounded-full border border-zinc-700 bg-[#1C1C1E] px-5 py-2.5 text-sm font-semibold text-zinc-200 transition hover:border-[#075473]"
         }
       >
         {displayLabel}

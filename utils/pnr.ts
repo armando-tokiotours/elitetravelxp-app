@@ -2,11 +2,38 @@
 
 const PNR_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // no O/0/I/1
 
-export type BookingStatus =
-  | "draft"
+/**
+ * Lead / itinerary lifecycle:
+ * draft → in_progress (guest actions) → confirmed (admin only).
+ *
+ * Legacy aliases `requested` / `deposit_paid` normalize to `in_progress`.
+ */
+export type BookingStatus = "draft" | "in_progress" | "confirmed";
+
+/** @deprecated Legacy persisted values — use normalizeBookingStatus(). */
+export type LegacyBookingStatus =
+  | BookingStatus
   | "requested"
   | "deposit_paid"
-  | "confirmed";
+  | "pre_qualification";
+
+export function normalizeBookingStatus(raw: unknown): BookingStatus {
+  const s = String(raw || "")
+    .trim()
+    .toLowerCase();
+  if (s === "confirmed" || s === "contacted") return "confirmed";
+  if (
+    s === "in_progress" ||
+    s === "requested" ||
+    s === "deposit_paid" ||
+    s === "quoted" ||
+    s === "pending_deposit" ||
+    s === "paid"
+  ) {
+    return "in_progress";
+  }
+  return "draft";
+}
 
 function randomCode(length = 6): string {
   let code = "";
@@ -77,44 +104,36 @@ export function isTempBookingRef(raw: string): boolean {
 
 /** UI badge label per spec. */
 export function bookingRefBadgeLabel(status: BookingStatus): string {
-  return status === "draft" ? "Draft (Not Confirmed)" : "Confirmed";
-}
-
-export function bookingStatusLabel(status: BookingStatus): string {
-  switch (status) {
-    case "requested":
-      return "Requested";
-    case "deposit_paid":
-      return "Deposit Paid";
+  switch (normalizeBookingStatus(status)) {
     case "confirmed":
       return "Confirmed";
+    case "in_progress":
+      return "In Progress";
     default:
       return "Draft (Not Confirmed)";
   }
 }
 
-/** Map PocketBase booking_requests.status → store bookingStatus. */
+export function bookingStatusLabel(status: BookingStatus | string): string {
+  switch (normalizeBookingStatus(status)) {
+    case "in_progress":
+      return "In Progress";
+    case "confirmed":
+      return "Confirmed";
+    default:
+      return "Draft";
+  }
+}
+
+/** Map PocketBase booking_requests / bookings.status → store bookingStatus. */
 export function bookingStatusFromPbRecord(
   pbStatus: string | undefined,
-  payloadStatus: BookingStatus | undefined
+  payloadStatus: BookingStatus | string | undefined
 ): BookingStatus {
-  if (
-    payloadStatus &&
-    payloadStatus !== "draft"
-  ) {
-    return payloadStatus;
+  if (payloadStatus && normalizeBookingStatus(payloadStatus) !== "draft") {
+    return normalizeBookingStatus(payloadStatus);
   }
-  switch (pbStatus) {
-    case "quoted":
-      return "requested";
-    case "pending_deposit":
-    case "paid":
-      return "deposit_paid";
-    case "contacted":
-      return "confirmed";
-    default:
-      return payloadStatus ?? "confirmed";
-  }
+  return normalizeBookingStatus(pbStatus ?? payloadStatus ?? "draft");
 }
 
 export function activeBookingRef(opts: {
@@ -122,7 +141,7 @@ export function activeBookingRef(opts: {
   confirmedBookingRef: string | null;
   bookingStatus: BookingStatus;
 }): string {
-  if (opts.bookingStatus === "draft") {
+  if (normalizeBookingStatus(opts.bookingStatus) === "draft") {
     return opts.tempBookingRef || "";
   }
   return opts.confirmedBookingRef || opts.tempBookingRef || "";

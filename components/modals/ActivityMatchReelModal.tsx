@@ -79,7 +79,7 @@ export function ActivityMatchReelModal({
       {open ? (
         <motion.div
           key="match-reel"
-          className="fixed inset-0 z-[130] flex items-center justify-center bg-black/90 p-3 backdrop-blur-md sm:p-4"
+          className="fixed inset-0 z-[130] flex items-center justify-center tokio-modal-backdrop bg-[#05080C]/55 p-3 backdrop-blur-md sm:p-4"
           role="dialog"
           aria-modal="true"
           aria-label="Match Reel"
@@ -181,7 +181,7 @@ export function ActivityMatchReelModal({
 
                 <div className="relative z-[5] flex h-full flex-col justify-between p-5 pt-10">
                   <div className="space-y-2">
-                    <span className="inline-flex items-center gap-1 rounded-full border border-accent-500/40 bg-[#B85304]/15 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-accent-500">
+                    <span className="inline-flex items-center gap-1 rounded-full border border-[#F6A724]/40 bg-[#F6A724]/15 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-[#F6A724]">
                       <Sparkles className="h-3 w-3" aria-hidden />
                       Matched for Your Vibe
                     </span>
@@ -212,7 +212,7 @@ export function ActivityMatchReelModal({
                         .map((v, i) => (
                         <span
                           key={`${slide.id}-vibe-${v}-${i}`}
-                          className="rounded-md border border-[#B85304]/40 bg-zinc-800/80 px-2 py-0.5 text-[10px] text-accent-500"
+                          className="rounded-md border border-[#075473]/40 bg-zinc-800/80 px-2 py-0.5 text-[10px] text-accent-500"
                         >
                           {vibeBadgeLabel(v)}
                         </span>
@@ -233,7 +233,7 @@ export function ActivityMatchReelModal({
                         </span>
                       ) : null}
                       {vibe ? (
-                        <span className="rounded-md border border-[#B85304]/30 bg-[#B85304]/10 px-2 py-0.5 text-[10px] text-[#F3D9C4]">
+                        <span className="rounded-md border border-[#075473]/30 bg-[#075473]/10 px-2 py-0.5 text-[10px] text-[#F3D9C4]">
                           {(
                             QUIZ_VIBE.find((o) => o.id === vibe)?.label ??
                             String(vibe)
@@ -276,7 +276,7 @@ export function ActivityMatchReelModal({
                 <button
                   type="button"
                   onClick={onClose}
-                  className="mt-2 rounded-full bg-accent-500 px-4 py-2 text-xs font-bold text-zinc-950"
+                  className="mt-2 rounded-full bg-accent-500 px-4 py-2 text-xs font-bold text-white"
                 >
                   Close
                 </button>

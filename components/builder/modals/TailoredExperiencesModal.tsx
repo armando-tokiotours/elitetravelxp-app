@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
+import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import { ArrowLeft, Car, Sparkles, Ticket } from "lucide-react";
 import type {
@@ -44,7 +45,9 @@ import {
 } from "@/lib/vehicleAllocator";
 import { recommendedToursForCity } from "@/lib/experienceProfiler";
 import { useBuilderStore } from "@/store/useBuilderStore";
+import { useActiveMatchProfile } from "@/store/useQuizStore";
 import { ExperienceProfilerModal } from "@/components/quiz/ExperienceProfilerModal";
+import { TravelProfileBadge } from "@/components/quiz/TravelProfileBadge";
 import { ActivityMatchReelModal } from "@/components/modals/ActivityMatchReelModal";
 import { buildTripMatchReelSlides } from "@/lib/matchReel";
 import { ConciergeSuggestionCard } from "../ConciergeSuggestionCard";
@@ -77,6 +80,7 @@ export function TailoredExperiencesModal({
   /** When true, only show experiences (drivers live in Builder Step 6). */
   hideTransport?: boolean;
 }) {
+  const router = useRouter();
   const locations = useBuilderStore((s) => s.locations);
   const arrivalDate = useBuilderStore((s) => s.arrivalDate);
   const committedTours = useBuilderStore((s) => s.selectedTours);
@@ -89,7 +93,7 @@ export function TailoredExperiencesModal({
   );
   const setExperienceService = useBuilderStore((s) => s.setExperienceService);
   const commitSelectedTours = useBuilderStore((s) => s.commitSelectedTours);
-  const experienceProfile = useBuilderStore((s) => s.experienceProfile);
+  const experienceProfile = useActiveMatchProfile();
   const durationDays = useBuilderStore((s) => s.durationDays);
   const totalPax = adults + children;
 
@@ -112,6 +116,7 @@ export function TailoredExperiencesModal({
     setDraftTours(snapshot);
     setAutoFillNote(null);
     setDrawerCityId(null);
+    setExpandedKey(null);
   }, [open]); // eslint-disable-line react-hooks/exhaustive-deps -- snapshot once per open
 
   const selectedToursMap = draftTours;
@@ -234,8 +239,9 @@ export function TailoredExperiencesModal({
       setExpandedKey(null);
       return;
     }
+    // Keep expansion only if the open key still exists — never auto-open a city
     setExpandedKey((prev) =>
-      prev && stayStops.some((l) => l.key === prev) ? prev : stayStops[0].key
+      prev && stayStops.some((l) => l.key === prev) ? prev : null
     );
   }, [stayStops]);
 
@@ -382,7 +388,7 @@ export function TailoredExperiencesModal({
       {open ? (
         <motion.div
           key="tailored-experiences"
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 backdrop-blur-sm"
+          className="fixed inset-0 z-50 flex items-center justify-center tokio-modal-backdrop bg-[#05080C]/55 backdrop-blur-sm"
           role="dialog"
           aria-modal="true"
           aria-label="Tailored Experiences"
@@ -392,13 +398,13 @@ export function TailoredExperiencesModal({
           transition={{ duration: 0.2 }}
         >
           <motion.div
-            className="relative flex h-[100dvh] w-full flex-col overflow-hidden bg-[#0a0a0a] md:h-[85vh] md:max-w-2xl md:rounded-2xl md:border md:border-zinc-800"
+            className="tokio-modal-content relative flex h-[100dvh] w-full flex-col overflow-hidden border border-white/10 md:h-[85vh] md:max-w-2xl md:rounded-2xl"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 20 }}
             transition={{ duration: 0.25, ease: "easeOut" }}
           >
-            <div className="flex flex-shrink-0 items-center gap-4 border-b border-zinc-800 bg-[#0a0a0a] p-4 pt-[max(1rem,env(safe-area-inset-top))]">
+            <div className="tokio-modal-chrome flex flex-shrink-0 items-center gap-4 border-b p-4 pt-[max(1rem,env(safe-area-inset-top))]">
               <button
                 type="button"
                 onClick={handleCancel}
@@ -408,7 +414,7 @@ export function TailoredExperiencesModal({
                 <ArrowLeft className="h-5 w-5" />
               </button>
               <div className="min-w-0 flex-1">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#B85304]">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#D9718C]">
                   Configure
                 </p>
                 <h3 className="truncate font-display text-2xl text-white">
@@ -418,37 +424,15 @@ export function TailoredExperiencesModal({
             </div>
 
             <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4 pb-12">
-              <ActivityMatcherBanner
-                onOpenQuiz={() => setQuizOpen(true)}
-                onWatch={() => setReelOpen(true)}
-              />
-
+              {/* 1. Your Travel Profile */}
               {experienceProfile ? (
-                <div className="space-y-2">
-                  <button
-                    type="button"
-                    onClick={handleAutoFillRecommended}
-                    className="inline-flex w-full items-center justify-center gap-1.5 rounded-full border border-[#B85304]/50 bg-[#B85304]/15 px-3 py-2.5 text-[13px] font-semibold text-[#F3D9C4] transition hover:bg-[#B85304]/25 sm:gap-2 sm:px-4 sm:py-3 sm:text-sm"
-                  >
-                    <Sparkles className="h-3.5 w-3.5 sm:h-4 sm:w-4" aria-hidden />
-                    Auto-Fill Recommended Activities
-                  </button>
-                  {autoFillNote ? (
-                    <p
-                      role="status"
-                      className="rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2 text-center text-xs text-zinc-400"
-                    >
-                      {autoFillNote}
-                    </p>
-                  ) : (
-                    <p className="text-center text-[11px] text-zinc-500">
-                      Gold ⭐ Recommended Match badges appear in Tokyo,
-                      Kamakura, Kyoto &amp; other city lists.
-                    </p>
-                  )}
-                </div>
+                <TravelProfileBadge
+                  onRetake={() => setQuizOpen(true)}
+                  tone="dark"
+                />
               ) : null}
 
+              {/* 2. Your Cities */}
               <div className="rounded-xl bg-zinc-950 px-4 py-3 text-sm text-zinc-400">
                 Maximum {MAX_TOUR_HOURS_PER_DAY} hours of activities allowed per
                 day.{" "}
@@ -587,9 +571,52 @@ export function TailoredExperiencesModal({
                   </div>
                 )}
               </div>
+
+              {/* 3. Activity Matcher */}
+              <div className="space-y-3">
+                <FieldLabel>Activity Matcher</FieldLabel>
+                <ActivityMatcherBanner
+                  showProfile={false}
+                  onOpenQuiz={() => setQuizOpen(true)}
+                  onWatch={() => setReelOpen(true)}
+                  onDiscover={() => {
+                    handleDone();
+                    router.push("/discover");
+                  }}
+                />
+
+                {experienceProfile ? (
+                  <div className="space-y-2">
+                    <button
+                      type="button"
+                      onClick={handleAutoFillRecommended}
+                      className="inline-flex w-full items-center justify-center gap-1.5 rounded-full border border-[#075473]/50 bg-[#075473]/15 px-3 py-2.5 text-[13px] font-semibold text-[#F3D9C4] transition hover:bg-[#075473]/25 sm:gap-2 sm:px-4 sm:py-3 sm:text-sm"
+                    >
+                      <Sparkles
+                        className="h-3.5 w-3.5 sm:h-4 sm:w-4"
+                        aria-hidden
+                      />
+                      Auto-Fill Recommended Activities
+                    </button>
+                    {autoFillNote ? (
+                      <p
+                        role="status"
+                        className="rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2 text-center text-xs text-zinc-400"
+                      >
+                        {autoFillNote}
+                      </p>
+                    ) : (
+                      <p className="text-center text-[11px] text-zinc-500">
+                        Gold ⭐ Recommended Match badges appear in Tokyo,
+                        Kamakura, Kyoto &amp; other city lists.
+                      </p>
+                    )}
+                  </div>
+                ) : null}
+              </div>
             </div>
 
-            <div className="flex flex-shrink-0 flex-col gap-3 border-t border-zinc-800 bg-[#0a0a0a]/90 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] backdrop-blur-md">
+            <div className="tokio-modal-chrome flex flex-shrink-0 flex-col gap-3 border-t p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
               <p className="text-center text-xs text-zinc-500">
                 {tourCount === 0
                   ? "No experiences yet"
@@ -608,7 +635,7 @@ export function TailoredExperiencesModal({
               <button
                 type="button"
                 onClick={handleDone}
-                className="w-full rounded-full bg-[#1E2D4A] py-3 text-sm font-semibold text-white transition hover:bg-[#243656]"
+                className="w-full rounded-full bg-[#1CA67F] py-3 text-sm font-semibold text-white transition hover:bg-[#178f6d]"
               >
                 Save &amp; Apply
               </button>
@@ -635,6 +662,11 @@ export function TailoredExperiencesModal({
                   : []
               }
               guests={{ adults, children }}
+              availableLanguages={
+                drawerCityId
+                  ? cityMap[drawerCityId]?.available_languages
+                  : undefined
+              }
               onRemoveTour={(tourId) => {
                 if (!drawerCityId) return;
                 draftRemoveCityTour(drawerCityId, tourId);
@@ -796,7 +828,7 @@ function CityExperienceAccordion({
           </span>
         </span>
         <span
-          className={`shrink-0 text-[#B85304] transition ${
+          className={`shrink-0 text-[#075473] transition ${
             expanded ? "rotate-180" : ""
           }`}
           aria-hidden
@@ -817,7 +849,7 @@ function CityExperienceAccordion({
               onClick={onBrowse}
               className="cursor-pointer rounded-xl border border-zinc-800 bg-zinc-900 p-4 text-left transition-all hover:bg-zinc-800"
             >
-              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#B85304]/15 text-[#B85304]">
+              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#F29727]/15 text-[#F29727]">
                 <Ticket className="h-4 w-4" aria-hidden />
               </span>
               <p className="mt-2 text-sm font-bold text-white md:text-base">

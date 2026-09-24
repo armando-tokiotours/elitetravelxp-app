@@ -379,7 +379,7 @@ export function HotelRatesUploader({
           type="button"
           disabled={busy || exportBusy}
           onClick={() => void downloadTemplate()}
-          className="rounded-full border border-[#D9D2C7] bg-white px-4 py-2 text-sm font-semibold text-[#0B1F3A] transition hover:border-[#B85304] disabled:opacity-50"
+          className="rounded-full border border-[#D9D2C7] bg-white px-4 py-2 text-sm font-semibold text-[#0B1F3A] transition hover:border-[#075473] disabled:opacity-50"
         >
           {exportBusy ? "Preparing…" : "Download CSV template"}
         </button>
@@ -411,8 +411,8 @@ export function HotelRatesUploader({
         }}
         className={`flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed px-4 py-8 text-center transition ${
           dragOver
-            ? "border-[#B85304] bg-[#FDF7F3]"
-            : "border-[#D9D2C7] bg-[#FBF8F2] hover:border-[#B85304]"
+            ? "border-[#075473] bg-[#FDF7F3]"
+            : "border-[#D9D2C7] bg-[#FBF8F2] hover:border-[#075473]"
         } ${busy ? "opacity-60" : ""}`}
       >
         <span className="text-2xl" aria-hidden>

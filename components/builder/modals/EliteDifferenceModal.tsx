@@ -25,7 +25,7 @@ const FALLBACK_BULLETS = [
 ];
 
 /**
- * Centered “Elite Travel Difference” explainer — opened from Tailored Experiences.
+ * Centered “TOKIOTOURS Difference” explainer — opened from Tailored Experiences.
  */
 export function EliteDifferenceModal({
   open,
@@ -71,14 +71,14 @@ export function EliteDifferenceModal({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm animate-in fade-in duration-200"
+      className="fixed inset-0 z-50 flex items-center justify-center tokio-modal-backdrop bg-[#05080C]/50 p-4 backdrop-blur-sm animate-in fade-in duration-200"
       role="dialog"
       aria-modal="true"
-      aria-label="The Elite Travel Difference"
+      aria-label="The TOKIOTOURS Difference"
       onClick={onClose}
     >
       <div
-        className="relative w-full max-w-lg rounded-2xl border border-[#B85304]/40 bg-[#121212] p-6 shadow-2xl"
+        className="tokio-modal-content relative w-full max-w-lg rounded-2xl border border-[#075473]/40 p-6"
         onClick={(e) => e.stopPropagation()}
       >
         <button
@@ -90,8 +90,8 @@ export function EliteDifferenceModal({
           <X className="h-5 w-5" />
         </button>
 
-        <p className="text-[10px] font-bold uppercase tracking-wider text-[#B85304]">
-          {vp.title || "The Elite Travel Difference"}
+        <p className="text-[10px] font-bold uppercase tracking-wider text-[#F29727]">
+          {vp.title || "The TOKIOTOURS Difference"}
         </p>
         <h3 className="mb-3 mt-1 font-display text-xl font-extrabold text-white">
           {vp.subtitle || "Cultural Translation, Not Just Sightseeing"}
@@ -104,7 +104,7 @@ export function EliteDifferenceModal({
             const rest = colon > 0 ? line.slice(colon + 1).trim() : line;
             return (
               <li key={`elite-diff-${i}`} className="flex gap-2">
-                <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-[#B85304]" />
+                <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-[#075473]" />
                 <span>
                   {label ? (
                     <>
@@ -124,7 +124,7 @@ export function EliteDifferenceModal({
 
         {whyBody ? (
           <div className="mt-4 border-t border-zinc-800 pt-4">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-[#B85304]">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-[#1CA67F]">
               {whyTitle}
             </p>
             <p className="mt-1.5 text-sm leading-relaxed text-zinc-400">
@@ -136,7 +136,7 @@ export function EliteDifferenceModal({
         <button
           type="button"
           onClick={handleConfirm}
-          className="mt-5 w-full rounded-xl bg-[#1E2D4A] py-2.5 text-xs font-bold text-white transition hover:bg-[#0A4074]"
+          className="mt-5 w-full rounded-xl bg-[#D91147] py-2.5 text-xs font-bold text-white transition hover:bg-[#b80e3b]"
         >
           I Understand →
         </button>

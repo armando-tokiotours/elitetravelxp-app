@@ -1,6 +1,6 @@
 /// <reference path="../pb_data/types.d.ts" />
 /**
- * Core value proposition branding — Elite Travel Difference.
+ * Core value proposition branding — TOKIOTOURS Difference.
  */
 migrate((app) => {
   const col = app.findCollectionByNameOrId("branding_ui_items");
@@ -24,7 +24,7 @@ migrate((app) => {
     const record = new Record(col, {
       key: "value_proposition",
       category: "value",
-      title: "The Elite Travel Difference",
+      title: "The TOKIOTOURS Difference",
       subtitle: "Cultural Translation, Not Just Sightseeing",
       description:
         "Seamless Logistics: Zero language barriers, no local rule confusion, and VIP crowd navigation.\nCultural Translator: Move beyond Wikipedia facts—understand the deep history, unwritten etiquette, and hidden stories.\nTime & Comfort Optimization: Skip queues, avoid travel friction, and experience Japan at your preferred rhythm.",

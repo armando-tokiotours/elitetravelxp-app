@@ -12,7 +12,7 @@ services:
       context: .
       dockerfile: Dockerfile
       args:
-        NEXT_PUBLIC_POCKETBASE_URL: ${PUBLIC_URL:-https://travelexperiencesgroup.com}
+        NEXT_PUBLIC_POCKETBASE_URL: ${PUBLIC_URL:-https://tokiotours-app.com}
     container_name: elite-web
     restart: unless-stopped
     env_file: .env
@@ -20,7 +20,7 @@ services:
       NODE_ENV: production
       PORT: "3000"
       HOSTNAME: "0.0.0.0"
-      NEXT_PUBLIC_POCKETBASE_URL: ${PUBLIC_URL:-https://travelexperiencesgroup.com}
+      NEXT_PUBLIC_POCKETBASE_URL: ${PUBLIC_URL:-https://tokiotours-app.com}
       # Server-side admin APIs use the Docker network (not public nginx)
       POCKETBASE_INTERNAL_URL: http://pocketbase:8090
       POCKETBASE_URL: http://pocketbase:8090
@@ -39,7 +39,7 @@ services:
     restart: unless-stopped
     env_file: .env
     environment:
-      PB_ADMIN_EMAIL: ${PB_ADMIN_EMAIL:-admin@travelexperiencesgroup.com}
+      PB_ADMIN_EMAIL: ${PB_ADMIN_EMAIL:-admin@tokiotours-app.com}
       PB_ADMIN_PASSWORD: ${PB_ADMIN_PASSWORD:-EliteTravelAdmin2026!}
     volumes:
       - pb_data:/pb/pb_data

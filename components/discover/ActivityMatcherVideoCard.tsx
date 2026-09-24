@@ -35,7 +35,7 @@ export function ActivityMatcherVideoCard({
   const imageSrc = banner.mediaUrl || "/images/matcher-poster.webp";
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-950 shadow-lg">
+    <div className="overflow-hidden rounded-2xl border border-zinc-800/80 bg-[#0D1117]/60 shadow-lg backdrop-blur-md">
       <div className="relative aspect-[21/9] min-h-[8rem] w-full sm:aspect-[2.4/1]">
         <MediaImage
           src={imageSrc}
@@ -47,7 +47,7 @@ export function ActivityMatcherVideoCard({
         <div className="absolute inset-0 bg-gradient-to-r from-black/90 via-black/65 to-black/35" />
         <div className="absolute inset-0 flex flex-col justify-center gap-3 px-4 py-3 sm:px-5">
           <div>
-            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#B85304]">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#075473]">
               {eyebrow}
             </p>
             <p className="mt-0.5 text-sm font-semibold leading-snug text-white sm:text-[15px]">
@@ -58,7 +58,7 @@ export function ActivityMatcherVideoCard({
             <button
               type="button"
               onClick={onWatch ?? onOpenQuiz}
-              className="flex items-center gap-2 rounded-xl border border-[#B85304]/40 bg-zinc-900/90 px-4 py-2 text-xs font-semibold text-accent-500 shadow-lg transition-all hover:border-accent-500/40"
+              className="flex items-center gap-2 rounded-xl border border-[#075473]/40 bg-zinc-900/90 px-4 py-2 text-xs font-semibold text-accent-500 shadow-lg transition-all hover:border-accent-500/40"
             >
               <Play className="h-4 w-4 fill-accent-400" aria-hidden />
               <span>{primaryCta}</span>
@@ -66,7 +66,7 @@ export function ActivityMatcherVideoCard({
             <button
               type="button"
               onClick={onOpenQuiz}
-              className="inline-flex items-center gap-1.5 rounded-full border border-[#B85304]/50 bg-[#B85304]/15 px-3 py-1.5 text-[11px] font-semibold text-[#F3D9C4] transition hover:bg-[#B85304]/25"
+              className="inline-flex items-center gap-1.5 rounded-full border border-[#075473]/50 bg-[#075473]/15 px-3 py-1.5 text-[11px] font-semibold text-[#F3D9C4] transition hover:bg-[#075473]/25"
             >
               <Target className="h-3 w-3" aria-hidden />
               {secondaryCta}

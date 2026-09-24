@@ -24,6 +24,7 @@ import { SectionContinue } from "./SectionContinue";
 import { ExplainerTriggerButton } from "./ExplainerTriggerButton";
 import { CityTransportModal } from "./modals/CityTransportModal";
 import { formatUsd } from "@/lib/builder-pricing";
+import { travelStyleTierRules } from "@/lib/preEliteHydrate";
 
 export function DriversTransportSection({
   cities = [],
@@ -48,6 +49,9 @@ export function DriversTransportSection({
   );
   const experienceService = useBuilderStore((s) => s.experienceService);
   const isEliteConcierge = useBuilderStore((s) => s.isEliteConcierge);
+  const preEliteTravelStyle = useBuilderStore((s) => s.preEliteTravelStyle);
+  const tierRules = travelStyleTierRules(preEliteTravelStyle);
+  const allowPrivate = tierRules.allowPrivateChauffeur;
   const conciergeLocked = isEliteConcierge || experienceService === "concierge";
 
   const [activeCityId, setActiveCityId] = useState<string | null>(null);
@@ -99,9 +103,11 @@ export function DriversTransportSection({
 
   const summary = conciergeLocked
     ? "Included with Elite Concierge"
-    : chauffeurDayCount === 0
-      ? "No private driver days yet"
-      : `${chauffeurDayCount} driver day${chauffeurDayCount === 1 ? "" : "s"}`;
+    : !allowPrivate
+      ? "Public Transit & Walking Guide · Suica / Bullet Rail"
+      : chauffeurDayCount === 0
+        ? "No private driver days yet"
+        : `${chauffeurDayCount} driver day${chauffeurDayCount === 1 ? "" : "s"}`;
 
   const activeStop = stayStops.find((s) => s.cityId === activeCityId);
   const activeCity = activeCityId ? cityMap[activeCityId] : undefined;
@@ -138,7 +144,7 @@ export function DriversTransportSection({
       summary={summary}
     >
       {experienceService === "concierge" || isEliteConcierge ? (
-        <div className="mb-4 rounded-2xl border border-[#B85304]/40 bg-[#B85304]/15 px-4 py-3">
+        <div className="mb-4 rounded-2xl border border-[#075473]/40 bg-[#075473]/15 px-4 py-3">
           <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-accent-500">
             ✨ Elite Concierge Active
           </p>
@@ -150,12 +156,39 @@ export function DriversTransportSection({
         </div>
       ) : null}
 
-      <div className="mb-4">
-        <ExplainerTriggerButton
-          featureKey="daily_transport_explainer"
-          title="Watch: Why you need private daily transport"
-        />
-      </div>
+      {!allowPrivate && !conciergeLocked ? (
+        <div className="mb-4 rounded-2xl border border-[#075473]/35 bg-[#1C1C1E] px-4 py-3">
+          <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#075473]">
+            Classic Explorer · Public transit focus
+          </p>
+          <p className="mt-1.5 text-sm leading-relaxed text-zinc-300">
+            Luxury private chauffeur options are hidden for this travel style.
+            Your guide will use bullet trains and local public transport for an
+            authentic, best-value rhythm.
+          </p>
+        </div>
+      ) : null}
+
+      {tierRules.vipHighlight && !conciergeLocked ? (
+        <div className="mb-4 rounded-2xl border border-[#075473]/50 bg-[#075473]/10 px-4 py-3">
+          <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#075473]">
+            VIP Bespoke · Luxury chauffeur highlighted
+          </p>
+          <p className="mt-1.5 text-sm leading-relaxed text-zinc-300">
+            High-end chauffeurs, VIP airport lounge meets, and exclusive
+            door-to-door timing are available for every stay city.
+          </p>
+        </div>
+      ) : null}
+
+      {allowPrivate ? (
+        <div className="mb-4">
+          <ExplainerTriggerButton
+            featureKey="daily_transport_explainer"
+            title="Watch: Why you need private daily transport"
+          />
+        </div>
+      ) : null}
 
       {conciergeLocked ? (
         <p className="rounded-xl border border-dashed border-zinc-700 bg-zinc-950 p-4 text-sm text-zinc-400">
@@ -199,7 +232,7 @@ export function DriversTransportSection({
                 key={stop.key || `driver-${stop.cityId}-${name}`}
                 type="button"
                 onClick={() => setActiveCityId(stop.cityId)}
-                className="flex w-full items-center gap-3 rounded-2xl border border-zinc-800 bg-zinc-900 p-3 text-left transition hover:border-[#B85304]/40 hover:bg-zinc-800/80 sm:p-4"
+                className="flex w-full items-center gap-3 rounded-2xl border border-zinc-800 bg-zinc-900 p-3 text-left transition hover:border-[#075473]/40 hover:bg-zinc-800/80 sm:p-4"
               >
                 {img ? (
                   // eslint-disable-next-line @next/next/no-img-element
@@ -218,13 +251,15 @@ export function DriversTransportSection({
                     {name}
                   </span>
                   <span className="mt-0.5 block text-xs text-zinc-400">
-                    {driverDays === 0
-                      ? "Self-arranged / not set"
-                      : `${driverDays} private driver day${
-                          driverDays === 1 ? "" : "s"
-                        }`}
-                    {fleet ? ` · ${fleet}` : ""}
-                    {rateLabel ? ` · ${rateLabel}/day` : ""}
+                    {!allowPrivate
+                      ? "Public Transit & Walking Guide · Suica / Bullet Rail Coverage"
+                      : driverDays === 0
+                        ? "Public transit (default)"
+                        : `${driverDays} private driver day${
+                            driverDays === 1 ? "" : "s"
+                          }${fleet ? ` · ${fleet}` : ""}${
+                            rateLabel ? ` · ${rateLabel}/day` : ""
+                          }`}
                   </span>
                 </span>
                 <ChevronRight
@@ -254,13 +289,20 @@ export function DriversTransportSection({
         ) : (
           <>
             <p className="mt-1 text-sm font-semibold text-white">
-              {chauffeurDayCount === 0
-                ? "No private chauffeur days selected"
-                : `${chauffeurDayCount} billable driver day${
-                    chauffeurDayCount === 1 ? "" : "s"
-                  }`}
+              {!allowPrivate
+                ? "Public Transit & Walking Guide · Suica / Bullet Rail Coverage"
+                : chauffeurDayCount === 0
+                  ? "No private chauffeur days selected"
+                  : `${chauffeurDayCount} billable driver day${
+                      chauffeurDayCount === 1 ? "" : "s"
+                    }`}
             </p>
-            {subtotal.min > 0 ? (
+            {!allowPrivate ? (
+              <p className="mt-1 text-xs text-zinc-500">
+                IC Card (Suica / Pasmo) for local transit · Shinkansen reserved
+                rail between cities — no luxury vehicle fees on this tier.
+              </p>
+            ) : subtotal.min > 0 ? (
               <p className="mt-1 text-xs text-zinc-400">
                 Est. {formatUsd(subtotal.min)}
                 {subtotal.max > subtotal.min

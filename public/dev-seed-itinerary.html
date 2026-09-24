@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Dev seed itinerary</title>
+  </head>
+  <body>
+    <script>
+      (function () {
+        var uid = function () {
+          return "k" + Math.random().toString(36).slice(2, 9);
+        };
+        var existing = {};
+        try {
+          existing = JSON.parse(
+            localStorage.getItem("elite-travel-builder") || "{}"
+          );
+        } catch (e) {}
+        var prev =
+          existing.state && typeof existing.state === "object"
+            ? existing.state
+            : {};
+        var state = Object.assign({}, prev, {
+          adults: 2,
+          children: 0,
+          durationDays: 7,
+          arrivalDate: "2026-10-10",
+          airportPickup: true,
+          airportDropoff: true,
+          needHotels: true,
+          hotelTier: "4-star",
+          roomCount: 1,
+          roomType: "Double",
+          locations: [
+            {
+              key: uid(),
+              cityId: "8z0mms825khn3gh",
+              nights: 3,
+              visitType: "stay",
+              transitType: "private",
+              needsTicket: false,
+              ticketType: "none",
+              ticketPricePerPax: 0,
+            },
+            {
+              key: uid(),
+              cityId: "8ackk082b773xtr",
+              nights: 2,
+              visitType: "stay",
+              transitType: "public",
+              needsTicket: true,
+              ticketType: "shinkansen_reserved",
+              ticketPricePerPax: 45,
+            },
+            {
+              key: uid(),
+              cityId: "8d2ksmk1s0830u5",
+              nights: 2,
+              visitType: "stay",
+              transitType: "self",
+              needsTicket: false,
+              ticketType: "none",
+              ticketPricePerPax: 0,
+            },
+          ],
+          highestUnlockedStep: 7,
+        });
+        localStorage.setItem(
+          "elite-travel-builder",
+          JSON.stringify({ state: state, version: 0 })
+        );
+        location.replace("/builder/itinerary");
+      })();
+    </script>
+  </body>
+</html>

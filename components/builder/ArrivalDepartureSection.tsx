@@ -100,7 +100,7 @@ export function ArrivalDepartureSection({
         {arrivalTransferId ? arriveName : "—"} →{" "}
         {departureTransferId ? departName : "—"}
       </span>
-      <span className="block text-[9px] font-semibold text-[#B85304] sm:text-[11px]">
+      <span className="block text-[9px] font-semibold text-[#DC6E8A] sm:text-[11px]">
         Pickup: {airportPickup ? "Yes" : "No"} · Drop-off:{" "}
         {airportDropoff ? "Yes" : "No"}
       </span>
@@ -216,7 +216,7 @@ function HubSummaryCard({
     <button
       type="button"
       onClick={onClick}
-      className="group flex min-h-[110px] flex-col justify-between rounded-2xl border border-[#2C2C2E] bg-[#121212] p-3 text-left transition hover:border-[#B85304]/45 hover:bg-[#222226] sm:min-h-[130px] sm:rounded-[1.35rem] sm:p-5"
+      className="group flex min-h-[110px] flex-col justify-between rounded-2xl border border-[#2C2C2E] bg-[#121212] p-3 text-left transition hover:border-[#075473]/45 hover:bg-[#222226] sm:min-h-[130px] sm:rounded-[1.35rem] sm:p-5"
     >
       <div className="flex items-start justify-between gap-2">
         <p className="text-[9px] font-bold uppercase tracking-wider text-zinc-400 sm:text-[10px]">
@@ -257,7 +257,7 @@ function HubSummaryCard({
           </p>
         </div>
         <ChevronRight
-          className="h-3.5 w-3.5 shrink-0 text-zinc-600 transition group-hover:text-[#B85304] sm:h-4 sm:w-4"
+          className="h-3.5 w-3.5 shrink-0 text-zinc-600 transition group-hover:text-[#075473] sm:h-4 sm:w-4"
           aria-hidden
         />
       </div>

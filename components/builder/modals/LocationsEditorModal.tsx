@@ -13,6 +13,7 @@ import { ArrowLeft } from "lucide-react";
 import { canAppendCity } from "@/lib/locationRules";
 import type { PbCity, PbHub } from "@/lib/pocketbase/client";
 import { getCityName } from "@/lib/cityLabels";
+import { isTransitHubStop } from "@/lib/transitHubs";
 import type { validateCityRoute } from "@/lib/routeValidator";
 import {
   matchesForCity,
@@ -36,6 +37,8 @@ export function LocationsEditorModal({
   cityMap,
   dateByKey,
   arrivalHub,
+  departureHub: _departureHub,
+  hubById,
   hubShortName,
   expandedKey,
   setExpandedKey,
@@ -64,6 +67,8 @@ export function LocationsEditorModal({
   cityMap: Record<string, PbCity>;
   dateByKey: Record<string, { label?: string }>;
   arrivalHub: PbHub | null;
+  departureHub?: PbHub | null;
+  hubById?: Record<string, PbHub>;
   hubShortName: (hub: PbHub | null) => string;
   expandedKey: string | null;
   setExpandedKey: Dispatch<SetStateAction<string | null>>;
@@ -103,6 +108,7 @@ export function LocationsEditorModal({
   }, []);
 
   if (!mounted) return null;
+  void _departureHub;
 
   return createPortal(
     <AnimatePresence
@@ -113,7 +119,7 @@ export function LocationsEditorModal({
       {open ? (
         <motion.div
           key="locations-editor"
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 backdrop-blur-sm"
+          className="fixed inset-0 z-50 flex items-center justify-center tokio-modal-backdrop bg-[#05080C]/55 backdrop-blur-sm"
           role="dialog"
           aria-modal="true"
           aria-label="Edit route"
@@ -123,13 +129,13 @@ export function LocationsEditorModal({
           transition={{ duration: 0.2 }}
         >
           <motion.div
-            className="relative flex h-[100dvh] w-full flex-col overflow-hidden bg-[#0a0a0a] md:h-[85vh] md:max-w-2xl md:rounded-2xl md:border md:border-zinc-800"
+            className="tokio-modal-content relative flex h-[100dvh] w-full flex-col overflow-hidden border border-white/10 md:h-[85vh] md:max-w-2xl md:rounded-2xl"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 20 }}
             transition={{ duration: 0.25, ease: "easeOut" }}
           >
-            <div className="flex flex-shrink-0 items-start gap-3 border-b border-zinc-800 bg-[#0a0a0a] p-4 pt-[max(1rem,env(safe-area-inset-top))]">
+            <div className="tokio-modal-chrome flex flex-shrink-0 items-start gap-3 border-b p-4 pt-[max(1rem,env(safe-area-inset-top))]">
               <button
                 type="button"
                 onClick={onClose}
@@ -139,7 +145,7 @@ export function LocationsEditorModal({
                 <ArrowLeft className="h-5 w-5" />
               </button>
               <div className="min-w-0 flex-1">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#D9BB96]">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#075473]">
                   Configure
                 </p>
                 <div className="mt-0.5 flex items-start justify-between gap-3">
@@ -175,7 +181,7 @@ export function LocationsEditorModal({
               {routeToast ? (
                 <div
                   role="status"
-                  className="rounded-xl border border-[#B85304]/50 bg-zinc-950 px-3.5 py-2.5 text-sm text-[#F3D9C4]"
+                  className="rounded-xl border border-[#075473]/50 bg-zinc-950 px-3.5 py-2.5 text-sm text-[#F3D9C4]"
                 >
                   {routeToast}
                 </div>
@@ -187,8 +193,8 @@ export function LocationsEditorModal({
                       key={w.type}
                       className={`rounded-xl px-3.5 py-3 text-sm ${
                         w.type === "inefficient"
-                          ? "border border-[#B85304]/35 bg-zinc-950 text-zinc-300"
-                          : "border border-[#B85304]/50 bg-zinc-950 text-[#F3D9C4]"
+                          ? "border border-[#075473]/35 bg-zinc-950 text-zinc-300"
+                          : "border border-[#075473]/50 bg-zinc-950 text-[#F3D9C4]"
                       }`}
                     >
                       <p className="font-semibold text-white">
@@ -214,27 +220,48 @@ export function LocationsEditorModal({
                 >
                   {locations.map((loc, index) => {
                     const prev = index > 0 ? locations[index - 1] : null;
+                    const hubName =
+                      loc.hubId && hubById?.[loc.hubId]
+                        ? hubById[loc.hubId].name.replace(
+                            /\s*\([^)]*\)\s*$/,
+                            ""
+                          ).trim()
+                        : null;
                     const fromLabel =
                       index === 0
                         ? hubShortName(arrivalHub)
-                        : cityMap[prev!.cityId]?.name ||
-                          getCityName(prev!.cityId);
+                        : prev && isTransitHubStop(prev) && prev.hubId && hubById?.[prev.hubId]
+                          ? hubById[prev.hubId].name.replace(
+                              /\s*\([^)]*\)\s*$/,
+                              ""
+                            ).trim()
+                          : cityMap[prev!.cityId]?.name ||
+                            getCityName(prev!.cityId);
                     const range = dateByKey[loc.key];
+                    const showFromLabel =
+                      index > 0 &&
+                      prev != null &&
+                      !isTransitHubStop(prev);
                     return (
                       <CityAccordionItem
                         key={loc.key || `loc-${index}`}
                         loc={loc}
                         city={cityMap[loc.cityId]}
+                        displayName={hubName || undefined}
                         dateLabel={range?.label ?? ""}
                         fromLabel={fromLabel}
+                        showFromLabel={showFromLabel}
                         index={index}
                         totalLocations={locations.length}
-                        expanded={expandedKey === loc.key}
-                        onToggle={() =>
+                        expanded={
+                          !isTransitHubStop(loc) && expandedKey === loc.key
+                        }
+                        onToggle={() => {
+                          if (isTransitHubStop(loc)) return;
                           setExpandedKey((k) =>
                             k === loc.key ? null : loc.key
-                          )
-                        }
+                          );
+                        }}
                         suggestions={matchesForCity(
                           seasonalMatches,
                           loc.cityId
@@ -255,13 +282,13 @@ export function LocationsEditorModal({
                 type="button"
                 onClick={() => setPickerOpen(true)}
                 disabled={cities.length === 0}
-                className="w-full rounded-full border border-dashed border-[#B85304] bg-zinc-950 py-3 text-sm font-semibold text-white transition hover:bg-zinc-800 disabled:opacity-40"
+                className="w-full rounded-full border border-dashed border-[#075473] bg-zinc-950 py-3 text-sm font-semibold text-white transition hover:bg-zinc-800 disabled:opacity-40"
               >
                 + Add Location
               </button>
             </div>
 
-            <div className="flex flex-shrink-0 flex-col gap-3 border-t border-zinc-800 bg-[#0a0a0a]/90 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] backdrop-blur-md">
+            <div className="tokio-modal-chrome flex flex-shrink-0 flex-col gap-3 border-t p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
               <div
                 className={`rounded-xl px-4 py-3 text-sm font-medium ${
                   matches
@@ -311,7 +338,7 @@ export function LocationsEditorModal({
                       className={`flex w-full items-center gap-3 rounded-xl border px-3 py-2.5 text-left transition ${
                         disabled
                           ? "cursor-not-allowed border-zinc-700 bg-zinc-800 opacity-50"
-                          : "border-zinc-700 bg-zinc-800 text-zinc-200 hover:border-[#B85304]"
+                          : "border-zinc-700 bg-zinc-800 text-zinc-200 hover:border-[#075473]"
                       }`}
                     >
                       <span className="h-11 w-11 shrink-0 overflow-hidden rounded-lg">
@@ -367,7 +394,7 @@ function RouteNoticeBadge({ message }: { message: string }) {
         onClick={onToggleClick}
         aria-expanded={isOpen}
         aria-describedby={isOpen ? "route-notice-tooltip" : undefined}
-        className="flex cursor-pointer items-center gap-1.5 rounded-lg border border-[#B85304]/60 bg-[#B85304]/15 px-3 py-1.5 text-xs font-bold text-[#B85304] shadow-sm transition hover:bg-[#B85304]/30 active:scale-95"
+        className="flex cursor-pointer items-center gap-1.5 rounded-lg border border-[#075473]/60 bg-[#075473]/15 px-3 py-1.5 text-xs font-bold text-[#075473] shadow-sm transition hover:bg-[#075473]/30 active:scale-95"
       >
         <span>⚠️ Route Notice</span>
       </button>
@@ -375,10 +402,10 @@ function RouteNoticeBadge({ message }: { message: string }) {
         <div
           id="route-notice-tooltip"
           role="tooltip"
-          className="absolute right-0 top-full z-50 mt-2 w-64 max-w-[260px] rounded-xl border border-[#B85304]/40 bg-[#D9BB96] p-3 text-left text-[11px] font-semibold leading-tight text-[#000000] shadow-2xl animate-in fade-in duration-150"
+          className="absolute right-0 top-full z-50 mt-2 w-64 max-w-[260px] rounded-xl border border-[#075473]/40 bg-[#075473] p-3 text-left text-[11px] font-semibold leading-tight text-[#000000] shadow-2xl animate-in fade-in duration-150"
         >
           <div
-            className="absolute bottom-full right-4 border-[6px] border-transparent border-b-[#D9BB96]"
+            className="absolute bottom-full right-4 border-[6px] border-transparent border-b-[#075473]"
             aria-hidden
           />
           <p className="leading-snug">{message}</p>

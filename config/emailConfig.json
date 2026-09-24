@@ -1,21 +1,21 @@
 {
   "smtp": {
-    "host": "smtp.hostinger.com",
+    "host": "mail.tokiotours.com",
     "port": 465,
     "secure": true,
-    "user": "no.reply@travelexperiencesgroup.com",
-    "pass": "Cocacola2027-/"
+    "user": "no_reply@tokiotours.com",
+    "pass": "Cococola2027-/"
   },
   "routing": {
-    "fromName": "Elite Travel Japan",
-    "fromAddress": "no.reply@travelexperiencesgroup.com",
+    "fromName": "TOKIOTOURS",
+    "fromAddress": "no_reply@tokiotours.com",
     "bccRecipient": "armando@tokiotours.nl"
   },
   "template": {
     "subjectLine": "Your Japan Journey Proposal - {{bookingRef}}",
     "headerTitle": "YOUR JAPAN JOURNEY PROPOSAL",
-    "welcomeBody": "Thank you for designing your bespoke itinerary. Our concierge team at Tokio Tours has received your trip selections and is preparing your confirmed 1-on-1 daily proposal.",
-    "ctaButtonText": "REVIEW MY ITINERARY →",
-    "ctaUrl": "https://travelexperiencesgroup.com/builder"
+    "welcomeBody": "Thank you for designing your bespoke itinerary. Our concierge team at TOKIOTOURS has received your trip selections and is preparing your confirmed 1-on-1 daily proposal.",
+    "ctaButtonText": "REVIEW & MANAGE MY BOOKING →",
+    "ctaUrl": "https://tokiotours-app.com/manage"
   }
 }

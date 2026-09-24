@@ -22,6 +22,11 @@ import {
 import { buildCityMap, getCityName } from "@/lib/cityLabels";
 import { validateCityRoute } from "@/lib/routeValidator";
 import { useBuilderStore, type LocationStop } from "@/store/useBuilderStore";
+import {
+  isTransitHubStop,
+  overnightNightsTotal,
+  overnightStopCount,
+} from "@/lib/transitHubs";
 import { SectionContinue } from "./SectionContinue";
 import { SectionBlock } from "./ui";
 import { useLazyModalMount } from "./modals/useLazyModalMount";
@@ -65,6 +70,7 @@ export function LocationsNightsSection({
   );
   const reorderLocations = useBuilderStore((s) => s.reorderLocations);
   const toggleTour = useBuilderStore((s) => s.toggleTour);
+  const syncRouteTransitHubs = useBuilderStore((s) => s.syncRouteTransitHubs);
 
   const [isLocationModalOpen, setIsLocationModalOpen] = useState(false);
   const modalMounted = useLazyModalMount(isLocationModalOpen);
@@ -73,12 +79,24 @@ export function LocationsNightsSection({
   const [routeToast, setRouteToast] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!hubs.length) return;
+    syncRouteTransitHubs(hubs, cities);
+  }, [
+    hubs,
+    cities,
+    arrivalTransferId,
+    departureTransferId,
+    syncRouteTransitHubs,
+  ]);
+
+  useEffect(() => {
     if (locations.length === 0) {
       setExpandedKey(null);
       return;
     }
+    // Never auto-open a location card — expand only on user tap
     setExpandedKey((prev) =>
-      prev && locations.some((l) => l.key === prev) ? prev : locations[0].key
+      prev && locations.some((l) => l.key === prev) ? prev : null
     );
   }, [locations]);
 
@@ -88,15 +106,28 @@ export function LocationsNightsSection({
     return () => window.clearTimeout(t);
   }, [routeToast]);
 
-  const totalNights = locations.reduce((s, l) => s + l.nights, 0);
+  const totalNights = overnightNightsTotal(locations);
   const matches = totalNights === durationDays;
-  const lastCityId = locations[locations.length - 1]?.cityId ?? null;
+  const stayCount = overnightStopCount(locations);
+  const lastCityId =
+    [...locations].reverse().find((l) => !isTransitHubStop(l))?.cityId ?? null;
 
   const cityMap = useMemo(
     () => Object.fromEntries(cities.map((c) => [c.id, c])),
     [cities]
   );
   const cityLabelMap = useMemo(() => buildCityMap(cities), [cities]);
+  const hubById = useMemo(
+    () => Object.fromEntries(hubs.map((h) => [h.id, h])),
+    [hubs]
+  );
+
+  const stopLabel = (l: LocationStop) => {
+    if (l.hubId && hubById[l.hubId]) {
+      return hubById[l.hubId].name.replace(/\s*\([^)]*\)\s*$/, "").trim();
+    }
+    return getCityName(l.cityId, cityLabelMap);
+  };
 
   const dateRanges = useMemo(
     () => calculateCityDateRanges(arrivalDate, locations),
@@ -134,16 +165,20 @@ export function LocationsNightsSection({
   );
 
   const summary =
-    locations.length === 0
-      ? "No cities yet"
+    stayCount === 0 && locations.every(isTransitHubStop)
+      ? locations.length
+        ? locations.map(stopLabel).join(" → ")
+        : "No cities yet"
       : locations
           .map((l) => {
-            const name = getCityName(l.cityId, cityLabelMap);
-            if (l.visitType === "arrival") return `${name} (arrival)`;
-            if (l.visitType === "departure") return `${name} (departure)`;
+            const name = stopLabel(l);
+            if (isTransitHubStop(l) || l.visitType === "arrival") {
+              return `${name} (0n)`;
+            }
+            if (l.visitType === "departure") return `${name} (0n)`;
             return `${name} (${l.nights}n)`;
           })
-          .join(", ");
+          .join(" → ");
 
   const hubShortName = (hub: PbHub | null) => {
     if (!hub) return "Arrival";
@@ -174,30 +209,34 @@ export function LocationsNightsSection({
       summary={summary}
     >
       <p className="mb-3 rounded-xl border border-[#2C2C2E] bg-[#1C1C1E] p-3 text-xs text-zinc-300">
-        Plan your time in each city and transit between stops.
+        After total days are set in Step 1 ({durationDays} day
+        {durationDays === 1 ? "" : "s"}), pick cities and distribute those nights
+        (e.g. Tokyo 5 · Kyoto 5).
       </p>
 
       {!arrivalDate ? (
         <p className="mb-3 rounded-xl bg-zinc-950 px-3 py-2 text-xs text-zinc-400">
-          Set an arrival date in Step 1 to unlock seasonal concierge suggestions.
+          Set total days and an arrival date in Step 1 before locking night
+          distribution and seasonal suggestions.
         </p>
       ) : null}
 
       <RouteSummaryWidget
         locations={locations}
-        cityMap={cityMap}
+        stopLabel={stopLabel}
+        stayCount={stayCount}
         totalNights={totalNights}
         durationDays={durationDays}
         matches={matches}
         warningCount={routeWarnings.length}
-        stepSaved={highestUnlockedStep >= 4 || locations.length > 0}
+        stepSaved={highestUnlockedStep >= 4 || stayCount > 0}
         onClick={openEditor}
       />
 
       <button
         type="button"
         onClick={openEditor}
-        className="mt-3 flex w-full items-center justify-center gap-2 rounded-full border border-[#B85304]/50 bg-zinc-950 py-2.5 text-sm font-semibold text-white transition hover:border-[#B85304] hover:bg-[#0B1F3A]"
+        className="mt-3 flex w-full items-center justify-center gap-2 rounded-full border border-[#075473]/50 bg-zinc-950 py-2.5 text-sm font-semibold text-white transition hover:border-[#075473] hover:bg-[#0B1F3A]"
       >
         <Pencil className="h-3.5 w-3.5" aria-hidden />
         {locations.length === 0 ? "Build your route" : "Edit Route"}
@@ -214,6 +253,8 @@ export function LocationsNightsSection({
         cityMap={cityMap}
         dateByKey={dateByKey}
         arrivalHub={arrivalHub}
+        departureHub={departureHub}
+        hubById={hubById}
         hubShortName={hubShortName}
         expandedKey={expandedKey}
         setExpandedKey={setExpandedKey}
@@ -251,7 +292,8 @@ export function LocationsNightsSection({
 
 function RouteSummaryWidget({
   locations,
-  cityMap,
+  stopLabel,
+  stayCount,
   totalNights,
   durationDays,
   matches,
@@ -260,7 +302,8 @@ function RouteSummaryWidget({
   onClick,
 }: {
   locations: LocationStop[];
-  cityMap: Record<string, PbCity>;
+  stopLabel: (l: LocationStop) => string;
+  stayCount: number;
   totalNights: number;
   durationDays: number;
   matches: boolean;
@@ -272,7 +315,7 @@ function RouteSummaryWidget({
     <button
       type="button"
       onClick={onClick}
-      className="group w-full rounded-[1.35rem] border border-zinc-800 bg-[#1C1C1E] p-4 text-left transition hover:border-[#B85304]/45 hover:bg-[#222226] sm:p-5"
+      className="group w-full rounded-[1.35rem] border border-zinc-800 bg-[#1C1C1E] p-4 text-left transition hover:border-[#075473]/45 hover:bg-[#222226] sm:p-5"
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
@@ -280,9 +323,11 @@ function RouteSummaryWidget({
             City nights · not hotels
           </p>
           <p className="mt-1 font-display text-xl text-white sm:text-2xl">
-            {locations.length === 0
-              ? "No cities yet"
-              : `${locations.length} stop${locations.length === 1 ? "" : "s"}`}
+            {stayCount === 0
+              ? locations.length === 0
+                ? "No cities yet"
+                : "Add overnight cities"
+              : `${stayCount} stop${stayCount === 1 ? "" : "s"}`}
           </p>
         </div>
         <span
@@ -299,23 +344,47 @@ function RouteSummaryWidget({
       {locations.length > 0 ? (
         <div className="mt-4 flex flex-wrap items-center gap-1.5">
           {locations.map((loc, i) => {
-            const name =
-              cityMap[loc.cityId]?.name ?? getCityName(loc.cityId);
-            const nightsLabel =
-              loc.visitType === "arrival"
-                ? "arr"
+            const name = stopLabel(loc);
+            const isHub = isTransitHubStop(loc);
+            const nightsLabel = isHub
+              ? "0n"
+              : loc.visitType === "arrival"
+                ? "0n"
                 : loc.visitType === "departure"
-                  ? "dep"
+                  ? "0n"
                   : `${loc.nights}n`;
             return (
-              <span key={loc.key || `chip-${loc.cityId}-${i}`} className="inline-flex items-center gap-1.5">
+              <span
+                key={loc.key || `chip-${loc.cityId}-${i}`}
+                className="inline-flex items-center gap-1.5"
+              >
                 {i > 0 ? (
                   <span className="text-zinc-600" aria-hidden>
                     →
                   </span>
                 ) : null}
-                <span className="inline-flex max-w-full items-center gap-1 overflow-hidden rounded-full border border-zinc-700 bg-zinc-950 px-2.5 py-1 text-xs text-zinc-200">
-                  <span className="break-words font-semibold leading-tight text-white">
+                <span
+                  className={`inline-flex max-w-full items-center gap-1 overflow-hidden rounded-full border px-2.5 py-1 text-xs ${
+                    isHub
+                      ? "border-zinc-700 bg-zinc-800 text-zinc-400"
+                      : "border-zinc-700 bg-zinc-950 text-zinc-200"
+                  }`}
+                  title={
+                    isHub
+                      ? "Auto-set from Step 2 (Arrival/Departure)"
+                      : undefined
+                  }
+                >
+                  {isHub ? (
+                    <span aria-hidden>
+                      {loc.visitType === "departure" ? "🛫" : "🛬"}
+                    </span>
+                  ) : null}
+                  <span
+                    className={`break-words font-semibold leading-tight ${
+                      isHub ? "text-zinc-300" : "text-white"
+                    }`}
+                  >
                     {name}
                   </span>
                   <span className="shrink-0 text-zinc-500">{nightsLabel}</span>
@@ -354,7 +423,7 @@ function RouteSummaryWidget({
           ) : null}
         </div>
         <ChevronRight
-          className="h-4 w-4 shrink-0 text-zinc-600 transition group-hover:text-[#B85304]"
+          className="h-4 w-4 shrink-0 text-zinc-600 transition group-hover:text-[#075473]"
           aria-hidden
         />
       </div>

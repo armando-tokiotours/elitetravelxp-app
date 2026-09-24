@@ -46,7 +46,7 @@ function TeamShell({
   return (
     <>
       <AppSidebar
-        brandEyebrow="Elite Travel"
+        brandEyebrow="TOKIOTOURS"
         brandTitle={title}
         expandOnHover
       />
@@ -54,10 +54,10 @@ function TeamShell({
         className={`${APP_SIDEBAR_RAIL_PAD} min-h-screen bg-zinc-950 text-white`}
       >
         <header className="sticky top-0 z-40 flex items-center gap-3 border-b border-zinc-800 bg-zinc-950 px-4 py-3 lg:hidden">
-          <MobileAppNav brandEyebrow="Elite Travel" brandTitle={title} />
+          <MobileAppNav brandEyebrow="TOKIOTOURS" brandTitle={title} />
           <div className="min-w-0">
-            <p className="text-[0.6rem] font-semibold uppercase tracking-[0.28em] text-[#B85304]">
-              Elite Travel
+            <p className="text-[0.6rem] font-semibold uppercase tracking-[0.28em] text-[#075473]">
+              TOKIOTOURS
             </p>
             <h1 className="font-display text-lg leading-tight text-white">
               {title}
@@ -150,7 +150,7 @@ export function TeamAccessApp() {
                   required
                   value={emailInput}
                   onChange={(e) => setEmailInput(e.target.value)}
-                  className="mt-1 w-full rounded-xl border border-zinc-700 bg-zinc-950 px-3 py-2.5 text-sm text-zinc-100 outline-none focus:border-[#B85304]"
+                  className="mt-1 w-full rounded-xl border border-zinc-700 bg-zinc-950 px-3 py-2.5 text-sm text-zinc-100 outline-none focus:border-[#075473]"
                 />
               </label>
               <label className="block text-xs uppercase tracking-wider text-zinc-400">
@@ -160,7 +160,7 @@ export function TeamAccessApp() {
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="mt-1 w-full rounded-xl border border-zinc-700 bg-zinc-950 px-3 py-2.5 text-sm text-zinc-100 outline-none focus:border-[#B85304]"
+                  className="mt-1 w-full rounded-xl border border-zinc-700 bg-zinc-950 px-3 py-2.5 text-sm text-zinc-100 outline-none focus:border-[#075473]"
                 />
               </label>
               {authError ? (
@@ -169,7 +169,7 @@ export function TeamAccessApp() {
               <button
                 type="submit"
                 disabled={authLoading}
-                className="w-full rounded-full bg-accent-500 py-3 text-sm font-semibold text-zinc-950 disabled:opacity-50"
+                className="w-full rounded-full bg-accent-500 py-3 text-sm font-semibold text-white disabled:opacity-50"
               >
                 {authLoading ? "Signing in…" : "Enter Team Access"}
               </button>
@@ -187,14 +187,14 @@ export function TeamAccessApp() {
           <div className="flex flex-wrap items-center gap-3">
             <Link
               href="/admin"
-              className="flex items-center gap-1.5 rounded-xl border border-zinc-800 bg-[#1C1C1E] px-3.5 py-1.5 text-xs font-bold text-zinc-300 transition hover:border-[#B85304] hover:text-white"
+              className="flex items-center gap-1.5 rounded-xl border border-zinc-800 bg-[#1C1C1E] px-3.5 py-1.5 text-xs font-bold text-zinc-300 transition hover:border-[#075473] hover:text-white"
             >
               <span aria-hidden>←</span>
               <span>Back to Leads / Admin</span>
             </Link>
             <Link
               href="/builder"
-              className="flex items-center gap-1.5 rounded-xl border border-zinc-800 bg-[#1C1C1E] px-3.5 py-1.5 text-xs font-bold text-zinc-400 transition hover:border-[#B85304] hover:text-white"
+              className="flex items-center gap-1.5 rounded-xl border border-zinc-800 bg-[#1C1C1E] px-3.5 py-1.5 text-xs font-bold text-zinc-400 transition hover:border-[#075473] hover:text-white"
             >
               <span aria-hidden>🏠</span>
               <span>Exit to Trip Builder</span>
@@ -279,7 +279,7 @@ function TabButton({
       onClick={onClick}
       className={`flex items-center gap-2 rounded-xl border px-4 py-2 text-xs font-bold transition ${
         active
-          ? "border-[#B85304] bg-[#B85304] text-white shadow-md"
+          ? "border-[#075473] bg-[#075473] text-white shadow-md"
           : "border-zinc-800 bg-[#1C1C1E] text-zinc-300 hover:bg-[#1C1C1E] hover:text-white"
       }`}
     >
@@ -635,7 +635,7 @@ function SourceOfTruthPanel({ getClient }: { getClient: () => PbClient }) {
                   setCreating(true);
                   setEditing(null);
                 }}
-                className="rounded-full bg-[#B85304] px-4 py-2 text-sm font-semibold text-[#0B1F3A]"
+                className="rounded-full bg-[#075473] px-4 py-2 text-sm font-semibold text-[#0B1F3A]"
               >
                 + Add
               </button>
@@ -650,7 +650,7 @@ function SourceOfTruthPanel({ getClient }: { getClient: () => PbClient }) {
                 setCreating(true);
                 setEditing(null);
               }}
-              className="rounded-full bg-[#B85304] px-4 py-2 text-sm font-semibold text-[#0B1F3A]"
+              className="rounded-full bg-[#075473] px-4 py-2 text-sm font-semibold text-[#0B1F3A]"
             >
               + Add
             </button>
@@ -807,7 +807,7 @@ function SourceOfTruthPanel({ getClient }: { getClient: () => PbClient }) {
                       <td className="py-3 text-right whitespace-nowrap">
                         <button
                           type="button"
-                          className="mr-3 text-[#B85304]"
+                          className="mr-3 text-[#075473]"
                           onClick={() => {
                             setEditing(row);
                             setCreating(false);
@@ -1307,8 +1307,8 @@ function RecordEditModal({
                   <div
                     className={`rounded-2xl border-2 border-dashed p-5 text-center transition ${
                       dragKey === f.key
-                        ? "border-[#B85304] bg-[#1C1C1E]"
-                        : "border-[#2C2C2E] bg-[#121212] hover:border-[#B85304]"
+                        ? "border-[#075473] bg-[#1C1C1E]"
+                        : "border-[#2C2C2E] bg-[#121212] hover:border-[#075473]"
                     }`}
                     onDragOver={(e) => {
                       e.preventDefault();
@@ -1397,7 +1397,7 @@ function RecordEditModal({
                           min={0}
                           value={form[tf.key] ?? ""}
                           onChange={(e) => set(tf.key, e.target.value)}
-                          className="w-full rounded-xl border border-[#2C2C2E] bg-[#121212] px-2.5 py-2 text-sm text-white placeholder-zinc-500 outline-none [color-scheme:dark] focus:border-[#B85304] focus:ring-1 focus:ring-[#B85304]"
+                          className="w-full rounded-xl border border-[#2C2C2E] bg-[#121212] px-2.5 py-2 text-sm text-white placeholder-zinc-500 outline-none [color-scheme:dark] focus:border-[#075473] focus:ring-1 focus:ring-[#075473]"
                         />
                       </div>
                     ))}
@@ -1466,7 +1466,7 @@ function RecordEditModal({
                     rows={3}
                     value={form[f.key] ?? ""}
                     onChange={(e) => set(f.key, e.target.value)}
-                    className="w-full rounded-xl border border-[#2C2C2E] bg-[#121212] px-3 py-2 text-sm text-white placeholder-zinc-500 outline-none [color-scheme:dark] focus:border-[#B85304] focus:ring-1 focus:ring-[#B85304]"
+                    className="w-full rounded-xl border border-[#2C2C2E] bg-[#121212] px-3 py-2 text-sm text-white placeholder-zinc-500 outline-none [color-scheme:dark] focus:border-[#075473] focus:ring-1 focus:ring-[#075473]"
                   />
                 ) : f.type === "bool" ? (
                   <div className="inline-flex rounded-full border border-[#2C2C2E] bg-[#121212] p-1">
@@ -1534,7 +1534,7 @@ function RecordEditModal({
                             className={`rounded-full border px-3 py-1.5 text-sm transition ${
                               on
                                 ? "border-[#0B1F3A] bg-[#0B1F3A] text-white"
-                                : "border-[#2C2C2E] bg-[#121212] text-zinc-400 hover:border-[#B85304]/40"
+                                : "border-[#2C2C2E] bg-[#121212] text-zinc-400 hover:border-[#075473]/40"
                             }`}
                           >
                             {labels[o] ?? o}
@@ -1546,7 +1546,7 @@ function RecordEditModal({
                   <select
                     value={form[f.key] ?? ""}
                     onChange={(e) => set(f.key, e.target.value)}
-                    className="w-full rounded-xl border border-[#2C2C2E] bg-[#121212] px-3 py-2 text-sm text-white placeholder-zinc-500 outline-none [color-scheme:dark] focus:border-[#B85304] focus:ring-1 focus:ring-[#B85304]"
+                    className="w-full rounded-xl border border-[#2C2C2E] bg-[#121212] px-3 py-2 text-sm text-white placeholder-zinc-500 outline-none [color-scheme:dark] focus:border-[#075473] focus:ring-1 focus:ring-[#075473]"
                   >
                     <option key="__select_empty__" value="">
                       Select…
@@ -1611,7 +1611,7 @@ function RecordEditModal({
                           className={`rounded-full border px-3 py-1.5 text-sm transition ${
                             on
                               ? "border-[#0B1F3A] bg-[#0B1F3A] text-white"
-                              : "border-[#2C2C2E] bg-[#121212] text-zinc-400 hover:border-[#B85304]/40"
+                              : "border-[#2C2C2E] bg-[#121212] text-zinc-400 hover:border-[#075473]/40"
                           }`}
                         >
                           {optionLabel}
@@ -1623,7 +1623,7 @@ function RecordEditModal({
                   <select
                     value={form[f.key] ?? ""}
                     onChange={(e) => set(f.key, e.target.value)}
-                    className="w-full rounded-xl border border-[#2C2C2E] bg-[#121212] px-3 py-2 text-sm text-white placeholder-zinc-500 outline-none [color-scheme:dark] focus:border-[#B85304] focus:ring-1 focus:ring-[#B85304]"
+                    className="w-full rounded-xl border border-[#2C2C2E] bg-[#121212] px-3 py-2 text-sm text-white placeholder-zinc-500 outline-none [color-scheme:dark] focus:border-[#075473] focus:ring-1 focus:ring-[#075473]"
                   >
                     <option value="">
                       {def.id === "seasonal_highlights"
@@ -1640,7 +1640,7 @@ function RecordEditModal({
                   <select
                     value={form[f.key] ?? ""}
                     onChange={(e) => set(f.key, e.target.value)}
-                    className="w-full rounded-xl border border-[#2C2C2E] bg-[#121212] px-3 py-2 text-sm text-white placeholder-zinc-500 outline-none [color-scheme:dark] focus:border-[#B85304] focus:ring-1 focus:ring-[#B85304]"
+                    className="w-full rounded-xl border border-[#2C2C2E] bg-[#121212] px-3 py-2 text-sm text-white placeholder-zinc-500 outline-none [color-scheme:dark] focus:border-[#075473] focus:ring-1 focus:ring-[#075473]"
                   >
                     <option value="">Select airport / hub</option>
                     {hubs.map((h) => (
@@ -1653,7 +1653,7 @@ function RecordEditModal({
                   <select
                     value={form[f.key] ?? ""}
                     onChange={(e) => set(f.key, e.target.value)}
-                    className="w-full rounded-xl border border-[#2C2C2E] bg-[#121212] px-3 py-2 text-sm text-white placeholder-zinc-500 outline-none [color-scheme:dark] focus:border-[#B85304] focus:ring-1 focus:ring-[#B85304]"
+                    className="w-full rounded-xl border border-[#2C2C2E] bg-[#121212] px-3 py-2 text-sm text-white placeholder-zinc-500 outline-none [color-scheme:dark] focus:border-[#075473] focus:ring-1 focus:ring-[#075473]"
                   >
                     <option value="">Select vehicle</option>
                     {vehicles.map((v) => (
@@ -1669,7 +1669,7 @@ function RecordEditModal({
                   <select
                     value={form[f.key] ?? ""}
                     onChange={(e) => set(f.key, e.target.value)}
-                    className="w-full rounded-xl border border-[#2C2C2E] bg-[#121212] px-3 py-2 text-sm text-white placeholder-zinc-500 outline-none [color-scheme:dark] focus:border-[#B85304] focus:ring-1 focus:ring-[#B85304]"
+                    className="w-full rounded-xl border border-[#2C2C2E] bg-[#121212] px-3 py-2 text-sm text-white placeholder-zinc-500 outline-none [color-scheme:dark] focus:border-[#075473] focus:ring-1 focus:ring-[#075473]"
                   >
                     <option value="">No linked tour</option>
                     {tours.map((t) => (
@@ -1684,7 +1684,7 @@ function RecordEditModal({
                     step={f.type === "number" ? "any" : undefined}
                     value={form[f.key] ?? ""}
                     onChange={(e) => set(f.key, e.target.value)}
-                    className="w-full rounded-xl border border-[#2C2C2E] bg-[#121212] px-3 py-2 text-sm text-white placeholder-zinc-500 outline-none [color-scheme:dark] focus:border-[#B85304] focus:ring-1 focus:ring-[#B85304]"
+                    className="w-full rounded-xl border border-[#2C2C2E] bg-[#121212] px-3 py-2 text-sm text-white placeholder-zinc-500 outline-none [color-scheme:dark] focus:border-[#075473] focus:ring-1 focus:ring-[#075473]"
                   />
                 )}
               </div>
@@ -1716,7 +1716,7 @@ function RecordEditModal({
                     },
                   ])
                 }
-                className="rounded-full border border-[#B85304]/60 bg-[#121212] px-3 py-1.5 text-xs font-semibold text-[#D9BB96]"
+                className="rounded-full border border-[#075473]/60 bg-[#121212] px-3 py-1.5 text-xs font-semibold text-[#075473]"
               >
                 + Add Vehicle Rate
               </button>
@@ -1748,7 +1748,7 @@ function RecordEditModal({
                             )
                           )
                         }
-                        className="mt-1 w-full rounded-lg border border-[#2C2C2E] bg-[#121212] px-2 py-2 text-sm text-white placeholder-zinc-500 outline-none [color-scheme:dark] focus:border-[#B85304] focus:ring-1 focus:ring-[#B85304]"
+                        className="mt-1 w-full rounded-lg border border-[#2C2C2E] bg-[#121212] px-2 py-2 text-sm text-white placeholder-zinc-500 outline-none [color-scheme:dark] focus:border-[#075473] focus:ring-1 focus:ring-[#075473]"
                       >
                         <option value="">Select vehicle…</option>
                         {vehicles.map((v) => (
@@ -1777,7 +1777,7 @@ function RecordEditModal({
                             )
                           )
                         }
-                        className="mt-1 w-full rounded-lg border border-[#2C2C2E] bg-[#121212] px-2 py-2 text-sm text-white placeholder-zinc-500 outline-none [color-scheme:dark] focus:border-[#B85304] focus:ring-1 focus:ring-[#B85304]"
+                        className="mt-1 w-full rounded-lg border border-[#2C2C2E] bg-[#121212] px-2 py-2 text-sm text-white placeholder-zinc-500 outline-none [color-scheme:dark] focus:border-[#075473] focus:ring-1 focus:ring-[#075473]"
                       />
                     </label>
                     <label className="block text-[10px] uppercase tracking-wider text-[#8A8278]">
@@ -1796,7 +1796,7 @@ function RecordEditModal({
                             )
                           )
                         }
-                        className="mt-1 w-full rounded-lg border border-[#2C2C2E] bg-[#121212] px-2 py-2 text-sm text-white placeholder-zinc-500 outline-none [color-scheme:dark] focus:border-[#B85304] focus:ring-1 focus:ring-[#B85304]"
+                        className="mt-1 w-full rounded-lg border border-[#2C2C2E] bg-[#121212] px-2 py-2 text-sm text-white placeholder-zinc-500 outline-none [color-scheme:dark] focus:border-[#075473] focus:ring-1 focus:ring-[#075473]"
                       />
                     </label>
                     <div className="flex items-end">
@@ -2163,7 +2163,7 @@ function UsersPanel({
           type="button"
           disabled={saving || !email || !password}
           onClick={() => void createUser()}
-          className="mt-4 rounded-full bg-[#B85304] px-5 py-2 text-sm font-semibold text-[#0B1F3A] disabled:opacity-50"
+          className="mt-4 rounded-full bg-[#075473] px-5 py-2 text-sm font-semibold text-[#0B1F3A] disabled:opacity-50"
         >
           {saving ? "Creating…" : "+ Create user"}
         </button>
@@ -2196,7 +2196,7 @@ function UsersPanel({
                     <td className="py-3 text-right whitespace-nowrap">
                       <button
                         type="button"
-                        className="mr-3 text-[#B85304]"
+                        className="mr-3 text-[#075473]"
                         onClick={() => {
                           setResetId(row.id);
                           setResetPass("");
@@ -2223,7 +2223,7 @@ function UsersPanel({
       </div>
 
       {resetId ? (
-        <div className="mt-5 rounded-2xl border border-[#B85304]/40 bg-zinc-950 p-4">
+        <div className="mt-5 rounded-2xl border border-[#075473]/40 bg-zinc-950 p-4">
           <h3 className="font-medium text-zinc-100">
             Reset password · {rows.find((r) => r.id === resetId)?.email}
           </h3>

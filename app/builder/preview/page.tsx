@@ -9,6 +9,7 @@ import {
   type BuilderConfig,
 } from "@/lib/pocketbase/client";
 import { calculateBuilderQuote, formatUsd } from "@/lib/builder-pricing";
+import { requestAdvanceBookingInProgress } from "@/lib/bookingLifecycle";
 import { useBuilderStore } from "@/store/useBuilderStore";
 import { BottomNav } from "@/components/builder/BottomNav";
 
@@ -28,10 +29,22 @@ export default function PreviewPage() {
     [config, state]
   );
 
+  const continueHref = state.confirmedBookingRef
+    ? `/builder?ref=${encodeURIComponent(state.confirmedBookingRef)}`
+    : "/builder";
+
+  const onContinueEditing = () => {
+    const ref = state.confirmedBookingRef || state.tempBookingRef;
+    if (ref) {
+      void requestAdvanceBookingInProgress(ref);
+      useBuilderStore.getState().confirmBookingRef(ref, "in_progress");
+    }
+  };
+
   return (
     <div className="builder-theme min-h-screen bg-[#F5F0E8] pb-28 text-[#0B1F3A]">
       <header className="border-b border-[#E8E2D9] bg-[#FBF8F2] px-4 py-5">
-        <p className="text-[0.65rem] font-semibold uppercase tracking-[0.35em] text-[#B85304]">
+        <p className="text-[0.65rem] font-semibold uppercase tracking-[0.35em] text-[#075473]">
           Preview Trip
         </p>
         <h1 className="mt-1 font-display text-3xl">
@@ -73,7 +86,7 @@ export default function PreviewPage() {
                   </div>
                 )}
                 <div className="p-4">
-                  <p className="text-xs uppercase tracking-[0.2em] text-[#B85304]">
+                  <p className="text-xs uppercase tracking-[0.2em] text-[#075473]">
                     Stop {i + 1}
                   </p>
                   <h2 className="font-display text-2xl">
@@ -102,7 +115,8 @@ export default function PreviewPage() {
         ) : null}
 
         <Link
-          href="/builder"
+          href={continueHref}
+          onClick={onContinueEditing}
           className="mt-6 block rounded-full bg-[#0B1F3A] py-3 text-center text-sm font-semibold text-white"
         >
           Continue Editing

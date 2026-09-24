@@ -28,9 +28,29 @@ const ABBREV: Record<string, string> = {
   Korean: "KO",
 };
 
-export function normalizeTourLanguages(
-  raw: unknown
-): string[] {
+const FLAGS: Record<string, string> = {
+  English: "🇬🇧",
+  Dutch: "🇳🇱",
+  Spanish: "🇪🇸",
+  French: "🇫🇷",
+  German: "🇩🇪",
+  Italian: "🇮🇹",
+  Japanese: "🇯🇵",
+  Portuguese: "🇵🇹",
+  Chinese: "🇨🇳",
+  Korean: "🇰🇷",
+};
+
+const DEFAULT_CITY_LANGUAGES = [
+  "English",
+  "Japanese",
+  "French",
+  "German",
+  "Spanish",
+  "Italian",
+] as const;
+
+export function normalizeTourLanguages(raw: unknown): string[] {
   if (!raw) return [];
   if (Array.isArray(raw)) {
     return raw.map((v) => String(v).trim()).filter(Boolean);
@@ -78,8 +98,31 @@ export function languageToCode(raw: string): string {
   return trimmed.slice(0, 2).toUpperCase();
 }
 
+export function languageFlag(raw: string): string {
+  const trimmed = String(raw || "").trim();
+  if (FLAGS[trimmed]) return FLAGS[trimmed];
+  const byCode = Object.entries(ABBREV).find(
+    ([, code]) => code.toLowerCase() === trimmed.toLowerCase()
+  );
+  if (byCode) return FLAGS[byCode[0]] || "🌐";
+  return "🌐";
+}
+
+export function languageDisplayLabel(name: string): string {
+  const flag = languageFlag(name);
+  if (name === "Japanese") return `${flag} 日本語 (Japanese)`;
+  if (name === "French") return `${flag} Français (French)`;
+  if (name === "German") return `${flag} Deutsch (German)`;
+  if (name === "Spanish") return `${flag} Español (Spanish)`;
+  if (name === "Italian") return `${flag} Italiano (Italian)`;
+  if (name === "English") return `${flag} English (Standard)`;
+  return `${flag} ${name}`;
+}
+
 /** Codes available for a tour (catalog languages, else English). */
-export function tourLanguageChoices(raw: unknown): { name: string; code: string }[] {
+export function tourLanguageChoices(
+  raw: unknown
+): { name: string; code: string }[] {
   const names = normalizeTourLanguages(raw);
   const source = names.length ? names : ["English"];
   const seen = new Set<string>();
@@ -91,4 +134,21 @@ export function tourLanguageChoices(raw: unknown): { name: string; code: string 
     out.push({ name, code });
   }
   return out;
+}
+
+/**
+ * City-level languages from PocketBase `cities.available_languages`,
+ * falling back to the standard guided set.
+ */
+export function cityLanguageChoices(
+  raw: unknown
+): { name: string; code: string; flag: string; label: string }[] {
+  const names = normalizeTourLanguages(raw);
+  const source = names.length ? names : [...DEFAULT_CITY_LANGUAGES];
+  return tourLanguageChoices(source).map(({ name, code }) => ({
+    name,
+    code,
+    flag: languageFlag(name),
+    label: languageDisplayLabel(name),
+  }));
 }

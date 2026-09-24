@@ -1,3 +1,8 @@
+import {
+  SINGLE_DAY_BUILDER_CONFIG,
+  SINGLE_DAY_BUILDER_HERO_KEY,
+} from "@/config/mediaConfig";
+
 /**
  * Fallback copy + media for brandable UI cards (pace / quiz / concierge).
  * Used when PocketBase records are missing or fields are empty.
@@ -11,7 +16,9 @@ export type BrandingUiCategory =
   | "concierge"
   | "matcher"
   | "planner"
-  | "value";
+  | "value"
+  | "builder"
+  | "pre_elite";
 
 export type BrandingUiKey = string;
 
@@ -205,7 +212,7 @@ export const BRANDING_UI_FALLBACKS: Record<string, BrandingUiFallback> = {
   value_proposition: {
     key: "value_proposition",
     category: "value",
-    title: "The Elite Travel Difference",
+    title: "The TOKIOTOURS Difference",
     subtitle: "Cultural Translation, Not Just Sightseeing",
     description:
       "Seamless Logistics: Zero language barriers, no local rule confusion, and VIP crowd navigation.\nCultural Translator: Move beyond Wikipedia facts—understand the deep history, unwritten etiquette, and hidden stories.\nTime & Comfort Optimization: Skip queues, avoid travel friction, and experience Japan at your preferred rhythm.",
@@ -219,6 +226,19 @@ export const BRANDING_UI_FALLBACKS: Record<string, BrandingUiFallback> = {
     creditTitle: "Self-Guided (Ticket Only): Photo opportunity & entry.",
     creditBody:
       "Elite Guided Experience: Full cultural translation, zero transit friction, and local etiquette masterclass.",
+  },
+  single_day_builder_hero: {
+    key: SINGLE_DAY_BUILDER_HERO_KEY,
+    category: "builder",
+    /** Beauty-script accent (red) overlaid on the scenic hero */
+    title: SINGLE_DAY_BUILDER_CONFIG.hero.scriptAccent,
+    /** Tagline under the hero title stack */
+    subtitle: SINGLE_DAY_BUILDER_CONFIG.hero.subtitle,
+    description: "",
+    mediaFallback: SINGLE_DAY_BUILDER_CONFIG.hero.videoUrl,
+    sortOrder: 0,
+    /** Godiva / sheet prefix — e.g. "YOUR DAY IN" */
+    ctaPrimary: SINGLE_DAY_BUILDER_CONFIG.hero.mainTitlePrefix,
   },
 };
 

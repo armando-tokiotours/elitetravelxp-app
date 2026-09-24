@@ -1,6 +1,7 @@
 "use client";
 
 import { Reorder, useDragControls } from "framer-motion";
+import { Lock } from "lucide-react";
 import type { PbCity } from "@/lib/pocketbase/client";
 import type { SeasonalMatch } from "@/lib/seasonalMatcher";
 import type {
@@ -9,6 +10,7 @@ import type {
   LocationStop,
 } from "@/store/useBuilderStore";
 import { coerceTransitType } from "@/store/useBuilderStore";
+import { isTransitHubStop } from "@/lib/transitHubs";
 import { allowedVisitTypesForIndex } from "@/lib/locationRules";
 import { useHybridTooltip } from "@/hooks/useHybridTooltip";
 import { ConciergeSuggestionCard } from "./ConciergeSuggestionCard";
@@ -17,8 +19,10 @@ import { CityThumb } from "./CityThumb";
 export function CityAccordionItem({
   loc,
   city,
+  displayName,
   dateLabel,
   fromLabel,
+  showFromLabel = true,
   index,
   totalLocations,
   expanded,
@@ -33,8 +37,12 @@ export function CityAccordionItem({
 }: {
   loc: LocationStop;
   city?: PbCity;
+  /** Override label (airport / port hub name) */
+  displayName?: string;
   dateLabel: string;
   fromLabel: string;
+  /** Hide FROM origin on first overnight city (airport is Step 2). */
+  showFromLabel?: boolean;
   index: number;
   totalLocations: number;
   expanded: boolean;
@@ -48,20 +56,54 @@ export function CityAccordionItem({
   onAddTour: (tourId: string) => void;
 }) {
   const controls = useDragControls();
-  const name = city?.name ?? "City";
+  const locked = isTransitHubStop(loc);
+  const name = displayName || city?.name || "City";
   const transit: CityTransitType = coerceTransitType(loc.transitType);
   const allowedVisitTypes = allowedVisitTypesForIndex(index, totalLocations);
-  const visitType: CityVisitType = allowedVisitTypes.includes(loc.visitType)
-    ? loc.visitType
-    : "stay";
-  const isStay = visitType === "stay";
+  const visitType: CityVisitType = locked
+    ? loc.visitType === "departure"
+      ? "departure"
+      : "arrival"
+    : allowedVisitTypes.includes(loc.visitType)
+      ? loc.visitType
+      : "stay";
+  const isStay = !locked && visitType === "stay";
   const isLast = index === totalLocations - 1;
   const nightsOk = isStay ? loc.nights >= 1 : true;
-  const transitOk = isLast || transit !== "unset";
+  const transitOk = locked || isLast || transit !== "unset";
   const isConfigured = nightsOk && transitOk;
   const nightsStatusClass = isConfigured
     ? "text-emerald-400"
-    : "text-[#B85304]";
+    : "text-[#075473]";
+
+  if (locked) {
+    return (
+      <Reorder.Item
+        value={loc}
+        dragListener={false}
+        className="w-full overflow-visible rounded-2xl border border-zinc-700 bg-zinc-900/80"
+      >
+        <div
+          className="flex items-center gap-3 px-3 py-3"
+          title="Auto-set from Step 2 (Arrival/Departure)"
+        >
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-zinc-700 bg-zinc-800 text-lg">
+            {visitType === "departure" ? "🛫" : "🛬"}
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-semibold text-zinc-200">{name}</p>
+            <p className="text-[11px] text-zinc-500">
+              Auto-set from Step 2 (Arrival/Departure)
+            </p>
+          </div>
+          <span className="inline-flex items-center gap-1 rounded-full border border-zinc-700 bg-zinc-800 px-2.5 py-1 text-xs font-semibold text-zinc-400">
+            0n
+          </span>
+          <Lock className="h-3.5 w-3.5 shrink-0 text-zinc-500" aria-hidden />
+        </div>
+      </Reorder.Item>
+    );
+  }
 
   return (
     <Reorder.Item
@@ -149,21 +191,29 @@ export function CityAccordionItem({
               </div>
             </div>
 
-            <div className="relative z-30 mt-4 w-full overflow-visible rounded-xl border-t border-zinc-800/80 bg-[#121212] p-3 pt-3 sm:p-3.5">
-              {/* Row 1: Departure origin */}
-              <div className="mb-2.5 shrink-0 min-w-max">
-                <span className="mb-0.5 block text-[10px] font-bold uppercase tracking-wider text-zinc-400">
-                  From
-                </span>
-                <p className="whitespace-nowrap text-xs font-semibold text-white">
-                  {fromLabel}
-                </p>
-              </div>
+            <div className="relative z-30 mt-4 w-full overflow-visible rounded-xl border-t border-zinc-800/80 bg-[#121212] p-3 pt-3 sm:p-3.5 space-y-3">
+              {/* Hide FROM on first overnight city — arrival hub is Step 2 */}
+              {showFromLabel ? (
+                <div className="shrink-0 min-w-max">
+                  <span className="mb-0.5 block text-[10px] font-bold uppercase tracking-wider text-zinc-400">
+                    From
+                  </span>
+                  <p className="whitespace-nowrap text-xs font-semibold text-white">
+                    {fromLabel}
+                  </p>
+                </div>
+              ) : null}
 
-              {/* Row 2: Travel to next */}
+              {/* Travel to next — all non-terminal stays */}
               {!isLast ? (
-                <div className="relative z-30 flex flex-col gap-1.5 overflow-visible border-t border-zinc-800/80 pt-2.5">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">
+                <div
+                  className={`relative z-30 flex flex-col gap-1.5 overflow-visible ${
+                    showFromLabel
+                      ? "border-t border-zinc-800/80 pt-2.5"
+                      : ""
+                  }`}
+                >
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-[#075473]">
                     Travel to next
                   </span>
                   {transit === "unset" ? (
@@ -252,7 +302,7 @@ export function CityAccordionItem({
             </span>
             {dateLabel ? (
               <span className="shrink-0 text-xs text-zinc-400">
-                <span className="mr-0.5 text-[#B85304]">›</span>
+                <span className="mr-0.5 text-[#075473]">›</span>
                 {dateLabel.toLowerCase()}
               </span>
             ) : null}
@@ -281,7 +331,7 @@ function VisitPill({
       onClick={onClick}
       className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
         active
-          ? "bg-[#0B1F3A] text-white ring-1 ring-[#B85304]/50"
+          ? "bg-[#0B1F3A] text-white ring-1 ring-[#075473]/50"
           : "text-zinc-400 hover:bg-zinc-800 hover:text-white"
       }`}
     >
@@ -337,7 +387,7 @@ function TransitPill({
     >
       <div
         role="tooltip"
-        className={`pointer-events-none absolute bottom-full z-50 mb-2 max-w-[220px] whitespace-normal break-words rounded-lg border border-[#B85304]/40 bg-[#D9BB96] p-2 text-center text-[10px] font-bold text-[#000000] shadow-2xl transition-all duration-150 ${tipPos} ${tipWidth} ${
+        className={`pointer-events-none absolute bottom-full z-50 mb-2 max-w-[220px] whitespace-normal break-words rounded-lg border border-[#075473]/40 bg-[#075473] p-2 text-center text-[10px] font-bold text-[#000000] shadow-2xl transition-all duration-150 ${tipPos} ${tipWidth} ${
           isOpen
             ? "visible opacity-100"
             : "invisible opacity-0 group-hover:visible group-hover:opacity-100"
@@ -345,7 +395,7 @@ function TransitPill({
       >
         <span>{tooltip}</span>
         <div
-          className={`absolute top-full border-4 border-transparent border-t-[#D9BB96] ${arrowPos}`}
+          className={`absolute top-full border-4 border-transparent border-t-[#075473] ${arrowPos}`}
           aria-hidden
         />
       </div>
@@ -358,7 +408,7 @@ function TransitPill({
         aria-expanded={isOpen}
         className={`rounded-full px-3 py-1.5 text-xs font-semibold transition active:scale-95 ${
           active
-            ? "bg-[#0B1F3A] text-white ring-1 ring-[#D9BB96]/50"
+            ? "bg-[#0B1F3A] text-white ring-1 ring-[#075473]/50"
             : "text-zinc-400 hover:bg-zinc-800 hover:text-white"
         }`}
       >

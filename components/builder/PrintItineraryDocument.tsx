@@ -109,7 +109,7 @@ export function PrintItineraryDocument({
 
   return (
     <div
-      id="itinerary-dossier-view"
+      id="itinerary-invoice-content"
       className={`print-document text-[#0B1F3A] ${
         embedded ? "" : "min-h-screen bg-[#F5F0E8]"
       }`}
@@ -117,11 +117,19 @@ export function PrintItineraryDocument({
       {!embedded && showToolbar ? (
         <div className="no-print border-b border-[#E8E2D9] bg-[#FBF8F2] px-4 py-4">
           <div className="mx-auto flex max-w-3xl flex-wrap items-center justify-between gap-3">
-            <div>
-              <p className="text-[0.65rem] font-semibold uppercase tracking-[0.3em] text-[#B85304]">
-                Elite Travel Experiences
-              </p>
-              <h1 className="font-display text-2xl">View / Print Itinerary</h1>
+            <div className="flex items-center gap-3">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/images/tokiotours-logo.png"
+                alt="TOKIOTOURS"
+                className="h-10 w-10 rounded-full object-cover"
+              />
+              <div>
+                <p className="text-[0.65rem] font-semibold uppercase tracking-[0.3em] text-[#075473]">
+                  TOKIOTOURS
+                </p>
+                <h1 className="font-display text-2xl">View / Print Itinerary</h1>
+              </div>
             </div>
             <div className="flex flex-wrap gap-2">
               <Link
@@ -154,9 +162,9 @@ export function PrintItineraryDocument({
             : "mx-auto max-w-3xl px-4 py-8 sm:px-6 print:max-w-none print:px-0 print:py-0"
         }
       >
-        <header className="border-b border-[#B85304]/40 pb-6">
+        <header className="border-b border-[#075473]/40 pb-6">
           <div className="text-center sm:text-left">
-            <p className="text-[0.7rem] font-semibold uppercase tracking-[0.4em] text-[#B85304]">
+            <p className="text-[0.7rem] font-semibold uppercase tracking-[0.4em] text-[#E60F43]">
               Private Quotation
             </p>
             <h2 className="mt-2 font-display text-[1.44rem] leading-tight text-[#0B1F3A] sm:text-4xl sm:leading-none">
@@ -385,8 +393,8 @@ export function PrintItineraryDocument({
         </section>
 
         {quote ? (
-          <section className="mt-8 rounded-2xl border border-[#B85304]/45 bg-[#FDF7F3] p-6 text-center print:border print:bg-white">
-            <p className="text-[0.65rem] font-semibold uppercase tracking-[0.3em] text-[#B85304]">
+          <section className="mt-8 rounded-2xl border border-[#075473]/45 bg-[#FDF7F3] p-6 text-center print:border print:bg-white">
+            <p className="text-[0.65rem] font-semibold uppercase tracking-[0.3em] text-[#075473]">
               Experience Japan Range
             </p>
             <p className="mt-2 font-display text-3xl text-[#0B1F3A]">
@@ -405,11 +413,11 @@ export function PrintItineraryDocument({
             })()}
             <p className="mt-2 text-xs text-[#8A8278]">
               Indicative range based on current Source of Truth pricing. Final
-              quotation confirmed by your Elite Travel consultant.
+              quotation confirmed by your TOKIOTOURS consultant.
             </p>
             {state.isEliteConcierge ||
             state.experienceService === "concierge" ? (
-              <p className="mt-3 rounded-xl border border-[#B85304]/40 bg-accent-50 px-3 py-2 text-left text-xs leading-relaxed text-accent-900">
+              <p className="mt-3 rounded-xl border border-[#075473]/40 bg-accent-50 px-3 py-2 text-left text-xs leading-relaxed text-accent-900">
                 <span className="font-bold uppercase tracking-wide">
                   ✨ Elite Concierge Active
                 </span>
@@ -426,9 +434,9 @@ export function PrintItineraryDocument({
 
         <footer className="mt-10 border-t border-[#E8E2D9] pt-6 text-center text-xs text-[#8A8278]">
           <p className="font-display text-lg text-[#0B1F3A]">
-            Elite Travel Experiences
+            TOKIOTOURS
           </p>
-          <p className="mt-1">travelexperiencesgroup.com</p>
+          <p className="mt-1">tokiotours-app.com</p>
           <p className="mt-3">
             This document reflects your saved trip builder selections. A 10%
             deposit may be required to lock your quotation while a travel expert
@@ -575,7 +583,7 @@ function CityExperienceBlock({
           <p className="mt-1 text-xs text-[#8A8278]">{statusLabel}</p>
         </div>
         <ChevronDown
-          className={`h-4 w-4 shrink-0 text-[#B85304]/80 transition-transform duration-200 ${
+          className={`h-4 w-4 shrink-0 text-[#075473]/80 transition-transform duration-200 ${
             open ? "rotate-180" : ""
           }`}
           aria-hidden
@@ -664,8 +672,8 @@ function InvoiceCard({
   children: React.ReactNode;
 }) {
   return (
-    <div className="rounded-2xl border border-[#E8E2D9] bg-white p-4 sm:p-5 print:border print:shadow-none">
-      <h3 className="mb-3 text-[0.65rem] font-semibold uppercase tracking-[0.22em] text-[#B85304]">
+    <div className="bg-card dark-card rounded-2xl border border-[#E8E2D9] bg-white p-4 sm:p-5 print:border print:shadow-none">
+      <h3 className="accent-title mb-3 text-[0.65rem] font-semibold uppercase tracking-[0.22em] text-[#075473]">
         {title}
       </h3>
       <div>{children}</div>

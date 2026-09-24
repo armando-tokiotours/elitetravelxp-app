@@ -6,6 +6,7 @@ import {
   Download,
   Loader2,
   Mail,
+  Pencil,
   Printer,
   X,
 } from "lucide-react";
@@ -15,11 +16,15 @@ import {
 } from "@/lib/pocketbase/client";
 import { calculateBuilderQuote } from "@/lib/builder-pricing";
 import { useBuilderStore } from "@/store/useBuilderStore";
+import { useItineraryStore } from "@/store/useItineraryStore";
+import { usePreBuilderStore } from "@/store/usePreBuilderStore";
 import {
   downloadItineraryPdf,
   itineraryPdfToBase64,
   printItineraryLocally,
 } from "@/lib/clientItineraryPdf";
+import { BookingTermsModal } from "@/components/checkout/BookingTermsModal";
+import { activeBookingRef } from "@/utils/pnr";
 
 export type PrintRequestResult = {
   bookingRef: string;
@@ -27,43 +32,103 @@ export type PrintRequestResult = {
   message: string;
 };
 
+function resolveKnownEmail(): string {
+  const it = useItineraryStore.getState();
+  const pre = usePreBuilderStore.getState();
+  return (
+    it.clientEmail ||
+    pre.email ||
+    pre.lastPayload?.email ||
+    ""
+  )
+    .trim()
+    .toLowerCase();
+}
+
+function resolveKnownName(): string {
+  const it = useItineraryStore.getState();
+  const pre = usePreBuilderStore.getState();
+  return (it.clientName || pre.fullName || pre.lastPayload?.fullName || "").trim();
+}
+
 /**
  * Send / Save PDF — emails via Hostinger SMTP / Resend, with instant local PDF.
+ * Opens with BookingTermsModal acknowledgment before the email / download form.
  */
 export function PrintRequestModal({
   isOpen,
   onClose,
   onSuccess,
+  skipTerms = false,
 }: {
   isOpen: boolean;
   onClose: () => void;
   onSuccess?: (result: PrintRequestResult) => void;
+  /** When true, skip the deposit/how-it-works gate (already acknowledged upstream). */
+  skipTerms?: boolean;
 }) {
   const state = useBuilderStore();
   const departureDate = useBuilderStore((s) => s.departureDate);
   const confirmBookingRef = useBuilderStore((s) => s.confirmBookingRef);
+  const setClientEmail = useItineraryStore((s) => s.setClientEmail);
+  const setClientName = useItineraryStore((s) => s.setClientName);
+
   const [config, setConfig] = useState<BuilderConfig | null>(null);
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
+  const [emailLocked, setEmailLocked] = useState(true);
   const [busy, setBusy] = useState(false);
   const [localBusy, setLocalBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [showDirectDownload, setShowDirectDownload] = useState(false);
   const [pdfRef, setPdfRef] = useState(state.tempBookingRef || "TMP-DRAFT");
+  const [termsAccepted, setTermsAccepted] = useState(skipTerms);
+
+  const bookingRefDisplay = useMemo(
+    () =>
+      activeBookingRef({
+        tempBookingRef: state.tempBookingRef,
+        confirmedBookingRef: state.confirmedBookingRef,
+        bookingStatus: state.bookingStatus,
+      }) ||
+      state.confirmedBookingRef ||
+      state.tempBookingRef ||
+      pdfRef ||
+      "TMP-DRAFT",
+    [
+      state.tempBookingRef,
+      state.confirmedBookingRef,
+      state.bookingStatus,
+      pdfRef,
+    ]
+  );
 
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen) {
+      setTermsAccepted(skipTerms);
+      return;
+    }
+    setTermsAccepted(skipTerms);
     setError(null);
     setSuccess(null);
     setShowDirectDownload(false);
-    setPdfRef(
-      state.confirmedBookingRef || state.tempBookingRef || "TMP-DRAFT"
-    );
+
+    const knownEmail = resolveKnownEmail();
+    const knownName = resolveKnownName();
+    setEmail(knownEmail);
+    setName(knownName);
+    // Lock when we already have an email on file; unlock for empty / edit
+    setEmailLocked(Boolean(knownEmail));
+
+    const ref =
+      state.confirmedBookingRef || state.tempBookingRef || "TMP-DRAFT";
+    setPdfRef(ref);
+
     fetchBuilderConfig({ includeAccommodations: true })
       .then(setConfig)
       .catch(() => setConfig(null));
-  }, [isOpen, state.confirmedBookingRef, state.tempBookingRef]);
+  }, [isOpen, skipTerms, state.confirmedBookingRef, state.tempBookingRef]);
 
   const quote = useMemo(
     () => (config ? calculateBuilderQuote(state, config) : null),
@@ -80,12 +145,26 @@ export function PrintRequestModal({
     try {
       await downloadItineraryPdf(ref);
     } catch (err) {
-      console.warn("[PrintRequestModal] client PDF failed, using print()", err);
-      printItineraryLocally();
+      console.warn("[PrintRequestModal] html2pdf failed, using print()", err);
+      await printItineraryLocally(ref);
     }
   };
 
   if (!isOpen) return null;
+
+  // Prefer prop gate so skipTerms takes effect on the same render as open
+  // (avoids a second terms flash after parent already acknowledged).
+  if (!skipTerms && !termsAccepted) {
+    return (
+      <BookingTermsModal
+        open
+        onConfirm={() => setTermsAccepted(true)}
+        onCancel={onClose}
+        confirmLabel="I Understand — Proceed to Invoice / Download PDF →"
+        cancelLabel="Back to Builder"
+      />
+    );
+  }
 
   const handleDirectDownload = async () => {
     setLocalBusy(true);
@@ -121,7 +200,19 @@ export function PrintRequestModal({
     setSuccess(null);
     setShowDirectDownload(false);
     setBusy(true);
-    const to = email.trim();
+    const to = email.trim().toLowerCase();
+    const displayName = name.trim();
+
+    if (!to || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) {
+      setError("Enter a valid email address to receive your itinerary.");
+      setBusy(false);
+      setEmailLocked(false);
+      return;
+    }
+
+    // Persist identity for Manage Booking / future opens
+    setClientEmail(to);
+    if (displayName) setClientName(displayName);
 
     let clientPdfBase64: string | undefined;
     try {
@@ -136,9 +227,9 @@ export function PrintRequestModal({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           contactEmail: to,
-          contactName: name.trim(),
+          contactName: displayName,
           email: to,
-          fullName: name.trim(),
+          fullName: displayName,
           state,
           quote,
           departureDate: departureDate(),
@@ -151,23 +242,52 @@ export function PrintRequestModal({
       const ref = String(data.bookingRef || pdfRef);
       setPdfRef(ref);
 
-      if (!res.ok) {
-        setError(
-          "Email notice delayed, but your PDF is ready below!"
+      const dualWriteLead = () => {
+        if (!to || !ref) return;
+        void import("@/lib/syncBookingLead").then(
+          ({ syncMultiDayBookingLead, syncSingleDayBookingLead }) => {
+            if (state.tripMode === "single_day") {
+              void import("@/store/useSingleDayBuilderStore").then(
+                ({ useSingleDayBuilderStore }) =>
+                  syncSingleDayBookingLead({
+                    bookingRef: ref,
+                    email: to,
+                    state: useSingleDayBuilderStore.getState(),
+                    status: "quoted",
+                    quote: quote ? { min: quote.min, max: quote.max } : null,
+                  })
+              );
+            } else {
+              void syncMultiDayBookingLead({
+                bookingRef: ref,
+                email: to,
+                state,
+                cityNames,
+                status: "quoted",
+                quote: quote ? { min: quote.min, max: quote.max } : null,
+              });
+            }
+          }
         );
+      };
+
+      if (!res.ok) {
+        dualWriteLead();
+        setError("Email notice delayed, but your PDF is ready below!");
         setShowDirectDownload(true);
         setSuccess(null);
         return;
       }
 
       if (typeof data.bookingRef === "string" && data.bookingRef) {
-        confirmBookingRef(data.bookingRef, "requested");
+        confirmBookingRef(data.bookingRef, "in_progress");
       }
+
+      dualWriteLead();
 
       setSuccess(
         "✓ Proposal emailed to you and copy sent to armando@tokiotours.nl"
       );
-      // Instant local PDF after success banner
       await runLocalPdf(ref);
       onSuccess?.({
         bookingRef: ref,
@@ -187,7 +307,7 @@ export function PrintRequestModal({
   };
 
   return (
-    <div className="fixed inset-0 z-[90] flex items-end justify-center bg-black/45 p-4 sm:items-center">
+    <div className="fixed inset-0 z-[90] flex items-end justify-center bg-black/45 p-4 sm:items-center no-print print:hidden">
       <div
         role="dialog"
         aria-modal="true"
@@ -196,7 +316,7 @@ export function PrintRequestModal({
       >
         <div className="flex items-start justify-between gap-3">
           <div>
-            <p className="text-[0.65rem] font-semibold uppercase tracking-[0.3em] text-[#B85304]">
+            <p className="text-[0.65rem] font-semibold uppercase tracking-[0.3em] text-[#075473]">
               Send / Save PDF
             </p>
             <h2
@@ -206,8 +326,8 @@ export function PrintRequestModal({
               Email your itinerary
             </h2>
             <p className="mt-1 text-sm text-[#5C6570]">
-              We’ll save your trip, issue a booking PNR, and email your dossier.
-              A PDF also downloads to this device.
+              We’ll save your trip, email your dossier, and download a PDF to
+              this device.
             </p>
           </div>
           <button
@@ -220,6 +340,16 @@ export function PrintRequestModal({
           </button>
         </div>
 
+        {/* Booking reference prominence */}
+        <div className="mt-4 rounded-xl border-2 border-[#F6A724]/55 bg-[#FFF8EB] px-4 py-3">
+          <p className="text-[0.65rem] font-semibold uppercase tracking-[0.22em] text-[#B8860B]">
+            Booking Ref
+          </p>
+          <p className="mt-1 font-godiva text-xl uppercase tracking-wider text-[#0B1F3A]">
+            {bookingRefDisplay}
+          </p>
+        </div>
+
         <form onSubmit={handleSendPdf} className="mt-5 space-y-3">
           <label className="block">
             <span className="text-xs font-semibold uppercase tracking-wider text-[#8A8278]">
@@ -229,27 +359,78 @@ export function PrintRequestModal({
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="mt-1 w-full rounded-xl border border-[#E8E2D9] bg-[#FBF8F2] px-3 py-2.5 text-sm text-[#0B1F3A] outline-none focus:border-[#B85304]"
+              className="mt-1 w-full rounded-xl border border-[#E8E2D9] bg-[#FBF8F2] px-3 py-2.5 text-sm text-[#0B1F3A] outline-none focus:border-[#075473]"
               placeholder="Optional"
               autoComplete="name"
               disabled={busy}
             />
           </label>
-          <label className="block">
-            <span className="text-xs font-semibold uppercase tracking-wider text-[#8A8278]">
-              Email *
-            </span>
-            <input
-              type="email"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="mt-1 w-full rounded-xl border border-[#E8E2D9] bg-[#FBF8F2] px-3 py-2.5 text-sm text-[#0B1F3A] outline-none focus:border-[#B85304]"
-              placeholder="you@example.com"
-              autoComplete="email"
-              disabled={busy}
-            />
-          </label>
+
+          <div className="block">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-xs font-semibold uppercase tracking-wider text-[#8A8278]">
+                Email *
+              </span>
+              {emailLocked && email ? (
+                <button
+                  type="button"
+                  onClick={() => setEmailLocked(false)}
+                  disabled={busy}
+                  className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#075473] hover:underline disabled:opacity-50"
+                >
+                  <Pencil className="h-3 w-3" aria-hidden />
+                  Change Email
+                </button>
+              ) : null}
+            </div>
+
+            {emailLocked && email ? (
+              <div className="mt-1 flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2.5">
+                <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
+                <p className="min-w-0 flex-1 truncate text-sm font-medium text-[#0B1F3A]">
+                  {email}
+                </p>
+                <span className="shrink-0 text-[10px] font-bold uppercase tracking-wider text-emerald-700">
+                  On file
+                </span>
+              </div>
+            ) : (
+              <input
+                type="email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                onBlur={() => {
+                  const next = email.trim().toLowerCase();
+                  setEmail(next);
+                  if (next && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(next)) {
+                    setEmailLocked(true);
+                  }
+                }}
+                className="mt-1 w-full rounded-xl border border-[#E8E2D9] bg-[#FBF8F2] px-3 py-2.5 text-sm text-[#0B1F3A] outline-none focus:border-[#075473]"
+                placeholder="you@example.com"
+                autoComplete="email"
+                disabled={busy}
+                autoFocus={!emailLocked}
+              />
+            )}
+          </div>
+
+          {/* Access notice */}
+          <div
+            role="note"
+            className="rounded-xl border border-amber-300/70 bg-amber-50 px-3.5 py-3 text-xs leading-relaxed text-amber-950"
+          >
+            <p className="font-semibold text-amber-900">Please verify your email</p>
+            <p className="mt-1">
+              You will need access to this email address along with your Booking
+              Reference (
+              <span className="font-godiva font-bold uppercase tracking-wider text-[#0B1F3A]">
+                {bookingRefDisplay}
+              </span>
+              ) to retrieve, manage, or edit your itinerary in the future.
+            </p>
+          </div>
 
           {success ? (
             <p className="inline-flex w-full items-start gap-2 rounded-lg bg-emerald-50 px-3 py-2 text-xs font-medium text-emerald-800">
@@ -266,7 +447,7 @@ export function PrintRequestModal({
                   type="button"
                   disabled={localBusy || busy}
                   onClick={() => void handleDirectDownload()}
-                  className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-[#B85304] py-2.5 text-sm font-semibold text-white disabled:opacity-60"
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-[#075473] py-2.5 text-sm font-semibold text-white disabled:opacity-60"
                 >
                   {localBusy ? (
                     <>
@@ -297,7 +478,7 @@ export function PrintRequestModal({
             ) : (
               <>
                 <Mail className="h-4 w-4" />
-                Send / Save PDF
+                Confirm &amp; Email My Itinerary
               </>
             )}
           </button>

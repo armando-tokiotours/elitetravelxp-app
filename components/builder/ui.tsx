@@ -6,7 +6,7 @@ import { Lock } from "lucide-react";
 import { useBuilderStore } from "@/store/useBuilderStore";
 import { useBuilderAccordionOptional } from "./BuilderAccordion";
 
-const GOLD = "#B85304";
+const GOLD = "#075473";
 const NAVY = "#1E2D4A";
 
 export type SectionIcon =
@@ -24,6 +24,7 @@ export function SectionBlock({
   id,
   icon = "calendar",
   summary,
+  bypassLock = false,
 }: {
   number: number;
   title: ReactNode;
@@ -32,10 +33,14 @@ export function SectionBlock({
   icon?: SectionIcon;
   /** Collapsed at-a-glance preview of the user's selection */
   summary?: ReactNode;
+  /** When true, ignore multi-day unlock gate (Builder S). */
+  bypassLock?: boolean;
 }) {
   const accordion = useBuilderAccordionOptional();
-  const highestUnlockedStep = useBuilderStore((s) => s.highestUnlockedStep);
-  const locked = number > highestUnlockedStep;
+  const multiDayUnlocked = useBuilderStore((s) => s.highestUnlockedStep);
+  const highestUnlockedStep =
+    accordion?.highestUnlockedStep ?? multiDayUnlocked;
+  const locked = bypassLock ? false : number > highestUnlockedStep;
   const isOpen = accordion
     ? !locked && accordion.openSection === number
     : true;
@@ -57,7 +62,7 @@ export function SectionBlock({
     <section
       id={id}
       aria-disabled={locked || undefined}
-      className={`scroll-mt-24 overflow-hidden rounded-2xl border border-[#2C2C2E] bg-[#121212] p-0 shadow-2xl ${
+      className={`scroll-mt-24 overflow-hidden rounded-2xl border border-white/10 bg-[#05080C]/80 p-0 shadow-2xl backdrop-blur-xl ${
         locked ? "opacity-50" : ""
       }`}
     >
@@ -70,14 +75,14 @@ export function SectionBlock({
         className={`flex w-full items-center gap-3 px-4 py-4 text-left transition sm:gap-3.5 sm:px-5 sm:py-5 ${
           locked
             ? "cursor-not-allowed"
-            : "hover:bg-[#1C1C1E]/80"
+            : "hover:bg-white/[0.04]"
         }`}
       >
         <span
           className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-colors ${
             stepSaved
               ? "bg-[#1E2D4A] text-cyan-400"
-              : "bg-[#1C1C1E] text-zinc-500"
+              : "bg-white/5 text-zinc-500"
           }`}
           aria-hidden
         >
@@ -85,12 +90,12 @@ export function SectionBlock({
         </span>
 
         <div className="min-w-0 flex-1">
-          <h2 className="font-display text-sm font-extrabold tracking-tight text-white sm:text-[1.2rem]">
-            <span className="text-[#E2C498]">{number}.</span> {title}
+          <h2 className="font-godiva text-sm font-extrabold uppercase tracking-wider text-white sm:text-[1.2rem]">
+            {title}
           </h2>
           {!isOpen && !locked && summary ? (
             typeof summary === "string" ? (
-              <p className="mt-0.5 max-w-[180px] truncate text-[10px] font-medium text-[#E2C498] sm:max-w-none sm:text-xs">
+              <p className="mt-0.5 max-w-[180px] truncate text-[10px] font-medium text-[#D9718C] sm:max-w-none sm:text-xs">
                 {summary}
               </p>
             ) : (
@@ -123,7 +128,7 @@ export function SectionBlock({
           <motion.span
             animate={{ rotate: isOpen ? 180 : 0 }}
             transition={{ duration: 0.25 }}
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-[#2C2C2E] bg-[#1C1C1E] text-[#F5EFE6]"
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/5 text-[#F5EFE6]"
             aria-hidden
           >
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
@@ -149,7 +154,7 @@ export function SectionBlock({
             transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
             className="overflow-hidden"
           >
-            <div className="border-t border-[#2C2C2E] bg-[#1C1C1E]/40 px-4 pb-5 pt-4 sm:px-5 sm:pb-6">
+            <div className="border-t border-white/10 bg-[#0D1117]/40 px-4 pb-5 pt-4 sm:px-5 sm:pb-6">
               {children}
             </div>
           </motion.div>
@@ -218,7 +223,7 @@ function SectionGlyph({ name }: { name: SectionIcon }) {
   }
 }
 
-/** Selection pill with gold check when active — matches luxury builder mockup. */
+/** Selection pill — matches luxury builder mockup. */
 export function ChoicePill({
   active,
   onClick,
@@ -235,23 +240,10 @@ export function ChoicePill({
 }) {
   const sizing =
     size === "xs"
-      ? active
-        ? "min-h-[2rem] gap-1 px-3 py-1.5 pr-7 text-xs"
-        : "min-h-[2rem] gap-1 px-3 py-1.5 text-xs"
+      ? "min-h-[2rem] gap-1 px-3 py-1.5 text-xs"
       : size === "sm"
-        ? active
-          ? "min-h-[2.35rem] gap-1.5 px-5 py-2 pr-9 text-[0.8125rem]"
-          : "min-h-[2.35rem] gap-1.5 px-5 py-2 text-[0.8125rem]"
-        : active
-          ? "min-h-[2.75rem] gap-2 px-6 py-2.5 pr-11 text-sm"
-          : "min-h-[2.75rem] gap-2 px-6 py-2.5 text-sm";
-  const checkSize =
-    size === "xs"
-      ? "h-4 w-4 text-[0.55rem]"
-      : size === "sm"
-        ? "h-5 w-5 text-[0.6rem]"
-        : "h-6 w-6 text-[0.7rem]";
-  const checkRight = size === "xs" ? "right-1.5" : "right-2";
+        ? "min-h-[2.35rem] gap-1.5 px-5 py-2 text-[0.8125rem]"
+        : "min-h-[2.75rem] gap-2 px-6 py-2.5 text-sm";
 
   return (
     <button
@@ -259,19 +251,11 @@ export function ChoicePill({
       onClick={onClick}
       className={`relative inline-flex items-center justify-center rounded-full font-semibold tracking-wide transition ${sizing} ${
         active
-          ? "border border-[#D9BB96] bg-[#0B1F3A] text-white shadow-md"
+          ? "border border-[#075473] bg-[#0B1F3A] text-white shadow-md"
           : "border border-zinc-700 bg-zinc-800 text-zinc-300 hover:bg-zinc-700"
       } ${className}`}
     >
       {children}
-      {active ? (
-        <span
-          className={`absolute ${checkRight} top-1/2 flex -translate-y-1/2 items-center justify-center rounded-full bg-[#D9BB96] font-bold text-[#0B1F3A] ${checkSize}`}
-          aria-hidden
-        >
-          ✓
-        </span>
-      ) : null}
     </button>
   );
 }
@@ -335,7 +319,7 @@ export function SelectField({
       id={id}
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-950 px-4 py-3 text-sm text-white outline-none transition focus:border-[#B85304] focus:ring-2 focus:ring-[#B85304]/25"
+      className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-950 px-4 py-3 text-sm text-white outline-none transition focus:border-[#075473] focus:ring-2 focus:ring-[#075473]/25"
     >
       <option key="__placeholder__" value="">
         {placeholder}

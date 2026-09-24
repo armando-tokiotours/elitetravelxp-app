@@ -3,8 +3,8 @@
  * Seed PocketBase from Tokiotours_Trip_Builder_Menu_Data_2026.xlsx
  *
  * Usage:
- *   PB_URL=https://travelexperiencesgroup.com \
- *   PB_ADMIN_EMAIL=admin@travelexperiencesgroup.com \
+ *   PB_URL=https://tokiotours-app.com \
+ *   PB_ADMIN_EMAIL=admin@tokiotours-app.com \
  *   PB_ADMIN_PASSWORD='…' \
  *   npm run seed:excel
  *
