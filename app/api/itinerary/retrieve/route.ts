@@ -120,7 +120,7 @@ export async function POST(request: Request) {
           : expandMultiDaySelectionsToState(lead);
 
       // Prefer Pre-Elite itinerary_data; fall back to selections.preEliteBrief
-      const sel = (lead.selections || {}) as Record<string, unknown>;
+      const sel = (lead.selections || {}) as unknown as Record<string, unknown>;
       const embeddedBrief =
         typeof sel.preEliteBrief === "string"
           ? sel.preEliteBrief

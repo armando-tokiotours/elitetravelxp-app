@@ -117,13 +117,19 @@ export function RetrieveItineraryModal({
             tripMode: "single_day",
             ...singleDay,
             confirmedBookingRef: cleanPnr,
-            bookingStatus: bookingStatusFromPbRecord(String(matched.status)),
+            bookingStatus: bookingStatusFromPbRecord(
+              String(matched.status),
+              undefined
+            ),
           });
         } else {
           loadSavedItinerary({
             ...expandMultiDaySelectionsToState(lead),
             confirmedBookingRef: cleanPnr,
-            bookingStatus: bookingStatusFromPbRecord(String(matched.status)),
+            bookingStatus: bookingStatusFromPbRecord(
+              String(matched.status),
+              undefined
+            ),
           });
         }
         onSuccess?.(cleanPnr);

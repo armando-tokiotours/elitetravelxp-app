@@ -153,7 +153,7 @@ async function hydrateFromLead(opts: {
       tripMode: "single_day",
       ...singleDay,
       confirmedBookingRef: opts.bookingRef,
-      bookingStatus: bookingStatusFromPbRecord(opts.status),
+      bookingStatus: bookingStatusFromPbRecord(opts.status, undefined),
     });
   } else {
     const state = expandMultiDaySelectionsToState(lead);
