@@ -71,9 +71,14 @@ async function sendViaSmtp(
     from,
     to,
     ...(bcc.length ? { bcc } : {}),
+    replyTo: "armando@tokiotours.nl",
     subject: input.subject,
     text: input.text,
     html: input.html,
+    envelope: {
+      from: cfg.smtp.user,
+      to: [...to, ...bcc],
+    },
     attachments: input.attachments?.map((a) => ({
       filename: a.filename,
       content: a.content,
