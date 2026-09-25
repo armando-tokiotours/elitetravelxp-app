@@ -1507,11 +1507,20 @@ export const useBuilderStore = create<BuilderState & BuilderActions>()(
         })),
 
       ensureTempBookingRef: () => {
+        // Never write before rehydrate — that clobbers localStorage with defaults.
+        if (!useBuilderStore.persist.hasHydrated()) {
+          const s = get();
+          return s.confirmedBookingRef || s.tempBookingRef || "";
+        }
         const s = get();
         if (s.confirmedBookingRef && s.bookingStatus !== "draft") {
           return s.confirmedBookingRef;
         }
-        if (s.tempBookingRef && /^TMP-[A-Z2-9]{6}$/i.test(s.tempBookingRef)) {
+        if (
+          s.tempBookingRef &&
+          (/^TMP-[A-Z2-9]{6}$/i.test(s.tempBookingRef) ||
+            isValidBookingPNR(s.tempBookingRef))
+        ) {
           return s.tempBookingRef;
         }
         const next = generateTempPNR();

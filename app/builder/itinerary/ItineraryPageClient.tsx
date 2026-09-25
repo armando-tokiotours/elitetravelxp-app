@@ -31,13 +31,14 @@ import {
   MobileAppNav,
 } from "@/components/navigation/AppSidebar";
 import { PriceSummaryFooter } from "@/components/builder/PriceSummaryFooter";
+import { DossierSectionOutline } from "@/components/builder/DossierSectionOutline";
 
 type ViewMode = "dossier" | "invoice";
 
 export default function ItineraryPageClient() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const state = useBuilderStore();
+  const state = useBuilderStore((s) => s);
   const departureDate = useBuilderStore((s) => s.departureDate);
   const ensureTempBookingRef = useBuilderStore((s) => s.ensureTempBookingRef);
   const officialBookingRef = useBuilderStore((s) => s.officialBookingRef);
@@ -60,19 +61,25 @@ export default function ItineraryPageClient() {
 
   useEffect(() => {
     let cancelled = false;
-    void (async () => {
-      await useBuilderStore.persist.rehydrate();
+
+    const boot = () => {
       if (cancelled) return;
       ensureTempBookingRef();
-      try {
-        const cfg = await fetchBuilderConfig({ includeAccommodations: true });
-        if (!cancelled) setConfig(cfg);
-      } catch {
-        if (!cancelled) setConfig(null);
-      }
-    })();
+      void fetchBuilderConfig({ includeAccommodations: true })
+        .then((cfg) => {
+          if (!cancelled) setConfig(cfg);
+        })
+        .catch(() => {
+          if (!cancelled) setConfig(null);
+        });
+    };
+
+    const unsub = useBuilderStore.persist.onFinishHydration(boot);
+    void Promise.resolve(useBuilderStore.persist.rehydrate()).then(boot);
+
     return () => {
       cancelled = true;
+      unsub();
     };
   }, [ensureTempBookingRef]);
 
@@ -252,7 +259,7 @@ export default function ItineraryPageClient() {
   };
 
   return (
-    <div className="builder-theme min-h-screen overflow-x-hidden bg-[#0B1728] pb-44 text-white md:pb-36">
+    <div className="builder-theme relative z-10 min-h-screen w-full overflow-x-hidden bg-transparent pb-28 text-white md:pb-20">
       <AppSidebar
         brandEyebrow="TOKIOTOURS"
         brandTitle="Itinerary"
@@ -260,108 +267,133 @@ export default function ItineraryPageClient() {
       />
 
       <div className={APP_SIDEBAR_RAIL_PAD}>
-        <header className="no-print border-b border-white/10 bg-[#0D1117]/90 px-4 py-5 backdrop-blur-md">
+        <div className="mx-auto w-full max-w-md px-4 py-6 md:max-w-lg lg:max-w-2xl">
           <div className="mb-3 flex items-center gap-3 lg:hidden">
             <MobileAppNav
               brandEyebrow="TOKIOTOURS"
               brandTitle="Itinerary"
             />
           </div>
-          <p className="text-[0.65rem] font-semibold uppercase tracking-[0.35em] text-[#F6A724]">
-            My Itinerary
-          </p>
-          <h1 className="mt-1 font-display text-3xl text-white">Your Japan Journey</h1>
-          <p className="mt-1 text-sm text-white/55">
-            Switch between travel dossier and private quotation.
-          </p>
 
-        <div
-          className="mt-4 inline-flex rounded-full border border-white/15 bg-[#0D1117] p-1 shadow-sm"
-          role="tablist"
-          aria-label="Itinerary view"
-        >
-          <ToggleBtn
-            active={activeView === "dossier"}
-            onClick={() => setMode("dossier")}
-            icon={<Plane className="h-3.5 w-3.5" />}
-            label="Travel Dossier"
-          />
-          <ToggleBtn
-            active={activeView === "invoice"}
-            onClick={requestInvoiceView}
-            icon={<FileText className="h-3.5 w-3.5" />}
-            label="Invoice / Print"
-          />
+          {/* Section 1 — Hero header + tabs */}
+          <DossierSectionOutline label="Section 1: Hero" className="no-print my-4">
+            <header>
+              <p className="text-[0.65rem] font-semibold uppercase tracking-[0.35em] text-[#F6A724]">
+                My Itinerary
+              </p>
+              <h1 className="mt-1 font-godiva text-3xl uppercase tracking-wide text-white">
+                Your Japan Journey
+              </h1>
+              <p className="mt-1 text-sm text-white/55">
+                Switch between travel dossier and private quotation.
+              </p>
+
+              <div
+                className="mt-4 flex flex-wrap gap-2"
+                role="tablist"
+                aria-label="Itinerary view"
+              >
+                <ToggleBtn
+                  active={activeView === "dossier"}
+                  onClick={() => setMode("dossier")}
+                  icon={<Plane className="h-3.5 w-3.5" />}
+                  label="Travel Dossier"
+                />
+                <ToggleBtn
+                  active={activeView === "invoice"}
+                  onClick={requestInvoiceView}
+                  icon={<FileText className="h-3.5 w-3.5" />}
+                  label="Invoice / Print"
+                />
+              </div>
+
+              {activeView === "invoice" ? (
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <Link
+                    href="/builder"
+                    className="inline-flex rounded-full border border-white/20 bg-white/5 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/10"
+                  >
+                    ← Edit builder
+                  </Link>
+                  <button
+                    type="button"
+                    onClick={requestSendPdf}
+                    className="rounded-full bg-[#075473] px-5 py-2 text-sm font-semibold text-white"
+                  >
+                    Send / Save PDF
+                  </button>
+                </div>
+              ) : (
+                <div className="mt-4">
+                  <Link
+                    href="/builder"
+                    className="inline-flex rounded-full border border-white/20 bg-white/5 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-white/10"
+                  >
+                    ← Continue editing
+                  </Link>
+                </div>
+              )}
+            </header>
+          </DossierSectionOutline>
+
+          <main className="mt-6 w-full overflow-x-hidden pb-8">
+            {activeView === "dossier" ? (
+              <TravelDossierView
+                state={state}
+                config={config}
+                departureIso={depIso}
+                dateRanges={dateRanges}
+                fleetLabel={fleetLabel}
+                arrivalHub={arrivalHub}
+                departureHub={departureHub}
+                afterSummary={
+                  <PriceSummaryFooter
+                    placement="inline"
+                    quoteMin={quote?.min ?? null}
+                    quoteMax={quote?.max ?? null}
+                    minPerPerson={minPerPerson}
+                    maxPerPerson={maxPerPerson}
+                    totalGuests={totalGuests}
+                    onRequestPay={handleRequestPay}
+                    requestDisabled={!quote}
+                  />
+                }
+              />
+            ) : null}
+
+            {/* Always mount full itemized invoice for PDF/print capture (off-screen on dossier). */}
+            <div
+              className={
+                activeView === "invoice"
+                  ? "mt-4 rounded-2xl border border-white/10 bg-[#0A1017]/80 px-4 py-6 shadow-2xl backdrop-blur-md sm:px-6"
+                  : "invoice-capture-offscreen pointer-events-none fixed left-[-10000px] top-0 z-[-1] w-[800px] bg-[#0D1117]"
+              }
+              aria-hidden={activeView !== "invoice"}
+            >
+              <PrintItineraryDocument
+                embedded
+                showToolbar={false}
+                onPrintRequest={requestSendPdf}
+              />
+            </div>
+
+            {activeView === "invoice" ? (
+              <div className="mt-4">
+                <PriceSummaryFooter
+                  placement="inline"
+                  quoteMin={quote?.min ?? null}
+                  quoteMax={quote?.max ?? null}
+                  minPerPerson={minPerPerson}
+                  maxPerPerson={maxPerPerson}
+                  totalGuests={totalGuests}
+                  onRequestPay={handleRequestPay}
+                  requestDisabled={!quote}
+                />
+              </div>
+            ) : null}
+          </main>
         </div>
-
-        {activeView === "invoice" ? (
-          <div className="mt-4 flex flex-wrap gap-2">
-            <Link
-              href="/builder"
-              className="rounded-full border border-white/20 bg-white/5 px-4 py-2 text-sm font-semibold text-white"
-            >
-              ← Edit builder
-            </Link>
-            <button
-              type="button"
-              onClick={requestSendPdf}
-              className="rounded-full bg-[#075473] px-5 py-2 text-sm font-semibold text-white"
-            >
-              Send / Save PDF
-            </button>
-          </div>
-        ) : (
-          <div className="mt-4 flex flex-wrap gap-2">
-            <Link
-              href="/builder"
-              className="inline-flex rounded-full border border-white/20 bg-white/5 px-4 py-2.5 text-sm font-semibold text-white"
-            >
-              Continue editing
-            </Link>
-          </div>
-        )}
-      </header>
-
-      <main className="mx-auto w-full max-w-3xl overflow-x-hidden px-4 py-6 pb-40 md:pb-28">
-        {activeView === "dossier" ? (
-          <TravelDossierView
-            state={state}
-            config={config}
-            departureIso={depIso}
-            dateRanges={dateRanges}
-            fleetLabel={fleetLabel}
-            arrivalHub={arrivalHub}
-            departureHub={departureHub}
-          />
-        ) : null}
-
-        {/* Always mount full itemized invoice for PDF/print capture (off-screen on dossier). */}
-        <div
-          className={
-            activeView === "invoice"
-              ? "print-document rounded-2xl border border-white/10 bg-[#0D1117] px-4 py-6 sm:px-6"
-              : "invoice-capture-offscreen pointer-events-none fixed left-[-10000px] top-0 z-[-1] w-[800px] bg-[#0D1117]"
-          }
-          aria-hidden={activeView !== "invoice"}
-        >
-          <PrintItineraryDocument
-            embedded
-            showToolbar={false}
-            onPrintRequest={requestSendPdf}
-          />
-        </div>
-      </main>
       </div>
-
-      <PriceSummaryFooter
-        quoteMin={quote?.min ?? null}
-        quoteMax={quote?.max ?? null}
-        minPerPerson={minPerPerson}
-        maxPerPerson={maxPerPerson}
-        totalGuests={totalGuests}
-        onRequestPay={handleRequestPay}
-        requestDisabled={!quote}
-      />
 
       <RevolutCheckoutModal
         isOpen={isCheckoutModalOpen}
@@ -394,27 +426,27 @@ export default function ItineraryPageClient() {
       />
 
       {submitError && !isCheckoutModalOpen ? (
-        <p className="no-print fixed inset-x-0 bottom-[8.5rem] z-40 mx-auto max-w-3xl px-4 text-center text-xs text-red-700 md:bottom-28">
-          <span className="inline-block rounded-lg bg-red-50 px-3 py-2">
+        <p className="no-print fixed inset-x-0 bottom-24 z-40 mx-auto max-w-md px-4 text-center text-xs text-[#D9718C]">
+          <span className="inline-block rounded-xl border border-[#D9718C]/30 bg-[#0A1017]/95 px-3 py-2">
             {submitError}
           </span>
         </p>
       ) : null}
 
       {printResult ? (
-        <div className="no-print fixed inset-0 z-[80] flex items-end justify-center bg-black/45 p-4 sm:items-center">
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
-            <p className="text-[0.65rem] font-semibold uppercase tracking-[0.3em] text-[#075473]">
+        <div className="no-print fixed inset-0 z-[80] flex items-end justify-center bg-[#05080C]/75 p-4 backdrop-blur-sm sm:items-center">
+          <div className="w-full max-w-md rounded-2xl border border-white/10 bg-[#0A1017]/80 p-6 shadow-2xl backdrop-blur-md">
+            <p className="text-[0.65rem] font-semibold uppercase tracking-[0.3em] text-[#F6A724]">
               Itinerary saved
             </p>
-            <h2 className="mt-2 font-display text-2xl text-[#0B1F3A]">
+            <h2 className="mt-2 font-godiva text-2xl uppercase tracking-wide text-white">
               PNR {printResult.bookingRef}
             </h2>
-            <p className="mt-2 text-sm text-[#5C6570]">{printResult.message}</p>
+            <p className="mt-2 text-sm text-white/65">{printResult.message}</p>
             <button
               type="button"
               onClick={() => setPrintResult(null)}
-              className="mt-5 w-full rounded-full bg-[#0B1F3A] py-2.5 text-sm font-semibold text-white"
+              className="mt-5 w-full rounded-full bg-[#075473] py-2.5 text-sm font-semibold text-white"
             >
               Done
             </button>
@@ -423,15 +455,15 @@ export default function ItineraryPageClient() {
       ) : null}
 
       {submittedRef ? (
-        <div className="no-print fixed inset-0 z-[80] flex items-end justify-center bg-black/45 p-4 sm:items-center">
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
-            <p className="text-[0.65rem] font-semibold uppercase tracking-[0.3em] text-[#075473]">
+        <div className="no-print fixed inset-0 z-[80] flex items-end justify-center bg-[#05080C]/75 p-4 backdrop-blur-sm sm:items-center">
+          <div className="w-full max-w-md rounded-2xl border border-white/10 bg-[#0A1017]/80 p-6 shadow-2xl backdrop-blur-md">
+            <p className="text-[0.65rem] font-semibold uppercase tracking-[0.3em] text-[#F6A724]">
               Payment received
             </p>
-            <h2 className="mt-2 font-display text-2xl text-[#0B1F3A]">
+            <h2 className="mt-2 font-godiva text-2xl uppercase tracking-wide text-white">
               Booking {submittedRef}
             </h2>
-            <p className="mt-2 text-sm text-[#5C6570]">
+            <p className="mt-2 text-sm text-white/65">
               Thank you. Your quotation is locked. A travel expert will arrange
               the final details and confirm any remaining balance.
             </p>
@@ -442,14 +474,14 @@ export default function ItineraryPageClient() {
                   setSubmittedRef(null);
                   setMode("invoice");
                 }}
-                className="flex-1 rounded-full bg-[#0B1F3A] py-2.5 text-sm font-semibold text-white"
+                className="flex-1 rounded-full bg-[#075473] py-2.5 text-sm font-semibold text-white"
               >
                 View quotation
               </button>
               <button
                 type="button"
                 onClick={() => setSubmittedRef(null)}
-                className="flex-1 rounded-full border border-[#D9D2C7] py-2.5 text-sm font-semibold text-[#0B1F3A]"
+                className="flex-1 rounded-full border border-white/20 bg-white/5 py-2.5 text-sm font-semibold text-white"
               >
                 Close
               </button>
@@ -484,8 +516,8 @@ function ToggleBtn({
       onClick={onClick}
       className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-2 text-xs font-semibold transition sm:text-sm ${
         active
-          ? "bg-[#075473] text-white"
-          : "text-white/55 hover:text-white"
+          ? "bg-[#075473] text-white shadow-md shadow-[#075473]/25"
+          : "border border-white/20 bg-transparent text-white/80 hover:bg-white/5 hover:text-white"
       }`}
     >
       {icon}

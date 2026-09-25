@@ -18,10 +18,9 @@ import { useModalDismiss } from "@/hooks/useModalDismiss";
 import { useBuilderStore } from "@/store/useBuilderStore";
 import { useSingleDayBuilderStore } from "@/store/useSingleDayBuilderStore";
 
-/** Prefer PNG (transparent) under /brand — jpg would flatten the pop-out. */
+/** Prefer SVG under /svg — upright until email dispatches, then bow. */
 const MASCOT_UPRIGHT = "/svg/mascot-card.svg";
 const MASCOT_BOW = "/svg/mascot-bow.svg";
-const BOW_DELAY_MS = 1200;
 const TOAST_MS = 4200;
 
 function proposalSentStorageKey(ref: string) {
@@ -61,7 +60,7 @@ function markProposalSent(ref: string, email: string) {
 
 /**
  * Pre-Build summary after qualification submit or Manage Booking retrieve.
- * Centered card: mascot pops out of top border, then action row + greeting.
+ * Upright mascot = draft unsent; bow = email successfully dispatched.
  */
 export function PreBuildConfirmation({
   bookingRef,
@@ -81,8 +80,8 @@ export function PreBuildConfirmation({
   const [sending, setSending] = useState(false);
   const [actionMsg, setActionMsg] = useState<string | null>(null);
   const [actionErr, setActionErr] = useState<string | null>(null);
-  const [bowing, setBowing] = useState(false);
-  const [alreadySent, setAlreadySent] = useState(false);
+  /** True only after SAVE & EMAIL succeeds (or prior send for this ref). */
+  const [isEmailSent, setIsEmailSent] = useState(false);
   const [resendOpen, setResendOpen] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
 
@@ -92,13 +91,15 @@ export function PreBuildConfirmation({
   const emailOnFile = (email || "").trim().toLowerCase();
 
   useEffect(() => {
-    const t = window.setTimeout(() => setBowing(true), BOW_DELAY_MS);
-    return () => window.clearTimeout(t);
-  }, []);
+    setIsEmailSent(Boolean(readProposalSent(bookingRef)));
+  }, [bookingRef]);
 
   useEffect(() => {
-    setAlreadySent(Boolean(readProposalSent(bookingRef)));
-  }, [bookingRef]);
+    // Clear any leftover html2pdf overlay from a prior hung save.
+    document
+      .querySelectorAll(".html2pdf__overlay, .html2pdf__container")
+      .forEach((node) => node.remove());
+  }, []);
 
   useEffect(() => {
     if (!toast) return;
@@ -147,33 +148,45 @@ export function PreBuildConfirmation({
     router.push(result.href);
   };
 
+  /** html2pdf can leave a full-screen overlay that swallows all clicks. */
+  const cleanupHtml2PdfOverlay = () => {
+    if (typeof document === "undefined") return;
+    document
+      .querySelectorAll(".html2pdf__overlay, .html2pdf__container")
+      .forEach((node) => node.remove());
+  };
+
   const downloadBriefPdf = async () => {
     const el = cardRef.current;
     if (!el) return;
-    const mod = await import("html2pdf.js");
-    const html2pdf = (mod.default || mod) as (el?: HTMLElement) => {
-      set: (opts: unknown) => {
-        from: (src: HTMLElement) => { save: () => Promise<void> };
+    try {
+      const mod = await import("html2pdf.js");
+      const html2pdf = (mod.default || mod) as (el?: HTMLElement) => {
+        set: (opts: unknown) => {
+          from: (src: HTMLElement) => { save: () => Promise<void> };
+        };
       };
-    };
-    await html2pdf()
-      .set({
-        margin: [10, 10, 10, 10],
-        filename: `TOKIOTOURS-brief-${bookingRef}.pdf`,
-        image: { type: "jpeg", quality: 0.95 },
-        html2canvas: { scale: 2, useCORS: true, backgroundColor: "#0D1117" },
-        jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
-        pagebreak: { mode: ["css", "legacy"] },
-      })
-      .from(el)
-      .save();
+      await html2pdf()
+        .set({
+          margin: [10, 10, 10, 10],
+          filename: `TOKIOTOURS-brief-${bookingRef}.pdf`,
+          image: { type: "jpeg", quality: 0.95 },
+          html2canvas: { scale: 2, useCORS: true, backgroundColor: "#0D1117" },
+          jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
+          pagebreak: { mode: ["css", "legacy"] },
+        })
+        .from(el)
+        .save();
+    } finally {
+      cleanupHtml2PdfOverlay();
+    }
   };
 
   /** First click sends; later clicks open the re-send confirm modal. */
   const onSaveEmailClick = () => {
     if (sending) return;
-    if (alreadySent || readProposalSent(bookingRef)) {
-      setAlreadySent(true);
+    if (isEmailSent || readProposalSent(bookingRef)) {
+      setIsEmailSent(true);
       setResendOpen(true);
       return;
     }
@@ -205,39 +218,25 @@ export function PreBuildConfirmation({
       if (!res.ok) {
         throw new Error(payload?.error || "Could not send proposal email.");
       }
-      try {
-        await downloadBriefPdf();
-      } catch {
-        /* email still succeeded */
-      }
       markProposalSent(bookingRef, to);
-      setAlreadySent(true);
+      setIsEmailSent(true);
       setResendOpen(false);
-      const guestOk = Boolean(payload.guestSent);
+      setActionMsg("Request saved and email send, check you inbox.");
       if (resend) {
-        setToast(
-          guestOk
-            ? "Proposal sent again — PDF downloaded."
-            : "Snapshot refreshed. Email may be delayed — PDF downloaded."
-        );
-        setActionMsg(
-          guestOk
-            ? "Proposal sent again — PDF downloaded."
-            : "Snapshot refreshed. Email may be delayed — PDF downloaded."
-        );
-      } else {
-        setActionMsg(
-          guestOk
-            ? "Proposal email sent — PDF downloaded."
-            : "Snapshot saved. Email may be delayed — PDF downloaded."
-        );
+        setToast("Request saved and email send, check you inbox.");
       }
+      // Unlock UI before PDF — html2pdf overlays must never freeze buttons.
+      setSending(false);
+      void downloadBriefPdf().catch(() => {
+        /* email still succeeded */
+      });
     } catch (err) {
       setActionErr(
         err instanceof Error ? err.message : "Could not send proposal email."
       );
     } finally {
       setSending(false);
+      cleanupHtml2PdfOverlay();
     }
   };
 
@@ -289,26 +288,33 @@ export function PreBuildConfirmation({
         <div className="relative z-10 grid grid-cols-12 items-start gap-3">
           {/* LEFT COLUMN (≈1/3): Mascot + Vertical Stacked Buttons */}
           <div className="relative col-span-5 flex flex-col items-center space-y-2">
-            {/* 1. Large Mascot Popping OUT of the Top-Left Frame Border */}
-            <div className="pointer-events-none absolute -top-16 -left-2 z-30">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={bowing ? MASCOT_BOW : MASCOT_UPRIGHT}
-                alt="Tokiotours Mascot"
-                className="h-32 w-32 object-contain drop-shadow-[0_10px_20px_rgba(0,0,0,0.8)] transition-all duration-500"
-              />
+            {/* 1. Mascot — upright until email sent, then respectful bow */}
+            <div className="pointer-events-none absolute -top-16 -left-2 z-30 h-32 w-32 select-none">
+              <AnimatePresence mode="wait">
+                <motion.img
+                  key={isEmailSent ? "bow" : "upright"}
+                  src={isEmailSent ? MASCOT_BOW : MASCOT_UPRIGHT}
+                  alt="Tokiotours Mascot"
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.92 }}
+                  transition={{ duration: 0.35, ease: [0.34, 1.56, 0.64, 1] }}
+                  className="pointer-events-none h-32 w-32 object-contain drop-shadow-[0_10px_20px_rgba(0,0,0,0.8)]"
+                  draggable={false}
+                />
+              </AnimatePresence>
             </div>
 
-            {/* Invisible spacer so buttons sit cleanly BELOW the overlapping mascot */}
-            <div className="h-16 w-full" />
+            {/* Spacer under overlapping mascot — never capture clicks */}
+            <div className="pointer-events-none h-16 w-full" aria-hidden />
 
             {/* 2. Stacked Buttons directly beneath mascot (full labels, no truncation) */}
-            <div className="flex w-full flex-col space-y-2 pt-1">
+            <div className="relative z-20 flex w-full flex-col space-y-2 pt-1">
               <button
                 type="button"
                 onClick={onSaveEmailClick}
                 disabled={sending}
-                className="flex w-full items-center justify-center gap-1.5 whitespace-nowrap rounded-xl bg-[#075473] px-2 py-2 text-[10px] font-bold tracking-wider text-white uppercase shadow-md transition-all hover:bg-[#096a91] disabled:opacity-60"
+                className="relative z-20 flex w-full cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-xl bg-[#075473] px-2 py-2 text-[10px] font-bold tracking-wider text-white uppercase shadow-md transition-all pointer-events-auto hover:bg-[#096a91] disabled:opacity-60"
               >
                 <Mail className="h-3 w-3 shrink-0" />
                 <span>{sending ? "Sending…" : "Save & Email"}</span>
@@ -316,8 +322,12 @@ export function PreBuildConfirmation({
 
               <button
                 type="button"
-                onClick={openBuilder}
-                className="flex w-full items-center justify-center gap-1.5 whitespace-nowrap rounded-xl border border-cyan-500/40 bg-cyan-500/20 px-2 py-2 text-[10px] font-bold tracking-wider text-cyan-300 uppercase transition-all hover:bg-cyan-500/30"
+                onClick={() => {
+                  setSending(false);
+                  cleanupHtml2PdfOverlay();
+                  openBuilder();
+                }}
+                className="relative z-20 flex w-full cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-xl border border-cyan-500/40 bg-cyan-500/20 px-2 py-2 text-[10px] font-bold tracking-wider text-cyan-300 uppercase transition-all pointer-events-auto hover:bg-cyan-500/30"
               >
                 <span>Trip Builder</span>
                 <ArrowRight className="h-3 w-3 shrink-0" />
@@ -326,10 +336,15 @@ export function PreBuildConfirmation({
               {onReset ? (
                 <button
                   type="button"
-                  onClick={onReset}
+                  onClick={() => {
+                    setSending(false);
+                    setIsEmailSent(false);
+                    cleanupHtml2PdfOverlay();
+                    onReset();
+                  }}
                   title="Start Another Brief / Restart"
                   aria-label="Restart Brief"
-                  className="flex w-full items-center justify-center rounded-xl border border-zinc-700 bg-black/40 py-1.5 font-bold text-zinc-300 transition-all hover:bg-zinc-800"
+                  className="relative z-20 flex w-full cursor-pointer items-center justify-center rounded-xl border border-zinc-700 bg-black/40 py-1.5 font-bold text-zinc-300 transition-all pointer-events-auto hover:bg-zinc-800"
                 >
                   <RotateCcw className="h-3.5 w-3.5 text-zinc-300" />
                 </button>
@@ -340,7 +355,9 @@ export function PreBuildConfirmation({
           {/* RIGHT COLUMN (≈2/3): Header & Greeting Text Block */}
           <div className="col-span-7 space-y-1 pt-1 pl-1">
             <span className="block text-[10px] font-bold tracking-widest text-amber-400 uppercase">
-              We&apos;ve Got Your Request
+              {isEmailSent
+                ? "We've Got Your Request"
+                : "Prepared For Review"}
             </span>
             {firstName ? (
               <h2 className="font-godiva text-[1.575rem] leading-tight font-bold tracking-wide text-white uppercase">
@@ -348,13 +365,14 @@ export function PreBuildConfirmation({
               </h2>
             ) : null}
             <h3 className="font-godiva text-sm leading-tight font-bold tracking-wide text-white uppercase">
-              {bowing
+              {isEmailSent
                 ? "Your Brief Is With Us!"
                 : "We're Ready To Save Your Brief"}
             </h3>
             <p className="pt-1 text-[11px] leading-relaxed text-zinc-400">
-              We&apos;ve got your ideas saved. Keep this reference handy — your
-              concierge will use it to design your trip.
+              {isEmailSent
+                ? "We've got your ideas saved. Keep this reference handy — your concierge will use it to design your trip."
+                : "Review your selections below. Click Save & Email to send a copy directly to your inbox."}
             </p>
             {(actionMsg || actionErr) && (
               <p

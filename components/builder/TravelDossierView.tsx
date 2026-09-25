@@ -1,21 +1,16 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 import {
   BedDouble,
-  CalendarDays,
   Car,
-  ChevronDown,
   CircleDot,
   Pencil,
   PlaneLanding,
   PlaneTakeoff,
-  Route,
   Sparkles,
-  Ticket,
   TrainFront,
-  Users,
 } from "lucide-react";
 import {
   transferLocation,
@@ -36,16 +31,25 @@ import {
 import { formatHotelRoomsSummary } from "@/lib/hotelCalculator";
 import { sortSelectedToursChronologically } from "@/lib/selectedTours";
 import { travelPaceLabel } from "@/lib/travelPace";
-import { BookingRefBadge } from "@/components/builder/BookingRefBadge";
 import { CityThumb } from "@/components/builder/CityThumb";
-import { NewBookingResetButton } from "@/components/builder/NewBookingResetButton";
 import { type TransitTicketType } from "@/lib/transitTickets";
 import {
   InterCityTransitModal,
   type InterCityTransitLeg,
 } from "@/components/builder/modals/InterCityTransitModal";
 import { isTransitHubStop } from "@/lib/transitHubs";
+import { TRAVEL_STYLES, labelFor } from "@/lib/preEliteBuilder";
 import { travelStyleTierRules } from "@/lib/preEliteHydrate";
+import { DossierSectionOutline } from "@/components/builder/DossierSectionOutline";
+import { JapanBookingPass } from "@/components/dossier/JapanBookingPass";
+import { NewBookingResetButton } from "@/components/builder/NewBookingResetButton";
+import {
+  buildDossierQrUrl,
+  formatGuestCountText,
+  mapBookingStatusToPass,
+  resolvePnr,
+} from "@/lib/dossier/bookingPassHelpers";
+import { useItineraryStore } from "@/store/useItineraryStore";
 
 export function TravelDossierView({
   state,
@@ -55,6 +59,7 @@ export function TravelDossierView({
   fleetLabel: _fleetLabel,
   arrivalHub,
   departureHub,
+  afterSummary,
 }: {
   state: BuilderState;
   config: BuilderConfig | null;
@@ -63,6 +68,8 @@ export function TravelDossierView({
   fleetLabel: string | null;
   arrivalHub: PbHub | PbTransfer | null;
   departureHub: PbHub | PbTransfer | null;
+  /** Concierge video + budget cards — rendered after the ticket pass */
+  afterSummary?: ReactNode;
 }) {
   const setLocationTransitChoice = useBuilderStore(
     (s) => s.setLocationTransitChoice
@@ -73,6 +80,7 @@ export function TravelDossierView({
   const [transitLeg, setTransitLeg] = useState<InterCityTransitLeg | null>(
     null
   );
+  const passengerName = useItineraryStore((s) => s.clientName);
 
   const cityMap = useMemo(
     () => buildCityMap(config?.cities),
@@ -94,18 +102,6 @@ export function TravelDossierView({
     hubShort(departureHub)
   );
 
-  const routeParts: string[] = [];
-  if (arrivalHub) routeParts.push(hubShort(arrivalHub));
-  for (const loc of state.locations) {
-    if (loc.visitType === "stay" || !loc.visitType) {
-      routeParts.push(cityName(loc.cityId));
-    }
-  }
-  if (departureHub) {
-    const d = hubShort(departureHub);
-    if (routeParts[routeParts.length - 1] !== d) routeParts.push(d);
-  }
-
   const days = state.durationDays;
   const dateSpan = !state.arrivalDate
     ? "Dates TBD"
@@ -125,6 +121,17 @@ export function TravelDossierView({
 
   const openLeg = (leg: InterCityTransitLeg) => setTransitLeg(leg);
 
+  const styleLabel = state.preEliteTravelStyle
+    ? labelFor(TRAVEL_STYLES, state.preEliteTravelStyle)
+    : "";
+  const originCode = hubShort(arrivalHub) || "NRT";
+  const destinationCode = hubShort(departureHub) || "HND";
+  const pnrCode = resolvePnr({
+    tempBookingRef: state.tempBookingRef,
+    confirmedBookingRef: state.confirmedBookingRef,
+    bookingStatus: state.bookingStatus,
+  });
+
   const saveLeg = (choice: {
     mode: CityTransitType;
     needsTicket: boolean;
@@ -142,179 +149,126 @@ export function TravelDossierView({
   return (
     <div
       id="itinerary-dossier-view"
-      className="w-full space-y-0 overflow-hidden px-0"
+      className="w-full space-y-4 overflow-visible px-0"
     >
-      <section className="overflow-hidden rounded-2xl bg-[#0B1F3A] text-white shadow-[0_12px_40px_rgba(11,31,58,0.25)]">
-        <div className="border-b border-dashed border-white/20 px-4 py-4 sm:px-5">
-          <div className="flex min-w-0 items-center gap-3 overflow-hidden">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src="/images/tokiotours-logo.png"
-              alt="TOKIOTOURS"
-              className="h-11 w-11 shrink-0 rounded-full object-cover"
-            />
-            <div className="min-w-0">
-              <p className="text-[0.65rem] font-semibold uppercase tracking-[0.35em] text-[#075473]">
-                Booking Summary
-              </p>
-              <p className="mt-1 font-display text-lg leading-tight text-white sm:text-xl">
-                TOKIOTOURS
-              </p>
-            </div>
-          </div>
-          <div className="mt-3 flex w-full items-stretch gap-2">
-            <div className="min-w-0 flex-1">
-              <BookingRefBadge
-                tempBookingRef={state.tempBookingRef}
-                confirmedBookingRef={state.confirmedBookingRef}
-                bookingStatus={state.bookingStatus}
-              />
-            </div>
-            <NewBookingResetButton />
-          </div>
-        </div>
+      {/* Section 2 — reusable Japan Booking Pass */}
+      <JapanBookingPass
+        pnrCode={pnrCode}
+        passengerName={passengerName}
+        guestCountText={formatGuestCountText(state.adults, state.children)}
+        travelStyle={styleLabel || "—"}
+        tripType={state.tripMode === "single_day" ? "single" : "multi"}
+        originCode={originCode}
+        originLabel="Tokyo Entry"
+        destinationCode={destinationCode}
+        destinationLabel="Departure"
+        durationText={`${days} Day${days === 1 ? "" : "s"}`}
+        datesText={dateSpan === "Dates TBD" ? "" : dateSpan}
+        status={mapBookingStatusToPass(state.bookingStatus)}
+        qrValue={buildDossierQrUrl(pnrCode, "/builder/itinerary")}
+        paceLabel={paceLabel ? `${paceLabel} pace` : null}
+        experienceLabel={experienceLabel}
+        actions={<NewBookingResetButton />}
+      />
 
-        <div className="grid gap-4 px-5 py-5 sm:grid-cols-3">
-          <MetaBlock
-            icon={<Users className="h-4 w-4 text-[#075473]" />}
-            label="Guests"
-            value={`${state.adults} Adult${state.adults === 1 ? "" : "s"}, ${state.children} Child${state.children === 1 ? "" : "ren"}`}
-          />
-          <MetaBlock
-            icon={<CalendarDays className="h-4 w-4 text-[#075473]" />}
-            label="Dates"
-            value={dateSpan}
-          />
-          <MetaBlock
-            icon={<Route className="h-4 w-4 text-[#075473]" />}
-            label="Route"
-            value={
-              routeParts.length
-                ? routeParts.join(" ➔ ")
-                : "Add cities in the builder"
-            }
-          />
-        </div>
+      {afterSummary}
 
-        {paceLabel || experienceLabel ? (
-          <div className="flex flex-wrap gap-2 border-t border-dashed border-white/15 px-5 py-3">
-            {paceLabel ? (
-              <span className="rounded-full border border-white/20 bg-white/5 px-2.5 py-1 text-[11px] text-white/85">
-                {paceLabel} pace
-              </span>
-            ) : null}
-            {experienceLabel ? (
-              <span className="inline-flex items-center gap-1 rounded-full border border-[#075473]/45 bg-[#075473]/10 px-2.5 py-1 text-[11px] text-[#F3D9C4]">
-                <Sparkles className="h-3 w-3" aria-hidden />
-                {experienceLabel}
-              </span>
-            ) : null}
-          </div>
-        ) : null}
-      </section>
-
-      {(state.experienceService === "concierge" ||
-        state.isEliteConcierge) && (
-        <>
-          <TimelineSpine />
-          <TicketCard accent="gold">
-            <div className="flex items-start gap-2">
-              <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-[#075473]" />
-              <div>
-                <h2 className="text-[0.7rem] font-semibold uppercase tracking-[0.28em] text-white">
-                  Elite Concierge
-                </h2>
-                <p className="mt-2 text-sm font-semibold text-[#F6A724]">
-                  €50 Design Deposit
-                </p>
-                <p className="mt-2 text-sm text-white/60">
-                  Day-by-day itinerary design included — dining, access, and
-                  private drivers coordinated by your specialist. 100% of the
-                  €50 fee is credited toward your final trip balance when you
-                  book.
-                </p>
+      {/* Section 5 — Continuous day-by-day itinerary */}
+      <DossierSectionOutline label="Section 5: Day Timeline">
+        <div className="space-y-4">
+          {(state.experienceService === "concierge" ||
+            state.isEliteConcierge) && (
+            <TicketCard accent="gold">
+              <div className="flex items-start gap-2">
+                <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-[#F6A724]" />
+                <div>
+                  <h2 className="text-[0.7rem] font-semibold uppercase tracking-[0.28em] text-white">
+                    Elite Concierge
+                  </h2>
+                  <p className="mt-2 text-sm font-semibold text-[#F6A724]">
+                    €50 Design Deposit
+                  </p>
+                  <p className="mt-2 text-sm text-white/60">
+                    Day-by-day itinerary design included — dining, access, and
+                    private drivers coordinated by your specialist. 100% of the
+                    €50 fee is credited toward your final trip balance when you
+                    book.
+                  </p>
+                </div>
               </div>
+            </TicketCard>
+          )}
+
+          <TicketCard accent="gold">
+            <div className="flex items-center gap-2">
+              <PlaneLanding className="h-4 w-4 text-[#075473]" />
+              <h2 className="text-[0.7rem] font-semibold uppercase tracking-[0.28em] text-white">
+                Arrival
+                <span className="mx-2 text-[#075473]">·</span>
+                <span className="tracking-normal text-white/60">
+                  {formatDisplayDate(state.arrivalDate)}
+                </span>
+              </h2>
             </div>
-          </TicketCard>
-        </>
-      )}
-
-      <TimelineSpine />
-
-      <TicketCard accent="gold">
-        <div className="flex items-center gap-2">
-          <PlaneLanding className="h-4 w-4 text-[#075473]" />
-          <h2 className="text-[0.7rem] font-semibold uppercase tracking-[0.28em] text-white">
-            Arrival
-            <span className="mx-2 text-[#075473]">·</span>
-            <span className="tracking-normal text-white/60">
-              {formatDisplayDate(state.arrivalDate)}
-            </span>
-          </h2>
-        </div>
-        <p className="mt-3 text-base font-semibold text-white">
-          Landing at {arrivalHubLabel || "Arrival hub TBD"}
-        </p>
-        <p className="mt-1 text-sm text-white/60">{arrivalTransferLine}</p>
-      </TicketCard>
-
-      {/* Stay stops only — arrival/departure waypoint cards are folded into the airport nodes */}
-      {stayLocations.length === 0 ? (
-        <>
-          <TimelineSpine />
-          <TicketCard accent="muted">
-            <p className="text-sm text-white/45">
-              No cities on your route yet.{" "}
-              <Link
-                href="/builder"
-                className="font-semibold text-white underline"
-              >
-                Add locations in the builder
-              </Link>
-              .
+            <p className="mt-3 text-base font-semibold text-white">
+              Landing at {arrivalHubLabel || "Arrival hub TBD"}
             </p>
+            <p className="mt-1 text-sm text-white/60">{arrivalTransferLine}</p>
           </TicketCard>
-        </>
-      ) : (
-        stayLocations.map((loc, stayIndex) => {
-          const nextStay = stayLocations[stayIndex + 1] ?? undefined;
-          const originalIndex = state.locations.indexOf(loc);
-          return (
-            <LocationSegment
-              key={loc.key}
-              loc={loc}
-              index={stayIndex}
-              next={nextStay}
-              cityLabel={cityName(loc.cityId)}
-              nextCityLabel={nextStay ? cityName(nextStay.cityId) : ""}
-              dateLabel={dateRanges[originalIndex]?.label ?? ""}
-              config={config}
-              state={state}
-              onOpenTransit={(leg) => openLeg(leg)}
-              totalGuests={totalGuests}
-            />
-          );
-        })
-      )}
 
-      <TimelineSpine />
+          {stayLocations.length === 0 ? (
+            <TicketCard accent="muted">
+              <p className="text-sm text-white/45">
+                No cities on your route yet.{" "}
+                <Link
+                  href="/builder"
+                  className="font-semibold text-[#075473] underline"
+                >
+                  Add locations in the builder
+                </Link>
+                .
+              </p>
+            </TicketCard>
+          ) : (
+            stayLocations.map((loc, stayIndex) => {
+              const nextStay = stayLocations[stayIndex + 1] ?? undefined;
+              const originalIndex = state.locations.indexOf(loc);
+              return (
+                <LocationSegment
+                  key={loc.key}
+                  loc={loc}
+                  index={stayIndex}
+                  next={nextStay}
+                  cityLabel={cityName(loc.cityId)}
+                  nextCityLabel={nextStay ? cityName(nextStay.cityId) : ""}
+                  dateLabel={dateRanges[originalIndex]?.label ?? ""}
+                  config={config}
+                  state={state}
+                  onOpenTransit={(leg) => openLeg(leg)}
+                  totalGuests={totalGuests}
+                />
+              );
+            })
+          )}
 
-      <TicketCard accent="navy">
-        <div className="flex items-center gap-2">
-          <PlaneTakeoff className="h-4 w-4 text-white" />
-          <h2 className="text-[0.7rem] font-semibold uppercase tracking-[0.28em] text-white">
-            Departure
-            <span className="mx-2 text-[#075473]">·</span>
-            <span className="tracking-normal text-white/60">
-              {formatDisplayDate(departureIso)}
-            </span>
-          </h2>
+          <TicketCard accent="navy">
+            <div className="flex items-center gap-2">
+              <PlaneTakeoff className="h-4 w-4 text-[#075473]" />
+              <h2 className="text-[0.7rem] font-semibold uppercase tracking-[0.28em] text-white">
+                Departure
+                <span className="mx-2 text-[#075473]">·</span>
+                <span className="tracking-normal text-white/60">
+                  {formatDisplayDate(departureIso)}
+                </span>
+              </h2>
+            </div>
+            <p className="mt-3 text-base font-semibold text-white">
+              Departure from {departureHubLabel || "Departure hub TBD"}
+            </p>
+            <p className="mt-1 text-sm text-white/60">{departureTransferLine}</p>
+          </TicketCard>
         </div>
-        <p className="mt-3 text-base font-semibold text-white">
-          Departure from {departureHubLabel || "Departure hub TBD"}
-        </p>
-        <p className="mt-1 text-sm text-white/60">{departureTransferLine}</p>
-      </TicketCard>
+      </DossierSectionOutline>
 
       <InterCityTransitModal
         open={transitLeg != null}
@@ -351,7 +305,6 @@ function LocationSegment({
   onOpenTransit: (leg: InterCityTransitLeg) => void;
   totalGuests: number;
 }) {
-  const [open, setOpen] = useState(false);
   const city = config?.cities.find((c) => c.id === loc.cityId);
   const hotelPref = state.cityHotels[loc.cityId];
   const wantsHotel = hotelPref
@@ -397,165 +350,133 @@ function LocationSegment({
 
   return (
     <>
-      <TimelineSpine />
-      <section className="w-full overflow-hidden rounded-2xl border border-white/10 bg-[#0D1117]/90 text-white shadow-lg">
-          <div className="relative h-36 w-full bg-[#0B1728]">
-            <CityThumb
-              city={city}
-              name={cityLabel}
-              alt={cityLabel}
-              thumb="600x400"
-              className="h-36 w-full object-cover"
-            />
-            <span className="absolute left-3 top-3 inline-flex rounded-full bg-[#075473] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-white shadow-sm">
-              Stop {index + 1}
-            </span>
+      <section className="mb-4 w-full overflow-hidden rounded-2xl border border-white/10 bg-[#0A1017]/80 backdrop-blur-md p-0 text-white shadow-2xl">
+        <div className="relative h-36 w-full bg-[#0B1728]">
+          <CityThumb
+            city={city}
+            name={cityLabel}
+            alt={cityLabel}
+            thumb="600x400"
+            className="h-36 w-full object-cover"
+          />
+          <span className="absolute left-3 top-3 inline-flex rounded-full bg-[#075473] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-white shadow-sm">
+            Day {index + 1}
+          </span>
+        </div>
+
+        <div className="p-5">
+          <div className="flex min-w-0 flex-col gap-1">
+            <p className="text-[0.65rem] font-semibold uppercase tracking-[0.22em] text-[#F6A724]">
+              Day {index + 1}
+              {dateLabel ? ` · ${dateLabel}` : ""}
+              {cityLabel ? ` · ${cityLabel}` : ""}
+            </p>
+            <h2 className="break-words font-godiva text-2xl leading-tight tracking-wide text-white uppercase">
+              {cityLabel}
+              {nightsLabel ? ` · ${nightsLabel}` : ""}
+            </h2>
+            <p className="text-sm font-semibold leading-tight text-white/70">
+              {statusLabel}
+            </p>
           </div>
 
-          <div className="p-5">
-            <button
-              type="button"
-              onClick={() => setOpen((v) => !v)}
-              aria-expanded={open}
-              className="flex w-full items-start gap-2 text-left"
-            >
-              <div className="flex min-w-0 flex-1 flex-col gap-1.5 overflow-hidden sm:flex-row sm:items-start sm:justify-between sm:gap-3">
-                <div className="flex min-w-0 flex-col gap-1 overflow-hidden">
-                  <h2 className="break-words font-display text-2xl leading-tight text-white">
-                    {cityLabel}
-                  </h2>
-                  <p className="text-sm font-semibold leading-tight text-white/70">
-                    {nightsLabel}
-                    <span className="font-normal text-white/45">
+          {/* Always-visible day details — no accordion */}
+          {wantsHotel ? (
+            <div className="mt-4 flex w-full items-start gap-2 overflow-hidden border-t border-dashed border-white/10 pt-3">
+              <BedDouble className="mt-0.5 h-4 w-4 shrink-0 text-[#075473]" />
+              <div className="flex min-w-0 flex-col gap-1 overflow-hidden">
+                <p className="break-words text-sm font-semibold leading-tight text-white">
+                  {hotelPref
+                    ? `${hotelPref.starRating}-Star Hotel Tier`
+                    : `${state.hotelTier === "5-star" ? "5" : "4"}-Star Hotel Tier`}
+                </p>
+                <p className="break-words text-sm leading-tight text-white/60">
+                  {hotelPref
+                    ? (() => {
+                        const n = normalizeCityHotelPref(
+                          hotelPref,
+                          loc.cityId,
+                          state.roomCount
+                        );
+                        return (
+                          formatHotelRoomsSummary(
+                            n.rooms,
+                            n.standardOccupancy
+                          ) || `${state.roomCount}× Room`
+                        );
+                      })()
+                    : `${state.roomCount}× ${state.roomType} Room`}
+                  {hotelPref ? (
+                    <span className="text-white/45">
                       {" "}
-                      · {statusLabel}
+                      ·{" "}
+                      {hotelPref.breakfast ? "Breakfast" : "No breakfast"}
                     </span>
-                  </p>
-                </div>
-                {dateLabel ? (
-                  <p className="text-xs leading-tight text-[#F6A724] sm:shrink-0 sm:pt-1 sm:text-right">
-                    {dateLabel}
-                  </p>
-                ) : null}
-              </div>
-              <ChevronDown
-                className={`mt-1 h-4 w-4 shrink-0 text-[#F6A724] transition-transform duration-200 ${
-                  open ? "rotate-180" : ""
-                }`}
-                aria-hidden
-              />
-            </button>
-
-            <div
-              className={`grid transition-[grid-template-rows] duration-200 ease-out ${
-                open ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
-              }`}
-            >
-              <div className="overflow-hidden">
-                {wantsHotel ? (
-                  <div className="mt-4 flex w-full items-start gap-2 overflow-hidden border-t border-dashed border-white/10 pt-3">
-                    <BedDouble className="mt-0.5 h-4 w-4 shrink-0 text-[#075473]" />
-                    <div className="flex min-w-0 flex-col gap-1 overflow-hidden">
-                      <p className="break-words text-sm font-semibold leading-tight text-white">
-                        {hotelPref
-                          ? `${hotelPref.starRating}-Star Hotel Tier`
-                          : `${state.hotelTier === "5-star" ? "5" : "4"}-Star Hotel Tier`}
-                      </p>
-                      <p className="break-words text-sm leading-tight text-white/60">
-                        {hotelPref
-                          ? (() => {
-                              const n = normalizeCityHotelPref(
-                                hotelPref,
-                                loc.cityId,
-                                state.roomCount
-                              );
-                              return (
-                                formatHotelRoomsSummary(
-                                  n.rooms,
-                                  n.standardOccupancy
-                                ) || `${state.roomCount}× Room`
-                              );
-                            })()
-                          : `${state.roomCount}× ${state.roomType} Room`}
-                        {hotelPref ? (
-                          <span className="text-white/45">
-                            {" "}
-                            ·{" "}
-                            {hotelPref.breakfast
-                              ? "Breakfast"
-                              : "No breakfast"}
-                          </span>
-                        ) : null}
-                      </p>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="mt-4 flex w-full items-center gap-2 overflow-hidden border-t border-dashed border-white/10 pt-3 text-xs italic text-white/45">
-                    <BedDouble className="h-4 w-4 shrink-0 text-[#D9D2C7]" />
-                    <span>
-                      Accommodation Self-Arranged (No Hotel Required)
-                    </span>
-                  </div>
-                )}
-
-                {tours.length > 0 ? (
-                  <ul className="mt-3 space-y-2 border-t border-dashed border-white/10 pt-3">
-                    {tours.map((row) => {
-                      const tour = config?.tours.find(
-                        (t) => t.id === row.tourId
-                      );
-                      const hours =
-                        tour?.duration_hours ?? row.duration_hours;
-                      return (
-                        <li
-                          key={`${row.tourId}-${row.scheduledDate}`}
-                          className="flex items-start gap-2 text-sm"
-                        >
-                          <Ticket className="mt-0.5 h-4 w-4 shrink-0 text-[#075473]" />
-                          <span>
-                            <span className="font-medium text-white">
-                              {tour?.title ?? row.title ?? row.tourId}
-                            </span>
-                            {hours ? (
-                              <span className="text-white/45">
-                                , {hours}h
-                              </span>
-                            ) : null}
-                            {row.selectedLanguage ? (
-                              <span className="text-white/45">
-                                {" "}
-                                · {row.selectedLanguage}
-                              </span>
-                            ) : null}
-                            {row.scheduledDate ? (
-                              <span className="mt-0.5 block text-xs text-white/45">
-                                {formatCityDateSingle(row.scheduledDate) ||
-                                  formatDisplayDate(row.scheduledDate)}
-                              </span>
-                            ) : null}
-                          </span>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                ) : null}
-
-                {chauffeurLines.length > 0 ? (
-                  <div className="mt-3 flex items-start gap-2 border-t border-dashed border-white/10 pt-3">
-                    <Car className="mt-0.5 h-4 w-4 shrink-0 text-[#075473]" />
-                    <p className="text-sm text-white/60">
-                      <span className="font-semibold text-white">
-                        Private Chauffeur:
-                      </span>{" "}
-                      {chauffeurLines.join(", ")}
-                    </p>
-                  </div>
-                ) : null}
+                  ) : null}
+                </p>
               </div>
             </div>
-          </div>
-        </section>
+          ) : (
+            <div className="mt-4 flex w-full items-center gap-2 overflow-hidden border-t border-dashed border-white/10 pt-3 text-xs italic text-white/45">
+              <BedDouble className="h-4 w-4 shrink-0 text-white/30" />
+              <span>Accommodation Self-Arranged (No Hotel Required)</span>
+            </div>
+          )}
 
+          {tours.length > 0 ? (
+            <ul className="relative mt-3 space-y-3 border-t border-dashed border-white/10 pt-3">
+              <span
+                className="absolute top-3 bottom-1 left-[7px] w-px bg-gradient-to-b from-[#F6A724]/80 via-[#075473]/55 to-transparent"
+                aria-hidden
+              />
+              {tours.map((row) => {
+                const tour = config?.tours.find((t) => t.id === row.tourId);
+                const hours = tour?.duration_hours ?? row.duration_hours;
+                return (
+                  <li
+                    key={`${row.tourId}-${row.scheduledDate}`}
+                    className="relative flex items-start gap-2 text-sm"
+                  >
+                    <CircleDot className="mt-0.5 h-4 w-4 shrink-0 text-[#F6A724]" />
+                    <span>
+                      <span className="font-medium text-white">
+                        {tour?.title ?? row.title ?? row.tourId}
+                      </span>
+                      {hours ? (
+                        <span className="text-white/45">, {hours}h</span>
+                      ) : null}
+                      {row.selectedLanguage ? (
+                        <span className="text-white/45">
+                          {" "}
+                          · {row.selectedLanguage}
+                        </span>
+                      ) : null}
+                      {row.scheduledDate ? (
+                        <span className="mt-0.5 block text-xs text-white/45">
+                          {formatCityDateSingle(row.scheduledDate) ||
+                            formatDisplayDate(row.scheduledDate)}
+                        </span>
+                      ) : null}
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+          ) : null}
+
+          {chauffeurLines.length > 0 ? (
+            <div className="mt-3 flex items-start gap-2 border-t border-dashed border-white/10 pt-3">
+              <Car className="mt-0.5 h-4 w-4 shrink-0 text-[#075473]" />
+              <p className="text-sm text-white/60">
+                <span className="font-semibold text-white">
+                  Private Chauffeur:
+                </span>{" "}
+                {chauffeurLines.join(", ")}
+              </p>
+            </div>
+          ) : null}
+        </div>
+      </section>
 
       {next ? (
         <TransitConnectorPill
@@ -631,16 +552,14 @@ function TransitConnectorPill({
           : null;
 
   return (
-    <>
-      <TimelineSpine />
-      <div className="flex w-full justify-center overflow-hidden px-1 py-0.5">
+    <div className="flex w-full justify-center overflow-hidden px-1 py-0.5">
         <button
           type="button"
           onClick={onClick}
-          className={`group my-2 inline-flex max-w-full cursor-pointer flex-col items-center gap-1 rounded-full border px-3 py-2 text-xs font-semibold shadow-sm transition-all sm:px-4 ${
+          className={`group my-1 inline-flex max-w-full cursor-pointer flex-col items-center gap-1 rounded-full border px-3 py-2 text-xs font-semibold shadow-sm transition-all sm:px-4 ${
             isUnset
               ? "border-[#F6A724]/50 bg-[#F6A724]/15 text-[#F6A724] hover:border-[#F6A724] hover:shadow-md"
-              : "border-white/20 bg-[#0D1117] text-white hover:border-[#075473] hover:shadow-md"
+              : "border-white/20 bg-[#0A1017]/80 backdrop-blur-md text-white hover:border-[#075473] hover:shadow-md"
           }`}
           aria-label={
             isUnset
@@ -683,7 +602,6 @@ function TransitConnectorPill({
           ) : null}
         </button>
       </div>
-    </>
   );
 }
 
@@ -707,7 +625,7 @@ function TicketCard({
 
   return (
     <section
-      className={`w-full overflow-hidden rounded-2xl border border-white/10 bg-[#0D1117]/90 text-white shadow-[0_2px_12px_rgba(0,0,0,0.35)] ${border} ${
+      className={`w-full overflow-hidden rounded-2xl border border-white/10 bg-[#0A1017]/80 backdrop-blur-md text-white shadow-2xl ${border} ${
         compact ? "px-4 py-3" : "px-4 py-4 sm:px-5"
       }`}
     >
@@ -715,37 +633,6 @@ function TicketCard({
     </section>
   );
 }
-
-function MetaBlock({
-  icon,
-  label,
-  value,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  value: string;
-}) {
-  return (
-    <div>
-      <div className="mb-1.5 flex items-center gap-1.5">
-        {icon}
-        <p className="text-[0.6rem] font-semibold uppercase tracking-[0.22em] text-[#075473]">
-          {label}
-        </p>
-      </div>
-      <p className="text-sm leading-snug text-white/90">{value}</p>
-    </div>
-  );
-}
-
-function TimelineSpine() {
-  return (
-    <div className="flex justify-center py-1" aria-hidden>
-      <div className="h-5 w-px border-l border-dashed border-[#0B1F3A]/30" />
-    </div>
-  );
-}
-
 
 function inferredAirportTransferMode(
   state: BuilderState,

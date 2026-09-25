@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Users, CalendarDays, Compass } from "lucide-react";
 import {
   fetchBuilderConfig,
   fetchExperiencesAndPlaces,
@@ -25,8 +24,15 @@ import {
   useSingleDayBuilderStore,
 } from "@/store/useSingleDayBuilderStore";
 import { useBuilderStore } from "@/store/useBuilderStore";
-import { BookingRefBadge } from "@/components/builder/BookingRefBadge";
+import { useItineraryStore } from "@/store/useItineraryStore";
 import { NewBookingResetButton } from "@/components/builder/NewBookingResetButton";
+import { JapanBookingPass } from "@/components/dossier/JapanBookingPass";
+import {
+  buildDossierQrUrl,
+  formatGuestCountText,
+  mapBookingStatusToPass,
+  resolvePnr,
+} from "@/lib/dossier/bookingPassHelpers";
 import {
   enrichTimelineStops,
   SingleDayTimelineInfographic,
@@ -54,6 +60,7 @@ export function SingleDayItineraryView() {
   const tempBookingRef = useBuilderStore((s) => s.tempBookingRef);
   const confirmedBookingRef = useBuilderStore((s) => s.confirmedBookingRef);
   const bookingStatus = useBuilderStore((s) => s.bookingStatus);
+  const passengerName = useItineraryStore((s) => s.clientName);
 
   const [catalog, setCatalog] = useState<PbTour[]>([]);
 
@@ -140,71 +147,35 @@ export function SingleDayItineraryView() {
         Single-Day Tour Dossier
       </p>
 
-      {/* Navy glass ticket — mirrors Multi-Day TravelDossierView summary */}
-      <section className="overflow-hidden rounded-2xl border border-white/10 bg-[#0D1B2A] text-white shadow-[0_12px_40px_rgba(11,31,58,0.35)]">
-        <div className="border-b border-white/10 px-4 py-4 sm:px-5">
-          <div className="flex min-w-0 items-center gap-3 overflow-hidden">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src="/images/tokiotours-logo.png"
-              alt="TOKIOTOURS"
-              className="h-11 w-11 shrink-0 rounded-full object-cover ring-1 ring-white/15"
-            />
-            <div className="min-w-0">
-              <p className="text-[0.65rem] font-semibold uppercase tracking-[0.35em] text-cyan-400/90">
-                Booking Summary
-              </p>
-              <p className="mt-1 font-godiva text-lg uppercase leading-tight tracking-wider text-white sm:text-xl">
-                TOKIOTOURS
-              </p>
-            </div>
-          </div>
-
-          <div className="mt-3 flex w-full items-stretch gap-2">
-            <div className="min-w-0 flex-1">
-              <BookingRefBadge
-                tempBookingRef={tempBookingRef}
-                confirmedBookingRef={confirmedBookingRef}
-                bookingStatus={bookingStatus}
-              />
-            </div>
-            <NewBookingResetButton />
-          </div>
-        </div>
-
-        <div className="grid gap-4 border-t border-white/10 px-5 py-5 sm:grid-cols-3">
-          <MetaBlock
-            icon={<Users className="h-4 w-4 text-[#075473]" />}
-            label="Guests"
-            value={`${adults} Adult${adults === 1 ? "" : "s"}, ${children} Child${children === 1 ? "" : "ren"}`}
-          />
-          <MetaBlock
-            icon={<CalendarDays className="h-4 w-4 text-[#075473]" />}
-            label="Date & Duration"
-            value={`${dateLabel} · ${hoursLabel}`}
-          />
-          <MetaBlock
-            icon={<Compass className="h-4 w-4 text-[#075473]" />}
-            label="City Hub"
-            value={cityLabel}
-          />
-        </div>
-
-        {paceLabel || guideLabel ? (
-          <div className="flex flex-wrap gap-2 border-t border-white/10 px-5 py-3">
-            {paceLabel ? (
-              <span className="rounded-full border border-white/20 bg-white/5 px-2.5 py-1 text-[11px] text-white/85">
-                {paceLabel}
-              </span>
-            ) : null}
-            {guideLabel ? (
-              <span className="rounded-full border border-[#075473]/45 bg-[#075473]/15 px-2.5 py-1 text-[11px] text-[#F3D9C4]">
-                {guideLabel}
-              </span>
-            ) : null}
-          </div>
-        ) : null}
-      </section>
+      <JapanBookingPass
+        pnrCode={resolvePnr({
+          tempBookingRef,
+          confirmedBookingRef,
+          bookingStatus,
+        })}
+        passengerName={passengerName}
+        guestCountText={formatGuestCountText(adults, children)}
+        travelStyle={guideLabel || "Day Tour"}
+        tripType="single"
+        originCode={cityLabel.length > 10 ? cityLabel.slice(0, 10).toUpperCase() : cityLabel.toUpperCase()}
+        originLabel="Meeting Point"
+        destinationCode="END"
+        destinationLabel="Drop-Off"
+        durationText={hoursLabel}
+        datesText={dateLabel === "Date TBD" ? "" : dateLabel}
+        status={mapBookingStatusToPass(bookingStatus)}
+        qrValue={buildDossierQrUrl(
+          resolvePnr({
+            tempBookingRef,
+            confirmedBookingRef,
+            bookingStatus,
+          }),
+          "/builder-single/itinerary"
+        )}
+        paceLabel={paceLabel}
+        experienceLabel={guideLabel}
+        actions={<NewBookingResetButton />}
+      />
 
       <SingleDayTimelineInfographic
         stops={enrichedStops}
@@ -218,24 +189,4 @@ export function SingleDayItineraryView() {
   );
 }
 
-function MetaBlock({
-  icon,
-  label,
-  value,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  value: string;
-}) {
-  return (
-    <div>
-      <div className="mb-1.5 flex items-center gap-1.5">
-        {icon}
-        <p className="text-[0.6rem] font-semibold uppercase tracking-[0.22em] text-[#F6A724]">
-          {label}
-        </p>
-      </div>
-      <p className="text-sm leading-snug text-white/90">{value}</p>
-    </div>
-  );
-}
+

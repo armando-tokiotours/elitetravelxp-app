@@ -114,11 +114,18 @@ export function BuilderApp() {
 
     const unsubIt = useItineraryStore.subscribe(syncGuestBadge);
     const unsubPre = usePreBuilderStore.subscribe(syncGuestBadge);
-    ensureTempBookingRef();
-    setTripMode("multi_day");
+    const unsubHydrate = useBuilderStore.persist.onFinishHydration(() => {
+      ensureTempBookingRef();
+      setTripMode("multi_day");
+    });
+    if (useBuilderStore.persist.hasHydrated()) {
+      ensureTempBookingRef();
+      setTripMode("multi_day");
+    }
     return () => {
       unsubIt();
       unsubPre();
+      unsubHydrate();
     };
   }, [ensureTempBookingRef, setTripMode]);
 
