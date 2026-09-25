@@ -78,6 +78,18 @@ migrate((app) => {
         required: false,
         max: 2000,
       },
+      {
+        name: "created",
+        type: "autodate",
+        onCreate: true,
+        onUpdate: false,
+      },
+      {
+        name: "updated",
+        type: "autodate",
+        onCreate: true,
+        onUpdate: true,
+      },
     ],
     indexes: [
       "CREATE UNIQUE INDEX idx_bal_booking_ref ON bookings_and_leads (`booking_ref`)",

@@ -244,24 +244,81 @@ export function BookingsManagementTable({
         throw new Error("Admin session expired. Please sign in again.");
       }
 
-      const records = await pb.collection("bookings_and_leads").getFullList({
-        sort: "-created",
-        requestKey: null,
-      });
-
-      const pbRows: LeadRow[] = (records as LeadRow[]).map((r) => {
-        const q = extractQuote(r as unknown as Record<string, unknown>);
-        return {
-          ...r,
-          ...q,
-          source: "bookings_and_leads" as const,
-          status: normalizeBookingStatus(r.status),
+      // Prefer server-side admin list (uses Docker-internal PB + admin auth).
+      let pbRows: LeadRow[] = [];
+      let usedServerApi = false;
+      try {
+        const res = await fetch("/api/admin/bookings-and-leads", {
+          headers: {
+            Authorization: `Bearer ${pb.authStore.token}`,
+          },
+          cache: "no-store",
+        });
+        const data = (await res.json().catch(() => ({}))) as {
+          success?: boolean;
+          records?: LeadRow[];
+          error?: string;
         };
+        if (!res.ok || !data.success) {
+          throw new Error(data.error || `Admin list failed (${res.status})`);
+        }
+        pbRows = (data.records || []).map((r) => {
+          const q = extractQuote(r as unknown as Record<string, unknown>);
+          return {
+            ...r,
+            ...q,
+            source: "bookings_and_leads" as const,
+            status: normalizeBookingStatus(r.status),
+          };
+        });
+        usedServerApi = true;
+      } catch (apiErr) {
+        console.warn(
+          "[BookingsManagementTable] server list failed, trying browser PB:",
+          apiErr
+        );
+        // Avoid sort=-created — collection may lack autodate fields (PB 400).
+        let records;
+        try {
+          records = await pb.collection("bookings_and_leads").getFullList({
+            sort: "-created",
+            requestKey: null,
+          });
+        } catch {
+          records = await pb.collection("bookings_and_leads").getFullList({
+            sort: "-id",
+            requestKey: null,
+          });
+        }
+        pbRows = (records as LeadRow[]).map((r) => {
+          const q = extractQuote(r as unknown as Record<string, unknown>);
+          return {
+            ...r,
+            ...q,
+            source: "bookings_and_leads" as const,
+            status: normalizeBookingStatus(r.status),
+          };
+        });
+      }
+
+      pbRows = [...pbRows].sort((a, b) => {
+        const ta = a.created ? Date.parse(a.created) : 0;
+        const tb = b.created ? Date.parse(b.created) : 0;
+        if (tb !== ta) return tb - ta;
+        return String(b.id).localeCompare(String(a.id));
       });
 
+      // Merge local only as supplemental gaps (same-browser drafts), never as primary.
       const merged = combineAndDedupeLeads(pbRows, readLocalLeads());
       setRows(merged);
-      setError(null);
+      const localOnlyCount = merged.filter((r) => r.source === "local").length;
+      if (localOnlyCount > 0 && usedServerApi) {
+        setError(
+          `Notice: ${localOnlyCount} draft(s) only in this browser — not yet on PocketBase.`
+        );
+      } else {
+        setError(null);
+      }
     } catch (err) {
       console.warn(
         "[BookingsManagementTable] PocketBase fetch failed, using local cache:",
@@ -275,20 +332,14 @@ export function BookingsManagementTable({
         }))
       );
       setRows(localOnly);
+      const msg =
+        err instanceof Error ? err.message : "Could not load bookings & leads.";
       if (localOnly.length > 0) {
         setError(
-          "Notice: Showing local cache until server re-indexes. Refresh after sync."
+          `PocketBase unreachable (${msg}). Showing ${localOnly.length} local draft(s) from this browser only.`
         );
       } else {
-        const msg =
-          err instanceof Error
-            ? err.message
-            : "Could not load bookings & leads.";
-        setError(
-          /something went wrong/i.test(msg)
-            ? "Notice: Syncing with local cache until server re-indexes."
-            : msg
-        );
+        setError(msg);
       }
     } finally {
       setLoading(false);

@@ -204,8 +204,18 @@ export async function syncMultiDayBookingLead(opts: {
         dossierPdfUrl: opts.dossierPdfUrl ?? null,
       }),
     });
-    return res.ok;
-  } catch {
+    if (!res.ok) {
+      const body = (await res.json().catch(() => ({}))) as { error?: string };
+      console.error(
+        "[syncMultiDayBookingLead] PocketBase upsert failed:",
+        res.status,
+        body.error || res.statusText
+      );
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.error("[syncMultiDayBookingLead] network error:", err);
     return false;
   }
 }
@@ -267,8 +277,18 @@ export async function syncSingleDayBookingLead(opts: {
         dossierPdfUrl: opts.dossierPdfUrl ?? null,
       }),
     });
-    return res.ok;
-  } catch {
+    if (!res.ok) {
+      const body = (await res.json().catch(() => ({}))) as { error?: string };
+      console.error(
+        "[syncSingleDayBookingLead] PocketBase upsert failed:",
+        res.status,
+        body.error || res.statusText
+      );
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.error("[syncSingleDayBookingLead] network error:", err);
     return false;
   }
 }
