@@ -10,7 +10,7 @@ import {
 import { envVal } from "@/lib/email";
 import { getActiveEmailConfig } from "@/lib/emailConfigStore";
 import { sendTransactionalMail } from "@/lib/mail";
-import { renderBookingPassCardHtml } from "@/lib/emailTemplates/bookingPassEmail";
+import { renderBookingPassCardHtml, generateBookingEmailHtml } from "@/lib/emailTemplates/bookingPassEmail";
 
 export type DraftBoardingPassParams = {
   bookingRef: string;
@@ -114,6 +114,23 @@ export function buildDraftBoardingPassHtml(
     includeWalletCta: true,
   });
 
+  // Guest mail uses the shared three-tier layout (hero + pass + footer).
+  // Team alerts keep a compact internal layout with brief chips.
+  if (variant === "guest") {
+    return generateBookingEmailHtml({
+      pnrCode: ref,
+      guestName: name,
+      guestEmail: email,
+      partyText: party,
+      travelStyle: `${style} · ${experience}`,
+      startDateText: days
+        ? `${arrival} · ${days} Day${days === 1 ? "" : "s"}`
+        : arrival,
+      siteOrigin: base,
+      includeWalletCta: true,
+    });
+  }
+
   return `<!DOCTYPE html>
 <html lang="en" style="background-color:${BG};" bgcolor="${BG}">
 <head>
@@ -133,9 +150,8 @@ export function buildDraftBoardingPassHtml(
         <tr>
           <td style="padding:22px 24px 8px;" bgcolor="${CARD}">
             ${teamBanner}
-            <img src="https://tokiotours-app.com/images/tokiotours-logo.png" alt="TOKIOTOURS" width="44" height="44" style="display:block;border-radius:9999px;margin:0 0 12px 0;" />
             <p style="margin:0;font-size:10px;letter-spacing:0.28em;text-transform:uppercase;color:#E60F43;font-weight:700;">TOKIOTOURS</p>
-            <h1 style="margin:10px 0 0;font-size:24px;line-height:1.2;color:#FFFFFF;text-transform:uppercase;letter-spacing:0.05em;">Your Japan Journey Brief</h1>
+            <h1 style="margin:10px 0 0;font-size:24px;line-height:1.2;color:#FFFFFF;text-transform:uppercase;letter-spacing:0.05em;">New Draft Lead</h1>
           </td>
         </tr>
         <tr>
@@ -143,10 +159,7 @@ export function buildDraftBoardingPassHtml(
             ${passCard}
 
             <p style="margin:22px 0 0;font-size:14px;line-height:1.65;color:#E2E8F0;">
-              Dear <strong style="color:#FFFFFF;">${escapeHtml(firstName)}</strong>,
-            </p>
-            <p style="margin:12px 0 0;font-size:14px;line-height:1.65;color:#94A3B8;">
-              Thank you for sharing your Japan travel brief with <span style="color:#E60F43;font-weight:800;">TOKIOTOURS</span>. Your request is saved under reference <strong style="color:#F6A724;">${escapeHtml(ref)}</strong>. Our concierge team will use these preferences to shape your itinerary.
+              Guest <strong style="color:#FFFFFF;">${escapeHtml(firstName)}</strong> · ${escapeHtml(email)}
             </p>
 
             <div style="margin-top:20px;padding-top:16px;border-top:1px solid ${BORDER};">
@@ -169,16 +182,9 @@ export function buildDraftBoardingPassHtml(
 
             <div style="margin-top:22px;text-align:center;">
               <a href="${escapeHtml(resumeUrl)}" style="display:inline-block;padding:12px 22px;border-radius:999px;border:1px solid ${BORDER};color:#E2E8F0;font-size:11px;font-weight:700;text-decoration:none;letter-spacing:0.06em;">
-                MANAGE BOOKING
+                OPEN IN ADMIN
               </a>
             </div>
-          </td>
-        </tr>
-        <tr>
-          <td style="padding:14px 24px 22px;border-top:1px solid ${BORDER};" bgcolor="${CARD}">
-            <p style="margin:0;font-size:10px;letter-spacing:0.16em;text-transform:uppercase;color:#64748B;text-align:center;">
-              Status · Draft · No hotels or drivers locked yet
-            </p>
           </td>
         </tr>
       </table>

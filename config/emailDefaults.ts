@@ -68,7 +68,7 @@ export const EMAIL_CONFIG_DEFAULTS: StoredEmailConfig = {
     welcomeBody:
       "Thank you for designing your bespoke itinerary. Our concierge team at TOKIOTOURS has received your trip selections and is preparing your confirmed 1-on-1 daily proposal.",
     ctaButtonText: "REVIEW YOUR BOOKING BRIEF →",
-    ctaUrl: "https://tokiotours-app.com/manage",
+    ctaUrl: "https://tokiotours-app.com/manage?pnr={{bookingRef}}",
   },
 };
 
@@ -133,11 +133,21 @@ export function mergeStoredEmailConfig(
       bccRecipient: String(routing.bccRecipient ?? base.routing.bccRecipient),
     },
     template: {
-      subjectLine: String(template.subjectLine ?? base.template.subjectLine),
+      subjectLine: String(
+        template.subjectLine ??
+          template.subject ??
+          base.template.subjectLine
+      ),
       headerTitle: String(template.headerTitle ?? base.template.headerTitle),
-      welcomeBody: String(template.welcomeBody ?? base.template.welcomeBody),
+      welcomeBody: String(
+        template.welcomeBody ??
+          template.welcomeMessage ??
+          base.template.welcomeBody
+      ),
       ctaButtonText: String(
-        template.ctaButtonText ?? base.template.ctaButtonText
+        template.ctaButtonText ??
+          template.ctaText ??
+          base.template.ctaButtonText
       ),
       ctaUrl: String(template.ctaUrl ?? base.template.ctaUrl),
     },
@@ -215,7 +225,11 @@ export function buildProposalHtml(
     headerTitle,
     welcomeBody,
     ctaButtonText:
-      cfg.template.ctaButtonText || "REVIEW & MANAGE MY BOOKING →",
+      cfg.template.ctaButtonText || "REVIEW YOUR BOOKING BRIEF →",
+    ctaUrl: fillPlaceholders(cfg.template.ctaUrl || "", {
+      fullName,
+      bookingRef,
+    }),
     siteOrigin: "https://tokiotours-app.com",
     tourType: params.tourType ?? "multi_day",
     tourDate: params.tourDate ?? null,
