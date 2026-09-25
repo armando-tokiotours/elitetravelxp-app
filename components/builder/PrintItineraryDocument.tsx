@@ -205,7 +205,6 @@ export function PrintItineraryDocument({
               "······";
             const site = `https://${BRAND_DOMAIN}`;
             const dossierHref = `${site}/builder/itinerary?ref=${encodeURIComponent(pnr)}&view=dossier`;
-            const walletHref = `${site}/api/wallet/generate-pass?pnr=${encodeURIComponent(pnr)}`;
             return (
               <>
                 <div className="flex flex-wrap items-start justify-between gap-2 border-b border-dashed border-white/20 pb-3">
@@ -249,17 +248,9 @@ export function PrintItineraryDocument({
                   >
                     Open booking on website
                   </a>
-                  <a
-                    href={walletHref}
-                    className="rounded-xl border border-zinc-600 bg-black px-3.5 py-2 text-[10px] font-bold tracking-wider text-white uppercase"
-                  >
-                    Save to Apple Wallet
-                  </a>
                 </div>
                 <p className="mt-3 hidden text-[10px] text-zinc-400 print:block">
                   Website: {dossierHref}
-                  <br />
-                  Apple Wallet: {walletHref}
                 </p>
               </>
             );

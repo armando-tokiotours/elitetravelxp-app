@@ -404,7 +404,13 @@ export default function SingleDayItineraryPageClient() {
             <p className="mt-2 text-sm text-[#5C6570]">{printResult.message}</p>
             <button
               type="button"
-              onClick={() => setPrintResult(null)}
+              onClick={() => {
+                setPrintResult(null);
+                document
+                  .querySelectorAll(".html2pdf__overlay, .html2pdf__container")
+                  .forEach((node) => node.remove());
+                document.body.style.overflow = "";
+              }}
               className="mt-5 w-full rounded-full bg-[#0B1F3A] py-2.5 text-sm font-semibold text-white"
             >
               Done

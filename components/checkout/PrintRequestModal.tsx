@@ -86,7 +86,25 @@ export function PrintRequestModal({
   const [pdfRef, setPdfRef] = useState(state.tempBookingRef || "TMP-DRAFT");
   const [termsAccepted, setTermsAccepted] = useState(skipTerms);
 
-  useModalDismiss(isOpen && termsAccepted, onClose, { lockScroll: false });
+  useModalDismiss(isOpen && termsAccepted, () => {
+    setBusy(false);
+    setLocalBusy(false);
+    document
+      .querySelectorAll(".html2pdf__overlay, .html2pdf__container")
+      .forEach((node) => node.remove());
+    document.body.style.overflow = "";
+    onClose();
+  }, { lockScroll: false });
+
+  const handleDismiss = () => {
+    setBusy(false);
+    setLocalBusy(false);
+    document
+      .querySelectorAll(".html2pdf__overlay, .html2pdf__container")
+      .forEach((node) => node.remove());
+    document.body.style.overflow = "";
+    onClose();
+  };
 
   const bookingRefDisplay = useMemo(
     () =>
@@ -162,7 +180,7 @@ export function PrintRequestModal({
       <BookingTermsModal
         open
         onConfirm={() => setTermsAccepted(true)}
-        onCancel={onClose}
+        onCancel={handleDismiss}
         confirmLabel="I Understand — Proceed to Invoice / Download PDF →"
         cancelLabel="Back to Builder"
       />
@@ -291,7 +309,12 @@ export function PrintRequestModal({
       setSuccess(
         "✓ Proposal emailed to you and copy sent to armando@tokiotours.nl"
       );
-      await runLocalPdf(ref);
+      try {
+        await runLocalPdf(ref);
+      } catch {
+        /* email already succeeded */
+      }
+      setBusy(false);
       onSuccess?.({
         bookingRef: ref,
         mailSent: Boolean(data.mailSent ?? data.success),
@@ -299,13 +322,19 @@ export function PrintRequestModal({
           data.message ||
           `Proposal emailed to ${to} (BCC armando@tokiotours.nl). Reference: ${ref}`,
       });
-      window.setTimeout(() => onClose(), 1800);
+      // Close immediately so Done sheet is not trapped under this modal
+      onClose();
+      document
+        .querySelectorAll(".html2pdf__overlay, .html2pdf__container")
+        .forEach((node) => node.remove());
+      document.body.style.overflow = "";
     } catch {
       setError("Email notice delayed, but your PDF is ready below!");
       setShowDirectDownload(true);
       setSuccess(null);
     } finally {
       setBusy(false);
+      setLocalBusy(false);
     }
   };
 
@@ -315,7 +344,7 @@ export function PrintRequestModal({
         type="button"
         aria-label="Close overlay"
         className="absolute inset-0"
-        onClick={onClose}
+        onClick={handleDismiss}
       />
       <div
         role="dialog"
@@ -341,7 +370,7 @@ export function PrintRequestModal({
           </div>
           <button
             type="button"
-            onClick={onClose}
+            onClick={handleDismiss}
             className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[#0B1F3A]/20 bg-[#F5F0E8] text-[#0B1F3A]"
             aria-label="Close"
           >

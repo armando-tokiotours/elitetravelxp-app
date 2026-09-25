@@ -402,13 +402,13 @@ function RouteNoticeBadge({ message }: { message: string }) {
         <div
           id="route-notice-tooltip"
           role="tooltip"
-          className="absolute right-0 top-full z-50 mt-2 w-64 max-w-[260px] rounded-xl border border-[#075473]/40 bg-[#075473] p-3 text-left text-[11px] font-semibold leading-tight text-[#000000] shadow-2xl animate-in fade-in duration-150"
+          className="absolute right-0 top-full z-50 mt-2 w-64 max-w-[260px] rounded-xl border border-cyan-400/40 bg-[#075473] p-3 text-left text-[11px] font-semibold leading-tight text-white shadow-2xl animate-in fade-in duration-150"
         >
           <div
             className="absolute bottom-full right-4 border-[6px] border-transparent border-b-[#075473]"
             aria-hidden
           />
-          <p className="leading-snug">{message}</p>
+          <p className="leading-snug text-white">{message}</p>
         </div>
       ) : null}
     </div>

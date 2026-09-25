@@ -9,12 +9,6 @@ import {
   type BuilderConfig,
   type PbAccommodation,
 } from "@/lib/pocketbase/client";
-import {
-  calculateBuilderQuote,
-  formatEstimateSummary,
-  formatUsd,
-} from "@/lib/builder-pricing";
-import { ELITE_CONCIERGE_FEE } from "@/lib/eliteConcierge";
 import { hydrateStoresFromPreEliteBrief } from "@/lib/preEliteHydrate";
 import { useBuilderStore } from "@/store/useBuilderStore";
 import { usePreBuilderStore } from "@/store/usePreBuilderStore";
@@ -240,11 +234,6 @@ export function BuilderApp() {
     };
   }, [addLocation, setArrival, setDeparture, setTransit]);
 
-  const quote = useMemo(() => {
-    if (!config) return null;
-    return calculateBuilderQuote(state, config);
-  }, [config, state]);
-
   const cityNames = useMemo(() => {
     if (!config) return {};
     return Object.fromEntries(config.cities.map((c) => [c.id, c.name]));
@@ -394,95 +383,6 @@ export function BuilderApp() {
                 </div>
               </div>
             </div>
-
-            {/* Sticky CTA — estimate from Step 4; print CTA from Step 6 */}
-            {state.highestUnlockedStep >= 4 ? (
-              <div className="no-print sticky-action-bar fixed inset-x-0 bottom-[calc(3.75rem+env(safe-area-inset-bottom))] z-30 px-4 pb-2 md:bottom-6 lg:pl-16">
-                <div className="mx-auto max-w-3xl">
-                  {state.highestUnlockedStep >= 6 ? (
-                    <Link
-                      href="/builder/itinerary"
-                      onClick={() => {
-                        const email =
-                          guestBadge.email ||
-                          useItineraryStore.getState().clientEmail ||
-                          "";
-                        const ref =
-                          state.confirmedBookingRef ||
-                          state.tempBookingRef ||
-                          "";
-                        if (email && ref) {
-                          void import("@/lib/syncBookingLead").then(
-                            ({ syncMultiDayBookingLead }) =>
-                              syncMultiDayBookingLead({
-                                bookingRef: ref,
-                                email,
-                                state: useBuilderStore.getState(),
-                                cityNames,
-                                status: "lead",
-                                quote: quote
-                                  ? { min: quote.min, max: quote.max }
-                                  : null,
-                              })
-                          );
-                        }
-                      }}
-                      className="no-print flex w-full flex-col items-center rounded-2xl border border-zinc-800 bg-[#121212] px-6 py-4 text-center shadow-[0_12px_40px_rgba(0,0,0,0.55)] backdrop-blur-sm transition-colors hover:border-[#075473]/60"
-                    >
-                      <span className="text-base font-extrabold tracking-wide text-white">
-                        ✨ VIEW / PRINT ITINERARY
-                      </span>
-                      <span className="mt-1 text-xs text-zinc-400">
-                        Your trip is saved automatically.
-                        {quote ? (
-                          <>
-                            {" · "}
-                            <span className="text-[#075473]">
-                              Est. {formatUsd(quote.min)}–{formatUsd(quote.max)}
-                            </span>
-                          </>
-                        ) : null}
-                      </span>
-                    </Link>
-                  ) : (
-                    <div className="flex w-full flex-col items-center rounded-2xl border border-[#2C2C2E] bg-[#F6A724]/95 px-6 py-3.5 text-center shadow-[0_12px_40px_rgba(0,0,0,0.45)] backdrop-blur-sm">
-                      <span className="text-xs font-medium uppercase tracking-[0.16em] text-[#075473]">
-                        Estimate
-                      </span>
-                      {quote ? (
-                        <span className="mt-1 flex flex-col items-center gap-0.5 text-sm text-[#F5EFE6]">
-                          <span className="font-semibold">
-                            {formatEstimateSummary({
-                              min: quote.min,
-                              max: quote.max,
-                              conciergeActive:
-                                state.isEliteConcierge ||
-                                state.experienceService === "concierge",
-                              conciergeFee: ELITE_CONCIERGE_FEE,
-                            })}
-                          </span>
-                          {quote.min > 0 || quote.max > 0 ? (
-                            <span className="font-normal text-zinc-300">
-                              {state.isEliteConcierge ||
-                              state.experienceService === "concierge"
-                                ? "Elite Concierge design deposit included"
-                                : "Selected options and experiences"}
-                            </span>
-                          ) : null}
-                        </span>
-                      ) : (
-                        <span className="mt-1 text-sm font-semibold text-[#F5EFE6]">
-                          Building your trip…
-                        </span>
-                      )}
-                      <span className="mt-1 text-[11px] text-zinc-500">
-                        Complete all steps to view your itinerary
-                      </span>
-                    </div>
-                  )}
-                </div>
-              </div>
-            ) : null}
 
             <BottomNav />
           </div>

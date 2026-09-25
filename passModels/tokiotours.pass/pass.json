@@ -1,0 +1,72 @@
+{
+  "formatVersion": 1,
+  "passTypeIdentifier": "pass.com.tokiotours.travel",
+  "serialNumber": "DRAFT",
+  "teamIdentifier": "TEAMID",
+  "organizationName": "TOKIOTOURS",
+  "description": "TOKIOTOURS Japan Travel Pass",
+  "logoText": "TOKIOTOURS",
+  "foregroundColor": "rgb(255, 255, 255)",
+  "backgroundColor": "rgb(10, 16, 23)",
+  "labelColor": "rgb(246, 167, 36)",
+  "boardingPass": {
+    "transitType": "PKTransitTypeAir",
+    "headerFields": [
+      {
+        "key": "pnr",
+        "label": "BOOKING REF",
+        "value": "—"
+      }
+    ],
+    "primaryFields": [
+      {
+        "key": "origin",
+        "label": "TOKYO ENTRY",
+        "value": "NRT"
+      },
+      {
+        "key": "destination",
+        "label": "DEPARTURE",
+        "value": "HND"
+      }
+    ],
+    "secondaryFields": [
+      {
+        "key": "guest",
+        "label": "GUEST",
+        "value": "GUEST"
+      },
+      {
+        "key": "party",
+        "label": "PARTY",
+        "value": "—"
+      }
+    ],
+    "auxiliaryFields": [
+      {
+        "key": "dates",
+        "label": "DATES",
+        "value": "TBD"
+      }
+    ],
+    "backFields": [
+      {
+        "key": "tripType",
+        "label": "TRIP",
+        "value": "Japan Travel Pass"
+      }
+    ]
+  },
+  "barcode": {
+    "format": "PKBarcodeFormatQR",
+    "message": "https://tokiotours-app.com",
+    "messageEncoding": "iso-8859-1"
+  },
+  "barcodes": [
+    {
+      "format": "PKBarcodeFormatQR",
+      "message": "https://tokiotours-app.com",
+      "messageEncoding": "iso-8859-1"
+    }
+  ]
+}

@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 import { buildTokiotoursPassJson } from "@/lib/wallet/buildPassJson";
 import type { ApplePassPayload } from "@/lib/wallet/downloadApplePass";
+import {
+  generatePkpassBuffer,
+  hasLocalApplePassCerts,
+} from "@/lib/wallet/generatePkpass";
 
 export const runtime = "nodejs";
 
@@ -9,7 +13,17 @@ function allowFallback(): boolean {
   return v === "true" || v === "1" || v === "yes" || v == null || v === "";
 }
 
-function parsePayload(body: Partial<ApplePassPayload>): ApplePassPayload | null {
+function pkpassHeaders(pnrCode: string): HeadersInit {
+  return {
+    "Content-Type": "application/vnd.apple.pkpass",
+    "Content-Disposition": `inline; filename="Tokiotours-${pnrCode}.pkpass"`,
+    "Cache-Control": "no-cache, no-store, must-revalidate",
+  };
+}
+
+export function parsePayload(
+  body: Partial<ApplePassPayload>
+): ApplePassPayload | null {
   const pnrCode = String(body.pnrCode || "").trim().toUpperCase();
   if (!pnrCode) return null;
   return {
@@ -37,9 +51,33 @@ function parsePayload(body: Partial<ApplePassPayload>): ApplePassPayload | null 
   };
 }
 
+function minimalPayloadFromPnr(pnr: string): ApplePassPayload {
+  const origin =
+    process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") ||
+    "https://tokiotours-app.com";
+  return {
+    pnrCode: pnr,
+    guestName: "GUEST",
+    partyText: "—",
+    travelStyle: "—",
+    tripType: "multi",
+    experienceType: "PREMIUM CONCIERGE",
+    originCode: "NRT",
+    originLabel: "TOKYO ENTRY",
+    destinationCode: "HND",
+    destinationLabel: "DEPARTURE",
+    durationText: "",
+    startDateText: "",
+    endDateText: "",
+    routeBreakdown: [],
+    status: "IN_PROGRESS",
+    qrValue: `${origin}/builder/itinerary?ref=${encodeURIComponent(pnr)}&view=dossier`,
+  };
+}
+
 /**
  * GET /api/wallet/generate-pass?pnr=JPN-XXXX
- * Email / deep-link entry → mobile pass preview (signing optional).
+ * Direct Safari navigation — returns signed .pkpass, else pass-preview redirect.
  */
 export async function GET(req: Request) {
   const url = new URL(req.url);
@@ -49,20 +87,28 @@ export async function GET(req: Request) {
   if (!pnr) {
     return NextResponse.json({ error: "pnr is required." }, { status: 400 });
   }
-  const origin = url.origin;
-  return NextResponse.redirect(
-    `${origin}/pass-preview/${encodeURIComponent(pnr)}`,
-    302
-  );
+
+  const payload = minimalPayloadFromPnr(pnr);
+  const previewUrl = `${url.origin}/pass-preview/${encodeURIComponent(pnr)}`;
+
+  try {
+    const buf = await generatePkpassBuffer(payload);
+    if (buf) {
+      return new NextResponse(buf as unknown as BodyInit, {
+        status: 200,
+        headers: pkpassHeaders(pnr),
+      });
+    }
+  } catch (err) {
+    console.error("[wallet] GET generate failed:", err);
+  }
+
+  return NextResponse.redirect(previewUrl, 302);
 }
 
 /**
  * POST /api/wallet/generate-pass
- *
- * Returns a signed `.pkpass` when Apple Pass signing is configured:
- * - APPLE_PASS_SIGNER_URL — external signer that accepts pass.json and returns .pkpass
- *
- * Without signing config, returns 503 + previewUrl for the mobile pass page.
+ * Signed .pkpass when local Apple certs or APPLE_PASS_SIGNER_URL are configured.
  */
 export async function POST(req: Request) {
   let body: Partial<ApplePassPayload>;
@@ -81,90 +127,38 @@ export async function POST(req: Request) {
   }
 
   const passJson = buildTokiotoursPassJson(payload);
-  const signerUrl = process.env.APPLE_PASS_SIGNER_URL?.trim();
   const previewUrl = `/pass-preview/${encodeURIComponent(payload.pnrCode)}`;
 
-  // Avoid recursive self-calls if SIGNER_URL points at this app's generate route
-  const isSelfSigner = Boolean(
-    signerUrl && /\/api\/wallet\/generate(-pass)?/i.test(signerUrl)
-  );
-
-  if (signerUrl && !isSelfSigner) {
-    try {
-      const upstream = await fetch(signerUrl, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(process.env.APPLE_PASS_SIGNER_TOKEN
-            ? {
-                Authorization: `Bearer ${process.env.APPLE_PASS_SIGNER_TOKEN}`,
-              }
-            : {}),
-        },
-        body: JSON.stringify({ pass: passJson, pnrCode: payload.pnrCode }),
-      });
-      if (!upstream.ok) {
-        const errText = await upstream.text().catch(() => "");
-        if (allowFallback()) {
-          return NextResponse.json(
-            {
-              error: `Pass signer failed (${upstream.status}). Opening preview instead.`,
-              setupRequired: true,
-              fallback: true,
-              previewUrl,
-              passPreview: passJson,
-            },
-            { status: 503 }
-          );
-        }
-        return NextResponse.json(
-          {
-            error: `Pass signer failed (${upstream.status}). ${errText.slice(0, 200)}`,
-          },
-          { status: 502 }
-        );
-      }
-      const buf = Buffer.from(await upstream.arrayBuffer());
-      return new NextResponse(buf, {
+  try {
+    const buf = await generatePkpassBuffer(payload);
+    if (buf) {
+      return new NextResponse(buf as unknown as BodyInit, {
         status: 200,
-        headers: {
-          "Content-Type": "application/vnd.apple.pkpass",
-          "Content-Disposition": `attachment; filename="TOKIOTOURS-${payload.pnrCode}.pkpass"`,
-          "Cache-Control": "no-store",
-        },
+        headers: pkpassHeaders(payload.pnrCode),
       });
-    } catch (err) {
-      if (allowFallback()) {
-        return NextResponse.json(
-          {
-            error:
-              err instanceof Error
-                ? err.message
-                : "Could not reach Apple Pass signer.",
-            setupRequired: true,
-            fallback: true,
-            previewUrl,
-            passPreview: passJson,
-          },
-          { status: 503 }
-        );
-      }
+    }
+  } catch (err) {
+    console.error("[wallet] POST generate failed:", err);
+    if (!allowFallback()) {
       return NextResponse.json(
         {
           error:
             err instanceof Error
               ? err.message
-              : "Could not reach Apple Pass signer.",
+              : "Could not generate Apple Wallet pass.",
         },
         { status: 502 }
       );
     }
   }
 
+  const setupHint = hasLocalApplePassCerts()
+    ? "Pass signing failed — check certificate PEM contents and APPLE_PASS_TYPE_ID / APPLE_TEAM_ID."
+    : "Apple Wallet signing certificates are not configured yet. Set APPLE_WWDR_CERT, APPLE_PASS_CERT, APPLE_PASS_KEY (and APPLE_PASS_PASSPHRASE if needed), plus APPLE_PASS_TYPE_ID and APPLE_TEAM_ID.";
+
   return NextResponse.json(
     {
-      error:
-        "Apple Wallet signing certificates are not configured yet. Use the mobile pass preview — scan the QR or open on iPhone for Wallet access.",
+      error: setupHint,
       setupRequired: true,
       fallback: allowFallback(),
       previewUrl,

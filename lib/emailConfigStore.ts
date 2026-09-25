@@ -66,6 +66,10 @@ export function saveEmailConfig(input: unknown): StoredEmailConfig {
 
 export function resolveTeamMailFrom(cfg?: StoredEmailConfig): string {
   const active = cfg || getActiveEmailConfig();
+  const explicit =
+    envVal("EMAIL_FROM") || envVal("MAIL_FROM") || envVal("SMTP_FROM");
+  if (explicit) return explicit;
+
   const smtpReady = Boolean(
     (envVal("SMTP_PASS") || active.smtp.pass) &&
       (envVal("SMTP_USER") || active.smtp.user)
@@ -82,9 +86,6 @@ export function resolveTeamMailFrom(cfg?: StoredEmailConfig): string {
       active.routing.fromAddress;
     return `"${name}" <${address}>`;
   }
-
-  const override = envVal("MAIL_FROM") || envVal("SMTP_FROM");
-  if (override) return override;
 
   return `"${active.routing.fromName}" <${active.routing.fromAddress}>`;
 }

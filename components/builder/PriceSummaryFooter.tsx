@@ -17,7 +17,8 @@ export function PriceSummaryFooter({
   totalGuests,
   onRequestPay,
   requestDisabled,
-  placement = "sticky",
+  /** sticky disabled — use placement="inline" in dossier; floating bar overlaps nav */
+  placement = "inline",
 }: {
   quoteMin: number | null;
   quoteMax: number | null;
@@ -26,7 +27,7 @@ export function PriceSummaryFooter({
   totalGuests: number;
   onRequestPay: () => void;
   requestDisabled?: boolean;
-  /** sticky = fixed above bottom nav; inline = in-document glass cards */
+  /** sticky = fixed above bottom nav (hidden by default); inline = in-document glass cards */
   placement?: "sticky" | "inline";
 }) {
   const [conciergeVideoOpen, setConciergeVideoOpen] = useState(false);
@@ -99,28 +100,28 @@ export function PriceSummaryFooter({
             {estimateLabel}
           </p>
           <p className="mt-0.5 break-words text-[9px] leading-snug text-[#075473]/80 sm:text-[11px]">
-            {zeroAddOns ? (
-              "Self-arranged · add experiences for a range"
-            ) : conciergeActive &&
-              quoteMin != null &&
-              quoteMax != null &&
-              quoteMin === quoteMax &&
-              quoteMin <= ELITE_CONCIERGE_FEE ? (
-              `Design deposit · credited 100% toward your final trip`
-            ) : minPerPerson != null && maxPerPerson != null ? (
-              <>
-                {formatUsd(minPerPerson)} – {formatUsd(maxPerPerson)} / pax
-                {totalGuests > 0 ? ` · ${totalGuests} guests` : ""}
-                <br />
-                {conciergeActive
-                  ? "Elite Concierge design deposit included"
-                  : "Selected options and experiences"}
-              </>
-            ) : conciergeActive ? (
-              "Elite Concierge design deposit included"
-            ) : (
-              "Selected options and experiences"
-            )}
+                {zeroAddOns ? (
+                  "Self-arranged · add experiences for a range"
+                ) : conciergeActive &&
+                  quoteMin != null &&
+                  quoteMax != null &&
+                  quoteMin === quoteMax &&
+                  quoteMin <= ELITE_CONCIERGE_FEE ? (
+                  "50€ deposit applied as direct credit toward confirmed bookings."
+                ) : minPerPerson != null && maxPerPerson != null ? (
+                  <>
+                    {formatUsd(minPerPerson)} – {formatUsd(maxPerPerson)} / pax
+                    {totalGuests > 0 ? ` · ${totalGuests} guests` : ""}
+                    <br />
+                    {conciergeActive
+                      ? "50€ deposit applied as direct credit toward confirmed bookings."
+                      : "Selected options and experiences"}
+                  </>
+                ) : conciergeActive ? (
+                  "50€ deposit applied as direct credit toward confirmed bookings."
+                ) : (
+                  "Selected options and experiences"
+                )}
           </p>
         </div>
         <button
@@ -182,11 +183,6 @@ export function PriceSummaryFooter({
     return <div className="no-print w-full">{cards}</div>;
   }
 
-  return (
-    <div className="no-print sticky-action-bar fixed inset-x-0 bottom-16 z-30 mb-2 w-full overflow-x-hidden md:bottom-4 lg:left-16 lg:pl-0">
-      <div className="mx-auto flex w-full max-w-md flex-col overflow-x-hidden md:max-w-lg lg:max-w-2xl">
-        {cards}
-      </div>
-    </div>
-  );
+  // Sticky float disabled — overlaps BottomNav / Section CTAs (IMG_4816)
+  return null;
 }

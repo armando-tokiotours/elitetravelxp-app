@@ -3,7 +3,10 @@
 import { useState } from "react";
 import { Apple, Loader2, RotateCcw } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
-import { downloadAppleWalletPass, WalletPassFallbackError } from "@/lib/wallet/downloadApplePass";
+import {
+  downloadAppleWalletPass,
+  WalletPassFallbackError,
+} from "@/lib/wallet/downloadApplePass";
 import type { BookingPassProps } from "./JapanBookingPass.types";
 
 export type { BookingPassProps, RouteBreakdownItem } from "./JapanBookingPass.types";
@@ -51,7 +54,7 @@ export function JapanBookingPass({
     .split(/\s+/)
     .filter(Boolean);
 
-  const handleWallet = async () => {
+  const handleAppleWallet = () => {
     if (onDownloadWalletPass) {
       onDownloadWalletPass();
       return;
@@ -59,7 +62,8 @@ export function JapanBookingPass({
     setWalletBusy(true);
     setWalletMsg(null);
     try {
-      await downloadAppleWalletPass({
+      // CriOS → pass-preview; Safari/desktop → direct .pkpass navigation
+      downloadAppleWalletPass({
         pnrCode,
         guestName: nameParts.join(" "),
         partyText,
@@ -80,23 +84,24 @@ export function JapanBookingPass({
         status,
         qrValue: resolvedQr,
       });
-      setWalletMsg("Pass downloaded — open with Apple Wallet on iPhone.");
     } catch (err) {
+      setWalletBusy(false);
       if (err instanceof WalletPassFallbackError) {
-        window.open(err.previewUrl, "_blank", "noopener,noreferrer");
+        window.location.assign(err.previewUrl);
         setWalletMsg(
-          "Opened pass preview — on iPhone you can save or show the QR to concierge."
+          err.reason === "chrome_ios"
+            ? "Chrome on iPhone can’t add Apple Wallet passes — copy the link and open it in Safari."
+            : "Opened pass preview."
         );
         return;
       }
-      setWalletMsg(
-        err instanceof Error
-          ? err.message
-          : "Apple Wallet pass is not available yet."
-      );
-    } finally {
-      setWalletBusy(false);
+      window.location.href = `/api/wallet/apple/generate?pnr=${encodeURIComponent(pnrCode)}`;
     }
+  };
+
+  const handleGoogleWallet = () => {
+    setWalletMsg(null);
+    window.location.href = `/api/wallet/google/generate?pnr=${encodeURIComponent(pnrCode)}`;
   };
 
   const leftCode = isSingle ? startTime || "09:00" : originCode;
@@ -299,19 +304,38 @@ export function JapanBookingPass({
             />
           </div>
 
-          <button
-            type="button"
-            onClick={() => void handleWallet()}
-            disabled={walletBusy}
-            className="flex w-full items-center justify-center gap-1.5 rounded-xl border border-zinc-700 bg-black px-3 py-2.5 text-[10px] font-bold tracking-wider text-white uppercase shadow-md transition-all hover:bg-zinc-900 active:scale-95 disabled:opacity-60"
-          >
-            {walletBusy ? (
-              <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" />
-            ) : (
-              <Apple className="h-3.5 w-3.5 shrink-0 text-white" />
-            )}
-            <span>Add to Apple Wallet</span>
-          </button>
+          <div className="flex w-full flex-col gap-2">
+            <button
+              type="button"
+              onClick={handleAppleWallet}
+              disabled={walletBusy}
+              className="flex w-full items-center justify-center gap-1.5 rounded-xl border border-zinc-700 bg-black px-3 py-2.5 text-[10px] font-bold tracking-wider text-white uppercase shadow-md transition-all hover:bg-zinc-900 active:scale-95 disabled:opacity-60"
+            >
+              {walletBusy ? (
+                <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" />
+              ) : (
+                <Apple className="h-3.5 w-3.5 shrink-0 text-white" />
+              )}
+              <span>Add to Apple Wallet</span>
+            </button>
+            <button
+              type="button"
+              onClick={handleGoogleWallet}
+              className="flex w-full items-center justify-center gap-1.5 rounded-xl border border-[#4285F4]/40 bg-[#1A73E8] px-3 py-2.5 text-[10px] font-bold tracking-wider text-white uppercase shadow-md transition-all hover:bg-[#1967D2] active:scale-95"
+            >
+              <svg
+                viewBox="0 0 24 24"
+                className="h-3.5 w-3.5 shrink-0"
+                aria-hidden
+              >
+                <path
+                  fill="currentColor"
+                  d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14.5v-9l7 4.5-7 4.5z"
+                />
+              </svg>
+              <span>Add to Google Wallet</span>
+            </button>
+          </div>
 
           {walletMsg ? (
             <p className="text-[9px] leading-snug text-zinc-400" role="status">

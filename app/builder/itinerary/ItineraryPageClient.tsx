@@ -449,7 +449,15 @@ export default function ItineraryPageClient() {
             <p className="mt-2 text-sm text-white/65">{printResult.message}</p>
             <button
               type="button"
-              onClick={() => setPrintResult(null)}
+              onClick={() => {
+                setPrintResult(null);
+                setPrintOpen(false);
+                setPrintSkipTerms(false);
+                document
+                  .querySelectorAll(".html2pdf__overlay, .html2pdf__container")
+                  .forEach((node) => node.remove());
+                document.body.style.overflow = "";
+              }}
               className="mt-5 w-full rounded-full bg-[#075473] py-2.5 text-sm font-semibold text-white"
             >
               Done

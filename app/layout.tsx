@@ -72,6 +72,56 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       className={`${godiva.variable} ${hanson.variable} ${futura.variable} ${geosans.variable} ${beauty.variable} h-full antialiased`}
       style={{ backgroundColor: "#05080C" }}
     >
+      <head>
+        {/* Instant SVG / brand asset preloading — zero lag on tab/state swaps */}
+        <link
+          rel="preload"
+          href="/brand/1day-peek.svg"
+          as="image"
+          type="image/svg+xml"
+        />
+        <link
+          rel="preload"
+          href="/svg/1day-peek.svg"
+          as="image"
+          type="image/svg+xml"
+        />
+        <link
+          rel="preload"
+          href="/brand/mascot-bow.svg"
+          as="image"
+          type="image/svg+xml"
+        />
+        <link
+          rel="preload"
+          href="/svg/mascot-bow.svg"
+          as="image"
+          type="image/svg+xml"
+        />
+        <link
+          rel="preload"
+          href="/brand/mascot-card.svg"
+          as="image"
+          type="image/svg+xml"
+        />
+        <link
+          rel="preload"
+          href="/svg/mascot-card.svg"
+          as="image"
+          type="image/svg+xml"
+        />
+        <link
+          rel="preload"
+          href="/brand/mascot-multiday.svg"
+          as="image"
+          type="image/svg+xml"
+        />
+        <link
+          rel="preload"
+          href="/brand/tokiotours-logo.png"
+          as="image"
+        />
+      </head>
       <body className="tokio-ambient-bg flex min-h-full flex-col font-futura text-tokio-ice">
         <DynamicTypography />
         <SeasonalParticlesHost />

@@ -58,7 +58,7 @@ export const EMAIL_CONFIG_DEFAULTS: StoredEmailConfig = {
     pass: "",
   },
   routing: {
-    fromName: "Tokiotours Concierge",
+    fromName: "TOKIOTOURS",
     fromAddress: "no_reply@tokiotours.com",
     bccRecipient: "armando@tokiotours.nl",
   },
@@ -82,6 +82,25 @@ export function envVal(key: string): string | undefined {
     return raw.slice(1, -1).trim() || undefined;
   }
   return raw;
+}
+
+/** Parse `Name <addr@host>` or bare address into display + mailbox. */
+export function parseMailFrom(
+  raw: string | undefined
+): { name: string; address: string } | null {
+  const value = String(raw || "").trim();
+  if (!value) return null;
+  const angled = value.match(/^(?:"?([^"<]*)"?\s*)?<([^>]+)>$/);
+  if (angled) {
+    const address = angled[2].trim();
+    const name = (angled[1] || "").trim() || "TOKIOTOURS";
+    if (!address.includes("@")) return null;
+    return { name, address };
+  }
+  if (value.includes("@") && !value.includes(" ")) {
+    return { name: "TOKIOTOURS", address: value };
+  }
+  return null;
 }
 
 export function isPlainObject(v: unknown): v is Record<string, unknown> {
@@ -127,13 +146,18 @@ export function mergeStoredEmailConfig(
 
 export function applyEnvOverrides(cfg: StoredEmailConfig): StoredEmailConfig {
   const port = Number(envVal("SMTP_PORT") || cfg.smtp.port);
+  const parsedFrom = parseMailFrom(
+    envVal("EMAIL_FROM") || envVal("MAIL_FROM") || envVal("SMTP_FROM")
+  );
   const fromName =
     envVal("SMTP_FROM_NAME") ||
     envVal("MAIL_FROM_NAME") ||
+    parsedFrom?.name ||
     cfg.routing.fromName;
   const fromAddress =
     envVal("SMTP_FROM_EMAIL") ||
     envVal("MAIL_FROM_ADDRESS") ||
+    parsedFrom?.address ||
     envVal("SMTP_USER") ||
     cfg.routing.fromAddress;
 

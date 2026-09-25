@@ -845,7 +845,7 @@ export function formatEstimateSummary(opts: {
 
   if (opts.conciergeActive && min <= 0 && max <= 0) {
     // Defensive: calculator should already include the fee
-    return `Est. ${formatUsd(fee)} · Elite Concierge Included`;
+    return `Est. ${formatUsd(fee)} · Elite Concierge Active`;
   }
 
   if (min <= 0 && max <= 0) {
@@ -853,14 +853,14 @@ export function formatEstimateSummary(opts: {
   }
 
   if (opts.conciergeActive && min === max && min === fee) {
-    return `Est. ${formatUsd(min)} · Elite Concierge Included`;
+    return `Est. ${formatUsd(min)} · Elite Concierge Active`;
   }
 
   if (opts.conciergeActive) {
     if (min === max) {
-      return `Est. ${formatUsd(min)} · Elite Concierge + Add-ons`;
+      return `Est. ${formatUsd(min)} · Elite Concierge Active`;
     }
-    return `Est. ${formatUsd(min)}–${formatUsd(max)} · Elite Concierge + Add-ons`;
+    return `Est. ${formatUsd(min)}–${formatUsd(max)} · Elite Concierge Active`;
   }
 
   if (min === max) {

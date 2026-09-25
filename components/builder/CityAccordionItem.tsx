@@ -387,13 +387,13 @@ function TransitPill({
     >
       <div
         role="tooltip"
-        className={`pointer-events-none absolute bottom-full z-50 mb-2 max-w-[220px] whitespace-normal break-words rounded-lg border border-[#075473]/40 bg-[#075473] p-2 text-center text-[10px] font-bold text-[#000000] shadow-2xl transition-all duration-150 ${tipPos} ${tipWidth} ${
+        className={`pointer-events-none absolute bottom-full z-50 mb-2 max-w-[220px] whitespace-normal break-words rounded-xl border border-cyan-400/40 bg-[#075473] p-3 text-left text-xs font-semibold leading-snug text-white shadow-xl transition-all duration-150 ${tipPos} ${tipWidth} ${
           isOpen
             ? "visible opacity-100"
             : "invisible opacity-0 group-hover:visible group-hover:opacity-100"
         }`}
       >
-        <span>{tooltip}</span>
+        <p className="text-white font-semibold leading-snug">{tooltip}</p>
         <div
           className={`absolute top-full border-4 border-transparent border-t-[#075473] ${arrowPos}`}
           aria-hidden

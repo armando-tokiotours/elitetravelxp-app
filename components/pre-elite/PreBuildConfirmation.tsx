@@ -83,6 +83,7 @@ export function PreBuildConfirmation({
   /** True only after SAVE & EMAIL succeeds (or prior send for this ref). */
   const [isEmailSent, setIsEmailSent] = useState(false);
   const [resendOpen, setResendOpen] = useState(false);
+  const [saveGateOpen, setSaveGateOpen] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
 
   const data = parseItineraryData(itineraryData);
@@ -108,13 +109,33 @@ export function PreBuildConfirmation({
   }, [toast]);
 
   const closeResendModal = () => {
-    if (sending) return;
+    setSending(false);
     setResendOpen(false);
+    cleanupHtml2PdfOverlay();
+    if (typeof document !== "undefined") {
+      document.body.style.overflow = "";
+    }
+  };
+
+  const closeSaveGateModal = () => {
+    setSaveGateOpen(false);
+    setSending(false);
+    cleanupHtml2PdfOverlay();
+    if (typeof document !== "undefined") {
+      document.body.style.overflow = "";
+    }
   };
 
   useModalDismiss(resendOpen, closeResendModal);
+  useModalDismiss(saveGateOpen, closeSaveGateModal);
 
   const openBuilder = () => {
+    if (!isEmailSent && !readProposalSent(bookingRef)) {
+      setSaveGateOpen(true);
+      return;
+    }
+    setIsEmailSent(true);
+
     const builder = useBuilderStore.getState();
     const single = useSingleDayBuilderStore.getState();
     const alreadyLoaded =
@@ -234,9 +255,13 @@ export function PreBuildConfirmation({
       setActionErr(
         err instanceof Error ? err.message : "Could not send proposal email."
       );
+      setResendOpen(false);
     } finally {
       setSending(false);
       cleanupHtml2PdfOverlay();
+      if (typeof document !== "undefined") {
+        document.body.style.overflow = "";
+      }
     }
   };
 
@@ -420,6 +445,15 @@ export function PreBuildConfirmation({
         onConfirm={() => void sendProposal({ resend: true })}
       />
 
+      <SaveEmailGateModal
+        open={saveGateOpen}
+        onClose={closeSaveGateModal}
+        onSaveEmail={() => {
+          closeSaveGateModal();
+          onSaveEmailClick();
+        }}
+      />
+
       {toast ? (
         <div
           className="fixed bottom-6 left-1/2 z-[140] max-w-[min(92vw,24rem)] -translate-x-1/2 rounded-2xl border border-[#1CA67F]/40 bg-[#0D1117]/95 px-4 py-3 text-center text-sm text-[#1CA67F] shadow-2xl backdrop-blur-md"
@@ -429,6 +463,90 @@ export function PreBuildConfirmation({
         </div>
       ) : null}
     </>
+  );
+}
+
+function SaveEmailGateModal({
+  open,
+  onClose,
+  onSaveEmail,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onSaveEmail: () => void;
+}) {
+  if (typeof document === "undefined") return null;
+
+  return createPortal(
+    <AnimatePresence>
+      {open ? (
+        <motion.div
+          key="save-email-gate"
+          className="fixed inset-0 z-[130] flex items-end justify-center bg-[#05080C]/75 backdrop-blur-sm sm:items-center sm:p-4"
+          role="alertdialog"
+          aria-modal="true"
+          aria-labelledby="save-email-gate-title"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+        >
+          <button
+            type="button"
+            aria-label="Close"
+            className="absolute inset-0"
+            onClick={onClose}
+          />
+          <motion.div
+            className="relative z-[1] w-full max-w-md rounded-t-3xl border border-white/10 bg-[#0D1117] p-5 shadow-2xl sm:rounded-2xl sm:p-6"
+            initial={{ y: 24, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: 24, opacity: 0 }}
+          >
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Close"
+              className="absolute top-3 right-3 flex h-10 w-10 items-center justify-center rounded-full border border-white/20 bg-black/50 text-white"
+            >
+              <X className="h-5 w-5" strokeWidth={2.5} />
+            </button>
+
+            <p className="text-[10px] font-bold tracking-[0.2em] text-amber-400 uppercase">
+              Save required
+            </p>
+            <h3
+              id="save-email-gate-title"
+              className="mt-2 font-godiva text-2xl tracking-wider text-white uppercase"
+            >
+              Save Your Request First
+            </h3>
+            <p className="mt-3 text-sm leading-relaxed text-white/70">
+              Please click &apos;Save &amp; Email&apos; to save your request
+              before continuing to the Trip Builder.
+            </p>
+
+            <div className="mt-6 grid grid-cols-1 gap-2 sm:grid-cols-2">
+              <button
+                type="button"
+                onClick={onClose}
+                className="rounded-xl border border-white/15 bg-black/40 px-4 py-3 text-sm font-semibold text-white/80 transition hover:bg-white/5"
+              >
+                Close
+              </button>
+              <button
+                type="button"
+                onClick={onSaveEmail}
+                className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-[#075473] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[#096a91]"
+              >
+                <Mail className="h-4 w-4 shrink-0" />
+                Save &amp; Email
+              </button>
+            </div>
+          </motion.div>
+        </motion.div>
+      ) : null}
+    </AnimatePresence>,
+    document.body
   );
 }
 

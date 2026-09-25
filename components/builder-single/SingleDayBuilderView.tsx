@@ -254,8 +254,8 @@ export function SingleDayBuilderView() {
         brandTitle="Builder S"
         expandOnHover
       />
-      <div className={`${APP_SIDEBAR_RAIL_PAD} min-h-screen bg-transparent`}>
-        <div className="builder-theme relative min-h-screen bg-transparent text-white [color-scheme:dark]">
+      <div className={`${APP_SIDEBAR_RAIL_PAD} min-h-screen overflow-x-clip overflow-y-visible bg-[#04080C]`}>
+        <div className="builder-theme relative min-h-screen overflow-x-clip overflow-y-visible bg-[#04080C] text-white [color-scheme:dark]">
           <header className="absolute inset-x-0 top-0 z-40 flex items-center gap-2 border-b border-white/10 bg-[#0D1117]/70 px-4 py-3 backdrop-blur-md lg:hidden">
             <MobileAppNav brandEyebrow="TOKIOTOURS" brandTitle="Builder S" />
             <div className="min-w-0 flex-1" />
@@ -268,31 +268,32 @@ export function SingleDayBuilderView() {
             </Link>
           </header>
 
-          <div className="relative bg-transparent">
+          <div className="relative bg-[#04080C]">
             <SingleDayBuilderHero />
 
+            {/* Glass sheet overlaps hero fade — same as multi-day BuilderApp */}
             <div className="relative z-20 -mt-20 w-full bg-transparent sm:-mt-28">
-              <div className="px-3 pb-8 sm:px-4">
-                <div className="tokio-glass-sheet mx-auto max-w-3xl rounded-t-3xl border border-white/10">
-                  <div className="overflow-hidden rounded-t-3xl px-5 py-5 sm:px-6">
-                    <div className="flex items-start justify-between gap-4">
+              <div className="mx-auto w-full max-w-2xl px-4 pb-8 sm:max-w-3xl">
+                <div className="tokio-glass-sheet w-full rounded-t-3xl border border-white/10 bg-[#0A1017]/95 text-left shadow-2xl backdrop-blur-md">
+                  <div className="rounded-t-3xl px-5 pt-6 pb-5 sm:px-6">
+                    <div className="flex items-start justify-between gap-4 pt-1">
                       <div className="min-w-0">
-                        <p className="text-[10px] font-bold uppercase tracking-wider text-[#F29727]">
+                        <p className="text-[10px] font-bold uppercase tracking-wider text-amber-400">
                           {heroCopy.mainTitlePrefix}
                         </p>
-                        <h2 className="-mt-0.5 font-godiva text-[1.93rem] font-black uppercase tracking-wider text-white sm:text-[2.21rem]">
+                        <h2 className="font-godiva text-2xl font-bold uppercase tracking-wide text-white md:text-3xl">
                           {displayCity}
                         </h2>
-                        <p className="mt-1 max-w-sm font-futura text-xs leading-relaxed text-white/55 sm:text-sm">
+                        <p className="mt-2 text-xs text-zinc-400">
                           {dayTagline}
                         </p>
                       </div>
                       <div className="shrink-0 space-y-0.5 text-right">
-                        <p className="text-sm font-bold tracking-wide text-white sm:text-base">
+                        <p className="text-xs font-bold text-white">
                           {guestBadge.name}
                         </p>
                         {guestBadge.email ? (
-                          <p className="max-w-[14rem] truncate text-xs font-semibold text-[#075473] sm:max-w-[18rem]">
+                          <p className="max-w-[14rem] truncate font-mono text-[10px] text-cyan-400 sm:max-w-[18rem]">
                             {guestBadge.email}
                           </p>
                         ) : null}
