@@ -41,7 +41,7 @@ export function resolveResendApiKey(): string | undefined {
   return envVal("RESEND_API_KEY");
 }
 
-/** True when Hostinger SMTP is available (JSON store / defaults). */
+/** True when Bluehost cPanel SMTP is available (JSON store / defaults). */
 export function resolveSmtpConfigured(): boolean {
   const { host, user, pass } = getActiveEmailConfig().smtp;
   return Boolean(host && user && pass);
@@ -193,7 +193,7 @@ async function sendViaResend({
 }
 
 /**
- * Transactional itinerary email — prefers Hostinger SMTP from the
+ * Transactional itinerary email — prefers Bluehost cPanel SMTP from the
  * JSON/team config store, otherwise Resend. Always BCC team alert.
  */
 export async function sendItineraryEmail(
@@ -206,7 +206,7 @@ export async function sendItineraryEmail(
     try {
       return await sendViaSmtp(params);
     } catch (smtpErr) {
-      console.error("[email] Hostinger SMTP failed, trying Resend…", smtpErr);
+      console.error("[email] Bluehost SMTP failed, trying Resend…", smtpErr);
       if (resolveResendApiKey()) {
         return await sendViaResend(params);
       }
@@ -215,7 +215,7 @@ export async function sendItineraryEmail(
         : new MailDispatchError(
             smtpErr instanceof Error
               ? smtpErr.message
-              : "Failed to dispatch email via Hostinger SMTP",
+              : "Failed to dispatch email via Bluehost SMTP",
             500
           );
     }

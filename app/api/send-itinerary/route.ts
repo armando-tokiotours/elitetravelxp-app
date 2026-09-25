@@ -10,7 +10,7 @@ import { handleSendItinerary } from "@/lib/sendItinerary";
 /**
  * POST /api/send-itinerary
  *
- * Mode A: { email, bookingRef, pdfBase64?, customerName? } → Hostinger SMTP / Resend
+ * Mode A: { email, bookingRef, pdfBase64?, customerName? } → Bluehost SMTP / Resend
  * Mode B: { contactEmail, state, quote, pdfBase64?, … } → save PNR + email
  * Credentials / templates / BCC from config/emailConfig.json (Team Email Settings).
  */
@@ -112,7 +112,7 @@ export async function POST(req: Request) {
       id: result.id,
     });
   } catch (err: unknown) {
-    console.error("Hostinger SMTP Dispatch Error:", err);
+    console.error("Bluehost SMTP Dispatch Error:", err);
     if (err instanceof MailDispatchError) {
       return NextResponse.json({ error: err.message }, { status: err.status });
     }

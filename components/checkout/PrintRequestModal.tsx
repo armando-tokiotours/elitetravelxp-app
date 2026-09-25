@@ -53,7 +53,7 @@ function resolveKnownName(): string {
 }
 
 /**
- * Send / Save PDF — emails via Hostinger SMTP / Resend, with instant local PDF.
+ * Send / Save PDF — emails via Bluehost cPanel SMTP / Resend, with instant local PDF.
  * Opens with BookingTermsModal acknowledgment before the email / download form.
  */
 export function PrintRequestModal({

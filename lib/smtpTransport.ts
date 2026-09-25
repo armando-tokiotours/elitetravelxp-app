@@ -10,7 +10,7 @@ export type SmtpAuthConfig = {
 };
 
 /**
- * Hostinger / mail.tokiotours.com transporter (no_reply@tokiotours.com).
+ * Bluehost cPanel / mail.tokiotours.com transporter (no_reply@tokiotours.com).
  * Port 465 = implicit SSL/TLS (secure: true).
  * Pooling + timeouts help VPS environments where outbound SMTP is flaky.
  */
@@ -31,7 +31,7 @@ export function createSmtpTransport(smtp: SmtpAuthConfig) {
       pass: smtp.pass,
     },
     tls: {
-      // Custom Hostinger / domain certs can fail strict chain checks in some Node builds
+      // Custom cPanel / domain certs can fail strict chain checks in some Node builds
       rejectUnauthorized: false,
       minVersion: "TLSv1.2",
     },
