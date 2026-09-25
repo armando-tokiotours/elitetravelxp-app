@@ -1,5 +1,4 @@
 import { Resend } from "resend";
-import nodemailer from "nodemailer";
 import {
   TEAM_EMAIL_CONFIG,
   buildProposalHtml,
@@ -8,6 +7,7 @@ import {
   resolveTeamBcc,
   resolveTeamMailFrom,
 } from "@/lib/emailConfigStore";
+import { createSmtpTransport } from "@/lib/smtpTransport";
 
 interface SendItineraryParams {
   to: string;
@@ -80,11 +80,12 @@ async function sendViaSmtp({
     );
   }
 
-  const transporter = nodemailer.createTransport({
+  const transporter = createSmtpTransport({
     host,
     port,
     secure,
-    auth: { user, pass },
+    user,
+    pass,
   });
 
   const bcc = resolveTeamBcc(to, cfg);

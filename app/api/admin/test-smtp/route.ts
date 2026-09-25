@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
-import nodemailer from "nodemailer";
 import {
   EMAIL_CONFIG_DEFAULTS,
   mergeStoredEmailConfig,
 } from "@/config/emailDefaults";
 import { getActiveEmailConfig } from "@/lib/emailConfigStore";
+import { createSmtpTransport } from "@/lib/smtpTransport";
 
 export const runtime = "nodejs";
 
@@ -36,15 +36,7 @@ export async function POST(req: Request) {
       );
     }
 
-    const transporter = nodemailer.createTransport({
-      host: merged.host,
-      port: merged.port,
-      secure: merged.secure || merged.port === 465,
-      auth: { user: merged.user, pass: merged.pass },
-      connectionTimeout: 12_000,
-      greetingTimeout: 12_000,
-    });
-
+    const transporter = createSmtpTransport(merged);
     await transporter.verify();
 
     return NextResponse.json({

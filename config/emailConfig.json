@@ -4,10 +4,10 @@
     "port": 465,
     "secure": true,
     "user": "no_reply@tokiotours.com",
-    "pass": "Cococola2027-/"
+    "pass": ""
   },
   "routing": {
-    "fromName": "TOKIOTOURS",
+    "fromName": "Tokiotours Concierge",
     "fromAddress": "no_reply@tokiotours.com",
     "bccRecipient": "armando@tokiotours.nl"
   },

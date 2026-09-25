@@ -38,6 +38,8 @@ import {
   ELITE_CONCIERGE_FEE,
   ELITE_CONCIERGE_FEE_LABEL,
 } from "@/lib/eliteConcierge";
+import { activeBookingRef } from "@/utils/pnr";
+import { BRAND_DOMAIN } from "@/lib/brand";
 
 /** Formal luxury quotation / print document from persisted builder state. */
 export function PrintItineraryDocument({
@@ -188,6 +190,81 @@ export function PrintItineraryDocument({
             />
           </div>
         </header>
+
+        {/* Japan Booking Pass stub — print / PDF */}
+        <section className="mt-6 rounded-2xl border border-[#0A1017]/90 bg-[#0A1017] p-5 text-white print:break-inside-avoid">
+          {(() => {
+            const pnr =
+              activeBookingRef({
+                tempBookingRef: state.tempBookingRef,
+                confirmedBookingRef: state.confirmedBookingRef,
+                bookingStatus: state.bookingStatus,
+              }) ||
+              state.confirmedBookingRef ||
+              state.tempBookingRef ||
+              "······";
+            const site = `https://${BRAND_DOMAIN}`;
+            const dossierHref = `${site}/builder/itinerary?ref=${encodeURIComponent(pnr)}&view=dossier`;
+            const walletHref = `${site}/api/wallet/generate-pass?pnr=${encodeURIComponent(pnr)}`;
+            return (
+              <>
+                <div className="flex flex-wrap items-start justify-between gap-2 border-b border-dashed border-white/20 pb-3">
+                  <p className="text-[11px] font-bold tracking-widest text-[#F6A724] uppercase">
+                    Tokiotours Japan Pass
+                  </p>
+                  <p className="font-mono text-sm font-bold tracking-wider text-cyan-300">
+                    REF: {pnr}
+                  </p>
+                </div>
+                <div className="mt-3 space-y-1 text-sm">
+                  <p>
+                    <span className="text-zinc-400">GUEST:</span>{" "}
+                    <span className="font-semibold uppercase">
+                      {state.adults} adult
+                      {state.adults === 1 ? "" : "s"}
+                      {state.children
+                        ? `, ${state.children} child${state.children === 1 ? "" : "ren"}`
+                        : ""}
+                    </span>
+                  </p>
+                  <p>
+                    <span className="text-zinc-400">DATES:</span>{" "}
+                    <span className="font-semibold">
+                      {formatDisplayDate(state.arrivalDate)} –{" "}
+                      {formatDisplayDate(departureDate())}
+                    </span>
+                  </p>
+                  <p>
+                    <span className="text-zinc-400">DURATION:</span>{" "}
+                    <span className="font-semibold">
+                      {state.durationDays} day
+                      {state.durationDays === 1 ? "" : "s"}
+                    </span>
+                  </p>
+                </div>
+                <div className="mt-4 flex flex-wrap gap-2 no-print">
+                  <a
+                    href={dossierHref}
+                    className="rounded-xl bg-[#075473] px-3.5 py-2 text-[10px] font-bold tracking-wider text-white uppercase"
+                  >
+                    Open booking on website
+                  </a>
+                  <a
+                    href={walletHref}
+                    className="rounded-xl border border-zinc-600 bg-black px-3.5 py-2 text-[10px] font-bold tracking-wider text-white uppercase"
+                  >
+                    Save to Apple Wallet
+                  </a>
+                </div>
+                <p className="mt-3 hidden text-[10px] text-zinc-400 print:block">
+                  Website: {dossierHref}
+                  <br />
+                  Apple Wallet: {walletHref}
+                </p>
+              </>
+            );
+          })()}
+        </section>
 
         {/* Travel window */}
         <section className="mt-8">

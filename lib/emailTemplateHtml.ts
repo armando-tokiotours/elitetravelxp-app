@@ -20,6 +20,9 @@ export type ProposalEmailParams = {
   ctaButtonText?: string;
   /** Base site URL; manage link is built from bookingRef + email */
   siteOrigin?: string;
+  travelStyle?: string | null;
+  experienceTier?: string | null;
+  endDate?: string | null;
 } & ProposalTripMeta;
 
 const BRAND_RED = "#E60F43";
@@ -124,9 +127,25 @@ export function renderProposalEmailHtml(params: ProposalEmailParams): string {
   const isSingle = params.tourType === "single_day";
   const tourTypeLabel = isSingle ? "Single-Day Tour" : "Multi-Day Journey";
   const dateLabel = formatEmailDisplayDate(params.tourDate);
+  const endDateLabel = formatEmailDisplayDate(params.endDate);
   const adults = Math.max(0, Number(params.adults) || 0);
   const kids = Math.max(0, Number(params.children) || 0);
   const guestsLabel = `${adults} Adult${adults === 1 ? "" : "s"}, ${kids} Child${kids === 1 ? "" : "ren"}`;
+  const styleLabel = escapeHtml(params.travelStyle || "—");
+  const experienceLabel = escapeHtml(
+    params.experienceTier ||
+      (isSingle ? "Day Tour" : "Premium Concierge")
+  );
+  const datesPassLabel =
+    endDateLabel && endDateLabel !== "—" && endDateLabel !== dateLabel
+      ? `${escapeHtml(dateLabel)} to ${escapeHtml(endDateLabel)}`
+      : escapeHtml(dateLabel);
+  const dossierUrl = escapeHtml(
+    `${origin.replace(/\/$/, "")}/builder/itinerary?ref=${encodeURIComponent(params.bookingRef || "")}&view=dossier`
+  );
+  const walletUrl = escapeHtml(
+    `${origin.replace(/\/$/, "")}/api/wallet/generate-pass?pnr=${encodeURIComponent(params.bookingRef || "")}`
+  );
 
   return `<!DOCTYPE html>
 <html>
@@ -143,11 +162,24 @@ export function renderProposalEmailHtml(params: ProposalEmailParams): string {
             </td>
           </tr>
 
+          <!-- Japan Booking Pass stub -->
           <tr>
             <td style="padding-bottom:24px;">
-              <div style="background-color:${BG};border:1px solid ${BORDER};border-radius:12px;padding:16px;">
-                <span style="font-size:10px;text-transform:uppercase;color:${MUTED};letter-spacing:1px;display:block;margin-bottom:4px;">BOOKING REFERENCE</span>
-                <span style="font-size:22px;font-weight:800;color:${BRAND_AMBER};letter-spacing:2px;">${safeRef}</span>
+              <div style="background-color:#0A1017;color:#FFFFFF;padding:20px;border-radius:16px;border:1px solid ${BORDER};">
+                <table width="100%" border="0" cellspacing="0" cellpadding="0" style="border-bottom:1px dashed #334155;padding-bottom:12px;margin-bottom:12px;">
+                  <tr>
+                    <td style="color:${BRAND_AMBER};font-size:14px;font-weight:800;letter-spacing:0.06em;text-transform:uppercase;">TOKIOTOURS JAPAN PASS</td>
+                    <td align="right" style="font-family:monospace;font-size:14px;color:#38BDF8;">REF: ${safeRef}</td>
+                  </tr>
+                </table>
+                <p style="margin:4px 0;font-size:13px;"><strong style="color:${MUTED};">GUEST:</strong> ${safeName}</p>
+                <p style="margin:4px 0;font-size:13px;"><strong style="color:${MUTED};">PARTY:</strong> ${escapeHtml(guestsLabel)}</p>
+                <p style="margin:4px 0;font-size:13px;"><strong style="color:${MUTED};">STYLE &amp; EXPERIENCE:</strong> ${styleLabel} · ${experienceLabel}</p>
+                <p style="margin:4px 0;font-size:13px;"><strong style="color:${MUTED};">DATES:</strong> ${datesPassLabel}</p>
+                <div style="margin-top:18px;text-align:center;">
+                  <a href="${dossierUrl}" style="background-color:${CTA_TEAL};color:#ffffff;padding:12px 18px;text-decoration:none;font-weight:bold;border-radius:12px;display:inline-block;margin:4px;font-size:11px;letter-spacing:0.04em;">OPEN BOOKING ON WEBSITE</a>
+                  <a href="${walletUrl}" style="background-color:#000000;color:#ffffff;border:1px solid #475569;padding:12px 18px;text-decoration:none;font-weight:bold;border-radius:12px;display:inline-block;margin:4px;font-size:11px;letter-spacing:0.04em;">SAVE TO APPLE WALLET</a>
+                </div>
               </div>
             </td>
           </tr>

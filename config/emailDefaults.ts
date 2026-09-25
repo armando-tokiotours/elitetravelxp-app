@@ -54,10 +54,11 @@ export const EMAIL_CONFIG_DEFAULTS: StoredEmailConfig = {
     port: 465,
     secure: true,
     user: "no_reply@tokiotours.com",
-    pass: "Cococola2027-/",
+    /** Prefer SMTP_PASS / emailConfig.json — do not rely on this default in production. */
+    pass: "",
   },
   routing: {
-    fromName: "TOKIOTOURS",
+    fromName: "Tokiotours Concierge",
     fromAddress: "no_reply@tokiotours.com",
     bccRecipient: "armando@tokiotours.nl",
   },
@@ -126,6 +127,16 @@ export function mergeStoredEmailConfig(
 
 export function applyEnvOverrides(cfg: StoredEmailConfig): StoredEmailConfig {
   const port = Number(envVal("SMTP_PORT") || cfg.smtp.port);
+  const fromName =
+    envVal("SMTP_FROM_NAME") ||
+    envVal("MAIL_FROM_NAME") ||
+    cfg.routing.fromName;
+  const fromAddress =
+    envVal("SMTP_FROM_EMAIL") ||
+    envVal("MAIL_FROM_ADDRESS") ||
+    envVal("SMTP_USER") ||
+    cfg.routing.fromAddress;
+
   return {
     smtp: {
       host: envVal("SMTP_HOST") || cfg.smtp.host,
@@ -138,11 +149,8 @@ export function applyEnvOverrides(cfg: StoredEmailConfig): StoredEmailConfig {
       pass: envVal("SMTP_PASS") || cfg.smtp.pass,
     },
     routing: {
-      fromName: cfg.routing.fromName,
-      fromAddress:
-        envVal("MAIL_FROM_ADDRESS") ||
-        envVal("SMTP_USER") ||
-        cfg.routing.fromAddress,
+      fromName,
+      fromAddress,
       bccRecipient:
         envVal("BUSINESS_CONCIERGE_EMAIL") ||
         envVal("QUOTE_BCC_EMAIL") ||

@@ -1,11 +1,11 @@
 import { Resend } from "resend";
-import nodemailer from "nodemailer";
 import {
   getActiveEmailConfig,
   resolveTeamBcc,
   resolveTeamMailFrom,
 } from "@/lib/emailConfigStore";
 import { resolveResendApiKey } from "@/lib/email";
+import { createSmtpTransport } from "@/lib/smtpTransport";
 
 export type SendMailAttachment = {
   filename: string;
@@ -82,11 +82,12 @@ export async function sendTransactionalMail(
 
   const { host, port, user, pass, secure } = cfg.smtp;
   if (host && user && pass) {
-    const transporter = nodemailer.createTransport({
+    const transporter = createSmtpTransport({
       host,
       port,
       secure,
-      auth: { user, pass },
+      user,
+      pass,
     });
 
     await transporter.sendMail({

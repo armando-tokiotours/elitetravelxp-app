@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Apple, Loader2, RotateCcw } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
-import { downloadAppleWalletPass } from "@/lib/wallet/downloadApplePass";
+import { downloadAppleWalletPass, WalletPassFallbackError } from "@/lib/wallet/downloadApplePass";
 import type { BookingPassProps } from "./JapanBookingPass.types";
 
 export type { BookingPassProps, RouteBreakdownItem } from "./JapanBookingPass.types";
@@ -82,6 +82,13 @@ export function JapanBookingPass({
       });
       setWalletMsg("Pass downloaded — open with Apple Wallet on iPhone.");
     } catch (err) {
+      if (err instanceof WalletPassFallbackError) {
+        window.open(err.previewUrl, "_blank", "noopener,noreferrer");
+        setWalletMsg(
+          "Opened pass preview — on iPhone you can save or show the QR to concierge."
+        );
+        return;
+      }
       setWalletMsg(
         err instanceof Error
           ? err.message

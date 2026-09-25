@@ -64,11 +64,28 @@ export function saveEmailConfig(input: unknown): StoredEmailConfig {
   return next;
 }
 
-/** Formatted From header for nodemailer / Resend. */
 export function resolveTeamMailFrom(cfg?: StoredEmailConfig): string {
+  const active = cfg || getActiveEmailConfig();
+  const smtpReady = Boolean(
+    (envVal("SMTP_PASS") || active.smtp.pass) &&
+      (envVal("SMTP_USER") || active.smtp.user)
+  );
+
+  if (smtpReady) {
+    const name =
+      envVal("SMTP_FROM_NAME") ||
+      envVal("MAIL_FROM_NAME") ||
+      active.routing.fromName;
+    const address =
+      envVal("SMTP_FROM_EMAIL") ||
+      envVal("MAIL_FROM_ADDRESS") ||
+      active.routing.fromAddress;
+    return `"${name}" <${address}>`;
+  }
+
   const override = envVal("MAIL_FROM") || envVal("SMTP_FROM");
   if (override) return override;
-  const active = cfg || getActiveEmailConfig();
+
   return `"${active.routing.fromName}" <${active.routing.fromAddress}>`;
 }
 
