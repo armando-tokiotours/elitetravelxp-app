@@ -1,11 +1,14 @@
 /**
  * Dark Japan Pass email — three-tier layout:
- * 1) Hero banner (email-1.jpg)
+ * 1) Hero banner (email-1 — master SVG at /brand/email-1.svg; JPG used in HTML)
  * 2) Greeting + welcome + pass stub + CTAs
- * 3) Official footer banner (email-2)
+ * 3) Official footer banner (email-2 — master SVG at /brand/email-2.svg; PNG used in HTML)
  *
- * Solid hex backgrounds only (no rgba/gradients) so Gmail/Outlook
- * cannot fall back to white client chrome.
+ * Email clients (Gmail/Outlook/etc.) strip or block SVG <img> sources, so the
+ * HTML always references raster exports. Keep the .svg files as the source of truth.
+ *
+ * Solid hex backgrounds only (no rgba/gradients) so clients cannot fall back
+ * to white chrome.
  */
 
 export type BookingPassEmailFields = {
