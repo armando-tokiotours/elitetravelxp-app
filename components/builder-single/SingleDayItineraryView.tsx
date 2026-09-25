@@ -17,7 +17,6 @@ import {
 } from "@/lib/singleDayTimeSlots";
 import {
   guidePreferenceLabel,
-  singleDayPaceLabel,
 } from "@/lib/singleDayPricing";
 import {
   formatSingleDayDisplayDate,
@@ -25,10 +24,11 @@ import {
 } from "@/store/useSingleDayBuilderStore";
 import { useBuilderStore } from "@/store/useBuilderStore";
 import { useItineraryStore } from "@/store/useItineraryStore";
-import { NewBookingResetButton } from "@/components/builder/NewBookingResetButton";
 import { JapanBookingPass } from "@/components/dossier/JapanBookingPass";
 import {
   buildDossierQrUrl,
+  buildSingleDayHighlights,
+  experienceTierLabel,
   formatGuestCountText,
   mapBookingStatusToPass,
   resolvePnr,
@@ -51,7 +51,6 @@ export function SingleDayItineraryView() {
   const tourHours = useSingleDayBuilderStore((s) => s.tourHours);
   const startTime = useSingleDayBuilderStore((s) => s.startTime);
   const cityFocus = useSingleDayBuilderStore((s) => s.cityFocus);
-  const travelPace = useSingleDayBuilderStore((s) => s.travelPace);
   const guidePreference = useSingleDayBuilderStore((s) => s.guidePreference);
   const selectedExperiences = useSingleDayBuilderStore(
     (s) => s.selectedExperiences
@@ -60,6 +59,8 @@ export function SingleDayItineraryView() {
   const tempBookingRef = useBuilderStore((s) => s.tempBookingRef);
   const confirmedBookingRef = useBuilderStore((s) => s.confirmedBookingRef);
   const bookingStatus = useBuilderStore((s) => s.bookingStatus);
+  const experienceService = useBuilderStore((s) => s.experienceService);
+  const isEliteConcierge = useBuilderStore((s) => s.isEliteConcierge);
   const passengerName = useItineraryStore((s) => s.clientName);
 
   const [catalog, setCatalog] = useState<PbTour[]>([]);
@@ -132,11 +133,21 @@ export function SingleDayItineraryView() {
     ]);
   }, [timedStops.length, startTime, selectedExperiences, tourHours]);
 
-  const paceLabel = singleDayPaceLabel(travelPace);
   const guideLabel = guidePreferenceLabel(guidePreference);
   const dateLabel = formatSingleDayDisplayDate(tourDate) || "Date TBD";
   const cityLabel = cityFocus.trim() || "City TBD";
-  const hoursLabel = `${tourHours} Hour${tourHours === 1 ? "" : "s"}`;
+  const hoursLabel = `${tourHours} HOUR${tourHours === 1 ? "" : "S"}`;
+  const pnrCode = resolvePnr({
+    tempBookingRef,
+    confirmedBookingRef,
+    bookingStatus,
+  });
+  const passDate = dateLabel === "Date TBD" ? "" : dateLabel.toUpperCase();
+  const pickup = startTime || "09:00";
+  const highlights = buildSingleDayHighlights({
+    cityFocus: cityLabel,
+    guidePreference,
+  });
 
   return (
     <div
@@ -148,33 +159,23 @@ export function SingleDayItineraryView() {
       </p>
 
       <JapanBookingPass
-        pnrCode={resolvePnr({
-          tempBookingRef,
-          confirmedBookingRef,
-          bookingStatus,
-        })}
-        passengerName={passengerName}
-        guestCountText={formatGuestCountText(adults, children)}
-        travelStyle={guideLabel || "Day Tour"}
+        pnrCode={pnrCode}
+        guestName={passengerName || "GUEST"}
+        partyText={formatGuestCountText(adults, children)}
+        travelStyle={guideLabel || "DAY TOUR"}
         tripType="single"
-        originCode={cityLabel.length > 10 ? cityLabel.slice(0, 10).toUpperCase() : cityLabel.toUpperCase()}
-        originLabel="Meeting Point"
-        destinationCode="END"
-        destinationLabel="Drop-Off"
-        durationText={hoursLabel}
-        datesText={dateLabel === "Date TBD" ? "" : dateLabel}
-        status={mapBookingStatusToPass(bookingStatus)}
-        qrValue={buildDossierQrUrl(
-          resolvePnr({
-            tempBookingRef,
-            confirmedBookingRef,
-            bookingStatus,
-          }),
-          "/builder-single/itinerary"
+        experienceType={experienceTierLabel(
+          experienceService,
+          isEliteConcierge
         )}
-        paceLabel={paceLabel}
-        experienceLabel={guideLabel}
-        actions={<NewBookingResetButton />}
+        startTime={pickup}
+        endTime={dropOffTime || "15:00"}
+        singleDayHighlights={highlights}
+        durationText={hoursLabel}
+        startDateText={passDate}
+        endDateText={passDate}
+        status={mapBookingStatusToPass(bookingStatus)}
+        qrValue={buildDossierQrUrl(pnrCode, "/builder-single/itinerary")}
       />
 
       <SingleDayTimelineInfographic

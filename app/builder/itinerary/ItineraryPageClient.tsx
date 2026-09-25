@@ -32,6 +32,7 @@ import {
 } from "@/components/navigation/AppSidebar";
 import { PriceSummaryFooter } from "@/components/builder/PriceSummaryFooter";
 import { DossierSectionOutline } from "@/components/builder/DossierSectionOutline";
+import { NewBookingResetButton } from "@/components/builder/NewBookingResetButton";
 
 type ViewMode = "dossier" | "invoice";
 
@@ -275,21 +276,26 @@ export default function ItineraryPageClient() {
             />
           </div>
 
-          {/* Section 1 — Hero header + tabs */}
-          <DossierSectionOutline label="Section 1: Hero" className="no-print my-4">
-            <header>
-              <p className="text-[0.65rem] font-semibold uppercase tracking-[0.35em] text-[#F6A724]">
-                My Itinerary
-              </p>
-              <h1 className="mt-1 font-godiva text-3xl uppercase tracking-wide text-white">
-                Your Japan Journey
-              </h1>
-              <p className="mt-1 text-sm text-white/55">
-                Switch between travel dossier and private quotation.
-              </p>
+          {/* Section 1 — Hero header + navigation actions */}
+          <DossierSectionOutline
+            label="Section 1: Hero & Nav"
+            className="no-print my-4"
+          >
+            <header className="space-y-4 text-left">
+              <div>
+                <p className="font-mono text-[10px] font-bold tracking-widest text-amber-400 uppercase">
+                  My Itinerary
+                </p>
+                <h1 className="mt-1 font-godiva text-2xl tracking-wide text-white uppercase md:text-3xl">
+                  Your Japan Journey
+                </h1>
+                <p className="mt-1 text-xs text-zinc-400">
+                  Switch between travel dossier and private quotation.
+                </p>
+              </div>
 
               <div
-                className="mt-4 flex flex-wrap gap-2"
+                className="flex flex-wrap items-center gap-2 border-t border-white/10 pt-2"
                 role="tablist"
                 aria-label="Itinerary view"
               >
@@ -305,34 +311,32 @@ export default function ItineraryPageClient() {
                   icon={<FileText className="h-3.5 w-3.5" />}
                   label="Invoice / Print"
                 />
-              </div>
-
-              {activeView === "invoice" ? (
-                <div className="mt-4 flex flex-wrap gap-2">
+                {activeView === "invoice" ? (
+                  <>
+                    <Link
+                      href="/builder"
+                      className="inline-flex items-center gap-1.5 rounded-xl border border-zinc-700 bg-black/30 px-3.5 py-2 text-[11px] font-bold tracking-wider text-zinc-300 uppercase transition-all hover:bg-black/60"
+                    >
+                      ← Edit builder
+                    </Link>
+                    <button
+                      type="button"
+                      onClick={requestSendPdf}
+                      className="rounded-xl bg-[#075473] px-3.5 py-2 text-[11px] font-bold tracking-wider text-white uppercase"
+                    >
+                      Send / Save PDF
+                    </button>
+                  </>
+                ) : (
                   <Link
                     href="/builder"
-                    className="inline-flex rounded-full border border-white/20 bg-white/5 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/10"
-                  >
-                    ← Edit builder
-                  </Link>
-                  <button
-                    type="button"
-                    onClick={requestSendPdf}
-                    className="rounded-full bg-[#075473] px-5 py-2 text-sm font-semibold text-white"
-                  >
-                    Send / Save PDF
-                  </button>
-                </div>
-              ) : (
-                <div className="mt-4">
-                  <Link
-                    href="/builder"
-                    className="inline-flex rounded-full border border-white/20 bg-white/5 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-white/10"
+                    className="inline-flex items-center gap-1.5 rounded-xl border border-zinc-700 bg-black/30 px-3.5 py-2 text-[11px] font-bold tracking-wider text-zinc-300 uppercase transition-all hover:bg-black/60"
                   >
                     ← Continue editing
                   </Link>
-                </div>
-              )}
+                )}
+                <NewBookingResetButton variant="nav" />
+              </div>
             </header>
           </DossierSectionOutline>
 
@@ -514,10 +518,10 @@ function ToggleBtn({
       role="tab"
       aria-selected={active}
       onClick={onClick}
-      className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-2 text-xs font-semibold transition sm:text-sm ${
+      className={`inline-flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-[11px] font-bold tracking-wider uppercase transition-all ${
         active
-          ? "bg-[#075473] text-white shadow-md shadow-[#075473]/25"
-          : "border border-white/20 bg-transparent text-white/80 hover:bg-white/5 hover:text-white"
+          ? "border border-cyan-400/30 bg-[#075473] text-white shadow-md"
+          : "border border-white/10 bg-black/40 text-zinc-400 hover:text-white"
       }`}
     >
       {icon}

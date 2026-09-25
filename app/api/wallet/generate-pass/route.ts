@@ -31,16 +31,24 @@ export async function POST(req: Request) {
 
   const payload: ApplePassPayload = {
     pnrCode,
-    passengerName: String(body.passengerName || "GUEST"),
-    guestCountText: String(body.guestCountText || "—"),
+    guestName: String(body.guestName || "GUEST"),
+    partyText: String(body.partyText || "—"),
     travelStyle: String(body.travelStyle || "—"),
     tripType: body.tripType === "single" ? "single" : "multi",
+    experienceType: body.experienceType,
     originCode: body.originCode || "NRT",
     originLabel: body.originLabel || "TOKYO ENTRY",
     destinationCode: body.destinationCode || "HND",
     destinationLabel: body.destinationLabel || "DEPARTURE",
+    startTime: body.startTime,
+    endTime: body.endTime,
+    singleDayHighlights: body.singleDayHighlights,
     durationText: body.durationText || "",
-    datesText: String(body.datesText || ""),
+    startDateText: String(body.startDateText || ""),
+    endDateText: String(body.endDateText || ""),
+    routeBreakdown: Array.isArray(body.routeBreakdown)
+      ? body.routeBreakdown
+      : [],
     status: body.status || "IN_PROGRESS",
     qrValue: body.qrValue,
   };

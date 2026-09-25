@@ -1,61 +1,55 @@
 "use client";
 
 import { useState } from "react";
-import { Apple, Loader2 } from "lucide-react";
+import { Apple, Loader2, RotateCcw } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
-import { DossierSectionOutline } from "@/components/builder/DossierSectionOutline";
 import { downloadAppleWalletPass } from "@/lib/wallet/downloadApplePass";
 import type { BookingPassProps } from "./JapanBookingPass.types";
 
-export type { BookingPassProps } from "./JapanBookingPass.types";
+export type { BookingPassProps, RouteBreakdownItem } from "./JapanBookingPass.types";
 
+/**
+ * Reusable glassmorphic Japan Booking Pass — multi-day + single-day.
+ * Layout matches Builder M Travel Dossier Section 2 (Screenshot 13.05.34).
+ */
 export function JapanBookingPass({
   pnrCode,
-  passengerName,
-  guestCountText,
+  guestName,
+  partyText,
   travelStyle,
   tripType,
+  experienceType = "PREMIUM CONCIERGE",
   originCode = "NRT",
   originLabel = "TOKYO ENTRY",
   destinationCode = "HND",
   destinationLabel = "DEPARTURE",
-  durationText = "10 DAYS",
-  datesText,
+  durationText = "6 DAYS",
+  startDateText,
+  endDateText,
+  routeBreakdown = [],
+  startTime = "09:00",
+  endTime = "15:00",
+  singleDayHighlights,
   status = "IN_PROGRESS",
   qrValue,
-  paceLabel,
-  experienceLabel,
   actions,
   onDownloadWalletPass,
+  onRefreshPass,
   showSectionOutline = true,
 }: BookingPassProps) {
   const [walletBusy, setWalletBusy] = useState(false);
   const [walletMsg, setWalletMsg] = useState<string | null>(null);
+  const isSingle = tripType === "single";
 
   const resolvedQr =
     qrValue ||
     `https://tokiotours-app.com/builder/itinerary?ref=${encodeURIComponent(pnrCode)}&view=dossier`;
 
-  const displayName =
-    (passengerName || "").trim().split(/\s+/)[0]?.toUpperCase() || "GUEST";
-
-  const statusTone =
-    status === "CONFIRMED"
-      ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-400"
-      : status === "IN_PROGRESS"
-        ? "border-cyan-500/30 bg-cyan-500/10 text-cyan-400"
-        : status === "REVIEW"
-          ? "border-amber-500/40 bg-amber-500/10 text-amber-400"
-          : "border-white/20 bg-white/5 text-white/70";
-
-  const statusLabel =
-    status === "CONFIRMED"
-      ? "Confirmed"
-      : status === "IN_PROGRESS"
-        ? "In Progress"
-        : status === "REVIEW"
-          ? "Review"
-          : "Draft";
+  const nameParts = (guestName || "GUEST")
+    .trim()
+    .toUpperCase()
+    .split(/\s+/)
+    .filter(Boolean);
 
   const handleWallet = async () => {
     if (onDownloadWalletPass) {
@@ -67,16 +61,22 @@ export function JapanBookingPass({
     try {
       await downloadAppleWalletPass({
         pnrCode,
-        passengerName: displayName,
-        guestCountText,
+        guestName: nameParts.join(" "),
+        partyText,
         travelStyle,
         tripType,
+        experienceType,
         originCode,
         originLabel,
         destinationCode,
         destinationLabel,
+        startTime,
+        endTime,
+        singleDayHighlights,
         durationText,
-        datesText,
+        startDateText,
+        endDateText,
+        routeBreakdown,
         status,
         qrValue: resolvedQr,
       });
@@ -92,6 +92,11 @@ export function JapanBookingPass({
     }
   };
 
+  const leftCode = isSingle ? startTime || "09:00" : originCode;
+  const leftLabel = isSingle ? "START / PICKUP" : originLabel;
+  const rightCode = isSingle ? endTime || "15:00" : destinationCode;
+  const rightLabel = isSingle ? "FINISH / DROP-OFF" : destinationLabel;
+
   const ticket = (
     <div className="relative w-full overflow-hidden rounded-2xl border border-white/10 bg-[#0A1017]/90 text-white shadow-2xl">
       <div
@@ -104,120 +109,174 @@ export function JapanBookingPass({
       />
 
       <div className="grid grid-cols-1 md:grid-cols-12">
-        <div className="relative space-y-5 border-b border-dashed border-white/15 p-5 sm:p-6 md:col-span-8 md:border-r md:border-b-0">
-          <div
-            className="absolute -bottom-3 -left-3 z-10 h-6 w-6 rounded-full border border-white/10 bg-[#04080C] md:hidden"
-            aria-hidden
-          />
-          <div
-            className="absolute -right-3 -bottom-3 z-10 h-6 w-6 rounded-full border border-white/10 bg-[#04080C] md:hidden"
-            aria-hidden
-          />
-
+        <div className="space-y-4 border-b border-dashed border-white/15 p-6 md:col-span-8 md:border-r md:border-b-0">
           <div className="flex items-center justify-between gap-2">
             <div className="flex min-w-0 items-center gap-2">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src="/images/tokiotours-logo.png"
-                alt="TOKIOTOURS"
-                className="h-7 w-7 shrink-0 rounded-full object-cover ring-1 ring-white/15"
+                alt="Tokiotours"
+                className="h-6 w-6 shrink-0 rounded-full object-cover"
               />
-              <span className="font-godiva text-sm font-bold tracking-wider text-white uppercase">
+              <span className="font-godiva text-sm font-bold tracking-wider text-white">
                 TOKIOTOURS
               </span>
             </div>
-            <span className="shrink-0 rounded-full border border-cyan-500/30 bg-cyan-500/10 px-2.5 py-1 text-[10px] font-bold tracking-widest text-cyan-400 uppercase">
+            <span className="shrink-0 rounded-full border border-cyan-500/30 bg-cyan-500/10 px-3 py-1 text-[10px] font-bold tracking-widest text-cyan-400 uppercase">
               {tripType === "multi"
-                ? "Japan Multi-Day Pass"
-                : "Japan Day Tour Pass"}
+                ? "JAPAN MULTI-DAY PASS"
+                : "JAPAN DAY TOUR PASS"}
             </span>
           </div>
 
-          <div className="flex items-center justify-between pt-1">
+          <div className="flex items-center justify-between pt-2">
             <div>
-              <span className="font-mono text-2xl font-black tracking-wider text-white md:text-3xl">
-                {originCode}
+              <span
+                className={`font-black font-mono tracking-wider text-white ${
+                  isSingle
+                    ? "text-xl md:text-2xl"
+                    : "text-2xl md:text-3xl"
+                }`}
+              >
+                {leftCode}
               </span>
-              <span className="mt-0.5 block text-[10px] tracking-wider text-zinc-400 uppercase">
-                {originLabel}
+              <span className="block text-[10px] tracking-wider text-zinc-400 uppercase">
+                {leftLabel}
               </span>
             </div>
 
-            <div className="flex flex-col items-center px-3">
-              <span className="text-[9px] font-bold tracking-widest text-amber-400 uppercase">
+            <div className="flex flex-col items-center px-2 text-center">
+              <span className="text-[10px] font-bold tracking-widest text-amber-400 uppercase">
                 {durationText}
               </span>
-              <div className="relative my-1.5 h-[2px] w-20 bg-gradient-to-r from-cyan-500 via-amber-400 to-cyan-500 md:w-32">
-                <span className="absolute top-1/2 left-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-[#0A1017] bg-cyan-400" />
+              <div className="relative my-1 h-[2px] w-20 bg-gradient-to-r from-cyan-500 via-amber-400 to-cyan-500 md:w-28">
+                <span className="absolute -top-1 left-1/2 h-2.5 w-2.5 -translate-x-1/2 rounded-full border border-black bg-cyan-400" />
               </div>
-              <span className="max-w-[140px] truncate font-mono text-[9px] text-zinc-400">
-                {datesText || "Dates TBD"}
-              </span>
+              <div className="pt-0.5 font-mono text-[9px] leading-tight font-semibold text-zinc-300 uppercase">
+                {isSingle ? (
+                  <div>{startDateText || "DATE TBD"}</div>
+                ) : (
+                  <>
+                    <div>{startDateText || "DATE TBD"}</div>
+                    <div className="text-zinc-400">
+                      TO {endDateText || "DATE TBD"}
+                    </div>
+                  </>
+                )}
+              </div>
             </div>
 
             <div className="text-right">
-              <span className="font-mono text-2xl font-black tracking-wider text-white md:text-3xl">
-                {destinationCode}
+              <span
+                className={`font-black font-mono tracking-wider text-white ${
+                  isSingle
+                    ? "text-xl md:text-2xl"
+                    : "text-2xl md:text-3xl"
+                }`}
+              >
+                {rightCode}
               </span>
-              <span className="mt-0.5 block text-[10px] tracking-wider text-zinc-400 uppercase">
-                {destinationLabel}
+              <span className="block text-[10px] tracking-wider text-zinc-400 uppercase">
+                {rightLabel}
               </span>
             </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-3 border-t border-white/10 pt-3 text-left">
+          <div className="grid grid-cols-3 items-start gap-2 border-t border-white/10 pt-3 text-left">
             <div className="min-w-0">
               <span className="block text-[9px] font-semibold tracking-wider text-zinc-500 uppercase">
-                Passenger
+                GUEST
               </span>
-              <span className="mt-0.5 block truncate text-xs font-bold text-white uppercase">
-                {displayName}
+              <div className="pt-0.5 text-xs leading-tight font-bold tracking-wide text-white uppercase">
+                {nameParts.map((part, idx) => (
+                  <div key={`${part}-${idx}`} className="truncate">
+                    {part}
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="min-w-0">
+              <span className="block text-[9px] font-semibold tracking-wider text-zinc-500 uppercase">
+                PARTY
+              </span>
+              <span className="block truncate pt-0.5 text-xs font-bold text-white uppercase">
+                {partyText}
               </span>
             </div>
             <div className="min-w-0">
               <span className="block text-[9px] font-semibold tracking-wider text-zinc-500 uppercase">
-                Party
+                STYLE
               </span>
-              <span className="mt-0.5 block truncate text-xs font-bold text-white uppercase">
-                {guestCountText}
-              </span>
-            </div>
-            <div className="min-w-0">
-              <span className="block text-[9px] font-semibold tracking-wider text-zinc-500 uppercase">
-                Style
-              </span>
-              <span className="mt-0.5 block truncate text-xs font-bold text-amber-400 uppercase">
+              <span className="block truncate pt-0.5 text-xs font-bold text-amber-400 uppercase">
                 {travelStyle || "—"}
               </span>
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2 border-t border-white/10 pt-3">
-            <span
-              className={`rounded-full border px-2.5 py-1 text-[10px] font-bold tracking-wider uppercase ${statusTone}`}
-            >
-              {statusLabel}
-            </span>
-            {paceLabel ? (
-              <span className="rounded-full border border-white/15 bg-white/5 px-2.5 py-1 text-[10px] text-white/75">
-                {paceLabel}
-              </span>
-            ) : null}
-            {experienceLabel ? (
-              <span className="rounded-full border border-[#075473]/40 bg-[#075473]/10 px-2.5 py-1 text-[10px] text-[#F3D9C4]">
-                {experienceLabel}
-              </span>
-            ) : null}
-            {actions ? <div className="ml-auto">{actions}</div> : null}
-          </div>
+          {(isSingle || routeBreakdown.length > 0 || experienceType) && (
+            <div className="flex items-start justify-between gap-2 border-t border-white/10 pt-3 text-left">
+              <div className="min-w-0">
+                <span className="block text-[9px] font-semibold tracking-wider text-zinc-500 uppercase">
+                  {isSingle ? "HIGHLIGHTS & AREA" : "ROUTE & NIGHTS"}
+                </span>
+                <div className="flex flex-wrap items-center gap-1.5 pt-0.5 font-mono text-[11px] font-bold text-zinc-200">
+                  {isSingle ? (
+                    <span className="text-white">
+                      {singleDayHighlights || "TOKYO · DAY TOUR"}
+                    </span>
+                  ) : routeBreakdown.length === 0 ? (
+                    <span className="text-zinc-500">—</span>
+                  ) : (
+                    routeBreakdown.map((item, idx) => (
+                      <span
+                        key={`${item.city}-${idx}`}
+                        className="flex items-center gap-1"
+                      >
+                        <span className="text-white">{item.city}</span>
+                        {item.nights > 0 ? (
+                          <span className="text-[10px] text-amber-400">
+                            ({item.nights}N)
+                          </span>
+                        ) : null}
+                        {idx < routeBreakdown.length - 1 ? (
+                          <span className="text-zinc-600">→</span>
+                        ) : null}
+                      </span>
+                    ))
+                  )}
+                </div>
+              </div>
+              <div className="shrink-0 pl-2 text-right">
+                <span className="block text-[9px] font-semibold tracking-wider text-zinc-500 uppercase">
+                  EXPERIENCE TIER
+                </span>
+                <span className="mt-0.5 inline-block rounded border border-cyan-500/20 bg-cyan-950/40 px-2 py-0.5 text-[10px] font-bold tracking-wider text-cyan-300 uppercase">
+                  {experienceType}
+                </span>
+              </div>
+            </div>
+          )}
         </div>
 
-        <div className="relative flex flex-col items-center justify-center space-y-3 bg-cyan-950/20 p-5 text-center sm:p-6 md:col-span-4">
+        <div className="relative flex flex-col items-center justify-center space-y-3 bg-cyan-950/20 p-6 text-center md:col-span-4">
+          {actions ? (
+            <div className="absolute top-3 right-3">{actions}</div>
+          ) : onRefreshPass ? (
+            <button
+              type="button"
+              onClick={onRefreshPass}
+              title="Refresh Pass Details"
+              className="absolute top-3 right-3 rounded-lg bg-black/40 p-1.5 text-zinc-400 transition-all hover:bg-black/60 hover:text-white"
+            >
+              <RotateCcw className="h-3.5 w-3.5" />
+            </button>
+          ) : null}
+
           <div>
             <span className="block text-[9px] font-bold tracking-widest text-zinc-400 uppercase">
-              Booking Ref
+              BOOKING REF
             </span>
-            <span className="mt-0.5 block font-mono text-lg font-bold tracking-wider text-[#F6A724]">
+            <span className="block font-mono text-lg font-bold tracking-wider text-[#F6A724]">
               {pnrCode}
             </span>
           </div>
@@ -225,7 +284,7 @@ export function JapanBookingPass({
           <div className="rounded-xl border border-white/20 bg-white p-2.5 shadow-lg">
             <QRCodeSVG
               value={resolvedQr}
-              size={95}
+              size={100}
               bgColor="#FFFFFF"
               fgColor="#0A1017"
               level="H"
@@ -237,7 +296,7 @@ export function JapanBookingPass({
             type="button"
             onClick={() => void handleWallet()}
             disabled={walletBusy}
-            className="flex w-full items-center justify-center gap-1.5 rounded-xl border border-zinc-700 bg-black px-3 py-2 text-[10px] font-bold tracking-wider text-white uppercase shadow-md transition-all hover:bg-zinc-900 active:scale-95 disabled:opacity-60"
+            className="flex w-full items-center justify-center gap-1.5 rounded-xl border border-zinc-700 bg-black px-3 py-2.5 text-[10px] font-bold tracking-wider text-white uppercase shadow-md transition-all hover:bg-zinc-900 active:scale-95 disabled:opacity-60"
           >
             {walletBusy ? (
               <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" />
@@ -251,11 +310,7 @@ export function JapanBookingPass({
             <p className="text-[9px] leading-snug text-zinc-400" role="status">
               {walletMsg}
             </p>
-          ) : (
-            <span className="font-mono text-[9px] tracking-wider text-zinc-400 uppercase">
-              Scan for concierge access
-            </span>
-          )}
+          ) : null}
         </div>
       </div>
     </div>
@@ -264,8 +319,11 @@ export function JapanBookingPass({
   if (!showSectionOutline) return ticket;
 
   return (
-    <DossierSectionOutline label="Section 2: Booking Pass">
+    <div className="relative mx-auto my-6 w-full max-w-2xl rounded-3xl border-2 border-dashed border-white/40 bg-black/20 p-4">
+      <span className="absolute -top-3 left-4 z-20 rounded border border-white/30 bg-zinc-800 px-2 py-0.5 font-mono text-[9px] tracking-widest text-amber-400 uppercase">
+        SECTION 2: BOOKING PASS
+      </span>
       {ticket}
-    </DossierSectionOutline>
+    </div>
   );
 }

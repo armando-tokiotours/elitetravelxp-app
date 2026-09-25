@@ -1,10 +1,14 @@
 import type {
   BookingPassProps,
   BookingPassStatus,
+  RouteBreakdownItem,
 } from "@/components/dossier/JapanBookingPass.types";
 import type { BookingStatus } from "@/utils/pnr";
 import { activeBookingRef } from "@/utils/pnr";
 import { BRAND_DOMAIN } from "@/lib/brand";
+import { formatDisplayDate } from "@/store/useBuilderStore";
+import type { ExperienceService, LocationStop } from "@/store/useBuilderStore";
+import { isTransitHubStop } from "@/lib/transitHubs";
 
 export function mapBookingStatusToPass(
   status: BookingStatus
@@ -16,9 +20,59 @@ export function mapBookingStatusToPass(
 
 export function formatGuestCountText(adults: number, children: number): string {
   if (children > 0) {
-    return `${adults} Adult${adults === 1 ? "" : "s"}, ${children} Child${children === 1 ? "" : "ren"}`;
+    return `${adults} ADULT${adults === 1 ? "" : "S"}, ${children} CHILD${children === 1 ? "" : "REN"}`;
   }
-  return `${adults} Adult${adults === 1 ? "" : "s"}`;
+  return `${adults} ADULT${adults === 1 ? "" : "S"}`;
+}
+
+/** Uppercase pass date line (e.g. "30 SEPT 2026"). */
+export function formatPassDateLine(iso: string | null | undefined): string {
+  const raw = formatDisplayDate(iso);
+  if (!raw || raw === "—") return "";
+  return raw.toUpperCase();
+}
+
+export function experienceTierLabel(
+  experienceService: ExperienceService,
+  isEliteConcierge: boolean
+): string {
+  if (experienceService === "concierge" || isEliteConcierge) {
+    return "PREMIUM CONCIERGE";
+  }
+  if (experienceService === "tailored") {
+    return "SELF-GUIDED HYBRID";
+  }
+  return "SELF-GUIDED HYBRID";
+}
+
+/** Single-day highlights line, e.g. "TOKYO (WALKING + LUXURY VEHICLE)". */
+export function buildSingleDayHighlights(opts: {
+  cityFocus: string;
+  guidePreference?: "private_guide" | "local_host" | "self_paced" | string | null;
+}): string {
+  const area = (opts.cityFocus || "TOKYO").trim().toUpperCase() || "TOKYO";
+  const mode =
+    opts.guidePreference === "self_paced"
+      ? "WALKING"
+      : opts.guidePreference === "local_host"
+        ? "LOCAL HOST + TRANSIT"
+        : "WALKING + LUXURY VEHICLE";
+  return `${area} (${mode})`;
+}
+
+export function buildRouteBreakdown(
+  locations: LocationStop[],
+  cityName: (cityId: string) => string
+): RouteBreakdownItem[] {
+  return locations
+    .filter(
+      (l) => !isTransitHubStop(l) && (l.visitType === "stay" || !l.visitType)
+    )
+    .map((l) => ({
+      city: (cityName(l.cityId) || l.cityId || "CITY").toUpperCase(),
+      nights: Math.max(0, Math.round(Number(l.nights) || 0)),
+    }))
+    .filter((item) => item.nights > 0 || item.city);
 }
 
 /** Stable absolute dossier URL for QR / Wallet (SSR-safe, no window). */
@@ -44,4 +98,4 @@ export function resolvePnr(opts: {
   );
 }
 
-export type { BookingPassProps };
+export type { BookingPassProps, RouteBreakdownItem };

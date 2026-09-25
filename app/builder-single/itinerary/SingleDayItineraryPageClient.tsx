@@ -25,6 +25,7 @@ import {
   APP_SIDEBAR_RAIL_PAD,
   MobileAppNav,
 } from "@/components/navigation/AppSidebar";
+import { NewBookingResetButton } from "@/components/builder/NewBookingResetButton";
 
 type ViewMode = "dossier" | "invoice";
 
@@ -251,7 +252,7 @@ export default function SingleDayItineraryPageClient() {
           </p>
 
           <div
-            className="mt-4 inline-flex rounded-full border border-white/15 bg-[#0D1117] p-1 shadow-sm"
+            className="mt-4 flex flex-wrap items-center gap-2 border-t border-white/10 pt-2"
             role="tablist"
             aria-label="Single-day itinerary view"
           >
@@ -267,24 +268,22 @@ export default function SingleDayItineraryPageClient() {
               icon={<FileText className="h-3.5 w-3.5" />}
               label="Invoice / Print"
             />
-          </div>
-
-          <div className="mt-4 flex flex-wrap gap-2">
             <Link
               href="/builder-single"
-              className="inline-flex rounded-full border border-white/20 bg-white/5 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-white/10"
+              className="inline-flex items-center gap-1.5 rounded-xl border border-zinc-700 bg-black/30 px-3.5 py-2 text-[11px] font-bold tracking-wider text-zinc-300 uppercase transition-all hover:bg-black/60"
             >
-              Continue Editing Tour
+              ← Continue editing
             </Link>
             {activeView === "invoice" ? (
               <button
                 type="button"
                 onClick={requestSendPdf}
-                className="rounded-full bg-[#075473] px-5 py-2 text-sm font-semibold text-white"
+                className="rounded-xl bg-[#075473] px-3.5 py-2 text-[11px] font-bold tracking-wider text-white uppercase"
               >
-                Save & Email Proposal →
+                Save & Email →
               </button>
             ) : null}
+            <NewBookingResetButton variant="nav" />
           </div>
         </header>
 
@@ -462,10 +461,10 @@ function ToggleBtn({
       role="tab"
       aria-selected={active}
       onClick={onClick}
-      className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-2 text-xs font-semibold transition ${
+      className={`inline-flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-[11px] font-bold tracking-wider uppercase transition-all ${
         active
-          ? "bg-[#075473] text-white shadow-sm"
-          : "text-white/55 hover:text-white"
+          ? "border border-cyan-400/30 bg-[#075473] text-white shadow-md"
+          : "border border-white/10 bg-black/40 text-zinc-400 hover:text-white"
       }`}
     >
       {icon}

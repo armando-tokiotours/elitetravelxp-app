@@ -6,6 +6,16 @@ import type { ApplePassPayload } from "@/lib/wallet/downloadApplePass";
  */
 export function buildTokiotoursPassJson(payload: ApplePassPayload) {
   const serial = payload.pnrCode.replace(/[^A-Z0-9-]/gi, "").toUpperCase();
+  const isSingle = payload.tripType === "single";
+  const datesLine = isSingle
+    ? payload.startDateText || "TBD"
+    : [payload.startDateText, payload.endDateText].filter(Boolean).join(" – ");
+  const routeLine = isSingle
+    ? payload.singleDayHighlights || ""
+    : (payload.routeBreakdown || [])
+        .map((r) => `${r.city} (${r.nights}N)`)
+        .join(" → ");
+
   return {
     formatVersion: 1,
     passTypeIdentifier:
@@ -30,25 +40,31 @@ export function buildTokiotoursPassJson(payload: ApplePassPayload) {
       primaryFields: [
         {
           key: "origin",
-          label: payload.originLabel || "ORIGIN",
-          value: payload.originCode || "NRT",
+          label: isSingle ? "START / PICKUP" : payload.originLabel || "ORIGIN",
+          value: isSingle
+            ? payload.startTime || "09:00"
+            : payload.originCode || "NRT",
         },
         {
           key: "destination",
-          label: payload.destinationLabel || "DESTINATION",
-          value: payload.destinationCode || "HND",
+          label: isSingle
+            ? "FINISH / DROP-OFF"
+            : payload.destinationLabel || "DESTINATION",
+          value: isSingle
+            ? payload.endTime || "15:00"
+            : payload.destinationCode || "HND",
         },
       ],
       secondaryFields: [
         {
-          key: "passenger",
-          label: "PASSENGER",
-          value: payload.passengerName,
+          key: "guest",
+          label: "GUEST",
+          value: payload.guestName,
         },
         {
           key: "party",
           label: "PARTY",
-          value: payload.guestCountText,
+          value: payload.partyText,
         },
       ],
       auxiliaryFields: [
@@ -60,7 +76,7 @@ export function buildTokiotoursPassJson(payload: ApplePassPayload) {
         {
           key: "dates",
           label: "DATES",
-          value: payload.datesText || "TBD",
+          value: datesLine || "TBD",
         },
         {
           key: "duration",
@@ -72,10 +88,17 @@ export function buildTokiotoursPassJson(payload: ApplePassPayload) {
         {
           key: "tripType",
           label: "TRIP",
-          value:
-            payload.tripType === "single"
-              ? "Japan Day Tour Pass"
-              : "Japan Multi-Day Pass",
+          value: isSingle ? "Japan Day Tour Pass" : "Japan Multi-Day Pass",
+        },
+        {
+          key: "experience",
+          label: "EXPERIENCE TIER",
+          value: payload.experienceType || "",
+        },
+        {
+          key: "route",
+          label: isSingle ? "HIGHLIGHTS & AREA" : "ROUTE & NIGHTS",
+          value: routeLine || "",
         },
         {
           key: "status",
@@ -121,8 +144,6 @@ export async function notifyApplePassUpdate(opts: {
     };
   }
 
-  // Device registrations would be looked up by PNR serial + push tokens
-  // stored when Wallet hits /api/wallet/v1/devices/...
   console.info(
     `[wallet] APNs update queued for ${opts.pnrCode}: ${opts.reason || "fields changed"}`
   );

@@ -2,7 +2,7 @@ import type { BookingPassProps } from "@/components/dossier/JapanBookingPass.typ
 
 export type ApplePassPayload = Omit<
   BookingPassProps,
-  "actions" | "onDownloadWalletPass" | "showSectionOutline" | "paceLabel" | "experienceLabel"
+  "actions" | "onDownloadWalletPass" | "onRefreshPass" | "showSectionOutline"
 >;
 
 /** Client helper — downloads a signed .pkpass when the API can produce one. */

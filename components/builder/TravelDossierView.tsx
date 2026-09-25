@@ -30,7 +30,6 @@ import {
 } from "@/store/useBuilderStore";
 import { formatHotelRoomsSummary } from "@/lib/hotelCalculator";
 import { sortSelectedToursChronologically } from "@/lib/selectedTours";
-import { travelPaceLabel } from "@/lib/travelPace";
 import { CityThumb } from "@/components/builder/CityThumb";
 import { type TransitTicketType } from "@/lib/transitTickets";
 import {
@@ -42,10 +41,12 @@ import { TRAVEL_STYLES, labelFor } from "@/lib/preEliteBuilder";
 import { travelStyleTierRules } from "@/lib/preEliteHydrate";
 import { DossierSectionOutline } from "@/components/builder/DossierSectionOutline";
 import { JapanBookingPass } from "@/components/dossier/JapanBookingPass";
-import { NewBookingResetButton } from "@/components/builder/NewBookingResetButton";
 import {
   buildDossierQrUrl,
+  buildRouteBreakdown,
+  experienceTierLabel,
   formatGuestCountText,
+  formatPassDateLine,
   mapBookingStatusToPass,
   resolvePnr,
 } from "@/lib/dossier/bookingPassHelpers";
@@ -103,17 +104,11 @@ export function TravelDossierView({
   );
 
   const days = state.durationDays;
+  const startDateText = formatPassDateLine(state.arrivalDate);
+  const endDateText = formatPassDateLine(departureIso);
   const dateSpan = !state.arrivalDate
     ? "Dates TBD"
     : `${formatDisplayDate(state.arrivalDate)} – ${formatDisplayDate(departureIso)} (${days} Day${days === 1 ? "" : "s"})`;
-
-  const paceLabel = travelPaceLabel(state.travelPace);
-  const experienceLabel =
-    state.experienceService === "concierge" || state.isEliteConcierge
-      ? "Elite Concierge"
-      : state.experienceService === "tailored"
-        ? "Tailored Experiences"
-        : null;
 
   const arrivalHubLabel = hubFull(arrivalHub) || "Arrival hub";
   const departureHubLabel = hubFull(departureHub) || "Departure hub";
@@ -131,6 +126,11 @@ export function TravelDossierView({
     confirmedBookingRef: state.confirmedBookingRef,
     bookingStatus: state.bookingStatus,
   });
+  const routeBreakdown = buildRouteBreakdown(state.locations, cityName);
+  const experienceType = experienceTierLabel(
+    state.experienceService,
+    state.isEliteConcierge
+  );
 
   const saveLeg = (choice: {
     mode: CityTransitType;
@@ -154,21 +154,21 @@ export function TravelDossierView({
       {/* Section 2 — reusable Japan Booking Pass */}
       <JapanBookingPass
         pnrCode={pnrCode}
-        passengerName={passengerName}
-        guestCountText={formatGuestCountText(state.adults, state.children)}
+        guestName={passengerName || "GUEST"}
+        partyText={formatGuestCountText(state.adults, state.children)}
         travelStyle={styleLabel || "—"}
         tripType={state.tripMode === "single_day" ? "single" : "multi"}
+        experienceType={experienceType}
         originCode={originCode}
-        originLabel="Tokyo Entry"
+        originLabel="TOKYO ENTRY"
         destinationCode={destinationCode}
-        destinationLabel="Departure"
-        durationText={`${days} Day${days === 1 ? "" : "s"}`}
-        datesText={dateSpan === "Dates TBD" ? "" : dateSpan}
+        destinationLabel="DEPARTURE"
+        durationText={`${days} DAY${days === 1 ? "" : "S"}`}
+        startDateText={startDateText}
+        endDateText={endDateText}
+        routeBreakdown={routeBreakdown}
         status={mapBookingStatusToPass(state.bookingStatus)}
         qrValue={buildDossierQrUrl(pnrCode, "/builder/itinerary")}
-        paceLabel={paceLabel ? `${paceLabel} pace` : null}
-        experienceLabel={experienceLabel}
-        actions={<NewBookingResetButton />}
       />
 
       {afterSummary}
