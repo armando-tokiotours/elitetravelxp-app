@@ -239,12 +239,32 @@ export function PreBuildConfirmation({
       if (!res.ok) {
         throw new Error(payload?.error || "Could not send proposal email.");
       }
+      const guestSent = Boolean(payload?.guestSent);
+      const teamSent = Boolean(payload?.teamSent);
+      const mailErrors = Array.isArray(payload?.errors)
+        ? payload.errors.filter(Boolean)
+        : [];
+      if (!guestSent && !teamSent) {
+        throw new Error(
+          mailErrors[0] ||
+            "Mail server accepted the request but did not send any messages."
+        );
+      }
+      if (!guestSent) {
+        throw new Error(
+          mailErrors[0] ||
+            "Could not deliver email to your inbox. Team alert may have been sent — try again or check spam."
+        );
+      }
       markProposalSent(bookingRef, to);
       setIsEmailSent(true);
       setResendOpen(false);
-      setActionMsg("Request saved and email send, check you inbox.");
+      const okMsg = resend
+        ? "Email resent — check your inbox and spam folder."
+        : "Request saved and email sent — check your inbox.";
+      setActionMsg(okMsg);
       if (resend) {
-        setToast("Request saved and email send, check you inbox.");
+        setToast(okMsg);
       }
       // Unlock UI before PDF — html2pdf overlays must never freeze buttons.
       setSending(false);

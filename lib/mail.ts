@@ -81,6 +81,22 @@ async function sendViaSmtp(
     })),
   });
 
+  console.info("[mail] SMTP accepted", {
+    messageId: info.messageId,
+    accepted: info.accepted,
+    rejected: info.rejected,
+    response: info.response,
+    envelope: info.envelope,
+    to,
+    from,
+  });
+
+  if (Array.isArray(info.rejected) && info.rejected.length > 0) {
+    throw new Error(
+      `SMTP rejected recipient(s): ${info.rejected.join(", ")} (${info.response || "no response"})`
+    );
+  }
+
   return {
     sent: true,
     id: typeof info.messageId === "string" ? info.messageId : undefined,
@@ -116,7 +132,7 @@ async function sendViaResend(
 }
 
 /**
- * Prefer Hostinger SMTP when configured; fall back to Resend.
+ * Prefer Bluehost cPanel SMTP when configured; fall back to Resend.
  * (Resend alone fails when tokiotours.com is not verified on resend.com.)
  */
 export async function sendTransactionalMail(
@@ -133,7 +149,7 @@ export async function sendTransactionalMail(
       return await sendViaSmtp(input, from, to, bcc);
     } catch (smtpErr) {
       console.error(
-        "[mail] Hostinger SMTP failed, trying Resend…",
+        "[mail] Bluehost SMTP failed, trying Resend…",
         smtpErr instanceof Error ? smtpErr.message : smtpErr
       );
       if (resendKey) {

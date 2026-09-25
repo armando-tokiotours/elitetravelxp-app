@@ -10,7 +10,8 @@ export const runtime = "nodejs";
 
 /**
  * POST /api/admin/test-smtp
- * Verifies Hostinger SMTP credentials (from body or active config).
+ * Verifies Bluehost cPanel SMTP credentials.
+ * Optional body.sendTo → actually send a short diagnostic email and return SMTP receipt.
  */
 export async function POST(req: Request) {
   try {
@@ -22,6 +23,7 @@ export async function POST(req: Request) {
         user?: string;
         pass?: string;
       };
+      sendTo?: string;
     };
 
     const active = getActiveEmailConfig();
@@ -39,10 +41,48 @@ export async function POST(req: Request) {
     const transporter = createSmtpTransport(merged);
     await transporter.verify();
 
+    const sendTo = String(body.sendTo || "")
+      .trim()
+      .toLowerCase();
+    if (!sendTo) {
+      return NextResponse.json({
+        ok: true,
+        success: true,
+        message: `SMTP connection OK — ${merged.host}:${merged.port} as ${merged.user}`,
+      });
+    }
+
+    const stamp = new Date().toISOString();
+    const info = await transporter.sendMail({
+      from: `"TOKIOTOURS" <${merged.user}>`,
+      to: sendTo,
+      subject: `TOKIOTOURS SMTP diagnostic ${stamp}`,
+      text: [
+        "Bluehost cPanel SMTP diagnostic from tokiotours-app.com",
+        `Time: ${stamp}`,
+        `From: ${merged.user}`,
+        `Host: ${merged.host}:${merged.port}`,
+        "",
+        "If you received this, outbound SMTP delivery works.",
+      ].join("\n"),
+    });
+
+    console.info("[test-smtp] sent", {
+      messageId: info.messageId,
+      accepted: info.accepted,
+      rejected: info.rejected,
+      response: info.response,
+      to: sendTo,
+    });
+
     return NextResponse.json({
       ok: true,
       success: true,
-      message: `SMTP connection OK — ${merged.host}:${merged.port} as ${merged.user}`,
+      message: `SMTP sent diagnostic to ${sendTo}`,
+      messageId: info.messageId,
+      accepted: info.accepted,
+      rejected: info.rejected,
+      response: info.response,
     });
   } catch (err) {
     console.error("[test-smtp]", err);
@@ -52,7 +92,7 @@ export async function POST(req: Request) {
         error:
           err instanceof Error
             ? err.message
-            : "Failed to verify Hostinger SMTP connection",
+            : "Failed to verify Bluehost SMTP connection",
       },
       { status: 502 }
     );
