@@ -46,9 +46,78 @@ function resolveBccForRecipients(
   return Array.from(set);
 }
 
+function smtpReady(): boolean {
+  const { host, user, pass } = getActiveEmailConfig().smtp;
+  return Boolean(host && user && pass);
+}
+
+async function sendViaSmtp(
+  input: SendMailInput,
+  from: string,
+  to: string[],
+  bcc: string[]
+): Promise<{ sent: true; id?: string; bcc: string[] }> {
+  const cfg = getActiveEmailConfig();
+  const { host, port, user, pass, secure } = cfg.smtp;
+  const transporter = createSmtpTransport({
+    host,
+    port,
+    secure,
+    user,
+    pass,
+  });
+
+  const info = await transporter.sendMail({
+    from,
+    to,
+    ...(bcc.length ? { bcc } : {}),
+    subject: input.subject,
+    text: input.text,
+    html: input.html,
+    attachments: input.attachments?.map((a) => ({
+      filename: a.filename,
+      content: a.content,
+      contentType: a.contentType || "application/pdf",
+    })),
+  });
+
+  return {
+    sent: true,
+    id: typeof info.messageId === "string" ? info.messageId : undefined,
+    bcc,
+  };
+}
+
+async function sendViaResend(
+  input: SendMailInput,
+  from: string,
+  to: string[],
+  bcc: string[],
+  resendKey: string
+): Promise<{ sent: true; id?: string; bcc: string[] }> {
+  const resend = new Resend(resendKey);
+  const { data, error } = await resend.emails.send({
+    from,
+    to,
+    ...(bcc.length ? { bcc } : {}),
+    subject: input.subject,
+    text: input.text,
+    html: input.html,
+    attachments: input.attachments?.map((a) => ({
+      filename: a.filename,
+      content: a.content.toString("base64"),
+    })),
+  });
+
+  if (error) {
+    throw new Error(error.message || "Resend email failed.");
+  }
+  return { sent: true, id: data?.id, bcc };
+}
+
 /**
- * Prefer Resend SDK when RESEND_API_KEY is set; otherwise SMTP from team config.
- * Client receives the PDF; TokioTours team gets an automatic BCC.
+ * Prefer Hostinger SMTP when configured; fall back to Resend.
+ * (Resend alone fails when tokiotours.com is not verified on resend.com.)
  */
 export async function sendTransactionalMail(
   input: SendMailInput
@@ -59,51 +128,35 @@ export async function sendTransactionalMail(
   const bcc = resolveBccForRecipients(to, input.bcc, input.skipTeamBcc);
   const resendKey = resolveResendApiKey();
 
-  if (resendKey) {
-    const resend = new Resend(resendKey);
-    const { data, error } = await resend.emails.send({
-      from,
-      to,
-      ...(bcc.length ? { bcc } : {}),
-      subject: input.subject,
-      text: input.text,
-      html: input.html,
-      attachments: input.attachments?.map((a) => ({
-        filename: a.filename,
-        content: a.content.toString("base64"),
-      })),
-    });
-
-    if (error) {
-      throw new Error(error.message || "Resend email failed.");
+  if (smtpReady()) {
+    try {
+      return await sendViaSmtp(input, from, to, bcc);
+    } catch (smtpErr) {
+      console.error(
+        "[mail] Hostinger SMTP failed, trying Resend…",
+        smtpErr instanceof Error ? smtpErr.message : smtpErr
+      );
+      if (resendKey) {
+        try {
+          return await sendViaResend(input, from, to, bcc, resendKey);
+        } catch (resendErr) {
+          const smtpMsg =
+            smtpErr instanceof Error ? smtpErr.message : String(smtpErr);
+          const resendMsg =
+            resendErr instanceof Error ? resendErr.message : String(resendErr);
+          throw new Error(
+            `SMTP failed (${smtpMsg}); Resend also failed (${resendMsg}).`
+          );
+        }
+      }
+      throw smtpErr instanceof Error
+        ? smtpErr
+        : new Error(String(smtpErr));
     }
-    return { sent: true, id: data?.id, bcc };
   }
 
-  const { host, port, user, pass, secure } = cfg.smtp;
-  if (host && user && pass) {
-    const transporter = createSmtpTransport({
-      host,
-      port,
-      secure,
-      user,
-      pass,
-    });
-
-    await transporter.sendMail({
-      from,
-      to,
-      ...(bcc.length ? { bcc } : {}),
-      subject: input.subject,
-      text: input.text,
-      html: input.html,
-      attachments: input.attachments?.map((a) => ({
-        filename: a.filename,
-        content: a.content,
-        contentType: a.contentType || "application/pdf",
-      })),
-    });
-    return { sent: true, bcc };
+  if (resendKey) {
+    return await sendViaResend(input, from, to, bcc, resendKey);
   }
 
   return {
