@@ -12,7 +12,6 @@ import {
   useSingleDayBuilderStore,
 } from "@/store/useSingleDayBuilderStore";
 import { useBuilderStore } from "@/store/useBuilderStore";
-import { BookingRefBadge } from "@/components/builder/BookingRefBadge";
 import {
   calculateDayEndTime,
   calculateTimeSlots,
@@ -24,7 +23,7 @@ import {
 } from "@/components/builder-single/SingleDayTimelineInfographic";
 
 /**
- * Printable 1-page Single-Day invoice — isolated from multi-day PrintItineraryDocument.
+ * Printable Single-Day invoice — dark glassmorphic TOKIOTOURS ticket theme.
  */
 export function SingleDayInvoicePrint({
   embedded = false,
@@ -42,17 +41,22 @@ export function SingleDayInvoicePrint({
   const startTime = useSingleDayBuilderStore((s) => s.startTime);
   const cityFocus = useSingleDayBuilderStore((s) => s.cityFocus);
   const guidePreference = useSingleDayBuilderStore((s) => s.guidePreference);
+  const meetingPoint = useSingleDayBuilderStore((s) => s.meetingPoint);
+  const preferredTourLanguage = useSingleDayBuilderStore(
+    (s) => s.preferredTourLanguage
+  );
   const selectedExperiences = useSingleDayBuilderStore(
     (s) => s.selectedExperiences
   );
 
   const tempBookingRef = useBuilderStore((s) => s.tempBookingRef);
   const confirmedBookingRef = useBuilderStore((s) => s.confirmedBookingRef);
-  const bookingStatus = useBuilderStore((s) => s.bookingStatus);
   const isEliteConcierge = useBuilderStore((s) => s.isEliteConcierge);
   const experienceService = useBuilderStore((s) => s.experienceService);
   const conciergeActive =
     isEliteConcierge || experienceService === "concierge";
+
+  const pnr = (confirmedBookingRef || tempBookingRef || "—").toUpperCase();
 
   const quote = useMemo(
     () =>
@@ -96,20 +100,22 @@ export function SingleDayInvoicePrint({
   return (
     <div
       id="single-day-invoice-content"
-      className={`print-document text-[#0B1F3A] ${
-        embedded ? "" : "min-h-screen bg-[#F5F0E8]"
+      className={`print-document text-white ${
+        embedded ? "" : "min-h-screen bg-[#05080C]"
       }`}
     >
       {!embedded && showToolbar ? (
-        <div className="no-print border-b border-[#E8E2D9] bg-[#FBF8F2] px-4 py-4">
+        <div className="no-print border-b border-white/10 bg-[#0D1117] px-4 py-4">
           <div className="mx-auto flex max-w-3xl flex-wrap items-center justify-between gap-3">
-            <p className="text-sm font-semibold">Single-Day Invoice</p>
+            <p className="text-sm font-semibold text-white">
+              Single-Day Invoice
+            </p>
             <button
               type="button"
               onClick={() =>
                 onPrintRequest ? onPrintRequest() : window.print()
               }
-              className="rounded-full bg-[#0B1F3A] px-5 py-2 text-sm font-semibold text-white"
+              className="rounded-full bg-[#075473] px-5 py-2 text-sm font-semibold text-white"
             >
               Print / Save PDF
             </button>
@@ -117,60 +123,55 @@ export function SingleDayInvoicePrint({
         </div>
       ) : null}
 
-      <article className="mx-auto max-w-3xl bg-white px-5 py-8 sm:px-8">
-        <header className="border-b border-[#E8E2D9] pb-5">
-          <p className="text-[0.65rem] font-semibold uppercase tracking-[0.35em] text-[#8A8278]">
-            TOKIOTOURS
-          </p>
-          <h1 className="mt-2 font-godiva text-2xl uppercase tracking-wider sm:text-3xl">
-            Single-Day Tour Quotation
-          </h1>
-          <p className="mt-2 text-sm text-[#8A8278]">
-            Private day package — transit, guide, and selected experiences.
-          </p>
+      <article className="mx-auto max-w-3xl overflow-hidden rounded-2xl border border-white/10 bg-[#0D1117]/95 px-5 py-8 shadow-2xl backdrop-blur-md sm:px-8">
+        <header className="relative overflow-hidden rounded-2xl border border-[#075473]/40 bg-[#05080C] px-5 py-6">
+          <div
+            className="pointer-events-none absolute inset-0 opacity-30"
+            style={{
+              backgroundImage:
+                "radial-gradient(circle at 20% 20%, #075473 0%, transparent 45%), radial-gradient(circle at 80% 0%, #E60F43 0%, transparent 40%)",
+            }}
+          />
+          <div className="relative flex items-start justify-between gap-4">
+            <div>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/images/tokiotours-logo.png"
+                alt="TOKIOTOURS"
+                className="h-12 w-12 rounded-full object-cover"
+              />
+              <p className="mt-3 text-[0.65rem] font-semibold uppercase tracking-[0.35em] text-[#E60F43]">
+                TOKIOTOURS
+              </p>
+              <h1 className="mt-1 font-godiva text-2xl uppercase tracking-wider text-white sm:text-3xl">
+                Single-Day Tour Ticket
+              </h1>
+              <p className="mt-2 text-sm text-white/55">
+                Private day package — transit, guide, and selected experiences.
+              </p>
+            </div>
+            <div className="rounded-xl border border-[#F6A724]/40 bg-black/40 px-3 py-2 text-right">
+              <p className="text-[9px] font-bold uppercase tracking-[0.2em] text-white/45">
+                PNR
+              </p>
+              <p className="mt-1 font-mono text-lg font-bold tracking-wider text-[#F6A724]">
+                {pnr}
+              </p>
+            </div>
+          </div>
         </header>
 
-        <div className="mt-5">
-          <BookingRefBadge
-            tempBookingRef={tempBookingRef}
-            confirmedBookingRef={confirmedBookingRef}
-            bookingStatus={bookingStatus}
-            variant="inline"
-          />
-        </div>
-
         <dl className="mt-6 grid gap-3 text-sm sm:grid-cols-2">
-          <div>
-            <dt className="text-[0.65rem] font-bold uppercase tracking-[0.2em] text-[#8A8278]">
-              City Hub
-            </dt>
-            <dd className="mt-0.5 font-semibold">
-              {cityFocus.trim() || "—"}
-            </dd>
-          </div>
-          <div>
-            <dt className="text-[0.65rem] font-bold uppercase tracking-[0.2em] text-[#8A8278]">
-              Date & Duration
-            </dt>
-            <dd className="mt-0.5 font-semibold">
-              {dateLabel} · {tourHours}h
-            </dd>
-          </div>
-          <div>
-            <dt className="text-[0.65rem] font-bold uppercase tracking-[0.2em] text-[#8A8278]">
-              Guests
-            </dt>
-            <dd className="mt-0.5 font-semibold">{guests}</dd>
-          </div>
-          <div>
-            <dt className="text-[0.65rem] font-bold uppercase tracking-[0.2em] text-[#8A8278]">
-              Guide
-            </dt>
-            <dd className="mt-0.5 font-semibold">
-              {guidePreferenceLabel(guidePreference)} · starts{" "}
-              {formatClock12h(startTime || "09:00")}
-            </dd>
-          </div>
+          <Meta label="City Hub" value={cityFocus.trim() || "—"} />
+          <Meta label="Date & Duration" value={`${dateLabel} · ${tourHours}h`} />
+          <Meta label="Guests" value={guests} />
+          <Meta
+            label="Language / Guide"
+            value={`${preferredTourLanguage || "EN"} · ${guidePreferenceLabel(guidePreference)} · ${formatClock12h(startTime || "09:00")}`}
+          />
+          {meetingPoint ? (
+            <Meta label="Meeting point" value={meetingPoint} />
+          ) : null}
         </dl>
 
         {printStops.length > 0 ? (
@@ -187,13 +188,13 @@ export function SingleDayInvoicePrint({
               {timedStops.map((stop) => (
                 <li
                   key={`price-${stop.tourId}-${stop.stopNumber}`}
-                  className="flex justify-between gap-4 border-b border-[#F0EBE3] pb-1.5"
+                  className="flex justify-between gap-4 border-b border-white/10 pb-1.5"
                 >
-                  <span className="text-zinc-600">
+                  <span className="text-white/65">
                     STOP {String(stop.stopNumber).padStart(2, "0")} ·{" "}
                     {stop.title}
                   </span>
-                  <span className="shrink-0 font-semibold tabular-nums">
+                  <span className="shrink-0 font-semibold tabular-nums text-white">
                     {stop.price != null && stop.price > 0
                       ? formatEur(stop.price)
                       : "Incl."}
@@ -205,17 +206,17 @@ export function SingleDayInvoicePrint({
         ) : null}
 
         <section className="mt-8">
-          <h2 className="font-godiva text-sm uppercase tracking-wider text-[#8A8278]">
+          <h2 className="font-godiva text-sm uppercase tracking-wider text-white/50">
             Itemized Breakdown
           </h2>
           <ul className="mt-3 space-y-2.5 text-sm">
             {quote.lines.map((line) => (
               <li
                 key={line.id}
-                className="flex items-start justify-between gap-4 border-b border-[#F0EBE3] pb-2.5"
+                className="flex items-start justify-between gap-4 border-b border-white/10 pb-2.5"
               >
-                <span>{line.label}</span>
-                <span className="shrink-0 font-semibold tabular-nums">
+                <span className="text-white/75">{line.label}</span>
+                <span className="shrink-0 font-semibold tabular-nums text-white">
                   {formatEur(line.amountEur)}
                 </span>
               </li>
@@ -223,26 +224,37 @@ export function SingleDayInvoicePrint({
           </ul>
         </section>
 
-        <section className="mt-8 rounded-2xl border border-[#0B1F3A] bg-[#0B1F3A] px-5 py-5 text-white">
-          <p className="text-[0.65rem] font-bold uppercase tracking-[0.25em] text-white/60">
+        <section className="mt-8 rounded-2xl border border-[#075473]/50 bg-[#075473]/20 px-5 py-5">
+          <p className="text-[0.65rem] font-bold uppercase tracking-[0.25em] text-[#00B4D8]">
             Estimated Single-Day Package
           </p>
-          <p className="mt-2 font-display text-3xl font-semibold tabular-nums">
+          <p className="mt-2 font-display text-3xl font-semibold tabular-nums text-white">
             {formatEur(quote.totalEur)}
           </p>
-          <p className="mt-1 text-sm text-white/70 tabular-nums">
+          <p className="mt-1 text-sm text-white/60 tabular-nums">
             ≈ {formatYen(quote.totalYen)}
           </p>
-          <p className="mt-3 text-xs leading-relaxed text-white/55">
+          <p className="mt-3 text-xs leading-relaxed text-white/45">
             Estimate for planning. Final confirmation may adjust ticket
             availability, guide language, and seasonal surcharges.
           </p>
         </section>
 
-        <p className="mt-8 text-center text-[0.65rem] uppercase tracking-[0.25em] text-[#8A8278]">
+        <p className="mt-8 text-center text-[0.65rem] uppercase tracking-[0.25em] text-white/40">
           TOKIOTOURS · Single-Day Private Tour
         </p>
       </article>
+    </div>
+  );
+}
+
+function Meta({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-xl border border-white/10 bg-black/30 px-3 py-2.5">
+      <dt className="text-[0.65rem] font-bold uppercase tracking-[0.2em] text-white/40">
+        {label}
+      </dt>
+      <dd className="mt-0.5 font-semibold text-white">{value}</dd>
     </div>
   );
 }

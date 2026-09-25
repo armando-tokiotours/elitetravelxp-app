@@ -25,6 +25,7 @@ import {
 } from "@/lib/clientItineraryPdf";
 import { BookingTermsModal } from "@/components/checkout/BookingTermsModal";
 import { activeBookingRef } from "@/utils/pnr";
+import { useModalDismiss } from "@/hooks/useModalDismiss";
 
 export type PrintRequestResult = {
   bookingRef: string;
@@ -84,6 +85,8 @@ export function PrintRequestModal({
   const [showDirectDownload, setShowDirectDownload] = useState(false);
   const [pdfRef, setPdfRef] = useState(state.tempBookingRef || "TMP-DRAFT");
   const [termsAccepted, setTermsAccepted] = useState(skipTerms);
+
+  useModalDismiss(isOpen && termsAccepted, onClose, { lockScroll: false });
 
   const bookingRefDisplay = useMemo(
     () =>
@@ -308,11 +311,17 @@ export function PrintRequestModal({
 
   return (
     <div className="fixed inset-0 z-[90] flex items-end justify-center bg-black/45 p-4 sm:items-center no-print print:hidden">
+      <button
+        type="button"
+        aria-label="Close overlay"
+        className="absolute inset-0"
+        onClick={onClose}
+      />
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby="print-request-title"
-        className="w-full max-w-md rounded-2xl bg-white p-5 shadow-xl sm:p-6"
+        className="relative z-[1] w-full max-w-md rounded-2xl bg-white p-5 shadow-xl sm:p-6"
       >
         <div className="flex items-start justify-between gap-3">
           <div>
@@ -333,10 +342,10 @@ export function PrintRequestModal({
           <button
             type="button"
             onClick={onClose}
-            className="rounded-full p-2 text-[#8A8278] hover:bg-[#F5F0E8]"
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[#0B1F3A]/20 bg-[#F5F0E8] text-[#0B1F3A]"
             aria-label="Close"
           >
-            <X className="h-4 w-4" />
+            <X className="h-5 w-5" strokeWidth={2.5} />
           </button>
         </div>
 

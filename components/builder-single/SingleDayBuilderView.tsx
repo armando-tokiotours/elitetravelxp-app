@@ -26,12 +26,9 @@ import { hydrateStoresFromPreEliteBrief } from "@/lib/preEliteHydrate";
 import { useBuilderStore } from "@/store/useBuilderStore";
 import { usePreBuilderStore } from "@/store/usePreBuilderStore";
 import {
-  TOUR_HOUR_PRESETS,
   formatMinutes,
   totalScheduledMinutes,
   useSingleDayBuilderStore,
-  type DayBlockId,
-  type GuidePreference,
   type IntraCityTransport,
 } from "@/store/useSingleDayBuilderStore";
 import { BuilderAccordionProvider, useBuilderAccordionOptional } from "@/components/builder/BuilderAccordion";
@@ -39,6 +36,8 @@ import { SectionBlock } from "@/components/builder/ui";
 import { NewBookingResetButton } from "@/components/builder/NewBookingResetButton";
 import { SingleDayTripDurationSection } from "@/components/builder-s/SingleDayTripDurationSection";
 import { SingleDayExperiencesSection } from "@/components/builder-s/SingleDayExperiencesSection";
+import { MovementDetailModal } from "@/components/builder-s/MovementDetailModal";
+import { CityLanguageSelect } from "@/components/builder/CityLanguageSelect";
 import { SingleDayBuilderHero } from "@/components/builder-single/SingleDayBuilderHero";
 import { SingleDayProgressBar } from "@/components/builder-single/SingleDayProgressBar";
 import {
@@ -68,24 +67,6 @@ const TRANSPORT_OPTIONS: {
   { id: "private_driver", label: "Private driver", icon: Car },
 ];
 
-const GUIDE_OPTIONS: { id: GuidePreference; label: string; hint: string }[] = [
-  {
-    id: "private_guide",
-    label: "Private Guide",
-    hint: "Licensed host for the full day",
-  },
-  {
-    id: "local_host",
-    label: "Local Host",
-    hint: "Neighborhood specialist for key stops",
-  },
-  {
-    id: "self_paced",
-    label: "Self-Paced",
-    hint: "Timed route with written brief only",
-  },
-];
-
 const START_TIMES = [
   "08:00",
   "08:30",
@@ -108,6 +89,8 @@ export function SingleDayBuilderView() {
     name: "Guest Brief",
     email: "",
   });
+  const [movementModal, setMovementModal] =
+    useState<IntraCityTransport | null>(null);
 
   const setTripMode = useBuilderStore((s) => s.setTripMode);
   const tempBookingRef = useBuilderStore((s) => s.tempBookingRef);
@@ -117,16 +100,24 @@ export function SingleDayBuilderView() {
 
   const startTime = useSingleDayBuilderStore((s) => s.startTime);
   const tourHours = useSingleDayBuilderStore((s) => s.tourHours);
-  const guidePreference = useSingleDayBuilderStore((s) => s.guidePreference);
   const cityFocus = useSingleDayBuilderStore((s) => s.cityFocus);
   const blocks = useSingleDayBuilderStore((s) => s.blocks);
-  const tourDate = useSingleDayBuilderStore((s) => s.tourDate);
-  const setStartTime = useSingleDayBuilderStore((s) => s.setStartTime);
-  const setTourHours = useSingleDayBuilderStore((s) => s.setTourHours);
-  const setGuidePreference = useSingleDayBuilderStore(
-    (s) => s.setGuidePreference
+  const meetingPoint = useSingleDayBuilderStore((s) => s.meetingPoint);
+  const preferredMovement = useSingleDayBuilderStore(
+    (s) => s.preferredMovement
   );
+  const preferredTourLanguage = useSingleDayBuilderStore(
+    (s) => s.preferredTourLanguage
+  );
+  const setStartTime = useSingleDayBuilderStore((s) => s.setStartTime);
   const setCityFocus = useSingleDayBuilderStore((s) => s.setCityFocus);
+  const setMeetingPoint = useSingleDayBuilderStore((s) => s.setMeetingPoint);
+  const setPreferredMovement = useSingleDayBuilderStore(
+    (s) => s.setPreferredMovement
+  );
+  const setPreferredTourLanguage = useSingleDayBuilderStore(
+    (s) => s.setPreferredTourLanguage
+  );
 
   useEffect(() => {
     ensureTemp();
@@ -405,15 +396,15 @@ export function SingleDayBuilderView() {
               selectedCity={selectedCity}
             />
 
-            {/* §4 Transit & Transfers */}
+            {/* §4 Start time, meeting point & language */}
             <SectionBlock
               number={4}
-              title="Transit & Transfers"
+              title="Start Time, Meeting Point & Language"
               id="section-transit"
               icon="car"
-              summary={`${startTime} · ${tourHours}h · ${
-                GUIDE_OPTIONS.find((g) => g.id === guidePreference)?.label ?? ""
-              }`}
+              summary={`${startTime} · ${
+                preferredTourLanguage || "EN"
+              }${meetingPoint ? ` · ${meetingPoint}` : ""}`}
             >
               <div className="grid gap-5">
                 <div>
@@ -440,77 +431,58 @@ export function SingleDayBuilderView() {
 
                 <div>
                   <p className="mb-2 text-[10px] font-bold uppercase tracking-widest text-[#1BA58A]">
-                    Tour duration
+                    Meeting point
                   </p>
-                  <div className="grid grid-cols-3 gap-2">
-                    {TOUR_HOUR_PRESETS.map((h) => (
-                      <button
-                        key={h}
-                        type="button"
-                        onClick={() => setTourHours(h)}
-                        className={`px-4 py-3 text-left transition ${GLASS_CARD} ${
-                          tourHours === h
-                            ? "ring-2 ring-[#075473]"
-                            : "hover:border-white/25"
-                        }`}
-                      >
-                        <span className="block text-sm font-medium text-white">
-                          {h} Hours
-                        </span>
-                        <span className="mt-0.5 block text-xs text-white/50">
-                          {h === 3
-                            ? "Express highlights"
-                            : h === 6
-                              ? "Focused highlights"
-                              : "Full immersive day"}
-                        </span>
-                      </button>
-                    ))}
-                  </div>
+                  <p className="mb-2 text-xs text-white/45">
+                    Hotel lobby or station hub for morning pick-up.
+                  </p>
+                  <input
+                    type="text"
+                    value={meetingPoint}
+                    onChange={(e) => setMeetingPoint(e.target.value)}
+                    placeholder="e.g. Park Hyatt Tokyo lobby · Tokyo Station Yaesu"
+                    className="w-full rounded-xl border border-white/15 bg-[#121212] px-3 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-[#075473]"
+                  />
                 </div>
 
-                <div>
-                  <p className="mb-2 text-[10px] font-bold uppercase tracking-widest text-[#1BA58A]">
-                    Guide preference
+                {selectedCity ? (
+                  <CityLanguageSelect
+                    cityName={selectedCity.name}
+                    availableLanguages={selectedCity.available_languages}
+                    value={preferredTourLanguage}
+                    onChange={setPreferredTourLanguage}
+                  />
+                ) : (
+                  <p className="text-xs text-white/45">
+                    Choose a city focus to unlock tour languages.
                   </p>
-                  <div className="grid gap-2">
-                    {GUIDE_OPTIONS.map((opt) => (
-                      <button
-                        key={opt.id}
-                        type="button"
-                        onClick={() => setGuidePreference(opt.id)}
-                        className={`px-4 py-3 text-left transition ${GLASS_CARD} ${
-                          guidePreference === opt.id
-                            ? "ring-2 ring-[#075473]"
-                            : "hover:border-white/25"
-                        }`}
-                      >
-                        <span className="block text-sm text-white">
-                          {opt.label}
-                        </span>
-                        <span className="mt-0.5 block text-xs text-white/50">
-                          {opt.hint}
-                        </span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
+                )}
 
                 <div>
                   <p className="mb-2 text-[10px] font-bold uppercase tracking-widest text-[#1BA58A]">
                     Preferred movement
                   </p>
+                  <p className="mb-2 text-xs text-white/45">
+                    Tap an option for how transfers work during your day.
+                  </p>
                   <div className="grid grid-cols-3 gap-2">
                     {TRANSPORT_OPTIONS.map((opt) => {
                       const Icon = opt.icon;
+                      const on = preferredMovement === opt.id;
                       return (
-                        <div
+                        <button
                           key={opt.id}
-                          className={`${GLASS_CARD} flex flex-col items-center gap-1.5 px-2 py-3 text-[10px] text-white/70`}
+                          type="button"
+                          onClick={() => setMovementModal(opt.id)}
+                          className={`${GLASS_CARD} flex flex-col items-center gap-1.5 px-2 py-3 text-[10px] transition ${
+                            on
+                              ? "ring-2 ring-[#075473] text-white"
+                              : "text-white/70 hover:border-white/30"
+                          }`}
                         >
                           <Icon className="h-4 w-4 text-cyan-400" />
                           {opt.label}
-                        </div>
+                        </button>
                       );
                     })}
                   </div>
@@ -579,6 +551,16 @@ export function SingleDayBuilderView() {
           <BottomNav />
         </div>
       </div>
+
+      <MovementDetailModal
+        movementId={movementModal}
+        selected={preferredMovement}
+        onClose={() => setMovementModal(null)}
+        onSelect={(id) => {
+          setPreferredMovement(id);
+          setMovementModal(null);
+        }}
+      />
     </>
   );
 }
@@ -634,5 +616,3 @@ function SingleDayContinue({ next }: { next: number }) {
   );
 }
 
-/** Unused export kept for typed block helpers in tests / future UI. */
-export type { DayBlockId };

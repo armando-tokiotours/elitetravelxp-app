@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
-import { ArrowLeft, Check, Minus, Plus } from "lucide-react";
+import { ArrowLeft, Check, Minus, Plus, X } from "lucide-react";
 import type { PbSeasonTier } from "@/lib/pocketbase/client";
 import { resolveSeasonInsight } from "@/lib/seasonality";
 import { useSeasonalFxStore } from "@/store/useSeasonalFxStore";
@@ -12,6 +12,9 @@ import { PaceDetailModal } from "@/components/builder/modals/PaceDetailModal";
 import { SeasonalityDetailModal } from "@/components/builder/modals/SeasonalityDetailModal";
 import { DatePickerField } from "@/components/ui/CalendarModal";
 import { LazyVideo } from "@/components/ui/LazyVideo";
+import { useModalDismiss } from "@/hooks/useModalDismiss";
+import { parseItineraryData } from "@/lib/preEliteBuilder";
+import { experienceProfileFromBrief } from "@/lib/preEliteHydrate";
 import { type PaceId } from "@/lib/travelPace";
 import {
   TOUR_HOUR_PRESETS,
@@ -20,11 +23,12 @@ import {
   type TourDurationHours,
 } from "@/store/useSingleDayBuilderStore";
 import type { SeasonTierName } from "@/store/useBuilderStore";
+import { usePreBuilderStore } from "@/store/usePreBuilderStore";
 import { useSiteBrandingStore } from "@/store/useSiteBrandingStore";
 
 /**
  * Builder S–only tour details modal.
- * Guests → hours → tour date → travel pace. Never writes multi-day store.
+ * Guests → hours → tour date → travel pace. Seeds from Pre-Build when empty.
  */
 export function SingleDayTripDetailModal({
   open,
@@ -64,6 +68,8 @@ export function SingleDayTripDetailModal({
   const [paceModal, setPaceModal] = useState<PaceId | null>(null);
   const [seasonModalOpen, setSeasonModalOpen] = useState(false);
 
+  useModalDismiss(open, onClose);
+
   const totalGuests = adults + children;
   const canDone =
     Boolean(tourDate) &&
@@ -79,10 +85,39 @@ export function SingleDayTripDetailModal({
     if (!open) return;
     void ensureBrandingLoaded();
     setCustomDraft(String(tourHours));
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = "";
-    };
+
+    const pre = usePreBuilderStore.getState();
+    const brief = pre.lastPayload?.itineraryData
+      ? parseItineraryData(pre.lastPayload.itineraryData)
+      : null;
+    if (brief) {
+      const patch: Record<string, unknown> = {};
+      const sd = useSingleDayBuilderStore.getState();
+      const start =
+        brief.timing?.startDate ||
+        (brief.dates && /^\d{4}-\d{2}-\d{2}/.test(brief.dates)
+          ? brief.dates.slice(0, 10)
+          : null);
+      if (!sd.tourDate && start) patch.tourDate = start;
+      if (sd.adults === 2 && brief.groupSize.adults !== 2) {
+        patch.adults = Math.max(1, brief.groupSize.adults);
+      }
+      if (sd.children === 0 && brief.groupSize.children > 0) {
+        patch.children = brief.groupSize.children;
+      }
+      if (!sd.travelPace) {
+        const profile = experienceProfileFromBrief(brief);
+        patch.travelPace =
+          profile.pace === "relaxed"
+            ? "relaxed"
+            : profile.pace === "active"
+              ? "fast"
+              : "moderate";
+      }
+      if (Object.keys(patch).length) {
+        useSingleDayBuilderStore.setState(patch);
+      }
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- snapshot hours on open
   }, [open, ensureBrandingLoaded]);
 
@@ -131,7 +166,7 @@ export function SingleDayTripDetailModal({
       {open ? (
         <motion.div
           key="single-day-tour-detail"
-          className="fixed inset-0 z-[110] flex items-end justify-center bg-[#05080C]/55 backdrop-blur-sm sm:items-center sm:p-4"
+          className="fixed inset-0 z-[110] flex items-end justify-center bg-[#05080C]/55 backdrop-blur-sm sm:items-center sm:p-2"
           role="dialog"
           aria-modal="true"
           aria-label="Configure tour details"
@@ -142,18 +177,18 @@ export function SingleDayTripDetailModal({
         >
           <button
             type="button"
-            aria-label="Close"
+            aria-label="Close overlay"
             className="absolute inset-0 cursor-default"
             onClick={onClose}
           />
           <motion.div
-            className="relative z-[1] flex max-h-[min(92dvh,44rem)] w-full max-w-lg flex-col overflow-hidden rounded-t-3xl border border-white/10 bg-[#05080C]/88 shadow-2xl backdrop-blur-3xl sm:rounded-2xl"
+            className="relative z-[1] flex max-h-[min(96dvh,44rem)] w-full max-w-lg flex-col overflow-hidden rounded-t-3xl border border-white/10 bg-[#05080C]/88 shadow-2xl backdrop-blur-3xl sm:rounded-2xl"
             initial={{ opacity: 0, y: 24 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 24 }}
             transition={{ duration: 0.25, ease: "easeOut" }}
           >
-            <div className="flex shrink-0 items-center gap-3 border-b border-white/10 px-4 py-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
+            <div className="flex shrink-0 items-center gap-3 border-b border-white/10 px-4 py-2 pt-[max(0.5rem,env(safe-area-inset-top))]">
               <button
                 type="button"
                 onClick={onClose}
@@ -170,10 +205,17 @@ export function SingleDayTripDetailModal({
                   Configure Tour Details
                 </h3>
               </div>
+              <button
+                type="button"
+                onClick={onClose}
+                aria-label="Close"
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/25 bg-black/40 text-white"
+              >
+                <X className="h-5 w-5" strokeWidth={2.5} />
+              </button>
             </div>
 
-            <div className="min-h-0 flex-1 space-y-6 overflow-y-auto px-4 py-5 pb-8">
-              {/* 1. Guests */}
+            <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-4 py-4 pb-6">
               <div>
                 <p className="text-[10px] font-bold uppercase tracking-widest text-[#1BA58A]">
                   Number of Guests
@@ -194,7 +236,6 @@ export function SingleDayTripDetailModal({
                 </div>
               </div>
 
-              {/* 2. Duration hours */}
               <div>
                 <p className="text-[10px] font-bold uppercase tracking-widest text-[#1BA58A]">
                   Tour Duration (Hours)
@@ -257,7 +298,6 @@ export function SingleDayTripDetailModal({
                 ) : null}
               </div>
 
-              {/* 3. Tour date + seasonality */}
               <div className="flex flex-col gap-4 sm:grid sm:grid-cols-2 sm:gap-3">
                 <DatePickerField
                   value={tourDate}
@@ -284,7 +324,6 @@ export function SingleDayTripDetailModal({
                 />
               </div>
 
-              {/* 4. Travel pace */}
               <div>
                 <p className="text-[10px] font-bold uppercase tracking-widest text-[#1BA58A]">
                   Travel Pace
@@ -326,6 +365,10 @@ export function SingleDayTripDetailModal({
                               src={pace.image}
                               alt=""
                               className="h-full w-full object-cover"
+                              onError={(e) => {
+                                (e.currentTarget as HTMLImageElement).src =
+                                  "/brand/hero-single-day.jpg";
+                              }}
                             />
                           ) : null}
                           <span

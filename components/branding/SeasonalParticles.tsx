@@ -10,8 +10,11 @@ import {
 } from "@/store/useSeasonalFxStore";
 import type { ParticleSeason } from "@/lib/seasonality";
 
-/** Dense flurry — ~2× the original burst. */
-const PARTICLE_COUNT = 72;
+/** Soft ambient flurry — slower drift, staggered start. */
+const PARTICLE_COUNT = 48;
+
+/** Wave delays so petals start in a gentle cascade, not all at once. */
+const STAGGER_DELAYS_S = [0, 0.3, 0.7, 1.2] as const;
 
 type ParticleSpec = {
   id: number;
@@ -19,6 +22,7 @@ type ParticleSpec = {
   delay: string;
   duration: string;
   size: string;
+  height: string;
   drift: string;
   opacity: number;
   rotate: string;
@@ -29,23 +33,81 @@ function buildParticles(token: number): ParticleSpec[] {
   return Array.from({ length: PARTICLE_COUNT }, (_, i) => {
     const n = (seed + i * 7919) % 10000;
     const left = (n % 1000) / 10;
-    const delay = ((n % 90) / 100) * 0.85;
-    const duration = 1.85 + ((n % 55) / 100) * 1.15;
-    const size = 7 + (n % 16);
-    const drift = ((n % 70) - 35) * 2.2;
-    const opacity = 0.4 + ((n % 45) / 100) * 0.55;
+    // Staggered wave + tiny jitter so the cascade feels organic
+    const baseDelay = STAGGER_DELAYS_S[i % STAGGER_DELAYS_S.length];
+    const delay = baseDelay + ((n % 20) / 100) * 0.25;
+    // ~5s float; slight variance keeps the field from looking mechanical
+    const duration = 4.85 + ((n % 40) / 100) * 0.5;
+    // Soft petal sizes: ~16–25px wide, slightly taller for petal/leaf silhouette
+    const size = 16 + (n % 10);
+    const height = Math.round(size * 1.25);
+    // Wider side-to-side sway for natural flutter (px)
+    const drift = ((n % 80) - 40) * 1.15;
+    const opacity = 0.7 + ((n % 25) / 100) * 0.25;
     const rotate = `${(n % 360) - 180}deg`;
     return {
       id: i,
       left: `${left}%`,
-      delay: `${delay}s`,
-      duration: `${duration}s`,
+      delay: `${delay.toFixed(2)}s`,
+      duration: `${duration.toFixed(2)}s`,
       size: `${size}px`,
-      drift: `${drift}px`,
+      height: `${height}px`,
+      drift: `${drift.toFixed(1)}px`,
       opacity,
       rotate,
     };
   });
+}
+
+/** Soft cherry-blossom petal — readable at 16–25px. */
+function SakuraPetalSvg({ className }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      className={className}
+      aria-hidden
+      style={{ filter: "drop-shadow(0px 2px 4px rgba(230, 15, 67, 0.25))" }}
+    >
+      <path
+        d="M12 2C10.5 5 6 8.5 6 13.5C6 17.5 8.5 21 12 22C15.5 21 18 17.5 18 13.5C18 8.5 13.5 5 12 2Z"
+        fill="#FFB7C5"
+        fillOpacity="0.9"
+      />
+      <path
+        d="M12 2C11.2 6 8 9.5 8 13.5C8 16.5 9.8 19.5 12 20.5"
+        stroke="#E60F43"
+        strokeWidth="0.5"
+        strokeOpacity="0.4"
+      />
+    </svg>
+  );
+}
+
+/** Autumn maple leaf silhouette. */
+function MomijiLeafSvg({ className }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      className={className}
+      aria-hidden
+      style={{ filter: "drop-shadow(0px 2px 4px rgba(225, 29, 72, 0.2))" }}
+    >
+      <path
+        d="M12 3.2c.9 1.6 2.2 2.6 4.2 2.8-1.3.8-2.1 2-2.4 3.8 1.8-.2 3.4.2 4.8 1.4-1.6.7-2.7 1.8-3.3 3.4 1.2.1 2.4.6 3.4 1.5-1.8.3-3.1 1.1-4 2.5-.4-1.5-1.3-2.6-2.7-3.3-1.4.7-2.3 1.8-2.7 3.3-.9-1.4-2.2-2.2-4-2.5 1-.9 2.2-1.4 3.4-1.5-.6-1.6-1.7-2.7-3.3-3.4 1.4-1.2 3-1.6 4.8-1.4-.3-1.8-1.1-3-2.4-3.8 2-.2 3.3-1.2 4.2-2.8z"
+        fill="#E11D48"
+        fillOpacity="0.88"
+      />
+      <path
+        d="M12 3.5v14.5"
+        stroke="#7F1D1D"
+        strokeWidth="0.6"
+        strokeOpacity="0.35"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
 }
 
 function ParticleGlyph({
@@ -54,45 +116,30 @@ function ParticleGlyph({
   season: Exclude<ParticleSeason, null>;
 }) {
   if (season === "sakura") {
-    return (
-      <svg viewBox="0 0 24 24" className="pointer-events-none h-full w-full" aria-hidden>
-        <path
-          fill="currentColor"
-          d="M12 2c.4 2.8 1.6 4.6 3.6 5.4-1.6.6-2.8 2-3.6 4.2-.8-2.2-2-3.6-3.6-4.2C10.4 6.6 11.6 4.8 12 2zm0 20c-.4-2.8-1.6-4.6-3.6-5.4 1.6-.6 2.8-2 3.6-4.2.8 2.2 2 3.6 3.6 4.2C13.6 17.4 12.4 19.2 12 22zm10-10c-2.8-.4-4.6-1.6-5.4-3.6.6 1.6 2 2.8 4.2 3.6-2.2.8-3.6 2-4.2 3.6.8-2 2.6-3.2 5.4-3.6zM2 12c2.8.4 4.6 1.6 5.4 3.6-.6-1.6-2-2.8-4.2-3.6 2.2-.8 3.6-2 4.2-3.6C6.6 10.4 4.8 11.6 2 12z"
-        />
-        <circle cx="12" cy="12" r="2.2" fill="#FF69B4" />
-      </svg>
-    );
+    return <SakuraPetalSvg className="pointer-events-none h-full w-full" />;
   }
   if (season === "snow") {
     return (
-      <svg viewBox="0 0 24 24" className="pointer-events-none h-full w-full" aria-hidden>
+      <svg
+        viewBox="0 0 24 24"
+        className="pointer-events-none h-full w-full"
+        aria-hidden
+        style={{ filter: "drop-shadow(0px 1px 3px rgba(224, 247, 250, 0.35))" }}
+      >
         <g
           fill="none"
-          stroke="currentColor"
-          strokeWidth="1.6"
+          stroke="#E0F7FA"
+          strokeWidth="1.5"
           strokeLinecap="round"
+          opacity="0.92"
         >
           <path d="M12 2v20M4.9 4.9l14.2 14.2M19.1 4.9 4.9 19.1M2 12h20" />
         </g>
-        <circle cx="12" cy="12" r="2" fill="currentColor" opacity="0.85" />
+        <circle cx="12" cy="12" r="2" fill="#FFFFFF" opacity="0.9" />
       </svg>
     );
   }
-  return (
-    <svg viewBox="0 0 24 24" className="pointer-events-none h-full w-full" aria-hidden>
-      <path
-        fill="currentColor"
-        d="M12 3c1.2 2.4 2.8 3.6 5 3.6-1.8 1-2.8 2.6-3 4.8 2.2-.4 4-.2 5.6 1.2-2.2.8-3.6 2.2-4.2 4.4 1.6 0 3 .6 4.2 1.8-2.4.2-4.2 1.2-5.4 3.2-.4-2.2-1.4-3.8-3.2-4.8-1.8 1-2.8 2.6-3.2 4.8C6.6 21 4.8 20 2.4 19.8c1.2-1.2 2.6-1.8 4.2-1.8-.6-2.2-2-3.6-4.2-4.4 1.6-1.4 3.4-1.6 5.6-1.2-.2-2.2-1.2-3.8-3-4.8 2.2 0 3.8-1.2 5-3.6z"
-      />
-    </svg>
-  );
-}
-
-function seasonColor(season: Exclude<ParticleSeason, null>): string {
-  if (season === "sakura") return "#FFB7C5";
-  if (season === "snow") return "#E0F7FA";
-  return "#E11D48";
+  return <MomijiLeafSvg className="pointer-events-none h-full w-full" />;
 }
 
 function seasonBadgeEmoji(season: Exclude<ParticleSeason, null>): string {
@@ -102,7 +149,7 @@ function seasonBadgeEmoji(season: Exclude<ParticleSeason, null>): string {
 }
 
 /**
- * Full-screen seasonal ambient particles — dense 3s burst (incl. 0.5s fade).
+ * Full-screen seasonal ambient particles — gentle ~5s drift (plus fade).
  * Fixed full-viewport overlay for iOS Safari / Android Chrome; never blocks touch.
  */
 export function SeasonalParticlesHost() {
@@ -155,13 +202,7 @@ export function SeasonalParticlesHost() {
                   {
                     left: p.left,
                     width: p.size,
-                    height: p.size,
-                    color:
-                      season === "sakura" && p.id % 3 === 0
-                        ? "#FF69B4"
-                        : season === "momiji" && p.id % 2 === 0
-                          ? "#F29727"
-                          : seasonColor(season),
+                    height: p.height,
                     opacity: p.opacity,
                     animationDelay: p.delay,
                     animationDuration: p.duration,

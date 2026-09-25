@@ -80,7 +80,7 @@ export function buildDraftBoardingPassHtml(
   const ref = params.bookingRef.trim();
   const name = params.fullName.trim() || "Valued Guest";
   const email = params.email.trim().toLowerCase();
-  const resumeUrl = `${siteBaseUrl()}/builder?ref=${encodeURIComponent(ref)}`;
+  const resumeUrl = `${siteBaseUrl()}/manage?pnr=${encodeURIComponent(ref)}&email=${encodeURIComponent(email)}`;
   const arrival = formatArrivalLabel(itinerary);
   const days = itinerary.timing.totalDays;
   const style = labelFor(TRAVEL_STYLES, itinerary.travelStyle);
@@ -103,7 +103,7 @@ export function buildDraftBoardingPassHtml(
           <td style="padding:22px 24px 12px;border-bottom:1px dashed #075473;">
             ${teamBanner}
             <img src="https://tokiotours-app.com/images/tokiotours-logo.png" alt="TOKIOTOURS" width="44" height="44" style="display:block;border-radius:9999px;margin:0 0 12px 0;" />
-            <p style="margin:0;font-family:Helvetica,Arial,sans-serif;font-size:10px;letter-spacing:0.28em;text-transform:uppercase;color:#075473;">
+            <p style="margin:0;font-family:Helvetica,Arial,sans-serif;font-size:10px;letter-spacing:0.28em;text-transform:uppercase;color:#E60F43;">
               TOKIOTOURS · Draft Reservation Pass
             </p>
             <h1 style="margin:10px 0 0;font-size:26px;line-height:1.2;color:#FFFFFF;text-transform:uppercase;letter-spacing:0.05em;">Boarding Pass · Intent</h1>
@@ -115,7 +115,7 @@ export function buildDraftBoardingPassHtml(
               <tr>
                 <td style="padding:12px 14px;background:#121212;border:1px solid #075473;border-radius:12px;">
                   <p style="margin:0;font-family:Helvetica,Arial,sans-serif;font-size:10px;letter-spacing:0.22em;text-transform:uppercase;color:#075473;">Pass Ref</p>
-                  <p style="margin:6px 0 0;font-family:Helvetica,Arial,sans-serif;font-size:22px;font-weight:700;letter-spacing:0.08em;color:#FFFFFF;">${escapeHtml(ref)}</p>
+                  <p style="margin:6px 0 0;font-family:Helvetica,Arial,sans-serif;font-size:22px;font-weight:700;letter-spacing:0.08em;color:#F6A724;">${escapeHtml(ref)}</p>
                 </td>
               </tr>
             </table>
@@ -179,7 +179,7 @@ export function buildDraftBoardingPassHtml(
 
             <div style="margin-top:22px;text-align:center;">
               <a href="${escapeHtml(resumeUrl)}" style="display:inline-block;padding:14px 28px;border-radius:999px;background:#075473;color:#FFFFFF;font-family:Helvetica,Arial,sans-serif;font-size:13px;font-weight:700;text-decoration:none;letter-spacing:0.04em;">
-                Continue in Trip Builder →
+                REVIEW YOUR BOOKING BRIEF →
               </a>
               <p style="margin:12px 0 0;font-family:Helvetica,Arial,sans-serif;font-size:11px;color:#8A8278;">
                 ${escapeHtml(resumeUrl)}
@@ -213,7 +213,7 @@ export function buildDraftBoardingPassText(
     return `Draft reservation pass ${params.bookingRef}`;
   }
   const ref = params.bookingRef.trim();
-  const resumeUrl = `${siteBaseUrl()}/builder?ref=${encodeURIComponent(ref)}`;
+  const resumeUrl = `${siteBaseUrl()}/manage?pnr=${encodeURIComponent(ref)}&email=${encodeURIComponent(params.email.trim().toLowerCase())}`;
   const prefix = variant === "team" ? "[CONCIERGE ALERT] " : "";
   return `${prefix}TOKIOTOURS · DRAFT RESERVATION PASS
 PASS REF: ${ref}
@@ -229,7 +229,7 @@ Interests: ${itinerary.interests.map((id) => labelFor(INTERESTS, id)).join(", ")
 Concerns: ${itinerary.painPoints.map((id) => labelFor(PAIN_POINTS, id)).join(", ")}
 
 This email confirms your draft booking intent under PNR ${ref}.
-Continue building: ${resumeUrl}`;
+Review your booking brief: ${resumeUrl}`;
 }
 
 /**

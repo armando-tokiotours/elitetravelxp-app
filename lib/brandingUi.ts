@@ -240,6 +240,36 @@ export const BRANDING_UI_FALLBACKS: Record<string, BrandingUiFallback> = {
     /** Godiva / sheet prefix — e.g. "YOUR DAY IN" */
     ctaPrimary: SINGLE_DAY_BUILDER_CONFIG.hero.mainTitlePrefix,
   },
+  transit_walk: {
+    key: "transit_walk",
+    category: "builder",
+    title: "Walking",
+    subtitle: "Neighborhood pace on foot",
+    description:
+      "Your host leads you through alleys, temples, and market streets on foot. Ideal for compact districts where the best moments sit between subway exits.\n\nComfortable shoes recommended. Luggage stays at your hotel; we plan loops that return you near your meeting point.",
+    mediaFallback: "/brand/hero-single-day.jpg",
+    sortOrder: 10,
+  },
+  transit_subway: {
+    key: "transit_subway",
+    category: "builder",
+    title: "Subway",
+    subtitle: "IC card + guided transfers",
+    description:
+      "We provide (or top up) a Suica/Pasmo IC card and escort every transfer. Your host handles ticket gates, platform changes, and station exits so you never guess which stairs to take.\n\nBest for covering distant districts in one day while staying light and flexible.",
+    mediaFallback: "/brand/hero-single-day.jpg",
+    sortOrder: 11,
+  },
+  transit_private_driver: {
+    key: "transit_private_driver",
+    category: "builder",
+    title: "Private Driver",
+    subtitle: "Door-to-door vehicle",
+    description:
+      "A licensed private driver meets you at your hotel or station hub and relocates you between stops. Drop-off at each experience; rejoin after for the next leg.\n\nBest for families, luggage days, rain, or when you want zero station friction between icons.",
+    mediaFallback: "/brand/hero-single-day.jpg",
+    sortOrder: 12,
+  },
 };
 
 export const CONCIERGE_POSTER_FALLBACK = "/images/concierge-poster.webp";

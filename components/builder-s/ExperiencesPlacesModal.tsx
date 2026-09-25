@@ -10,7 +10,9 @@ import {
   GripVertical,
   MapPin,
   Plus,
+  X,
 } from "lucide-react";
+import { useModalDismiss } from "@/hooks/useModalDismiss";
 import {
   pbFileUrl,
   tourMediaFile,
@@ -40,7 +42,6 @@ import {
 } from "@/store/useSingleDayBuilderStore";
 import { useActiveMatchProfile } from "@/store/useQuizStore";
 import { LazyVideo } from "@/components/ui/LazyVideo";
-import { CityLanguageSelect } from "@/components/builder/CityLanguageSelect";
 
 /**
  * Builder S — full Experiences & Places configure modal
@@ -73,15 +74,14 @@ export function ExperiencesPlacesModal({
   const preferredTourLanguage = useSingleDayBuilderStore(
     (s) => s.preferredTourLanguage
   );
-  const setPreferredTourLanguage = useSingleDayBuilderStore(
-    (s) => s.setPreferredTourLanguage
-  );
   const experienceProfile = useActiveMatchProfile();
 
   const [mounted, setMounted] = useState(false);
   const [tab, setTab] = useState<ExperiencesPlacesTab>("all");
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+
+  useModalDismiss(open, onClose);
 
   const guests = useMemo(
     () => ({ adults, children }),
@@ -175,7 +175,7 @@ export function ExperiencesPlacesModal({
       {open ? (
         <motion.div
           key="experiences-places-modal"
-          className="fixed inset-0 z-[110] flex items-end justify-center bg-[#05080C]/55 backdrop-blur-sm sm:items-center sm:p-4"
+          className="fixed inset-0 z-[110] flex items-end justify-center bg-[#05080C]/55 backdrop-blur-sm sm:items-center sm:p-2"
           role="dialog"
           aria-modal="true"
           aria-label="Experiences and Places"
@@ -198,7 +198,7 @@ export function ExperiencesPlacesModal({
             transition={{ duration: 0.25, ease: "easeOut" }}
           >
             {/* Header */}
-            <div className="flex shrink-0 items-center gap-3 border-b border-white/10 px-4 py-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
+            <div className="flex shrink-0 items-center gap-3 border-b border-white/10 px-4 py-2 pt-[max(0.5rem,env(safe-area-inset-top))]">
               <button
                 type="button"
                 onClick={onClose}
@@ -215,6 +215,14 @@ export function ExperiencesPlacesModal({
                   Experiences & Places
                 </h3>
               </div>
+              <button
+                type="button"
+                onClick={onClose}
+                aria-label="Close"
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/25 bg-black/40 text-white"
+              >
+                <X className="h-5 w-5" strokeWidth={2.5} />
+              </button>
             </div>
 
             {/* Time budget */}
@@ -332,15 +340,7 @@ export function ExperiencesPlacesModal({
             </div>
 
             {/* Feed */}
-            <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-4 pb-8">
-              {selectedCity ? (
-                <CityLanguageSelect
-                  cityName={selectedCity.name}
-                  availableLanguages={selectedCity.available_languages}
-                  value={preferredTourLanguage}
-                  onChange={setPreferredTourLanguage}
-                />
-              ) : null}
+            <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-3 pb-6">
               {!selectedCity ? (
                 <p className="text-sm text-white/50">
                   Choose a city focus first.
@@ -389,7 +389,7 @@ export function ExperiencesPlacesModal({
                       data-lat={loc?.lat ?? undefined}
                       data-lng={loc?.lng ?? undefined}
                     >
-                      <div className="relative aspect-[16/10] w-full bg-zinc-900">
+                      <div className="relative aspect-[3/4] w-full overflow-hidden bg-zinc-900 sm:aspect-[16/9]">
                         {pbMedia && mediaType === "Video" ? (
                           <LazyVideo
                             src={pbMedia}
@@ -398,14 +398,18 @@ export function ExperiencesPlacesModal({
                             loop
                             playsInline
                             autoPlay
-                            className="h-full w-full object-cover"
+                            className="absolute inset-0 h-full w-full object-cover"
                           />
                         ) : poster ? (
                           // eslint-disable-next-line @next/next/no-img-element
                           <img
                             src={poster}
                             alt=""
-                            className="h-full w-full object-cover"
+                            className="absolute inset-0 h-full w-full object-cover"
+                            onError={(e) => {
+                              (e.currentTarget as HTMLImageElement).src =
+                                "/brand/hero-single-day.jpg";
+                            }}
                           />
                         ) : (
                           <div className="flex h-full items-end bg-gradient-to-br from-[#1a3355] to-[#0B1F3A] p-4">

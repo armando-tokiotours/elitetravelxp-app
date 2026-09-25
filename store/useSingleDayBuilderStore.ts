@@ -47,6 +47,10 @@ export interface SingleDayBuilderState {
   cityFocus: string;
   /** Preferred guided language code for the city (EN, JA, …). */
   preferredTourLanguage: string;
+  /** Hotel name or station hub for morning pick-up. */
+  meetingPoint: string;
+  /** Preferred intra-city movement for the day. */
+  preferredMovement: IntraCityTransport | null;
   blocks: DayBlock[];
   selectedExperiences: SingleDaySelectedExperience[];
   /** True after Save & Continue on Experiences (allows empty / skip). */
@@ -61,6 +65,8 @@ export interface SingleDayBuilderState {
   setGuidePreference: (pref: GuidePreference) => void;
   setCityFocus: (city: string) => void;
   setPreferredTourLanguage: (code: string) => void;
+  setMeetingPoint: (value: string) => void;
+  setPreferredMovement: (value: IntraCityTransport | null) => void;
   addExperience: (row: SingleDaySelectedExperience) => void;
   removeExperience: (tourId: string) => void;
   reorderExperiences: (fromIndex: number, toIndex: number) => void;
@@ -143,6 +149,8 @@ const initialState = {
   guidePreference: "private_guide" as GuidePreference,
   cityFocus: "Tokyo",
   preferredTourLanguage: "EN",
+  meetingPoint: "",
+  preferredMovement: null as IntraCityTransport | null,
   blocks: initialBlocks,
   selectedExperiences: [] as SingleDaySelectedExperience[],
   experiencesStepDone: false,
@@ -173,6 +181,9 @@ export const useSingleDayBuilderStore = create<SingleDayBuilderState>()(
         set({ cityFocus, experiencesStepDone: false }),
       setPreferredTourLanguage: (preferredTourLanguage) =>
         set({ preferredTourLanguage: preferredTourLanguage || "EN" }),
+      setMeetingPoint: (meetingPoint) =>
+        set({ meetingPoint: String(meetingPoint || "").trim() }),
+      setPreferredMovement: (preferredMovement) => set({ preferredMovement }),
       setExperiencesStepDone: (experiencesStepDone) =>
         set({ experiencesStepDone }),
 

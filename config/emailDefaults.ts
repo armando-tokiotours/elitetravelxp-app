@@ -66,7 +66,7 @@ export const EMAIL_CONFIG_DEFAULTS: StoredEmailConfig = {
     headerTitle: "YOUR JAPAN JOURNEY PROPOSAL",
     welcomeBody:
       "Thank you for designing your bespoke itinerary. Our concierge team at TOKIOTOURS has received your trip selections and is preparing your confirmed 1-on-1 daily proposal.",
-    ctaButtonText: "REVIEW & MANAGE MY BOOKING →",
+    ctaButtonText: "REVIEW YOUR BOOKING BRIEF →",
     ctaUrl: "https://tokiotours-app.com/manage",
   },
 };

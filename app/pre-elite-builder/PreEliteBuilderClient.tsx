@@ -94,6 +94,12 @@ export function PreEliteBuilderClient() {
   const step = draft.step;
   const submitted = Boolean(draft.bookingRef && draft.lastPayload);
 
+  // Already submitted → go straight to /pre-build (no interstitial).
+  useEffect(() => {
+    if (!hydrated || !submitted) return;
+    router.replace("/pre-build");
+  }, [hydrated, submitted, router]);
+
   const goNext = () => {
     const message = stepError(step, draft);
     if (message) {
@@ -146,7 +152,7 @@ export function PreEliteBuilderClient() {
         status: "draft",
         itineraryData: String(data.itineraryData || ""),
       });
-      router.push("/pre-build");
+      router.replace("/pre-build");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not save your brief.");
     } finally {
@@ -175,19 +181,9 @@ export function PreEliteBuilderClient() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-3xl px-5 py-10 sm:py-14">
-        {!hydrated ? (
+      <main className="relative mx-auto max-w-3xl overflow-visible px-5 py-10 sm:py-14">
+        {!hydrated || submitted ? (
           <div className="h-80 rounded-3xl border border-zinc-800/80 bg-[#0D1117]/80 backdrop-blur-md" />
-        ) : submitted && draft.lastPayload ? (
-          <div className="rounded-3xl border border-[#075473]/40 bg-[#0D1117]/80 p-7 text-center backdrop-blur-md sm:p-10">
-            <p className="text-sm text-white/60">Taking you to your brief…</p>
-            <Link
-              href="/pre-build"
-              className="mt-4 inline-flex text-sm font-semibold text-[#F29727]"
-            >
-              Open Pre-Build Summary →
-            </Link>
-          </div>
         ) : (
           <>
             <p className="text-xs tracking-[0.22em] text-[#1CA67F] uppercase">
@@ -215,7 +211,11 @@ export function PreEliteBuilderClient() {
               />
             </div>
 
-            <div className="mt-8 rounded-3xl border border-zinc-800/80 bg-[#0D1117]/80 p-5 backdrop-blur-md sm:p-7">
+            <div
+              className={`relative overflow-visible rounded-3xl border border-zinc-800/80 bg-[#0D1117]/80 p-5 backdrop-blur-md sm:p-7 ${
+                step === 5 ? "mt-10 pt-12" : "mt-8"
+              }`}
+            >
               <AnimatePresence mode="wait">
                 <motion.div
                   key={step}
@@ -223,6 +223,7 @@ export function PreEliteBuilderClient() {
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -8 }}
                   transition={{ duration: 0.2 }}
+                  className="relative overflow-visible"
                 >
                   {step === 1 && (
                     <ChoiceList
@@ -336,7 +337,7 @@ export function PreEliteBuilderClient() {
                     disabled={submitting}
                     className="inline-flex items-center gap-2 rounded-full bg-[#075473] px-5 py-2.5 text-sm font-medium text-white disabled:opacity-60"
                   >
-                    {submitting ? "Saving…" : "Submit qualification"}
+                    {submitting ? "Saving…" : "Save Request →"}
                   </button>
                 )}
               </div>
@@ -379,7 +380,13 @@ function ChoiceList({
   onOpenStory,
   resolveCopy,
 }: {
-  options: readonly { id: string; title: string; eyebrow?: string; description: string }[];
+  options: readonly {
+    id: string;
+    title: string;
+    eyebrow?: string;
+    description: string;
+    svgUrl?: string;
+  }[];
   selected: string | readonly string[] | null;
   /** Kept for API compatibility with multi-select steps; selection happens in the story modal. */
   multiple?: boolean;
@@ -401,9 +408,19 @@ function ChoiceList({
     <div className="grid gap-3">
       {options.map((option) => {
         const on = isOn(option.id);
-        const overlay = resolveCopy?.(option.id);
-        const title = overlay?.title || option.title;
-        const description = overlay?.subtitle || option.description;
+        const story = resolveCopy?.(option.id);
+        const title = story?.title || option.title;
+        const description = option.description;
+        const badgeTag = option.eyebrow;
+        const slide = story?.slides?.[0];
+        const videoUrl = slide?.videoUrl?.trim() || "";
+        /** Prefer dedicated SVG card art for instant selected-state swaps. */
+        const svgUrl = option.svgUrl?.trim() || "";
+        const imageFallback =
+          svgUrl ||
+          slide?.imageUrl?.trim() ||
+          "/svg/style-premium-comfort.svg";
+
         return (
           <button
             key={option.id}
@@ -411,26 +428,70 @@ function ChoiceList({
             aria-pressed={on}
             aria-label={`Preview and select ${title}`}
             onClick={() => onOpenStory(option.id)}
-            className={`relative w-full rounded-2xl px-4 py-4 text-left transition ${
+            className={`relative w-full min-h-[7.5rem] cursor-pointer overflow-hidden rounded-2xl border p-5 text-left transition-all duration-300 ${
               on
-                ? "border-2 border-[#075473] bg-[#0D1117]/80 shadow-lg shadow-[#075473]/10 backdrop-blur-md"
-                : "border border-zinc-800/80 bg-[#0D1117]/60 backdrop-blur-md hover:border-zinc-700"
+                ? "scale-[1.01] border-cyan-400 shadow-[0_0_25px_rgba(6,182,212,0.3)]"
+                : "border-white/10 bg-[#0A1017] opacity-60 hover:border-white/20 hover:opacity-90"
             }`}
           >
-            {option.eyebrow && (
-              <span
-                className="text-[11px] tracking-[0.16em] uppercase"
-                style={{ color: eyebrowColor(option.eyebrow) }}
-              >
-                {option.eyebrow}
-              </span>
-            )}
-            <span className="mt-1 block text-base text-white">
-              {title}
-            </span>
-            <span className="mt-1 block text-sm leading-relaxed text-white/55">
-              {description}
-            </span>
+            {/* Selected background — SVG first for crisp instant swaps; video optional */}
+            {on ? (
+              <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
+                {videoUrl && !svgUrl ? (
+                  <video
+                    key={videoUrl}
+                    src={videoUrl}
+                    autoPlay
+                    loop
+                    muted
+                    playsInline
+                    poster={imageFallback}
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={imageFallback}
+                    alt=""
+                    className="h-full w-full scale-105 object-cover transition-transform duration-500"
+                  />
+                )}
+                <div className="absolute inset-0 bg-black/60 backdrop-blur-[1px]" />
+              </div>
+            ) : null}
+
+            <div className="relative z-10 flex h-full flex-col justify-between space-y-2">
+              <div className="flex items-center justify-between gap-2">
+                {badgeTag ? (
+                  <span
+                    className={`text-[10px] font-bold tracking-widest uppercase ${
+                      on ? "text-cyan-400" : ""
+                    }`}
+                    style={on ? undefined : { color: eyebrowColor(badgeTag) }}
+                  >
+                    {badgeTag}
+                  </span>
+                ) : (
+                  <span />
+                )}
+                {on ? (
+                  <span className="h-2 w-2 animate-ping rounded-full bg-cyan-400" />
+                ) : null}
+              </div>
+
+              <div>
+                <h3 className="font-godiva text-base font-bold tracking-wide text-white">
+                  {title}
+                </h3>
+                <p
+                  className={`mt-1 text-xs leading-relaxed ${
+                    on ? "text-zinc-300" : "text-white/55"
+                  }`}
+                >
+                  {description}
+                </p>
+              </div>
+            </div>
           </button>
         );
       })}
@@ -466,94 +527,130 @@ function ContactFields({
   }) => void;
   onTripType: (tripType: TripType) => void;
 }) {
+  const mascotSrc =
+    tripType === "multi_day"
+      ? "/svg/mascot-multiday.svg"
+      : tripType === "single_day"
+        ? "/svg/mascot-1day.svg"
+        : null;
+
   return (
-    <div className="grid gap-4">
-      <Field label="Trip type" as="div">
-        <div className="grid gap-2 sm:grid-cols-2">
-          {TRIP_TYPES.map((option) => {
-            const on = tripType === option.id;
-            return (
-              <button
-                key={option.id}
-                type="button"
-                aria-pressed={on}
-                onClick={() => onTripType(option.id)}
-                className={`rounded-2xl px-4 py-3.5 text-left transition ${
-                  on
-                    ? "border-2 border-[#075473] bg-[#075473]/15"
-                    : "border border-white/10 bg-black/20 hover:border-white/25"
-                }`}
-              >
-                <span className="block text-sm font-medium text-white">
-                  {option.title}
-                </span>
-                <span className="mt-1 block text-xs leading-relaxed text-white/55">
-                  {option.description}
-                </span>
-              </button>
-            );
-          })}
+    <div className="relative overflow-visible pt-2">
+      {/* Trip-type mascot — always visible (incl. mobile); pops out top-right */}
+      <div className="pointer-events-none absolute -top-10 -right-1 z-30 block md:-top-14 md:-right-2">
+        <AnimatePresence mode="wait">
+          {mascotSrc ? (
+            <motion.img
+              key={tripType}
+              src={mascotSrc}
+              alt="Tokiotours Trip Type Mascot"
+              initial={{ opacity: 0, scale: 0.9, y: 8 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.75, y: 4 }}
+              transition={{
+                opacity: { duration: 0.2 },
+                scale: {
+                  duration: 0.3,
+                  ease: [0.34, 1.56, 0.64, 1],
+                },
+                y: { duration: 0.3, ease: [0.34, 1.56, 0.64, 1] },
+              }}
+              className="block h-24 w-24 object-contain drop-shadow-[0_10px_20px_rgba(0,0,0,0.8)] md:h-32 md:w-32"
+            />
+          ) : null}
+        </AnimatePresence>
+      </div>
+
+      <div className="grid gap-4">
+        <Field label="Trip type" as="div">
+          <div className="grid gap-2 sm:grid-cols-2">
+            {TRIP_TYPES.map((option) => {
+              const on = tripType === option.id;
+              return (
+                <button
+                  key={option.id}
+                  type="button"
+                  aria-pressed={on}
+                  onClick={() => onTripType(option.id)}
+                  className={`rounded-2xl px-4 py-3.5 text-left transition ${
+                    on
+                      ? "border-2 border-[#075473] bg-[#075473]/15"
+                      : "border border-white/10 bg-black/20 hover:border-white/25"
+                  }`}
+                >
+                  <span className="block text-sm font-medium text-white">
+                    {option.title}
+                  </span>
+                  <span className="mt-1 block text-xs leading-relaxed text-white/55">
+                    {option.description}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </Field>
+        <Field label="Full name">
+          <input
+            value={fullName}
+            onChange={(e) => onChange({ fullName: e.target.value })}
+            autoComplete="name"
+            className={inputClass}
+          />
+        </Field>
+        <Field label="Email">
+          <input
+            type="email"
+            value={email}
+            onChange={(e) => onChange({ email: e.target.value })}
+            autoComplete="email"
+            className={inputClass}
+          />
+        </Field>
+        <Field label="WhatsApp number" hint="Optional">
+          <input
+            value={whatsapp}
+            onChange={(e) => onChange({ whatsapp: e.target.value })}
+            autoComplete="tel"
+            inputMode="tel"
+            placeholder="+81 …"
+            className={inputClass}
+          />
+        </Field>
+        <Field
+          label={
+            tripType === "single_day" ? "Tour date" : "Planned dates or target month"
+          }
+          labelClassName="text-white"
+          as="div"
+        >
+          <TimingSelector
+            value={timing ?? emptyTiming()}
+            tripType={tripType}
+            onChange={(next) => onChange({ timing: normalizeTiming(next) })}
+          />
+        </Field>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Adults">
+            <input
+              type="number"
+              min={1}
+              max={20}
+              value={adults}
+              onChange={(e) => onChange({ adults: Number(e.target.value) })}
+              className={inputClass}
+            />
+          </Field>
+          <Field label="Children" labelClassName="text-[#DC6E8A]">
+            <input
+              type="number"
+              min={0}
+              max={20}
+              value={children}
+              onChange={(e) => onChange({ children: Number(e.target.value) })}
+              className={inputClass}
+            />
+          </Field>
         </div>
-      </Field>
-      <Field label="Full name">
-        <input
-          value={fullName}
-          onChange={(e) => onChange({ fullName: e.target.value })}
-          autoComplete="name"
-          className={inputClass}
-        />
-      </Field>
-      <Field label="Email">
-        <input
-          type="email"
-          value={email}
-          onChange={(e) => onChange({ email: e.target.value })}
-          autoComplete="email"
-          className={inputClass}
-        />
-      </Field>
-      <Field label="WhatsApp number" hint="Optional">
-        <input
-          value={whatsapp}
-          onChange={(e) => onChange({ whatsapp: e.target.value })}
-          autoComplete="tel"
-          inputMode="tel"
-          placeholder="+81 …"
-          className={inputClass}
-        />
-      </Field>
-      <Field
-        label={tripType === "single_day" ? "Tour date" : "Planned dates or target month"}
-        labelClassName="text-white"
-        as="div"
-      >
-        <TimingSelector
-          value={timing ?? emptyTiming()}
-          tripType={tripType}
-          onChange={(next) => onChange({ timing: normalizeTiming(next) })}
-        />
-      </Field>
-      <div className="grid grid-cols-2 gap-3">
-        <Field label="Adults">
-          <input
-            type="number"
-            min={1}
-            max={20}
-            value={adults}
-            onChange={(e) => onChange({ adults: Number(e.target.value) })}
-            className={inputClass}
-          />
-        </Field>
-        <Field label="Children" labelClassName="text-[#DC6E8A]">
-          <input
-            type="number"
-            min={0}
-            max={20}
-            value={children}
-            onChange={(e) => onChange({ children: Number(e.target.value) })}
-            className={inputClass}
-          />
-        </Field>
       </div>
     </div>
   );

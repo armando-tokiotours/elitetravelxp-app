@@ -134,9 +134,9 @@ export function SingleDayItineraryView() {
   return (
     <div
       id="single-day-dossier-view"
-      className="w-full space-y-6 overflow-hidden px-0 text-[#0B1F3A]"
+      className="w-full space-y-6 overflow-hidden px-0 text-white"
     >
-      <p className="px-0 text-[0.65rem] font-semibold uppercase tracking-[0.35em] text-[#8A8278]">
+      <p className="px-0 text-[0.65rem] font-semibold uppercase tracking-[0.35em] text-[#F6A724]">
         Single-Day Tour Dossier
       </p>
 
@@ -231,7 +231,7 @@ function MetaBlock({
     <div>
       <div className="mb-1.5 flex items-center gap-1.5">
         {icon}
-        <p className="text-[0.6rem] font-semibold uppercase tracking-[0.22em] text-[#075473]">
+        <p className="text-[0.6rem] font-semibold uppercase tracking-[0.22em] text-[#F6A724]">
           {label}
         </p>
       </div>

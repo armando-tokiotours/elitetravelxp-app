@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowRight, FileText, Plane } from "lucide-react";
+import { ArrowRight, FileText, Plane, Wallet } from "lucide-react";
 import { submitBookingRequest } from "@/lib/bookingRequest";
 import { calculateSingleDayQuote, formatEur } from "@/lib/singleDayPricing";
 import { useBuilderStore } from "@/store/useBuilderStore";
@@ -19,6 +19,7 @@ import {
 import { BookingTermsModal } from "@/components/checkout/BookingTermsModal";
 import { SingleDayItineraryView } from "@/components/builder-single/SingleDayItineraryView";
 import { SingleDayInvoicePrint } from "@/components/builder-single/SingleDayInvoicePrint";
+import { SingleDayBudgetModal } from "@/components/builder-s/SingleDayBudgetModal";
 import {
   AppSidebar,
   APP_SIDEBAR_RAIL_PAD,
@@ -61,6 +62,7 @@ export default function SingleDayItineraryPageClient() {
   const [termsIntent, setTermsIntent] = useState<"invoice" | "print" | null>(
     null
   );
+  const [budgetOpen, setBudgetOpen] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -98,6 +100,7 @@ export default function SingleDayItineraryPageClient() {
   );
 
   const totalGuests = Math.max(1, adults + children);
+  void totalGuests;
 
   const setMode = (mode: ViewMode) => {
     setActiveView(mode);
@@ -215,14 +218,14 @@ export default function SingleDayItineraryPageClient() {
 
   if (!hydrated) {
     return (
-      <p className="p-10 text-center text-sm text-[#8A8278]">
+      <p className="p-10 text-center text-sm text-white/50">
         Loading single-day itinerary…
       </p>
     );
   }
 
   return (
-    <div className="builder-theme min-h-screen overflow-x-hidden bg-[#F5F0E8] pb-44 text-[#0B1F3A] md:pb-36">
+    <div className="builder-theme min-h-screen overflow-x-hidden bg-[#0B1728] pb-44 text-white md:pb-36">
       <AppSidebar
         brandEyebrow="TOKIOTOURS"
         brandTitle="Single-Day Itinerary"
@@ -230,25 +233,25 @@ export default function SingleDayItineraryPageClient() {
       />
 
       <div className={APP_SIDEBAR_RAIL_PAD}>
-        <header className="no-print border-b border-[#E8E2D9] bg-[#FBF8F2] px-4 py-5">
+        <header className="no-print border-b border-white/10 bg-[#0D1117]/90 px-4 py-5 backdrop-blur-md">
           <div className="mb-3 flex items-center gap-3 lg:hidden">
             <MobileAppNav
               brandEyebrow="TOKIOTOURS"
               brandTitle="Single-Day Itinerary"
             />
           </div>
-          <p className="text-[0.65rem] font-semibold uppercase tracking-[0.35em] text-[#4B4B4B]">
+          <p className="text-[0.65rem] font-semibold uppercase tracking-[0.35em] text-[#F6A724]">
             Builder S · Itinerary
           </p>
-          <h1 className="mt-1 font-godiva text-3xl uppercase tracking-wider">
+          <h1 className="mt-1 font-godiva text-3xl uppercase tracking-wider text-white">
             Your Single-Day Tour Dossier
           </h1>
-          <p className="mt-1 text-sm text-[#8A8278]">
+          <p className="mt-1 text-sm text-white/55">
             Hour-by-hour day plan and private single-day quotation.
           </p>
 
           <div
-            className="mt-4 inline-flex rounded-full border border-[#E8E2D9] bg-white p-1 shadow-sm"
+            className="mt-4 inline-flex rounded-full border border-white/15 bg-[#0D1117] p-1 shadow-sm"
             role="tablist"
             aria-label="Single-day itinerary view"
           >
@@ -269,7 +272,7 @@ export default function SingleDayItineraryPageClient() {
           <div className="mt-4 flex flex-wrap gap-2">
             <Link
               href="/builder-single"
-              className="inline-flex rounded-full border border-[#0B1F3A]/20 bg-white px-4 py-2.5 text-sm font-semibold text-[#0B1F3A]"
+              className="inline-flex rounded-full border border-white/20 bg-white/5 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-white/10"
             >
               Continue Editing Tour
             </Link>
@@ -277,7 +280,7 @@ export default function SingleDayItineraryPageClient() {
               <button
                 type="button"
                 onClick={requestSendPdf}
-                className="rounded-full bg-[#0B1F3A] px-5 py-2 text-sm font-semibold text-white"
+                className="rounded-full bg-[#075473] px-5 py-2 text-sm font-semibold text-white"
               >
                 Save & Email Proposal →
               </button>
@@ -291,8 +294,8 @@ export default function SingleDayItineraryPageClient() {
           <div
             className={
               activeView === "invoice"
-                ? "print-document rounded-2xl border border-[#E8E2D9] bg-white px-4 py-6 sm:px-6"
-                : "invoice-capture-offscreen pointer-events-none fixed left-[-10000px] top-0 z-[-1] w-[800px] bg-white"
+                ? "print-document rounded-2xl border border-white/10 bg-[#0D1117] px-4 py-6 sm:px-6"
+                : "invoice-capture-offscreen pointer-events-none fixed left-[-10000px] top-0 z-[-1] w-[800px] bg-[#0D1117]"
             }
             aria-hidden={activeView !== "invoice"}
           >
@@ -305,54 +308,52 @@ export default function SingleDayItineraryPageClient() {
         </main>
       </div>
 
-      {/* Dedicated S action bar — not PriceSummaryFooter */}
+      {/* Compact dual-action bar: Request/Pay + Target Budget */}
       <div className="no-print sticky-action-bar fixed inset-x-0 bottom-16 z-30 mb-2 w-full overflow-x-hidden md:bottom-4 lg:left-16 lg:pl-0">
-        <div className="mx-auto flex w-full max-w-5xl flex-col gap-2 px-2 sm:px-4">
-          <div className="grid w-full grid-cols-1 gap-2.5 sm:grid-cols-2">
-            <div className="flex flex-col justify-between rounded-xl border border-[#075473]/50 bg-[#1C1C1E] p-3 shadow-lg sm:p-4">
-              <div>
-                <p className="text-[8px] font-bold uppercase tracking-wider text-[#075473] sm:text-[10px]">
-                  Single-Day Package
-                </p>
-                <p className="text-sm font-extrabold text-white sm:text-lg">
-                  {formatEur(quote.totalEur)}
-                </p>
-                <p className="mt-0.5 text-[10px] text-[#075473]/80">
-                  {totalGuests} guest{totalGuests === 1 ? "" : "s"} · {tourHours}h
-                  private day
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={handleRequestPay}
-                className="mt-2 flex w-full items-center justify-center gap-1 rounded-lg bg-[#075473] px-2 py-2.5 text-center text-[10px] font-bold text-white transition hover:bg-[#05384c] sm:text-xs"
-              >
-                Request & Pay Single-Day Tour
-                <ArrowRight className="h-3.5 w-3.5" aria-hidden />
-              </button>
+        <div className="mx-auto flex w-full max-w-5xl px-2 sm:px-4">
+          <div className="flex w-full items-center gap-2 rounded-2xl border border-white/10 bg-[#0D1117]/95 p-2 shadow-2xl backdrop-blur-md sm:gap-3 sm:p-2.5">
+            <div className="min-w-0 flex-1 pl-1 sm:pl-2">
+              <p className="text-[9px] font-bold uppercase tracking-wider text-[#00B4D8]">
+                Single-Day Package
+              </p>
+              <p className="truncate text-sm font-extrabold text-white sm:text-base">
+                {formatEur(quote.totalEur)}
+              </p>
             </div>
-            <div className="flex flex-col justify-between rounded-xl border border-zinc-800 bg-[#121212] p-3 shadow-lg sm:p-4">
-              <div>
-                <p className="text-[8px] font-bold uppercase tracking-wider text-zinc-400 sm:text-[10px]">
-                  Keep Planning
-                </p>
-                <p className="text-sm font-extrabold text-white sm:text-lg">
-                  Edit your day
-                </p>
-                <p className="mt-0.5 text-[10px] text-zinc-400">
-                  Adjust experiences, pace, or guide
-                </p>
-              </div>
-              <Link
-                href="/builder-single"
-                className="mt-2 flex w-full items-center justify-center rounded-lg border border-white/15 px-2 py-2.5 text-center text-[10px] font-bold text-white transition hover:bg-white/5 sm:text-xs"
-              >
-                Continue Editing Tour
-              </Link>
-            </div>
+            <button
+              type="button"
+              onClick={() => setBudgetOpen(true)}
+              className="inline-flex shrink-0 items-center gap-1.5 rounded-xl border border-white/15 bg-white/5 px-3 py-2.5 text-[10px] font-bold uppercase tracking-wide text-white transition hover:bg-white/10 sm:px-4 sm:text-xs"
+            >
+              <Wallet className="h-3.5 w-3.5" />
+              Target Budget
+            </button>
+            <button
+              type="button"
+              onClick={handleRequestPay}
+              className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-[#075473] px-3 py-2.5 text-[10px] font-bold uppercase tracking-wide text-white transition hover:bg-[#05384c] sm:px-4 sm:text-xs"
+            >
+              Request / Pay
+              <ArrowRight className="h-3.5 w-3.5" aria-hidden />
+            </button>
           </div>
         </div>
+        {submitError ? (
+          <p className="mx-auto mt-2 max-w-5xl px-4 text-center text-xs text-[#E60F43]">
+            {submitError}
+          </p>
+        ) : null}
+        {submittedRef ? (
+          <p className="mx-auto mt-2 max-w-5xl px-4 text-center text-xs text-[#1CA67F]">
+            Request received · {submittedRef}
+          </p>
+        ) : null}
       </div>
+
+      <SingleDayBudgetModal
+        open={budgetOpen}
+        onClose={() => setBudgetOpen(false)}
+      />
 
       <RevolutCheckoutModal
         isOpen={isCheckoutModalOpen}
@@ -463,8 +464,8 @@ function ToggleBtn({
       onClick={onClick}
       className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-2 text-xs font-semibold transition ${
         active
-          ? "bg-[#0B1F3A] text-white shadow-sm"
-          : "text-[#5C6570] hover:text-[#0B1F3A]"
+          ? "bg-[#075473] text-white shadow-sm"
+          : "text-white/55 hover:text-white"
       }`}
     >
       {icon}

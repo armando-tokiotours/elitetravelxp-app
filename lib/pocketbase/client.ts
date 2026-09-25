@@ -589,7 +589,7 @@ export function brandingGoogleFontsUrl(b: PbSiteBranding | null): string {
 }
 
 /** Default navbar logo (used until an admin uploads one in Site Branding). */
-export const DEFAULT_LOGO_IMAGE = "/images/tokiotours-logo.png";
+export const DEFAULT_LOGO_IMAGE = "/brand/site-logo.png";
 
 /** Fallback Chureito / Fuji hero when no upload is set (ships in public/brand). */
 export const DEFAULT_HERO_IMAGE = "/brand/hero-background.jpg";

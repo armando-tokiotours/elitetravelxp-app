@@ -26,6 +26,7 @@ const CATEGORY_LABEL: Record<string, string> = {
   matcher: "Activity Matcher banner",
   planner: "Budget Planner page",
   value: "Value proposition",
+  builder: "Builder S · Transit & Hero",
 };
 
 const CATEGORY_ORDER = [
@@ -33,6 +34,7 @@ const CATEGORY_ORDER = [
   "matcher",
   "planner",
   "concierge",
+  "builder",
   "pace",
   "quiz_vibe",
   "quiz_pace",

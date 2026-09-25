@@ -12,6 +12,7 @@ export const TRAVEL_STYLES = [
     eyebrow: "Best value",
     description:
       "Private guide with local public transport and walking. Authentic immersion.",
+    svgUrl: "/svg/style-classic-explorer.svg",
   },
   {
     id: "premium_comfort",
@@ -19,6 +20,7 @@ export const TRAVEL_STYLES = [
     eyebrow: "Most popular",
     description:
       "Private guide with a dedicated luxury vehicle. Seamless comfort.",
+    svgUrl: "/svg/style-premium-comfort.svg",
   },
   {
     id: "vip_bespoke",
@@ -26,6 +28,7 @@ export const TRAVEL_STYLES = [
     eyebrow: "Exclusive",
     description:
       "Complete VIP access, luxury chauffeur, high-end private dining, and exclusive entry.",
+    svgUrl: "/svg/style-vip-bespoke.svg",
   },
 ] as const;
 

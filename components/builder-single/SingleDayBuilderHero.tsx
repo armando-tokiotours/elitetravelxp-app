@@ -158,9 +158,14 @@ export function SingleDayBuilderHero() {
         ) : (
           // eslint-disable-next-line @next/next/no-img-element
           <img
-            src={posterUrl || mediaCfg.fallbackImage}
+            src={posterUrl || mediaCfg.fallbackImage || SINGLE_DAY_HERO_PUBLIC_FALLBACK}
             alt=""
             className="builder-hero-bg absolute inset-0 h-full w-full object-cover object-bottom sm:object-[center_70%]"
+            onError={(e) => {
+              const el = e.currentTarget as HTMLImageElement;
+              if (el.src.includes("hero-single-day")) return;
+              el.src = SINGLE_DAY_HERO_PUBLIC_FALLBACK;
+            }}
           />
         )}
       </div>

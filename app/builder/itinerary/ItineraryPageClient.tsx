@@ -252,7 +252,7 @@ export default function ItineraryPageClient() {
   };
 
   return (
-    <div className="builder-theme min-h-screen overflow-x-hidden bg-[#F5F0E8] pb-44 text-[#0B1F3A] md:pb-36">
+    <div className="builder-theme min-h-screen overflow-x-hidden bg-[#0B1728] pb-44 text-white md:pb-36">
       <AppSidebar
         brandEyebrow="TOKIOTOURS"
         brandTitle="Itinerary"
@@ -260,23 +260,23 @@ export default function ItineraryPageClient() {
       />
 
       <div className={APP_SIDEBAR_RAIL_PAD}>
-        <header className="no-print border-b border-[#E8E2D9] bg-[#FBF8F2] px-4 py-5">
+        <header className="no-print border-b border-white/10 bg-[#0D1117]/90 px-4 py-5 backdrop-blur-md">
           <div className="mb-3 flex items-center gap-3 lg:hidden">
             <MobileAppNav
               brandEyebrow="TOKIOTOURS"
               brandTitle="Itinerary"
             />
           </div>
-          <p className="text-[0.65rem] font-semibold uppercase tracking-[0.35em] text-[#4B4B4B]">
+          <p className="text-[0.65rem] font-semibold uppercase tracking-[0.35em] text-[#F6A724]">
             My Itinerary
           </p>
-          <h1 className="mt-1 font-display text-3xl">Your Japan Journey</h1>
-          <p className="mt-1 text-sm text-[#8A8278]">
+          <h1 className="mt-1 font-display text-3xl text-white">Your Japan Journey</h1>
+          <p className="mt-1 text-sm text-white/55">
             Switch between travel dossier and private quotation.
           </p>
 
         <div
-          className="mt-4 inline-flex rounded-full border border-[#E8E2D9] bg-white p-1 shadow-sm"
+          className="mt-4 inline-flex rounded-full border border-white/15 bg-[#0D1117] p-1 shadow-sm"
           role="tablist"
           aria-label="Itinerary view"
         >
@@ -298,14 +298,14 @@ export default function ItineraryPageClient() {
           <div className="mt-4 flex flex-wrap gap-2">
             <Link
               href="/builder"
-              className="rounded-full border border-[#D9D2C7] bg-white px-4 py-2 text-sm font-semibold text-[#0B1F3A]"
+              className="rounded-full border border-white/20 bg-white/5 px-4 py-2 text-sm font-semibold text-white"
             >
               ← Edit builder
             </Link>
             <button
               type="button"
               onClick={requestSendPdf}
-              className="rounded-full bg-[#0B1F3A] px-5 py-2 text-sm font-semibold text-white"
+              className="rounded-full bg-[#075473] px-5 py-2 text-sm font-semibold text-white"
             >
               Send / Save PDF
             </button>
@@ -314,7 +314,7 @@ export default function ItineraryPageClient() {
           <div className="mt-4 flex flex-wrap gap-2">
             <Link
               href="/builder"
-              className="inline-flex rounded-full border border-[#0B1F3A]/20 bg-white px-4 py-2.5 text-sm font-semibold text-[#0B1F3A]"
+              className="inline-flex rounded-full border border-white/20 bg-white/5 px-4 py-2.5 text-sm font-semibold text-white"
             >
               Continue editing
             </Link>
@@ -339,8 +339,8 @@ export default function ItineraryPageClient() {
         <div
           className={
             activeView === "invoice"
-              ? "print-document rounded-2xl border border-[#E8E2D9] bg-white px-4 py-6 sm:px-6"
-              : "invoice-capture-offscreen pointer-events-none fixed left-[-10000px] top-0 z-[-1] w-[800px] bg-white"
+              ? "print-document rounded-2xl border border-white/10 bg-[#0D1117] px-4 py-6 sm:px-6"
+              : "invoice-capture-offscreen pointer-events-none fixed left-[-10000px] top-0 z-[-1] w-[800px] bg-[#0D1117]"
           }
           aria-hidden={activeView !== "invoice"}
         >
@@ -484,8 +484,8 @@ function ToggleBtn({
       onClick={onClick}
       className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-2 text-xs font-semibold transition sm:text-sm ${
         active
-          ? "bg-[#0B1F3A] text-white"
-          : "text-[#5C6570] hover:text-[#0B1F3A]"
+          ? "bg-[#075473] text-white"
+          : "text-white/55 hover:text-white"
       }`}
     >
       {icon}

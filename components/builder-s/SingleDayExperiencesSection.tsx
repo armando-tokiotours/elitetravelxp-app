@@ -2,14 +2,15 @@
 
 import dynamic from "next/dynamic";
 import { useMemo, useState } from "react";
-import { Pencil, Route } from "lucide-react";
+import { Compass, Route, Sparkles } from "lucide-react";
 import type { PbCity, PbTour } from "@/lib/pocketbase/client";
 import { SectionBlock } from "@/components/builder/ui";
 import { useLazyModalMount } from "@/components/builder/modals/useLazyModalMount";
 import { useSingleDayBuilderStore } from "@/store/useSingleDayBuilderStore";
 import { useBuilderAccordionOptional } from "@/components/builder/BuilderAccordion";
 import { formatDurationBadge, selectedHoursTotal } from "@/lib/experiencesPlaces";
-import { calculateTimeSlots } from "@/lib/singleDayTimeSlots";
+import { QUIZ_VIBE } from "@/lib/experienceProfiler";
+import { useQuizStore } from "@/store/useQuizStore";
 
 const ExperiencesPlacesModal = dynamic(
   () =>
@@ -27,9 +28,17 @@ const SingleDayRouteModal = dynamic(
   { ssr: false }
 );
 
+const ExperienceProfilerModal = dynamic(
+  () =>
+    import("@/components/quiz/ExperienceProfilerModal").then((m) => ({
+      default: m.ExperienceProfilerModal,
+    })),
+  { ssr: false }
+);
+
 /**
  * Builder S §3 — Experiences & Places.
- * Catalog configure + Edit Route (draggable timed schedule).
+ * Three equal cards: Day Catalog · Route & Timeline · Match Suggestions.
  */
 export function SingleDayExperiencesSection({
   catalog,
@@ -40,34 +49,49 @@ export function SingleDayExperiencesSection({
 }) {
   const [catalogOpen, setCatalogOpen] = useState(false);
   const [routeOpen, setRouteOpen] = useState(false);
+  const [quizOpen, setQuizOpen] = useState(false);
   const catalogMounted = useLazyModalMount(catalogOpen);
   const routeMounted = useLazyModalMount(routeOpen);
+  const quizMounted = useLazyModalMount(quizOpen);
   const accordion = useBuilderAccordionOptional();
 
   const selectedRows = useSingleDayBuilderStore((s) => s.selectedExperiences);
   const tourHours = useSingleDayBuilderStore((s) => s.tourHours);
-  const startTime = useSingleDayBuilderStore((s) => s.startTime);
   const used = selectedHoursTotal(selectedRows);
 
-  const timed = useMemo(
-    () => calculateTimeSlots(startTime || "09:00", selectedRows),
-    [startTime, selectedRows]
-  );
+  const isQuizCompleted = useQuizStore((s) => s.isQuizCompleted);
+  const travelProfile = useQuizStore((s) => s.travelProfile);
+
+  const catalogHeadline = useMemo(() => {
+    if (selectedRows.length === 0) {
+      return "Select experiences for your day";
+    }
+    if (selectedRows.length === 1) {
+      return selectedRows[0].title;
+    }
+    return `${selectedRows[0].title} +${selectedRows.length - 1}`;
+  }, [selectedRows]);
+
+  const catalogSub = `${formatDurationBadge(used)} selected of ${formatDurationBadge(tourHours)}`;
+
+  const stopCount = selectedRows.length;
+  const routeSub =
+    stopCount === 0
+      ? "Drag & auto-time slots"
+      : `${stopCount} Stop${stopCount === 1 ? "" : "s"} Configured · Drag & auto-time`;
+
+  const matchLabel = useMemo(() => {
+    if (!isQuizCompleted || !travelProfile) return null;
+    const vibe =
+      QUIZ_VIBE.find((o) => o.id === travelProfile.vibe)?.label ??
+      travelProfile.vibe;
+    return vibe;
+  }, [isQuizCompleted, travelProfile]);
 
   const summary =
     selectedRows.length === 0
       ? "Pick experiences & places"
       : `${selectedRows.length} stop${selectedRows.length === 1 ? "" : "s"} · ${formatDurationBadge(used)} / ${formatDurationBadge(tourHours)}`;
-
-  const preview =
-    selectedRows.length === 0
-      ? "Browse experiences and landmark places for your city — filter by vibe, track your time budget, and build your day."
-      : timed
-          .map(
-            (r) =>
-              `${r.timeSlot} · ${r.title} (${formatDurationBadge(r.duration_hours)})`
-          )
-          .join(" → ");
 
   const requireCity = () => {
     if (!selectedCity) {
@@ -75,6 +99,16 @@ export function SingleDayExperiencesSection({
       return false;
     }
     return true;
+  };
+
+  const saveAndContinue = () => {
+    useSingleDayBuilderStore.getState().setExperiencesStepDone(true);
+    accordion?.advanceTo(4);
+    requestAnimationFrame(() => {
+      document
+        .getElementById("section-transit")
+        ?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
   };
 
   return (
@@ -85,64 +119,97 @@ export function SingleDayExperiencesSection({
       icon="tour"
       summary={summary}
     >
-      <button
-        type="button"
-        onClick={() => {
-          if (!requireCity()) return;
-          setCatalogOpen(true);
-        }}
-        className="w-full cursor-pointer rounded-2xl border border-white/10 bg-[#0D1117]/70 p-5 text-left backdrop-blur-md transition-all hover:border-[#075473]/40 hover:bg-[#0D1117]/90"
-      >
-        <div className="flex items-start justify-between gap-3">
-          <h3 className="text-sm font-semibold uppercase tracking-wider text-zinc-400">
-            Day catalog
-          </h3>
-          <Pencil className="h-4 w-4 shrink-0 text-zinc-500" aria-hidden />
-        </div>
-        <p className="mt-3 text-sm leading-relaxed text-white/80">{preview}</p>
-        <p className="mt-2 text-xs text-[#F6A724]">
-          {formatDurationBadge(used)} selected of {formatDurationBadge(tourHours)}{" "}
-          available · starts {startTime || "09:00"}
-        </p>
-      </button>
+      {/* 3 equal horizontal cards */}
+      <div className="grid grid-cols-3 gap-2 sm:gap-2.5">
+        {/* Card 1 — Day Catalog */}
+        <button
+          type="button"
+          onClick={() => {
+            if (!requireCity()) return;
+            setCatalogOpen(true);
+          }}
+          className="flex min-h-[7.5rem] flex-col rounded-2xl border border-white/10 bg-[#0D1117]/75 p-2.5 text-left backdrop-blur-md transition hover:border-[#075473]/50 hover:bg-[#0D1117]/95 sm:min-h-[8.5rem] sm:p-3.5"
+        >
+          <span className="inline-flex items-center gap-1 text-[9px] font-bold uppercase tracking-[0.14em] text-[#1BA58A] sm:text-[10px]">
+            <Compass className="h-3 w-3 shrink-0" aria-hidden />
+            Day Catalog
+          </span>
+          <span className="mt-2 line-clamp-3 text-[11px] font-semibold leading-snug text-white sm:text-xs">
+            {catalogHeadline}
+          </span>
+          <span className="mt-auto pt-2 text-[10px] font-medium leading-snug text-[#F6A724] sm:text-[11px]">
+            {catalogSub}
+          </span>
+        </button>
 
-      <button
-        type="button"
-        onClick={() => {
-          if (!requireCity()) return;
-          setCatalogOpen(true);
-        }}
-        className="mt-3 flex w-full items-center justify-center gap-2 rounded-full border border-[#075473]/50 bg-[#05080C]/60 py-2.5 text-sm font-semibold text-white backdrop-blur-md transition hover:border-[#075473] hover:bg-[#075473]/20"
-      >
-        <Pencil className="h-3.5 w-3.5" aria-hidden />
-        Configure Experiences & Places
-      </button>
-
-      {selectedRows.length > 0 ? (
+        {/* Card 2 — Route & Timeline */}
         <button
           type="button"
           onClick={() => {
             if (!requireCity()) return;
             setRouteOpen(true);
           }}
-          className="mt-2 flex w-full items-center justify-center gap-2 rounded-full border border-[#1BA58A]/45 bg-[#1BA58A]/10 py-2.5 text-sm font-semibold text-[#1BA58A] backdrop-blur-md transition hover:border-[#1BA58A] hover:bg-[#1BA58A]/20"
+          className="flex min-h-[7.5rem] flex-col rounded-2xl border border-white/10 bg-[#0D1117]/75 p-2.5 text-left backdrop-blur-md transition hover:border-[#075473]/50 hover:bg-[#0D1117]/95 sm:min-h-[8.5rem] sm:p-3.5"
         >
-          <Route className="h-3.5 w-3.5" aria-hidden />
-          Edit Route &amp; Schedule
+          <span className="inline-flex items-center gap-1 text-[9px] font-bold uppercase tracking-[0.14em] text-[#1BA58A] sm:text-[10px]">
+            <Route className="h-3 w-3 shrink-0" aria-hidden />
+            Route &amp; Timeline
+          </span>
+          <span className="mt-2 line-clamp-2 text-[11px] font-semibold leading-snug text-white sm:text-xs">
+            {stopCount === 0
+              ? "Build your day order"
+              : `${stopCount} Stop${stopCount === 1 ? "" : "s"} Configured`}
+          </span>
+          <span className="mt-auto pt-2 text-[10px] font-medium leading-snug text-white/50 sm:text-[11px]">
+            {routeSub}
+          </span>
         </button>
-      ) : null}
+
+        {/* Card 3 — Match Suggestions */}
+        <button
+          type="button"
+          onClick={() => setQuizOpen(true)}
+          className={`flex min-h-[7.5rem] flex-col rounded-2xl p-2.5 text-left backdrop-blur-md transition sm:min-h-[8.5rem] sm:p-3.5 ${
+            isQuizCompleted && travelProfile
+              ? "border border-white/10 bg-[#0D1117]/75 hover:border-[#075473]/50 hover:bg-[#0D1117]/95"
+              : "border border-[#E60F43]/40 bg-[#E60F43]/10 hover:border-[#E60F43]/60 hover:bg-[#E60F43]/15"
+          }`}
+        >
+          <span
+            className={`inline-flex items-center gap-1 text-[9px] font-bold uppercase tracking-[0.14em] sm:text-[10px] ${
+              isQuizCompleted && travelProfile
+                ? "text-[#1BA58A]"
+                : "text-[#E60F43]"
+            }`}
+          >
+            <Sparkles className="h-3 w-3 shrink-0" aria-hidden />
+            Match
+          </span>
+          {isQuizCompleted && travelProfile && matchLabel ? (
+            <>
+              <span className="mt-2 line-clamp-2 text-[11px] font-semibold leading-snug text-white sm:text-xs">
+                Matches: {matchLabel}
+              </span>
+              <span className="mt-auto pt-2 text-[10px] font-medium text-white/50 sm:text-[11px]">
+                Retake quiz anytime
+              </span>
+            </>
+          ) : (
+            <>
+              <span className="mt-2 line-clamp-3 text-[11px] font-semibold leading-snug text-[#FFB7C5] sm:text-xs">
+                Take 30-Sec Quiz → See tailored ideas
+              </span>
+              <span className="mt-auto pt-2 text-[10px] font-medium text-[#E60F43]/80 sm:text-[11px]">
+                Zero-state · Match Quiz
+              </span>
+            </>
+          )}
+        </button>
+      </div>
 
       <button
         type="button"
-        onClick={() => {
-          useSingleDayBuilderStore.getState().setExperiencesStepDone(true);
-          accordion?.advanceTo(4);
-          requestAnimationFrame(() => {
-            document
-              .getElementById("section-transit")
-              ?.scrollIntoView({ behavior: "smooth", block: "start" });
-          });
-        }}
+        onClick={saveAndContinue}
         className="mt-3 flex w-full items-center justify-center rounded-full border border-[#075473]/50 bg-[#05080C]/60 py-2.5 text-sm font-semibold text-white backdrop-blur-md transition hover:border-[#075473] hover:bg-[#075473]/20"
       >
         Save & Continue →
@@ -166,6 +233,13 @@ export function SingleDayExperiencesSection({
           open={routeOpen}
           onClose={() => setRouteOpen(false)}
           catalog={catalog}
+        />
+      ) : null}
+
+      {quizMounted ? (
+        <ExperienceProfilerModal
+          open={quizOpen}
+          onClose={() => setQuizOpen(false)}
         />
       ) : null}
     </SectionBlock>

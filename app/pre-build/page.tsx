@@ -99,7 +99,7 @@ export default function PreBuildPage() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-3xl px-5 py-10 sm:py-14">
+      <main className="relative mx-auto max-w-lg overflow-visible px-5 py-10 sm:px-8 sm:py-14">
         <PreBuildConfirmation
           bookingRef={bookingRef}
           fullName={lastPayload.fullName}
@@ -111,7 +111,7 @@ export default function PreBuildPage() {
                 "@/lib/useBookingSync"
               );
               await performFullBookingReset();
-              router.push("/");
+              router.push("/pre-elite-builder");
             })();
           }}
         />

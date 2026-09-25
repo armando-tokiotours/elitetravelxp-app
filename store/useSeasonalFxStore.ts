@@ -20,10 +20,10 @@ type SeasonalFxState = {
   clear: () => void;
 };
 
-/** Full opacity burst before fade begins. */
-const VISIBLE_MS = 2500;
+/** Visible window: ~5s fall + max stagger (~1.2s) before fade begins. */
+const VISIBLE_MS = 6500;
 /** Smooth dissolve before unmount. */
-export const SEASONAL_FX_FADE_MS = 500;
+export const SEASONAL_FX_FADE_MS = 600;
 /** Total on-screen lifetime including fade. */
 export const SEASONAL_FX_DURATION_MS = VISIBLE_MS + SEASONAL_FX_FADE_MS;
 

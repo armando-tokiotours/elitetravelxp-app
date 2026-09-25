@@ -277,25 +277,49 @@ body {
   border-color: rgba(255, 255, 255, 0.1);
 }
 
-/* Seasonal ambient particles (sakura / snow / momiji) */
-@keyframes tokio-seasonal-fall {
+/* Seasonal ambient particles — continuous linear fall, no mid-screen pause */
+@keyframes continuousFallingPetal {
   0% {
-    transform: translate3d(0, -10vh, 0) rotate(0deg);
     opacity: 0;
+    transform: translate3d(0, -10vh, 0) rotate(0deg) scale(0.8);
   }
-  8% {
-    opacity: 1;
+  10% {
+    opacity: 0.95;
+    transform: translate3d(
+        calc(var(--tokio-drift, 35px) * 0.25),
+        5vh,
+        0
+      )
+      rotate(36deg) scale(0.9);
+  }
+  50% {
+    opacity: 0.85;
+    transform: translate3d(var(--tokio-drift, 35px), 50vh, 0) rotate(180deg)
+      scale(1);
+  }
+  90% {
+    opacity: 0.7;
+    transform: translate3d(
+        calc(var(--tokio-drift, 35px) * -0.4),
+        95vh,
+        0
+      )
+      rotate(324deg) scale(0.95);
   }
   100% {
-    transform: translate3d(var(--tokio-drift, 40px), 110vh, 0)
-      rotate(var(--tokio-spin, 180deg));
     opacity: 0;
+    transform: translate3d(
+        calc(var(--tokio-drift, 35px) * -0.7),
+        110vh,
+        0
+      )
+      rotate(var(--tokio-spin, 360deg)) scale(0.9);
   }
 }
 
 .tokio-seasonal-particle {
   pointer-events: none !important;
-  animation-name: tokio-seasonal-fall;
+  animation-name: continuousFallingPetal;
   animation-timing-function: linear;
   animation-fill-mode: both;
   will-change: transform, opacity;
@@ -303,6 +327,11 @@ body {
   -webkit-transform: translate3d(0, 0, 0);
   backface-visibility: hidden;
   -webkit-backface-visibility: hidden;
+}
+
+.animate-falling-petal,
+.animate-floating-petal {
+  animation: continuousFallingPetal 5s linear forwards;
 }
 
 /* Global Typography Override for H1 Titles — always ALL CAPS */
@@ -429,6 +458,21 @@ h1 .font-beauty,
 
 .animate-fade-up {
   animation: fade-up 0.65s ease-out both;
+}
+
+@keyframes mascotSwap {
+  0% {
+    opacity: 0;
+    transform: scale(0.8) translateY(8px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.animate-mascot-swap {
+  animation: mascotSwap 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
 }
 
 /* Invoice DetailRow — 15% smaller type/padding on mobile */

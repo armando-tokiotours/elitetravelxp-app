@@ -188,7 +188,13 @@ export function buildSingleDaySelections(
     | "guidePreference"
     | "selectedExperiences"
     | "tourHours"
-  > & { cityId?: string; transitOption?: string }
+  > & {
+    cityId?: string;
+    transitOption?: string;
+    preferredMovement?: string | null;
+    meetingPoint?: string;
+    preferredTourLanguage?: string;
+  }
 ): SingleDaySelections {
   return {
     cityId: state.cityId,
@@ -199,7 +205,10 @@ export function buildSingleDaySelections(
     selectedExperienceIds: (state.selectedExperiences || []).map(
       (e) => e.tourId
     ),
-    transitOption: state.transitOption || state.guidePreference,
+    transitOption:
+      state.transitOption ||
+      state.preferredMovement ||
+      state.guidePreference,
     tourHours: state.tourHours,
   };
 }

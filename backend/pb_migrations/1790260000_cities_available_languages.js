@@ -39,7 +39,15 @@ migrate((app) => {
 
   // Default Tokyo / major cities to a sensible set when empty
   const rows = app.findAllRecords(cities);
-  const defaults = ["English", "Japanese", "French", "German", "Spanish", "Italian"];
+  const defaults = [
+    "English",
+    "Dutch",
+    "Japanese",
+    "French",
+    "German",
+    "Spanish",
+    "Italian",
+  ];
   for (const row of rows) {
     const existing = row.get("available_languages");
     const empty =

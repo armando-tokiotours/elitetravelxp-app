@@ -532,7 +532,7 @@ function TourThumb({
       type="button"
       onClick={onClick}
       aria-label={tour.title}
-      className="group relative aspect-square cursor-pointer overflow-hidden rounded-sm border border-zinc-800/60 bg-[#0D1117]/60 backdrop-blur-sm"
+      className="group relative aspect-[3/4] cursor-pointer overflow-hidden rounded-sm border border-zinc-800/60 bg-[#0D1117]/60 backdrop-blur-sm"
     >
       {thumbUrl ? (
         // eslint-disable-next-line @next/next/no-img-element

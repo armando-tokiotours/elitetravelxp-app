@@ -114,7 +114,7 @@ export function renderProposalEmailHtml(params: ProposalEmailParams): string {
       "Thank you for designing your bespoke itinerary. Our concierge team at TOKIOTOURS has received your trip selections and is preparing your confirmed 1-on-1 daily proposal."
   ).replace(/\n/g, "<br/>");
   const ctaText = escapeHtml(
-    params.ctaButtonText || "REVIEW & MANAGE MY BOOKING →"
+    params.ctaButtonText || "REVIEW YOUR BOOKING BRIEF →"
   );
   const origin = params.siteOrigin || "https://tokiotours-app.com";
   const manageUrl = escapeHtml(
@@ -137,6 +137,7 @@ export function renderProposalEmailHtml(params: ProposalEmailParams): string {
         <table width="600" border="0" cellspacing="0" cellpadding="0" style="max-width:600px;width:100%;background-color:${CARD};border:1px solid ${BORDER};border-radius:16px;padding:32px;text-align:left;">
           <tr>
             <td style="padding-bottom:20px;">
+              <img src="https://tokiotours-app.com/images/tokiotours-logo.png" alt="TOKIOTOURS" width="48" height="48" style="display:block;border-radius:9999px;margin:0 0 12px 0;" />
               <span style="color:${BRAND_RED};font-weight:800;font-size:22px;letter-spacing:2px;text-transform:uppercase;">TOKIOTOURS</span>
               <h1 style="color:#FFFFFF;font-size:24px;font-weight:700;margin:8px 0 0 0;text-transform:uppercase;letter-spacing:0.04em;">${headerTitle}</h1>
             </td>

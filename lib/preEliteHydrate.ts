@@ -20,6 +20,7 @@ import type { HotelStarRating } from "@/store/useBuilderStore";
 import { useBuilderStore } from "@/store/useBuilderStore";
 import { useItineraryStore } from "@/store/useItineraryStore";
 import { useQuizStore } from "@/store/useQuizStore";
+import { useSingleDayBuilderStore } from "@/store/useSingleDayBuilderStore";
 import { distributeStayNights } from "@/lib/transitHubs";
 
 export type TravelStyleTierRules = {
@@ -341,6 +342,21 @@ export function hydrateStoresFromPreEliteBrief(
       tempBookingRef: bookingRef,
     };
   });
+
+  // Builder S: seed tour date / guests / pace from the Pre-Build brief.
+  if (tripMode === "single_day") {
+    const singleHours =
+      data.timing?.totalDays === 1 && data.timing?.startDate
+        ? useSingleDayBuilderStore.getState().tourHours
+        : useSingleDayBuilderStore.getState().tourHours;
+    useSingleDayBuilderStore.setState({
+      tourDate: arrivalDate || useSingleDayBuilderStore.getState().tourDate,
+      adults: Math.max(1, adults),
+      children: Math.max(0, children),
+      travelPace,
+      tourHours: singleHours || 6,
+    });
+  }
 
   // Fire-and-forget: draft → in_progress on PocketBase bookings lead.
   if (typeof window !== "undefined") {

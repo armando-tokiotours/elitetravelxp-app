@@ -221,13 +221,13 @@ export function TravelDossierView({
             <div className="flex items-start gap-2">
               <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-[#075473]" />
               <div>
-                <h2 className="text-[0.7rem] font-semibold uppercase tracking-[0.28em] text-[#0B1F3A]">
+                <h2 className="text-[0.7rem] font-semibold uppercase tracking-[0.28em] text-white">
                   Elite Concierge
                 </h2>
-                <p className="mt-2 text-sm font-semibold text-accent-700">
+                <p className="mt-2 text-sm font-semibold text-[#F6A724]">
                   €50 Design Deposit
                 </p>
-                <p className="mt-2 text-sm text-[#5C6570]">
+                <p className="mt-2 text-sm text-white/60">
                   Day-by-day itinerary design included — dining, access, and
                   private drivers coordinated by your specialist. 100% of the
                   €50 fee is credited toward your final trip balance when you
@@ -244,18 +244,18 @@ export function TravelDossierView({
       <TicketCard accent="gold">
         <div className="flex items-center gap-2">
           <PlaneLanding className="h-4 w-4 text-[#075473]" />
-          <h2 className="text-[0.7rem] font-semibold uppercase tracking-[0.28em] text-[#0B1F3A]">
+          <h2 className="text-[0.7rem] font-semibold uppercase tracking-[0.28em] text-white">
             Arrival
             <span className="mx-2 text-[#075473]">·</span>
-            <span className="tracking-normal text-[#5C6570]">
+            <span className="tracking-normal text-white/60">
               {formatDisplayDate(state.arrivalDate)}
             </span>
           </h2>
         </div>
-        <p className="mt-3 text-base font-semibold text-[#0B1F3A]">
+        <p className="mt-3 text-base font-semibold text-white">
           Landing at {arrivalHubLabel || "Arrival hub TBD"}
         </p>
-        <p className="mt-1 text-sm text-[#5C6570]">{arrivalTransferLine}</p>
+        <p className="mt-1 text-sm text-white/60">{arrivalTransferLine}</p>
       </TicketCard>
 
       {/* Stay stops only — arrival/departure waypoint cards are folded into the airport nodes */}
@@ -263,11 +263,11 @@ export function TravelDossierView({
         <>
           <TimelineSpine />
           <TicketCard accent="muted">
-            <p className="text-sm text-[#8A8278]">
+            <p className="text-sm text-white/45">
               No cities on your route yet.{" "}
               <Link
                 href="/builder"
-                className="font-semibold text-[#0B1F3A] underline"
+                className="font-semibold text-white underline"
               >
                 Add locations in the builder
               </Link>
@@ -301,19 +301,19 @@ export function TravelDossierView({
 
       <TicketCard accent="navy">
         <div className="flex items-center gap-2">
-          <PlaneTakeoff className="h-4 w-4 text-[#0B1F3A]" />
-          <h2 className="text-[0.7rem] font-semibold uppercase tracking-[0.28em] text-[#0B1F3A]">
+          <PlaneTakeoff className="h-4 w-4 text-white" />
+          <h2 className="text-[0.7rem] font-semibold uppercase tracking-[0.28em] text-white">
             Departure
             <span className="mx-2 text-[#075473]">·</span>
-            <span className="tracking-normal text-[#5C6570]">
+            <span className="tracking-normal text-white/60">
               {formatDisplayDate(departureIso)}
             </span>
           </h2>
         </div>
-        <p className="mt-3 text-base font-semibold text-[#0B1F3A]">
+        <p className="mt-3 text-base font-semibold text-white">
           Departure from {departureHubLabel || "Departure hub TBD"}
         </p>
-        <p className="mt-1 text-sm text-[#5C6570]">{departureTransferLine}</p>
+        <p className="mt-1 text-sm text-white/60">{departureTransferLine}</p>
       </TicketCard>
 
       <InterCityTransitModal
@@ -398,8 +398,8 @@ function LocationSegment({
   return (
     <>
       <TimelineSpine />
-      <section className="w-full overflow-hidden rounded-2xl border border-zinc-200/80 bg-white shadow-lg">
-          <div className="relative h-36 w-full bg-[#E8E2D9]">
+      <section className="w-full overflow-hidden rounded-2xl border border-white/10 bg-[#0D1117]/90 text-white shadow-lg">
+          <div className="relative h-36 w-full bg-[#0B1728]">
             <CityThumb
               city={city}
               name={cityLabel}
@@ -421,25 +421,25 @@ function LocationSegment({
             >
               <div className="flex min-w-0 flex-1 flex-col gap-1.5 overflow-hidden sm:flex-row sm:items-start sm:justify-between sm:gap-3">
                 <div className="flex min-w-0 flex-col gap-1 overflow-hidden">
-                  <h2 className="break-words font-display text-2xl leading-tight text-[#0B1F3A]">
+                  <h2 className="break-words font-display text-2xl leading-tight text-white">
                     {cityLabel}
                   </h2>
-                  <p className="text-sm font-semibold leading-tight text-[#5C6570]">
+                  <p className="text-sm font-semibold leading-tight text-white/70">
                     {nightsLabel}
-                    <span className="font-normal text-[#8A8278]">
+                    <span className="font-normal text-white/45">
                       {" "}
                       · {statusLabel}
                     </span>
                   </p>
                 </div>
                 {dateLabel ? (
-                  <p className="text-xs leading-tight text-[#8A8278] sm:shrink-0 sm:pt-1 sm:text-right">
+                  <p className="text-xs leading-tight text-[#F6A724] sm:shrink-0 sm:pt-1 sm:text-right">
                     {dateLabel}
                   </p>
                 ) : null}
               </div>
               <ChevronDown
-                className={`mt-1 h-4 w-4 shrink-0 text-[#075473]/80 transition-transform duration-200 ${
+                className={`mt-1 h-4 w-4 shrink-0 text-[#F6A724] transition-transform duration-200 ${
                   open ? "rotate-180" : ""
                 }`}
                 aria-hidden
@@ -453,15 +453,15 @@ function LocationSegment({
             >
               <div className="overflow-hidden">
                 {wantsHotel ? (
-                  <div className="mt-4 flex w-full items-start gap-2 overflow-hidden border-t border-dashed border-[#E8E2D9] pt-3">
+                  <div className="mt-4 flex w-full items-start gap-2 overflow-hidden border-t border-dashed border-white/10 pt-3">
                     <BedDouble className="mt-0.5 h-4 w-4 shrink-0 text-[#075473]" />
                     <div className="flex min-w-0 flex-col gap-1 overflow-hidden">
-                      <p className="break-words text-sm font-semibold leading-tight text-[#0B1F3A]">
+                      <p className="break-words text-sm font-semibold leading-tight text-white">
                         {hotelPref
                           ? `${hotelPref.starRating}-Star Hotel Tier`
                           : `${state.hotelTier === "5-star" ? "5" : "4"}-Star Hotel Tier`}
                       </p>
-                      <p className="break-words text-sm leading-tight text-[#5C6570]">
+                      <p className="break-words text-sm leading-tight text-white/60">
                         {hotelPref
                           ? (() => {
                               const n = normalizeCityHotelPref(
@@ -478,7 +478,7 @@ function LocationSegment({
                             })()
                           : `${state.roomCount}× ${state.roomType} Room`}
                         {hotelPref ? (
-                          <span className="text-[#8A8278]">
+                          <span className="text-white/45">
                             {" "}
                             ·{" "}
                             {hotelPref.breakfast
@@ -490,7 +490,7 @@ function LocationSegment({
                     </div>
                   </div>
                 ) : (
-                  <div className="mt-4 flex w-full items-center gap-2 overflow-hidden border-t border-dashed border-[#E8E2D9] pt-3 text-xs italic text-[#8A8278]">
+                  <div className="mt-4 flex w-full items-center gap-2 overflow-hidden border-t border-dashed border-white/10 pt-3 text-xs italic text-white/45">
                     <BedDouble className="h-4 w-4 shrink-0 text-[#D9D2C7]" />
                     <span>
                       Accommodation Self-Arranged (No Hotel Required)
@@ -499,7 +499,7 @@ function LocationSegment({
                 )}
 
                 {tours.length > 0 ? (
-                  <ul className="mt-3 space-y-2 border-t border-dashed border-[#E8E2D9] pt-3">
+                  <ul className="mt-3 space-y-2 border-t border-dashed border-white/10 pt-3">
                     {tours.map((row) => {
                       const tour = config?.tours.find(
                         (t) => t.id === row.tourId
@@ -513,22 +513,22 @@ function LocationSegment({
                         >
                           <Ticket className="mt-0.5 h-4 w-4 shrink-0 text-[#075473]" />
                           <span>
-                            <span className="font-medium text-[#0B1F3A]">
+                            <span className="font-medium text-white">
                               {tour?.title ?? row.title ?? row.tourId}
                             </span>
                             {hours ? (
-                              <span className="text-[#8A8278]">
+                              <span className="text-white/45">
                                 , {hours}h
                               </span>
                             ) : null}
                             {row.selectedLanguage ? (
-                              <span className="text-[#8A8278]">
+                              <span className="text-white/45">
                                 {" "}
                                 · {row.selectedLanguage}
                               </span>
                             ) : null}
                             {row.scheduledDate ? (
-                              <span className="mt-0.5 block text-xs text-[#8A8278]">
+                              <span className="mt-0.5 block text-xs text-white/45">
                                 {formatCityDateSingle(row.scheduledDate) ||
                                   formatDisplayDate(row.scheduledDate)}
                               </span>
@@ -541,10 +541,10 @@ function LocationSegment({
                 ) : null}
 
                 {chauffeurLines.length > 0 ? (
-                  <div className="mt-3 flex items-start gap-2 border-t border-dashed border-[#E8E2D9] pt-3">
+                  <div className="mt-3 flex items-start gap-2 border-t border-dashed border-white/10 pt-3">
                     <Car className="mt-0.5 h-4 w-4 shrink-0 text-[#075473]" />
-                    <p className="text-sm text-[#5C6570]">
-                      <span className="font-semibold text-[#0B1F3A]">
+                    <p className="text-sm text-white/60">
+                      <span className="font-semibold text-white">
                         Private Chauffeur:
                       </span>{" "}
                       {chauffeurLines.join(", ")}
@@ -639,8 +639,8 @@ function TransitConnectorPill({
           onClick={onClick}
           className={`group my-2 inline-flex max-w-full cursor-pointer flex-col items-center gap-1 rounded-full border px-3 py-2 text-xs font-semibold shadow-sm transition-all sm:px-4 ${
             isUnset
-              ? "border-accent-500/40/70 bg-accent-50 text-accent-950 hover:border-accent-500 hover:shadow-md"
-              : "border-zinc-200 bg-white text-zinc-800 hover:border-[#075473] hover:shadow-md"
+              ? "border-[#F6A724]/50 bg-[#F6A724]/15 text-[#F6A724] hover:border-[#F6A724] hover:shadow-md"
+              : "border-white/20 bg-[#0D1117] text-white hover:border-[#075473] hover:shadow-md"
           }`}
           aria-label={
             isUnset
@@ -652,11 +652,11 @@ function TransitConnectorPill({
             {isUnset ? (
               <span aria-hidden>⚠️</span>
             ) : mode === "private" ? (
-              <Car className="h-3.5 w-3.5 text-[#075473]" />
+              <Car className="h-3.5 w-3.5 text-[#F6A724]" />
             ) : mode === "public" ? (
-              <TrainFront className="h-3.5 w-3.5 text-[#075473]" />
+              <TrainFront className="h-3.5 w-3.5 text-[#F6A724]" />
             ) : (
-              <CircleDot className="h-3.5 w-3.5 text-zinc-400" />
+              <CircleDot className="h-3.5 w-3.5 text-white/40" />
             )}
             {isUnset
               ? "Transfer Not Configured — Tap to Set Up"
@@ -665,12 +665,12 @@ function TransitConnectorPill({
                 : mode === "private"
                   ? privateLabel
                   : publicLabel}
-            <Pencil className="h-3 w-3 text-zinc-400 opacity-0 transition group-hover:opacity-100" />
+            <Pencil className="h-3 w-3 text-white/40 opacity-0 transition group-hover:opacity-100" />
           </span>
           {ticketNote ? (
             <span
               className={`text-[10px] font-medium ${
-                isSelf ? "text-zinc-500" : "text-accent-700"
+                isSelf ? "text-white/45" : "text-[#F6A724]"
               }`}
             >
               {ticketNote}
@@ -698,16 +698,16 @@ function TicketCard({
 }) {
   const border =
     accent === "gold"
-      ? "border-l-[3px] border-l-[#075473]"
+      ? "border-l-[3px] border-l-[#F6A724]"
       : accent === "navy"
-        ? "border-l-[3px] border-l-[#0B1F3A]"
+        ? "border-l-[3px] border-l-[#075473]"
         : accent === "muted"
-          ? "border-l-[3px] border-l-[#D9D2C7]"
-          : "border-l-[3px] border-l-[#E8E2D9]";
+          ? "border-l-[3px] border-l-white/20"
+          : "border-l-[3px] border-l-white/15";
 
   return (
     <section
-      className={`w-full overflow-hidden rounded-2xl border border-[#E8E2D9] bg-white shadow-[0_2px_12px_rgba(11,31,58,0.04)] ${border} ${
+      className={`w-full overflow-hidden rounded-2xl border border-white/10 bg-[#0D1117]/90 text-white shadow-[0_2px_12px_rgba(0,0,0,0.35)] ${border} ${
         compact ? "px-4 py-3" : "px-4 py-4 sm:px-5"
       }`}
     >

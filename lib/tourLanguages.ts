@@ -43,6 +43,7 @@ const FLAGS: Record<string, string> = {
 
 const DEFAULT_CITY_LANGUAGES = [
   "English",
+  "Dutch",
   "Japanese",
   "French",
   "German",
@@ -111,6 +112,7 @@ export function languageFlag(raw: string): string {
 export function languageDisplayLabel(name: string): string {
   const flag = languageFlag(name);
   if (name === "Japanese") return `${flag} 日本語 (Japanese)`;
+  if (name === "Dutch") return `${flag} Nederlands (Dutch)`;
   if (name === "French") return `${flag} Français (French)`;
   if (name === "German") return `${flag} Deutsch (German)`;
   if (name === "Spanish") return `${flag} Español (Spanish)`;
