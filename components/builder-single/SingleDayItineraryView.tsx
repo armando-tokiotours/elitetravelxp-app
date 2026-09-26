@@ -24,6 +24,7 @@ import {
 } from "@/store/useSingleDayBuilderStore";
 import { useBuilderStore } from "@/store/useBuilderStore";
 import { useItineraryStore } from "@/store/useItineraryStore";
+import { usePreBuilderStore } from "@/store/usePreBuilderStore";
 import { JapanBookingPass } from "@/components/dossier/JapanBookingPass";
 import { useConciergeAgentName } from "@/lib/useConciergeAgentName";
 import {
@@ -62,7 +63,16 @@ export function SingleDayItineraryView() {
   const bookingStatus = useBuilderStore((s) => s.bookingStatus);
   const experienceService = useBuilderStore((s) => s.experienceService);
   const isEliteConcierge = useBuilderStore((s) => s.isEliteConcierge);
-  const passengerName = useItineraryStore((s) => s.clientName);
+  const clientName = useItineraryStore((s) => s.clientName);
+  const clientEmail = useItineraryStore((s) => s.clientEmail);
+  const preName = usePreBuilderStore(
+    (s) => s.fullName || s.lastPayload?.fullName || ""
+  );
+  const preEmail = usePreBuilderStore(
+    (s) => s.email || s.lastPayload?.email || ""
+  );
+  const passengerName = (clientName || preName || "").trim();
+  const passengerEmail = (clientEmail || preEmail || "").trim().toLowerCase();
 
   const [catalog, setCatalog] = useState<PbTour[]>([]);
 
@@ -163,6 +173,7 @@ export function SingleDayItineraryView() {
       <JapanBookingPass
         pnrCode={pnrCode}
         guestName={passengerName || "GUEST"}
+        guestEmail={passengerEmail || undefined}
         partyText={formatGuestCountText(adults, children)}
         travelStyle={guideLabel || "DAY TOUR"}
         tripType="single"

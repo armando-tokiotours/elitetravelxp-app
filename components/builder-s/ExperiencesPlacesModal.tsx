@@ -176,7 +176,7 @@ export function ExperiencesPlacesModal({
       {open ? (
         <motion.div
           key="experiences-places-modal"
-          className="fixed inset-0 z-[110] flex items-end justify-center bg-[#05080C]/55 backdrop-blur-sm sm:items-center sm:p-2"
+          className="fixed inset-0 z-[110] flex items-stretch justify-center bg-[#05080C]/55 backdrop-blur-sm"
           role="dialog"
           aria-modal="true"
           aria-label="Experiences and Places"
@@ -192,14 +192,14 @@ export function ExperiencesPlacesModal({
             onClick={onClose}
           />
           <motion.div
-            className="relative z-[1] flex max-h-[min(94dvh,48rem)] w-full max-w-lg flex-col overflow-hidden rounded-t-3xl border border-white/10 bg-[#05080C]/92 shadow-2xl backdrop-blur-3xl sm:rounded-2xl"
+            className="relative z-[1] flex h-[100dvh] max-h-[100dvh] w-full max-w-lg flex-col overflow-hidden border border-white/10 bg-[#05080C]/92 shadow-2xl backdrop-blur-3xl sm:rounded-2xl md:max-w-4xl lg:max-w-5xl"
             initial={{ opacity: 0, y: 24 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 24 }}
             transition={{ duration: 0.25, ease: "easeOut" }}
           >
             {/* Header */}
-            <div className="flex shrink-0 items-center gap-3 border-b border-white/10 px-4 py-2 pt-[max(0.5rem,env(safe-area-inset-top))]">
+            <div className="flex shrink-0 items-center gap-3 border-b border-white/10 px-4 py-2 pt-[max(0.35rem,env(safe-area-inset-top))]">
               <button
                 type="button"
                 onClick={onClose}
@@ -480,7 +480,7 @@ export function ExperiencesPlacesModal({
               <button
                 type="button"
                 onClick={onClose}
-                className="w-full rounded-full bg-[#1CA67F] py-3 text-sm font-semibold text-white transition hover:bg-[#178f6d]"
+                className="w-full rounded-full bg-[#054F70] py-3 text-sm font-semibold text-white transition hover:bg-[#043d57]"
               >
                 Done
               </button>

@@ -238,9 +238,10 @@ export async function sendViaBluehostWebmail(
     throw new Error("Bluehost Roundcube compose session incomplete.");
   }
 
-  // Optional attachments via Roundcube upload
+  // Attachments via Roundcube upload — must succeed when PDFs are required
+  const wanted = input.attachments || [];
   const uploadedIds: string[] = [];
-  for (const att of input.attachments || []) {
+  for (const att of wanted) {
     const form = new FormData();
     form.set("_token", token);
     form.set("_id", composeId);
@@ -248,7 +249,7 @@ export async function sendViaBluehostWebmail(
     form.set(
       "_attachments[]",
       new Blob([new Uint8Array(att.content)], {
-        type: att.contentType || "application/octet-stream",
+        type: att.contentType || "application/pdf",
       }),
       att.filename
     );
@@ -268,16 +269,25 @@ export async function sendViaBluehostWebmail(
     const id =
       firstMatch(upText, [
         /"id":"([^"]+)"/,
+        /"attachment":\{[^}]*"id":"([^"]+)"/,
         /add2attachment\(['"]([^'"]+)/,
+        /_attachments":\s*\{[^}]*"([^"]+)":\{/,
       ]) || "";
     if (id) uploadedIds.push(id);
     else {
       console.warn(
-        "[mail] Roundcube attachment upload may have failed",
+        "[mail] Roundcube attachment upload failed",
         att.filename,
-        up.status
+        up.status,
+        upText.slice(0, 280)
       );
     }
+  }
+
+  if (wanted.length > 0 && uploadedIds.length < wanted.length) {
+    throw new Error(
+      `Bluehost Roundcube attached ${uploadedIds.length}/${wanted.length} PDF(s); falling back to relay/SMTP.`
+    );
   }
 
   const isHtml = Boolean(input.html && input.html.trim());
@@ -327,6 +337,7 @@ export async function sendViaBluehostWebmail(
     to: toList,
     bcc,
     subject: input.subject,
+    attachments: uploadedIds.length,
   });
   return { sent: true, via: "bluehost-webmail" };
 }

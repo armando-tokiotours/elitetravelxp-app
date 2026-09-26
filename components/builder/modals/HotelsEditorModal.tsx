@@ -24,6 +24,7 @@ import {
 import { FieldLabel } from "../ui";
 import { ExplainerTriggerButton } from "../ExplainerTriggerButton";
 import { CityThumb } from "../CityThumb";
+import { GoldLight } from "@/components/branding/GoldLight";
 import { CITY_PLACEHOLDER, cityPbImageUrl } from "@/lib/cityMedia";
 
 const ROOM_KEYS: {
@@ -492,8 +493,13 @@ function CityHotelCard({
 
   return (
     <div className="rounded-2xl border border-zinc-800 bg-zinc-900">
-      <div className="flex w-full flex-col gap-3 overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900/80 p-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex min-w-0 w-full items-center gap-3 overflow-hidden">
+      <div className="group relative flex w-full flex-col gap-3 overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900/80 p-4 sm:flex-row sm:items-center sm:justify-between">
+        <GoldLight
+          color="#F6A724"
+          placement="top-center"
+          active={needsHotel}
+        />
+        <div className="relative z-10 flex min-w-0 w-full items-center gap-3 overflow-hidden">
           <span className="h-16 w-16 shrink-0 overflow-hidden rounded-lg border border-zinc-700">
             <CityThumb
               city={city}
@@ -514,7 +520,7 @@ function CityHotelCard({
             </p>
           </div>
         </div>
-        <label className="flex shrink-0 cursor-pointer items-center justify-between gap-2.5 text-xs text-zinc-400 sm:justify-end">
+        <label className="relative z-10 flex shrink-0 cursor-pointer items-center justify-between gap-2.5 text-xs text-zinc-400 sm:justify-end">
           <span className="min-w-0 break-words leading-tight sm:hidden">
             Need a hotel in {cityName}?
           </span>

@@ -5,6 +5,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { Lock } from "lucide-react";
 import { useBuilderStore } from "@/store/useBuilderStore";
 import { CrimsonGlow } from "@/components/branding/CrimsonGlow";
+import { BoxGradingGlow } from "@/components/branding/BoxGradingGlow";
 import { useBuilderAccordionOptional } from "./BuilderAccordion";
 
 const GOLD = "#075473";
@@ -156,8 +157,9 @@ export function SectionBlock({
             transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
             className="overflow-hidden"
           >
-            <div className="relative z-10 border-t border-white/10 bg-[#0D1117]/40 px-4 pb-5 pt-4 sm:px-5 sm:pb-6">
-              {children}
+            <div className="relative z-10 overflow-hidden border-t border-white/10 bg-[#0D1117]/40 px-4 pb-5 pt-4 sm:px-5 sm:pb-6">
+              <BoxGradingGlow />
+              <div className="relative z-10">{children}</div>
             </div>
           </motion.div>
         ) : null}

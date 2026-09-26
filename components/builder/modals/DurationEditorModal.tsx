@@ -141,7 +141,7 @@ export function DurationEditorModal({
           transition={{ duration: 0.2 }}
         >
           <motion.div
-            className="tokio-modal-content relative flex h-[100dvh] w-full flex-col overflow-hidden border border-white/10 md:h-[85vh] md:max-w-2xl md:rounded-2xl"
+            className="tokio-modal-content relative flex h-[100dvh] max-h-[100dvh] w-full flex-col overflow-hidden border border-white/10 md:max-w-4xl md:rounded-2xl lg:max-w-5xl"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 20 }}
@@ -219,7 +219,8 @@ export function DurationEditorModal({
                 ) : null}
               </div>
 
-              <div className="flex flex-col gap-4 sm:grid sm:grid-cols-2 sm:gap-3">
+              <div className="relative z-[1] overflow-visible md:grid md:grid-cols-2 md:gap-4">
+                <div className="flex flex-col gap-4 md:contents">
                 <DatePickerField
                   value={arrivalDate}
                   onChange={(next) => {
@@ -242,6 +243,7 @@ export function DurationEditorModal({
                     }
                   }}
                 />
+                </div>
               </div>
 
               <div>

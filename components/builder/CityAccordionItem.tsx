@@ -14,6 +14,7 @@ import { isTransitHubStop } from "@/lib/transitHubs";
 import { allowedVisitTypesForIndex } from "@/lib/locationRules";
 import { useHybridTooltip } from "@/hooks/useHybridTooltip";
 import { CrimsonGlow } from "@/components/branding/CrimsonGlow";
+import { GoldLight } from "@/components/branding/GoldLight";
 import { ConciergeSuggestionCard } from "./ConciergeSuggestionCard";
 import { CityThumb } from "./CityThumb";
 
@@ -82,9 +83,9 @@ export function CityAccordionItem({
       <Reorder.Item
         value={loc}
         dragListener={false}
-        className="relative w-full overflow-hidden rounded-2xl border border-zinc-700 bg-zinc-900/80"
+        className="group relative w-full overflow-hidden rounded-2xl border border-zinc-700 bg-zinc-900/80"
       >
-        <CrimsonGlow placement="left-drag" />
+        <GoldLight color="#054F70" placement="left-center" active />
         <div
           className="relative z-10 flex items-center gap-3 px-3 py-3"
           title="Auto-set from Step 2 (Arrival/Departure)"

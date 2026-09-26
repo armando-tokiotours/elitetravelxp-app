@@ -309,7 +309,7 @@ export function ConciergeEditorModal({
                   <button
                     type="button"
                     onClick={applyConcierge}
-                    className="w-full rounded-xl bg-accent-500 py-3 text-sm font-bold text-zinc-950 transition hover:bg-[#05384c] sm:flex-1"
+                    className="w-full rounded-xl bg-[#F6A724] py-3 text-sm font-bold text-zinc-950 transition hover:bg-[#e0951f] sm:flex-1"
                   >
                     Confirm &amp; Apply Concierge
                   </button>

@@ -293,6 +293,30 @@ export async function handleSendItinerary(
       });
     }
 
+    const attachmentCount =
+      namedPdfs.length || (pdf && pdf.length > 0 ? 1 : 0);
+    if (attachmentCount === 0) {
+      console.error("[send-itinerary] no PDF buffers produced");
+      return NextResponse.json(
+        {
+          ok: false,
+          bookingRef,
+          error:
+            "Could not build the itinerary PDF for email. Please try again or use local Print.",
+        },
+        { status: 500 }
+      );
+    }
+
+    console.info("[send-itinerary] mailing with PDFs", {
+      bookingRef,
+      named: namedPdfs.map((p) => ({
+        filename: p.filename,
+        bytes: p.content.length,
+      })),
+      legacyBytes: pdf?.length || 0,
+    });
+
     let mailSent = false;
     let mailNote: string | undefined;
     let mailId: string | undefined;

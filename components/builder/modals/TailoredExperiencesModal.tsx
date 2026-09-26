@@ -55,6 +55,7 @@ import { ExperiencesDrawer } from "../ExperiencesDrawer";
 import { ActivityMatcherBanner } from "../ActivityMatcherBanner";
 import { FieldLabel } from "../ui";
 import { CityTransportModal } from "./CityTransportModal";
+import { GoldLight } from "@/components/branding/GoldLight";
 
 export function TailoredExperiencesModal({
   open,
@@ -398,13 +399,13 @@ export function TailoredExperiencesModal({
           transition={{ duration: 0.2 }}
         >
           <motion.div
-            className="tokio-modal-content relative flex h-[100dvh] w-full flex-col overflow-hidden border border-white/10 md:h-[85vh] md:max-w-2xl md:rounded-2xl"
+            className="tokio-modal-content relative flex h-[100dvh] max-h-[100dvh] w-full flex-col overflow-hidden border border-white/10 md:max-w-4xl md:rounded-2xl lg:max-w-5xl"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 20 }}
             transition={{ duration: 0.25, ease: "easeOut" }}
           >
-            <div className="tokio-modal-chrome flex flex-shrink-0 items-center gap-4 border-b p-4 pt-[max(1rem,env(safe-area-inset-top))]">
+            <div className="tokio-modal-chrome flex flex-shrink-0 items-center gap-4 border-b p-4 pt-[max(0.35rem,env(safe-area-inset-top))]">
               <button
                 type="button"
                 onClick={handleCancel}
@@ -635,7 +636,7 @@ export function TailoredExperiencesModal({
               <button
                 type="button"
                 onClick={handleDone}
-                className="w-full rounded-full bg-[#1CA67F] py-3 text-sm font-semibold text-white transition hover:bg-[#178f6d]"
+                className="w-full rounded-full bg-[#054F70] py-3 text-sm font-semibold text-white transition hover:bg-[#043d58]"
               >
                 Save &amp; Apply
               </button>
@@ -798,12 +799,13 @@ function CityExperienceAccordion({
   }, [dayOptions, daySelections]);
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-900 shadow-[0_2px_12px_rgba(11,31,58,0.04)]">
+    <div className="group relative overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-900 shadow-[0_2px_12px_rgba(11,31,58,0.04)]">
+      <GoldLight color="#054F70" placement="right-center" active />
       <button
         type="button"
         onClick={onToggle}
         aria-expanded={expanded}
-        className="flex w-full items-center gap-3 px-3 py-2.5 text-left sm:px-4"
+        className="relative z-10 flex w-full items-center gap-3 px-3 py-2.5 text-left sm:px-4"
       >
         {img ? (
           // eslint-disable-next-line @next/next/no-img-element
@@ -838,7 +840,7 @@ function CityExperienceAccordion({
       </button>
 
       {expanded ? (
-        <div className="border-t border-zinc-800 px-4 py-4">
+        <div className="relative z-10 border-t border-zinc-800 px-4 py-4">
           <div
             className={`mb-4 grid gap-3 ${
               hideTransport ? "grid-cols-1" : "grid-cols-2"

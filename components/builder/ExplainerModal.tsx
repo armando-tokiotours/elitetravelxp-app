@@ -228,7 +228,7 @@ export function ExplainerModal({
     <AnimatePresence>
       {open ? (
         <div
-          className="fixed inset-0 z-[100] flex items-end justify-center sm:items-center sm:p-4"
+          className="fixed inset-0 z-[100] flex items-stretch justify-center"
           role="dialog"
           aria-modal="true"
           aria-label={record?.title || "Feature explanation"}
@@ -243,13 +243,13 @@ export function ExplainerModal({
             onClick={onClose}
           />
           <motion.div
-            className="relative z-[1] flex h-[90dvh] max-h-[90dvh] w-full max-w-lg flex-col overflow-hidden rounded-t-3xl bg-[#FBF8F2] shadow-2xl sm:h-[min(90dvh,52rem)] sm:max-h-[min(90dvh,52rem)] sm:rounded-3xl"
-            initial={{ y: "100%" }}
-            animate={{ y: 0 }}
-            exit={{ y: "100%" }}
-            transition={{ type: "spring", damping: 28, stiffness: 320 }}
+            className="relative z-[1] flex h-[100dvh] max-h-[100dvh] w-full max-w-lg flex-col overflow-hidden bg-[#FBF8F2] shadow-2xl sm:rounded-3xl md:max-w-2xl"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 20 }}
+            transition={{ duration: 0.25, ease: "easeOut" }}
           >
-            <div className="sticky top-0 z-20 flex shrink-0 items-center justify-between gap-3 border-b border-[#EEE8DF] bg-white px-4 pb-4 pt-6 sm:px-5">
+            <div className="sticky top-0 z-20 flex shrink-0 items-center justify-between gap-3 border-b border-[#EEE8DF] bg-white px-4 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))] sm:px-5">
               <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#075473]">
                 How it works
               </p>

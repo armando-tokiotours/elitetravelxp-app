@@ -42,7 +42,7 @@ export function MovementDetailModal({
       {open && movementId && item ? (
         <motion.div
           key="movement-detail"
-          className="fixed inset-0 z-[130] flex items-end justify-center bg-[#05080C]/70 backdrop-blur-sm sm:items-center sm:p-4"
+          className="fixed inset-0 z-[130] flex items-stretch justify-center bg-[#05080C]/70 backdrop-blur-sm"
           role="dialog"
           aria-modal="true"
           aria-label={item.title}
@@ -57,7 +57,7 @@ export function MovementDetailModal({
             onClick={onClose}
           />
           <motion.div
-            className="relative z-[1] flex max-h-[min(90dvh,36rem)] w-full max-w-md flex-col overflow-hidden rounded-t-3xl border border-white/10 bg-[#0D1117]/95 shadow-2xl backdrop-blur-xl sm:rounded-2xl"
+            className="relative z-[1] flex h-[100dvh] max-h-[100dvh] w-full max-w-lg flex-col overflow-hidden border border-white/10 bg-[#0D1117]/95 shadow-2xl backdrop-blur-xl sm:rounded-2xl md:max-w-2xl"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 20 }}
@@ -93,7 +93,7 @@ export function MovementDetailModal({
               <div className="absolute inset-0 bg-gradient-to-t from-[#0D1117] via-transparent to-transparent" />
             </div>
 
-            <div className="space-y-3 overflow-y-auto px-5 py-4 pb-6">
+            <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-5 py-4 pb-[max(1.5rem,env(safe-area-inset-bottom))]">
               <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#1BA58A]">
                 Preferred movement
               </p>

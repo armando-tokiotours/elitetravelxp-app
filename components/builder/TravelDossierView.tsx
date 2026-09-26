@@ -7,8 +7,6 @@ import {
   Car,
   CircleDot,
   Pencil,
-  PlaneLanding,
-  PlaneTakeoff,
   Sparkles,
   TrainFront,
 } from "lucide-react";
@@ -40,6 +38,7 @@ import { isTransitHubStop } from "@/lib/transitHubs";
 import { TRAVEL_STYLES, labelFor } from "@/lib/preEliteBuilder";
 import { travelStyleTierRules } from "@/lib/preEliteHydrate";
 import { DossierSectionOutline } from "@/components/builder/DossierSectionOutline";
+import { BoardingPassCard } from "@/components/builder/BoardingPassCard";
 import { JapanBookingPass } from "@/components/dossier/JapanBookingPass";
 import { useConciergeAgentName } from "@/lib/useConciergeAgentName";
 import {
@@ -52,6 +51,7 @@ import {
   resolvePnr,
 } from "@/lib/dossier/bookingPassHelpers";
 import { useItineraryStore } from "@/store/useItineraryStore";
+import { usePreBuilderStore } from "@/store/usePreBuilderStore";
 
 export function TravelDossierView({
   state,
@@ -82,7 +82,16 @@ export function TravelDossierView({
   const [transitLeg, setTransitLeg] = useState<InterCityTransitLeg | null>(
     null
   );
-  const passengerName = useItineraryStore((s) => s.clientName);
+  const clientName = useItineraryStore((s) => s.clientName);
+  const clientEmail = useItineraryStore((s) => s.clientEmail);
+  const preName = usePreBuilderStore(
+    (s) => s.fullName || s.lastPayload?.fullName || ""
+  );
+  const preEmail = usePreBuilderStore(
+    (s) => s.email || s.lastPayload?.email || ""
+  );
+  const passengerName = (clientName || preName || "").trim();
+  const passengerEmail = (clientEmail || preEmail || "").trim().toLowerCase();
 
   const cityMap = useMemo(
     () => buildCityMap(config?.cities),
@@ -157,6 +166,7 @@ export function TravelDossierView({
       <JapanBookingPass
         pnrCode={pnrCode}
         guestName={passengerName || "GUEST"}
+        guestEmail={passengerEmail || undefined}
         partyText={formatGuestCountText(state.adults, state.children)}
         travelStyle={styleLabel || "—"}
         tripType={state.tripMode === "single_day" ? "single" : "multi"}
@@ -202,22 +212,13 @@ export function TravelDossierView({
             </TicketCard>
           )}
 
-          <TicketCard accent="gold">
-            <div className="flex items-center gap-2">
-              <PlaneLanding className="h-4 w-4 text-[#075473]" />
-              <h2 className="text-[0.7rem] font-semibold uppercase tracking-[0.28em] text-white">
-                Arrival
-                <span className="mx-2 text-[#075473]">·</span>
-                <span className="tracking-normal text-white/60">
-                  {formatDisplayDate(state.arrivalDate)}
-                </span>
-              </h2>
-            </div>
-            <p className="mt-3 text-base font-semibold text-white">
-              Landing at {arrivalHubLabel || "Arrival hub TBD"}
-            </p>
-            <p className="mt-1 text-sm text-white/60">{arrivalTransferLine}</p>
-          </TicketCard>
+          <BoardingPassCard
+            kind="arrival"
+            title={`Landing at ${arrivalHubLabel || "Arrival hub TBD"}`}
+            subtitle={arrivalTransferLine}
+            dateLabel={formatDisplayDate(state.arrivalDate) || "Date TBD"}
+            hubCode={hubShort(arrivalHub) || "—"}
+          />
 
           {stayLocations.length === 0 ? (
             <TicketCard accent="muted">
@@ -254,22 +255,13 @@ export function TravelDossierView({
             })
           )}
 
-          <TicketCard accent="navy">
-            <div className="flex items-center gap-2">
-              <PlaneTakeoff className="h-4 w-4 text-[#075473]" />
-              <h2 className="text-[0.7rem] font-semibold uppercase tracking-[0.28em] text-white">
-                Departure
-                <span className="mx-2 text-[#075473]">·</span>
-                <span className="tracking-normal text-white/60">
-                  {formatDisplayDate(departureIso)}
-                </span>
-              </h2>
-            </div>
-            <p className="mt-3 text-base font-semibold text-white">
-              Departure from {departureHubLabel || "Departure hub TBD"}
-            </p>
-            <p className="mt-1 text-sm text-white/60">{departureTransferLine}</p>
-          </TicketCard>
+          <BoardingPassCard
+            kind="departure"
+            title={`Departure from ${departureHubLabel || "Departure hub TBD"}`}
+            subtitle={departureTransferLine}
+            dateLabel={formatDisplayDate(departureIso) || "Date TBD"}
+            hubCode={hubShort(departureHub) || "—"}
+          />
         </div>
       </DossierSectionOutline>
 

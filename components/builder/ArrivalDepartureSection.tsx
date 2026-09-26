@@ -15,6 +15,7 @@ import {
 } from "@/store/useBuilderStore";
 import { SectionContinue } from "./SectionContinue";
 import { SectionBlock } from "./ui";
+import { GoldLight } from "@/components/branding/GoldLight";
 import { useLazyModalMount } from "./modals/useLazyModalMount";
 
 const HubConfigModal = dynamic(
@@ -212,13 +213,17 @@ function HubSummaryCard({
     ? "border border-emerald-500/50 bg-emerald-950/40 text-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.25)]"
     : "border border-zinc-700 bg-[#1C1C1E] text-zinc-500";
 
+  /** No pickup/drop-off → teal; VIP chosen → amber */
+  const spotlight = vipEnabled ? "#F6A724" : "#1BA58A";
+
   return (
     <button
       type="button"
       onClick={onClick}
-      className="group flex min-h-[110px] flex-col justify-between rounded-2xl border border-[#2C2C2E] bg-[#121212] p-3 text-left transition hover:border-[#075473]/45 hover:bg-[#222226] sm:min-h-[130px] sm:rounded-[1.35rem] sm:p-5"
+      className="group relative flex min-h-[110px] flex-col justify-between overflow-hidden rounded-2xl border border-[#2C2C2E] bg-[#121212] p-3 text-left transition hover:border-[#075473]/45 hover:bg-[#222226] sm:min-h-[130px] sm:rounded-[1.35rem] sm:p-5"
     >
-      <div className="flex items-start justify-between gap-2">
+      <GoldLight color={spotlight} placement="top-center" active />
+      <div className="relative z-10 flex items-start justify-between gap-2">
         <p className="text-[9px] font-bold uppercase tracking-wider text-zinc-400 sm:text-[10px]">
           {title}
         </p>
@@ -241,14 +246,14 @@ function HubSummaryCard({
       </div>
 
       <p
-        className={`my-1 line-clamp-2 break-words whitespace-normal font-display text-sm font-bold leading-tight text-white sm:text-lg ${
+        className={`relative z-10 my-1 line-clamp-2 break-words whitespace-normal font-display text-sm font-bold leading-tight text-white sm:text-lg ${
           configured ? "" : "text-zinc-500"
         }`}
       >
         {hubName}
       </p>
 
-      <div className="mt-auto flex items-end justify-between gap-2 pt-3 sm:pt-4">
+      <div className="relative z-10 mt-auto flex items-end justify-between gap-2 pt-3 sm:pt-4">
         <div className="min-w-0">
           <p className="truncate text-[10px] text-zinc-400 sm:text-xs">
             {modeLabel}

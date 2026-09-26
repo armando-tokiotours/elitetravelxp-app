@@ -1,28 +1,50 @@
 ---
-description: Gold light — top-center border lamp / spotlight wash (color on order)
+description: Gold light — border lamp / spotlight wash (color + placement on order)
 alwaysApply: true
 ---
 
 # Gold light
 
-When the user says **gold light** (or “apply gold light”) to a named card:
+When the user says **gold light** (or “apply gold light” / spotlight) to a named card:
 
 1. Use `GoldLight` from `@/components/branding/GoldLight`.
 2. Parent card: `relative overflow-hidden group` (so hover works).
 3. Put content in `relative z-10` above the light.
-4. **Color:** default is gold `#F6A724`. When the user names a color, pass it as `color="#......"`.
-5. Pass `active={selected}` (or equivalent) when the card has a selected state.
+4. **Color:** default is gold `#F6A724`. When the user names a color, pass `color="#......"`.
+5. **Placement:** `top-center` (default), `left-center`, `right-center`, or `bottom-center`.
+6. Pass `active` to force on; omit/`false` for group-hover only.
 
-## Locked measurements (`GOLD_LIGHT`)
+## Locked placements
 
-| Layer | Detail |
-|-------|--------|
-| Placement | Top **center** of the card (not top-left) |
-| Wash height | `50%` of card |
-| Ellipse | `108% × 144%` at `50% 0%` |
-| Wash opacity | core `0.28` → mid `0.1` → fade |
-| Hot spot | `8.4rem × 4.8rem`, centered on top border, `blur-md` |
-| Rim | 1px top edge, brightest at center |
+| Placement | Origin |
+|-----------|--------|
+| `top-center` | Middle of top edge |
+| `left-center` | Left edge → wash right |
+| `right-center` | Right edge → wash left |
+| `bottom-center` | Middle of bottom edge |
+
+## Pre-elite Travel Style & Interests
+
+Spotlight shows on **hover** or when **selected** only.
+
+| Card | Color | Placement |
+|------|-------|-----------|
+| Exclusive VIP | `#F6A724` | `top-center` |
+| Most Popular | `#1BA58A` | `left-center` |
+| Best Value | `#DC6E8A` | `bottom-center` |
+| Culture & Heritage | `#E60F43` | `top-center` |
+| Food & Culinary | `#DC6E8A` | `left-center` |
+| Modern & Pop Culture | `#054F70` | `bottom-center` |
+| Nature & Day Trips | `#1BA58A` | `right-center` |
+| Family Vacation | `#E60F43` | `top-center` |
+| Romantic / Honeymoon | `#DC6E8A` | `left-center` |
+| Solo Explorer | `#054F70` | `bottom-center` |
+| First-Time Japan Visitor | `#1BA58A` | `right-center` |
+| Language & transit | `#E60F43` | `top-center` |
+| Tourist traps | `#DC6E8A` | `left-center` |
+| Authentic dining | `#054F70` | `bottom-center` |
+| No time to breathe | `#1BA58A` | `right-center` |
+| Multi-Day / Single-Day | `#F6A724` | `left-center` |
 
 Tune only via `GOLD_LIGHT` / `GoldLight` so every instance stays in sync.
 

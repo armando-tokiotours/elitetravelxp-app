@@ -579,6 +579,23 @@ export async function findBookingsAndLeads(
   }
 }
 
+/** Lookup contact on a lead by booking ref only (Send / Print prefill). */
+export async function findBookingsAndLeadsByRef(
+  bookingRef: string
+): Promise<BookingsAndLeadsRecord | null> {
+  const ref = safeRef(bookingRef);
+  if (!ref) return null;
+  try {
+    const pb = await getAdminPocketBase();
+    const byRef = await pb
+      .collection("bookings_and_leads")
+      .getFirstListItem(`booking_ref="${ref}"`, { requestKey: null });
+    return byRef as unknown as BookingsAndLeadsRecord;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Expand a lightweight multi-day snapshot into a partial BuilderState patch
  * suitable for `loadSavedItinerary` (IDs only — catalogs rehydrate from PB).

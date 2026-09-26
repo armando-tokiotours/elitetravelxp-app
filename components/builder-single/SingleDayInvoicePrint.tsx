@@ -4,7 +4,6 @@ import { useMemo } from "react";
 import {
   calculateSingleDayQuote,
   formatEur,
-  formatYen,
   guidePreferenceLabel,
 } from "@/lib/singleDayPricing";
 import {
@@ -12,6 +11,8 @@ import {
   useSingleDayBuilderStore,
 } from "@/store/useSingleDayBuilderStore";
 import { useBuilderStore } from "@/store/useBuilderStore";
+import { useItineraryStore } from "@/store/useItineraryStore";
+import { usePreBuilderStore } from "@/store/usePreBuilderStore";
 import {
   calculateDayEndTime,
   calculateTimeSlots,
@@ -55,6 +56,17 @@ export function SingleDayInvoicePrint({
   const experienceService = useBuilderStore((s) => s.experienceService);
   const conciergeActive =
     isEliteConcierge || experienceService === "concierge";
+
+  const clientName = useItineraryStore((s) => s.clientName);
+  const clientEmail = useItineraryStore((s) => s.clientEmail);
+  const preName = usePreBuilderStore(
+    (s) => s.fullName || s.lastPayload?.fullName || ""
+  );
+  const preEmail = usePreBuilderStore(
+    (s) => s.email || s.lastPayload?.email || ""
+  );
+  const guestName = (clientName || preName || "").trim() || "Guest";
+  const guestEmail = (clientEmail || preEmail || "").trim().toLowerCase();
 
   const pnr = (confirmedBookingRef || tempBookingRef || "—").toUpperCase();
 
@@ -150,11 +162,11 @@ export function SingleDayInvoicePrint({
                 Private day package — transit, guide, and selected experiences.
               </p>
             </div>
-            <div className="rounded-xl border border-[#F6A724]/40 bg-black/40 px-3 py-2 text-right">
+            <div className="shrink-0 rounded-xl border border-[#F6A724]/40 bg-black/40 px-3 py-2 text-right">
               <p className="text-[9px] font-bold uppercase tracking-[0.2em] text-white/45">
                 PNR
               </p>
-              <p className="mt-1 font-mono text-lg font-bold tracking-wider text-[#F6A724]">
+              <p className="mt-1 whitespace-nowrap font-mono text-sm font-bold tracking-wide text-[#F6A724] sm:text-base md:text-lg">
                 {pnr}
               </p>
             </div>
@@ -162,6 +174,8 @@ export function SingleDayInvoicePrint({
         </header>
 
         <dl className="mt-6 grid gap-3 text-sm sm:grid-cols-2">
+          <Meta label="Guest" value={guestName} />
+          <Meta label="Email" value={guestEmail || "—"} />
           <Meta label="City Hub" value={cityFocus.trim() || "—"} />
           <Meta label="Date & Duration" value={`${dateLabel} · ${tourHours}h`} />
           <Meta label="Guests" value={guests} />
@@ -230,9 +244,6 @@ export function SingleDayInvoicePrint({
           </p>
           <p className="mt-2 font-display text-3xl font-semibold tabular-nums text-white">
             {formatEur(quote.totalEur)}
-          </p>
-          <p className="mt-1 text-sm text-white/60 tabular-nums">
-            ≈ {formatYen(quote.totalYen)}
           </p>
           <p className="mt-3 text-xs leading-relaxed text-white/45">
             Estimate for planning. Final confirmation may adjust ticket

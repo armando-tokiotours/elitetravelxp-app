@@ -19,6 +19,7 @@ import {
 } from "@/lib/vehicleAllocator";
 import { BUILDER_ALL_STEPS_COMPLETE } from "@/lib/builderSteps";
 import { useBuilderStore } from "@/store/useBuilderStore";
+import { GoldLight } from "@/components/branding/GoldLight";
 import { SectionBlock } from "./ui";
 import { SectionContinue } from "./SectionContinue";
 import { ExplainerTriggerButton } from "./ExplainerTriggerButton";
@@ -144,15 +145,18 @@ export function DriversTransportSection({
       summary={summary}
     >
       {experienceService === "concierge" || isEliteConcierge ? (
-        <div className="mb-4 rounded-2xl border border-[#075473]/40 bg-[#075473]/15 px-4 py-3">
-          <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-accent-500">
-            ✨ Elite Concierge Active
-          </p>
-          <p className="mt-1.5 text-sm leading-relaxed text-zinc-300">
-            Private chauffeur and city transfer picks are deactivated. Your
-            dedicated concierge will curate drivers and logistics 1:1 and price
-            them in your bespoke quotation.
-          </p>
+        <div className="group relative mb-4 overflow-hidden rounded-2xl border border-[#075473]/40 bg-[#075473]/15 px-4 py-3">
+          <GoldLight color="#F6A724" placement="top-center" active />
+          <div className="relative z-10">
+            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#F6A724]">
+              ✨ Elite Concierge Active
+            </p>
+            <p className="mt-1.5 text-sm leading-relaxed text-zinc-300">
+              Private chauffeur and city transfer picks are deactivated. Your
+              dedicated concierge will curate drivers and logistics 1:1 and price
+              them in your bespoke quotation.
+            </p>
+          </div>
         </div>
       ) : null}
 
@@ -272,52 +276,55 @@ export function DriversTransportSection({
         </div>
       )}
 
-      <div className="mt-5 rounded-2xl border border-zinc-800 bg-zinc-950/80 p-4">
-        <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-accent-500">
-          City Transfers & Drivers
-        </p>
-        {conciergeLocked ? (
-          <>
-            <p className="mt-1 text-sm font-semibold text-white">
-              Included with Elite Concierge
-            </p>
-            <p className="mt-1 text-xs text-zinc-500">
-              A-la-carte driver fees are zeroed. Your specialist prices private
-              transport in the bespoke quotation.
-            </p>
-          </>
-        ) : (
-          <>
-            <p className="mt-1 text-sm font-semibold text-white">
-              {!allowPrivate
-                ? "Public Transit & Walking Guide · Suica / Bullet Rail Coverage"
-                : chauffeurDayCount === 0
-                  ? "No private chauffeur days selected"
-                  : `${chauffeurDayCount} billable driver day${
-                      chauffeurDayCount === 1 ? "" : "s"
-                    }`}
-            </p>
-            {!allowPrivate ? (
+      <div className="group relative mt-5 overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-950/80 p-4">
+        <GoldLight color="#054F70" placement="left-center" active />
+        <div className="relative z-10">
+          <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#F6A724]">
+            City Transfers & Drivers
+          </p>
+          {conciergeLocked ? (
+            <>
+              <p className="mt-1 text-sm font-semibold text-white">
+                Included with Elite Concierge
+              </p>
               <p className="mt-1 text-xs text-zinc-500">
-                IC Card (Suica / Pasmo) for local transit · Shinkansen reserved
-                rail between cities — no luxury vehicle fees on this tier.
+                A-la-carte driver fees are zeroed. Your specialist prices private
+                transport in the bespoke quotation.
               </p>
-            ) : subtotal.min > 0 ? (
-              <p className="mt-1 text-xs text-zinc-400">
-                Est. {formatUsd(subtotal.min)}
-                {subtotal.max > subtotal.min
-                  ? ` – ${formatUsd(subtotal.max)}`
-                  : ""}{" "}
-                for private city transport
+            </>
+          ) : (
+            <>
+              <p className="mt-1 text-sm font-semibold text-white">
+                {!allowPrivate
+                  ? "Public Transit & Walking Guide · Suica / Bullet Rail Coverage"
+                  : chauffeurDayCount === 0
+                    ? "No private chauffeur days selected"
+                    : `${chauffeurDayCount} billable driver day${
+                        chauffeurDayCount === 1 ? "" : "s"
+                      }`}
               </p>
-            ) : (
-              <p className="mt-1 text-xs text-zinc-500">
-                Choose Private Chauffeur or Point-to-Point per city day for
-                pricing.
-              </p>
-            )}
-          </>
-        )}
+              {!allowPrivate ? (
+                <p className="mt-1 text-xs text-zinc-500">
+                  IC Card (Suica / Pasmo) for local transit · Shinkansen reserved
+                  rail between cities — no luxury vehicle fees on this tier.
+                </p>
+              ) : subtotal.min > 0 ? (
+                <p className="mt-1 text-xs text-zinc-400">
+                  Est. {formatUsd(subtotal.min)}
+                  {subtotal.max > subtotal.min
+                    ? ` – ${formatUsd(subtotal.max)}`
+                    : ""}{" "}
+                  for private city transport
+                </p>
+              ) : (
+                <p className="mt-1 text-xs text-zinc-500">
+                  Choose Private Chauffeur or Point-to-Point per city day for
+                  pricing.
+                </p>
+              )}
+            </>
+          )}
+        </div>
       </div>
 
       <SectionContinue

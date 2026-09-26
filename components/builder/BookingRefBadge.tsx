@@ -61,12 +61,12 @@ export function BookingRefBadge({
   if (variant === "inline") {
     return (
       <div className="grid w-full grid-cols-3 items-stretch gap-2">
-        <div className="col-span-2 flex flex-col justify-center rounded-xl border border-[#E8E2D9] bg-white p-2.5 shadow-sm">
-          <span className="block text-[9px] font-bold uppercase tracking-wider text-[#8A8278]">
+        <div className="col-span-2 flex flex-col justify-center rounded-xl border border-white/10 bg-[#0D1117]/80 p-2.5 shadow-sm print:border-[#E8E2D9] print:bg-white">
+          <span className="block text-[9px] font-bold uppercase tracking-wider text-white/50 print:text-[#8A8278]">
             Booking Ref
           </span>
           <span
-            className="truncate font-mono text-[0.825rem] font-extrabold tracking-widest text-[#0B1F3A] sm:text-[0.96rem]"
+            className="truncate font-mono text-[0.825rem] font-extrabold tracking-widest text-[#F6A724] sm:text-[0.96rem] print:text-[#0B1F3A]"
             suppressHydrationWarning
           >
             {code || "······"}

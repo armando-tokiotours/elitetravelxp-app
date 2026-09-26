@@ -93,13 +93,13 @@ export function PriceSummaryFooter({
     <div className="grid w-full min-w-0 grid-cols-2 gap-2.5 [grid-template-columns:minmax(0,1fr)_minmax(0,1fr)] sm:gap-3">
       <div className="flex w-full min-w-0 max-w-full flex-col justify-between overflow-hidden rounded-2xl border border-white/10 bg-[#0A1017]/80 p-2.5 shadow-2xl backdrop-blur-md sm:p-4">
         <div className="min-w-0 overflow-hidden">
-          <p className="mb-0.5 block text-[8px] font-bold uppercase tracking-wider text-[#075473] sm:text-[10px]">
+          <p className="mb-0.5 block text-[8px] font-bold uppercase tracking-wider text-white/50 sm:text-[10px]">
             Experience Japan Range
           </p>
           <p className="break-words text-xs font-extrabold leading-tight text-white sm:text-lg">
             {estimateLabel}
           </p>
-          <p className="mt-0.5 break-words text-[9px] leading-snug text-[#075473]/80 sm:text-[11px]">
+          <p className="mt-0.5 break-words text-[9px] leading-snug text-white/45 sm:text-[11px]">
                 {zeroAddOns ? (
                   "Self-arranged · add experiences for a range"
                 ) : conciergeActive &&

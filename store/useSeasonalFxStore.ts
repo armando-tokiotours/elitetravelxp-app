@@ -2,8 +2,8 @@
 
 import { create } from "zustand";
 import {
-  particleSeasonFromDate,
   particleSeasonFromMonthLabel,
+  resolveParticleMetaFromInput,
   seasonalParticleMeta,
   type ParticleSeason,
 } from "@/lib/seasonality";
@@ -12,15 +12,19 @@ type SeasonalFxState = {
   active: boolean;
   season: Exclude<ParticleSeason, null> | null;
   badge: string | null;
+  iconUrl: string | null;
   /** Monotonic token so rapid re-triggers remount the overlay. */
   token: number;
   triggerFromDate: (input: string | Date | null | undefined) => void;
   triggerFromMonthLabel: (label: string | null | undefined) => void;
-  triggerSeason: (season: ParticleSeason) => void;
+  triggerSeason: (
+    season: ParticleSeason,
+    opts?: { badge?: string; iconUrl?: string | null }
+  ) => void;
   clear: () => void;
 };
 
-/** Visible window: ~5s fall + max stagger (~1.2s) before fade begins. */
+/** Visible window: ~5s fall + stagger before fade begins. */
 const VISIBLE_MS = 6500;
 /** Smooth dissolve before unmount. */
 export const SEASONAL_FX_FADE_MS = 600;
@@ -31,27 +35,37 @@ export const useSeasonalFxStore = create<SeasonalFxState>((set, get) => ({
   active: false,
   season: null,
   badge: null,
+  iconUrl: null,
   token: 0,
   triggerFromDate: (input) => {
-    get().triggerSeason(particleSeasonFromDate(input));
+    const meta = resolveParticleMetaFromInput(input);
+    if (!meta) return;
+    get().triggerSeason(meta.season, {
+      badge: meta.badge,
+      iconUrl: meta.iconUrl,
+    });
   },
   triggerFromMonthLabel: (label) => {
     get().triggerSeason(particleSeasonFromMonthLabel(label));
   },
-  triggerSeason: (season) => {
-    const meta = seasonalParticleMeta(season);
-    if (!meta) return;
+  triggerSeason: (season, opts) => {
+    const fallback = seasonalParticleMeta(season);
+    if (!fallback && !opts?.badge) return;
+    if (!season) return;
+    const badge = opts?.badge?.trim() || fallback?.badge || season;
+    const iconUrl = opts?.iconUrl ?? null;
     set((s) => ({
       active: true,
-      season: meta.season,
-      badge: meta.badge,
+      season,
+      badge,
+      iconUrl,
       token: s.token + 1,
     }));
-    // Clear after visible window; host fades out over SEASONAL_FX_FADE_MS
     window.setTimeout(() => {
       const cur = get();
-      if (cur.season === meta.season && cur.active) get().clear();
+      if (cur.season === season && cur.active) get().clear();
     }, VISIBLE_MS);
   },
-  clear: () => set({ active: false, season: null, badge: null }),
+  clear: () =>
+    set({ active: false, season: null, badge: null, iconUrl: null }),
 }));

@@ -19,6 +19,7 @@ export type { BookingPassProps, RouteBreakdownItem } from "./JapanBookingPass.ty
 export function JapanBookingPass({
   pnrCode,
   guestName,
+  guestEmail,
   partyText,
   travelStyle,
   tripType,
@@ -276,6 +277,11 @@ export function JapanBookingPass({
                   </div>
                 ))}
               </div>
+              {guestEmail ? (
+                <p className="mt-0.5 truncate text-[10px] font-medium normal-case tracking-normal text-zinc-400">
+                  {guestEmail}
+                </p>
+              ) : null}
             </div>
             <div className="min-w-0">
               <span className="block text-[9px] font-semibold tracking-wider text-zinc-500 uppercase">

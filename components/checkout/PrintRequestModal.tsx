@@ -86,6 +86,7 @@ export function PrintRequestModal({
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
   const [emailLocked, setEmailLocked] = useState(true);
+  const [nameLocked, setNameLocked] = useState(true);
   const [busy, setBusy] = useState(false);
   const [localBusy, setLocalBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -152,17 +153,53 @@ export function PrintRequestModal({
     const knownName = resolveKnownName();
     setEmail(knownEmail);
     setName(knownName);
-    // Lock when we already have an email on file; unlock for empty / edit
+    // Lock when we already have identity on file; unlock for empty / edit
     setEmailLocked(Boolean(knownEmail));
+    setNameLocked(Boolean(knownName));
 
     const ref =
       state.confirmedBookingRef || state.tempBookingRef || "TMP-DRAFT";
     setPdfRef(ref);
 
+    // Hydrate from original booking request when local stores are empty
+    if ((!knownEmail || !knownName) && ref && ref !== "TMP-DRAFT") {
+      void fetch("/api/itinerary/contact", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ bookingRef: ref }),
+      })
+        .then((r) => r.json())
+        .then((data) => {
+          if (!data?.ok) return;
+          const remoteEmail = String(data.email || "")
+            .trim()
+            .toLowerCase();
+          const remoteName = String(data.fullName || "").trim();
+          if (remoteEmail) {
+            setEmail((prev) => prev || remoteEmail);
+            setEmailLocked(true);
+            setClientEmail(remoteEmail);
+          }
+          if (remoteName) {
+            setName((prev) => prev || remoteName);
+            setNameLocked(true);
+            setClientName(remoteName);
+          }
+        })
+        .catch(() => {});
+    }
+
     fetchBuilderConfig({ includeAccommodations: true })
       .then(setConfig)
       .catch(() => setConfig(null));
-  }, [isOpen, skipTerms, state.confirmedBookingRef, state.tempBookingRef]);
+  }, [
+    isOpen,
+    skipTerms,
+    state.confirmedBookingRef,
+    state.tempBookingRef,
+    setClientEmail,
+    setClientName,
+  ]);
 
   const quote = useMemo(
     () => (config ? calculateBuilderQuote(state, config) : null),
@@ -389,7 +426,7 @@ export function PrintRequestModal({
               Email your itinerary
             </h2>
             <p className="mt-1 text-sm text-[#5C6570]">
-              Choose dossier and/or invoice. We email you, BCC the concierge
+              Choose dossier and/or invoice. We email you, CC the concierge
               team, and move this booking to In Progress.
             </p>
           </div>
@@ -444,26 +481,52 @@ export function PrintRequestModal({
                 Invoice / Quotation
               </label>
             </div>
-            <p className="mt-2 text-[11px] leading-relaxed text-[#8A8278]">
-              Team copy goes to {teamBccLabel()} only on this send — not during
-              draft / pre-build.
-            </p>
           </fieldset>
 
-          <label className="block">
-            <span className="text-xs font-semibold uppercase tracking-wider text-[#8A8278]">
-              Full name
-            </span>
-            <input
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="mt-1 w-full rounded-xl border border-[#E8E2D9] bg-[#FBF8F2] px-3 py-2.5 text-sm text-[#0B1F3A] outline-none focus:border-[#075473]"
-              placeholder="Optional"
-              autoComplete="name"
-              disabled={busy}
-            />
-          </label>
+          <div className="block">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-xs font-semibold uppercase tracking-wider text-[#8A8278]">
+                Full name
+              </span>
+              {nameLocked && name ? (
+                <button
+                  type="button"
+                  onClick={() => setNameLocked(false)}
+                  disabled={busy}
+                  className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#075473] hover:underline disabled:opacity-50"
+                >
+                  <Pencil className="h-3 w-3" aria-hidden />
+                  Edit
+                </button>
+              ) : null}
+            </div>
+            {nameLocked && name ? (
+              <div className="mt-1 flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2.5">
+                <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
+                <p className="min-w-0 flex-1 truncate text-sm font-medium text-[#0B1F3A]">
+                  {name}
+                </p>
+                <span className="shrink-0 text-[10px] font-bold uppercase tracking-wider text-emerald-700">
+                  On file
+                </span>
+              </div>
+            ) : (
+              <input
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                onBlur={() => {
+                  const next = name.trim();
+                  setName(next);
+                  if (next) setNameLocked(true);
+                }}
+                className="mt-1 w-full rounded-xl border border-[#E8E2D9] bg-[#FBF8F2] px-3 py-2.5 text-sm text-[#0B1F3A] outline-none focus:border-[#075473]"
+                placeholder="As on your booking request"
+                autoComplete="name"
+                disabled={busy}
+              />
+            )}
+          </div>
 
           <div className="block">
             <div className="flex items-center justify-between gap-2">
@@ -478,7 +541,7 @@ export function PrintRequestModal({
                   className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#075473] hover:underline disabled:opacity-50"
                 >
                   <Pencil className="h-3 w-3" aria-hidden />
-                  Change Email
+                  Edit
                 </button>
               ) : null}
             </div>

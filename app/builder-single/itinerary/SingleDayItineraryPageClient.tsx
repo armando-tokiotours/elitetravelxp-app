@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowRight, FileText, Plane, Wallet } from "lucide-react";
+import { ArrowRight, FileText, Luggage, Receipt, Send, Wallet } from "lucide-react";
 import { submitBookingRequest } from "@/lib/bookingRequest";
 import { calculateSingleDayQuote, formatEur } from "@/lib/singleDayPricing";
 import { useBuilderStore } from "@/store/useBuilderStore";
@@ -26,7 +26,10 @@ import {
   MobileAppNav,
 } from "@/components/navigation/AppSidebar";
 import { NewBookingResetButton } from "@/components/builder/NewBookingResetButton";
-import { CrimsonGlow } from "@/components/branding/CrimsonGlow";
+import { GoldLight } from "@/components/branding/GoldLight";
+import { IdleHeroMascot } from "@/components/branding/IdleHeroMascot";
+import { useItineraryStore } from "@/store/useItineraryStore";
+import { usePreBuilderStore } from "@/store/usePreBuilderStore";
 
 type ViewMode = "dossier" | "invoice";
 
@@ -39,6 +42,12 @@ export default function SingleDayItineraryPageClient() {
   const confirmBookingRef = useBuilderStore((s) => s.confirmBookingRef);
   const isEliteConcierge = useBuilderStore((s) => s.isEliteConcierge);
   const experienceService = useBuilderStore((s) => s.experienceService);
+
+  const clientName = useItineraryStore((s) => s.clientName);
+  const preName = usePreBuilderStore(
+    (s) => s.fullName || s.lastPayload?.fullName || ""
+  );
+  const customerName = (clientName || preName || "").trim() || "Guest";
 
   const adults = useSingleDayBuilderStore((s) => s.adults);
   const children = useSingleDayBuilderStore((s) => s.children);
@@ -235,8 +244,8 @@ export default function SingleDayItineraryPageClient() {
       />
 
       <div className={APP_SIDEBAR_RAIL_PAD}>
-        <header className="no-print relative mx-auto mt-4 max-w-3xl overflow-hidden rounded-2xl border border-white/10 bg-[#0A1017]/80 px-4 py-5 shadow-2xl backdrop-blur-md sm:px-5">
-          <CrimsonGlow placement="top-right" />
+        <header className="group no-print relative mx-auto mt-4 max-w-3xl overflow-hidden rounded-2xl border border-white/10 bg-[#0A1017]/80 px-4 py-5 shadow-2xl backdrop-blur-md sm:px-5">
+          <GoldLight color="#F6A724" active />
           <div className="relative z-10">
           <div className="mb-3 flex items-center gap-3 lg:hidden">
             <MobileAppNav
@@ -244,15 +253,29 @@ export default function SingleDayItineraryPageClient() {
               brandTitle="Single-Day Itinerary"
             />
           </div>
-          <p className="text-[0.65rem] font-semibold uppercase tracking-[0.35em] text-[#F6A724]">
-            Builder S · Itinerary
-          </p>
-          <h1 className="mt-1 font-godiva text-3xl uppercase tracking-wider text-white">
-            Your Single-Day Tour Dossier
-          </h1>
-          <p className="mt-1 text-sm text-white/55">
-            Hour-by-hour day plan and private single-day quotation.
-          </p>
+
+          <div className="relative flex items-start justify-between gap-3">
+            <div className="min-w-0 flex-1 pr-20 sm:pr-28">
+              <p className="text-[0.65rem] font-semibold uppercase tracking-[0.35em] text-[#F6A724]">
+                Builder S · Itinerary
+              </p>
+              <h1 className="mt-1 font-godiva text-3xl uppercase tracking-wider text-white">
+                {customerName}
+              </h1>
+              <h1 className="mt-0.5 font-godiva text-[1.125rem] uppercase tracking-wider text-white/90">
+                Single Day Tour Dossier
+              </h1>
+              <p className="mt-1 text-sm text-white/55">
+                Hour-by-hour day plan and private single-day quotation.
+              </p>
+            </div>
+            <IdleHeroMascot
+              activeSrc="/brand/mascot-phone.png"
+              idleSrc="/brand/mascot-time.png"
+              idleMs={7_000}
+              className="pointer-events-none absolute -right-1 -bottom-4 z-[1] h-28 w-auto select-none object-contain sm:-right-2 sm:h-36 md:h-40"
+            />
+          </div>
 
           <div
             className="mt-4 flex flex-wrap items-center gap-2 border-t border-white/10 pt-2"
@@ -262,21 +285,24 @@ export default function SingleDayItineraryPageClient() {
             <ToggleBtn
               active={activeView === "dossier"}
               onClick={() => setMode("dossier")}
-              icon={<Plane className="h-3.5 w-3.5" />}
+              icon={<Luggage className="h-3.5 w-3.5" />}
               label="Travel Dossier"
             />
             <ToggleBtn
               active={activeView === "invoice"}
               onClick={requestInvoiceView}
-              icon={<FileText className="h-3.5 w-3.5" />}
-              label="Invoice / Print"
+              icon={<Receipt className="h-3.5 w-3.5" />}
+              label="Invoice"
             />
             <button
               type="button"
               onClick={requestSendPdf}
-              className="rounded-xl bg-[#075473] px-3.5 py-2 text-[11px] font-bold tracking-wider text-white uppercase"
+              aria-label="Send PDF"
+              title="Send / PDF"
+              className="inline-flex items-center gap-1.5 rounded-xl bg-[#075473] px-3 py-2 text-white transition-all hover:bg-[#064560]"
             >
-              Send / Print
+              <Send className="h-3.5 w-3.5" aria-hidden />
+              <FileText className="h-3.5 w-3.5" aria-hidden />
             </button>
             <Link
               href="/builder-single"

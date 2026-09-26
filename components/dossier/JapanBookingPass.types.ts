@@ -16,6 +16,8 @@ export interface RouteBreakdownItem {
 export interface BookingPassProps {
   pnrCode: string;
   guestName: string;
+  /** Shown under guest name when present (Send / Print identity). */
+  guestEmail?: string;
   partyText: string;
   travelStyle: string;
   tripType: BookingPassTripType;

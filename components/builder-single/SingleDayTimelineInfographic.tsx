@@ -1,6 +1,7 @@
 "use client";
 
 import { MapPin } from "lucide-react";
+import { BoardingPassCard } from "@/components/builder/BoardingPassCard";
 import { QUIZ_VIBE } from "@/lib/experienceProfiler";
 import { formatDurationBadge } from "@/lib/experiencesPlaces";
 import {
@@ -167,11 +168,21 @@ export function SingleDayTimelineInfographic({
         ) : null}
       </header>
 
-      <EndpointNode
-        label="Pick-up"
-        time={formatClock12h(startTime)}
-        detail="Hotel / Hub"
-        isPrint={isPrint}
+      <BoardingPassCard
+        kind="arrival"
+        headerMain="Pick-up Pass"
+        headerStub="Start"
+        title="Hotel / Hub Pick-up"
+        subtitle={
+          cityLabel
+            ? `${cityLabel} · Private day tour begins`
+            : "Private day tour begins"
+        }
+        dateLabel={formatClock12h(startTime)}
+        hubCode={cityHubCode(cityLabel)}
+        stubTopLabel="Time"
+        stubBottomLabel="City"
+        className="mb-6"
       />
 
       <ol className="sd-timeline-track relative mx-auto max-w-3xl list-none pl-0">
@@ -317,44 +328,30 @@ export function SingleDayTimelineInfographic({
         })}
       </ol>
 
-      <EndpointNode
-        label="Drop-off"
-        time={formatClock12h(endTime)}
-        detail="Hotel / Station"
-        isPrint={isPrint}
+      <BoardingPassCard
+        kind="departure"
+        headerMain="Drop-off Pass"
+        headerStub="End"
+        title="Hotel / Station Drop-off"
+        subtitle={
+          cityLabel
+            ? `${cityLabel} · Private day tour ends`
+            : "Private day tour ends"
+        }
+        dateLabel={formatClock12h(endTime)}
+        hubCode={cityHubCode(cityLabel)}
+        stubTopLabel="Time"
+        stubBottomLabel="City"
+        className="mt-6"
       />
     </div>
   );
 }
 
-function EndpointNode({
-  label,
-  time,
-  detail,
-  isPrint,
-}: {
-  label: string;
-  time: string;
-  detail: string;
-  isPrint: boolean;
-}) {
-  return (
-    <div className="relative mx-auto mb-6 flex max-w-3xl items-center gap-3 md:justify-center">
-      <div
-        className={`ml-1 h-3 w-3 shrink-0 rounded-full md:ml-0 ${
-          isPrint
-            ? "bg-[#075473] ring-2 ring-[#075473]/30"
-            : "bg-cyan-400 shadow-[0_0_10px_rgba(34,211,238,0.6)]"
-        }`}
-      />
-      <div className={isPrint ? "text-[#0B1F3A]" : "text-white/80"}>
-        <p className="text-[0.65rem] font-bold uppercase tracking-[0.2em] opacity-60">
-          {label}
-        </p>
-        <p className="font-mono text-sm font-semibold">
-          {time} · {detail}
-        </p>
-      </div>
-    </div>
-  );
+function cityHubCode(cityLabel?: string): string {
+  const raw = (cityLabel || "").trim();
+  if (!raw) return "HUB";
+  const first = raw.split(/[·,/]/)[0]?.trim() || raw;
+  if (first.length <= 4) return first.toUpperCase();
+  return first.slice(0, 3).toUpperCase();
 }

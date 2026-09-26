@@ -407,7 +407,7 @@ function RouteSummaryWidget({
         <div className="min-w-0">
           <p
             className={`inline-flex items-center gap-1.5 text-xs font-medium ${
-              matches ? "text-emerald-400" : "text-accent-500"
+              matches ? "text-emerald-400" : "text-[#F6A724]"
             }`}
           >
             {matches ? (

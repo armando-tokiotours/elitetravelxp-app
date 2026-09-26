@@ -26,6 +26,11 @@ export type BookingPassEmailFields = {
   ctaUrl?: string;
   /** When false, omit Apple Wallet CTA. Default true. */
   includeWalletCta?: boolean;
+  /**
+   * Include “How Your Itinerary & Booking Works” disclosure
+   * (Send / Print proposal stage). Off for draft boarding-pass mail.
+   */
+  includeBookingDisclosure?: boolean;
 };
 
 const BG = "#04080C";
@@ -120,6 +125,28 @@ export function renderBookingPassCardHtml(
 </div>`;
 }
 
+/** Same disclosure as BookingTermsModal — for Send / Print confirmation mail. */
+export function renderBookingDisclosureHtml(): string {
+  return `<div style="background-color:#111827;border:1px solid #1E293B;border-radius:12px;padding:16px 18px;margin:0 0 20px 0;">
+  <p style="margin:0 0 10px 0;font-size:11px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:${BRAND_RED};">TOKIOTOURS</p>
+  <p style="margin:0 0 14px 0;font-size:15px;font-weight:700;color:#ffffff;">How Your Itinerary &amp; Booking Works</p>
+  <p style="margin:0 0 12px 0;font-size:13px;line-height:1.55;color:${MUTED};">
+    <strong style="color:${AMBER};">1. Estimated Quotes:</strong>
+    This builder provides realistic price estimates for your personalized Japan route, hotels, tours, and transport choices. You can request our team to arrange everything turnkey, or use this dossier as your private guide.
+  </p>
+  <p style="margin:0 0 12px 0;font-size:13px;line-height:1.55;color:${MUTED};">
+    <strong style="color:${AMBER};">2. Lock Dates &amp; Secure Booking:</strong>
+    To confirm exact travel dates and issue your official itinerary dossier, a small design deposit fee is required.
+  </p>
+  <div style="background-color:#2A1520;border:1px solid #DC6E8A;border-radius:10px;padding:12px 14px;margin:0 0 12px 0;font-size:12px;line-height:1.5;color:#DC6E8A;">
+    <strong>100% Deposit Credit:</strong> Your fee is 100% applied as a credit toward your confirmed tour packages and travel arrangements. Terms &amp; Conditions apply.
+  </div>
+  <p style="margin:0;font-size:11px;line-height:1.5;color:#64748B;">
+    *Note: Hotel and chauffeur reservations are officially secured once the deposit is received. A dedicated TOKIOTOURS consultant will reach out via WhatsApp/Email immediately after payment to review every detail.
+  </p>
+</div>`;
+}
+
 /**
  * Full three-tier booking email HTML (hero → body → footer).
  * Preferred entry point for proposal + boarding-pass guest mail.
@@ -190,6 +217,12 @@ export function generateBookingEmailHtml(
               </p>
 
               ${passCard}
+
+              ${
+                data.includeBookingDisclosure
+                  ? renderBookingDisclosureHtml()
+                  : ""
+              }
 
               <p style="font-size:13px;line-height:1.5;color:${MUTED};margin:0 0 20px 0;text-align:center;">
                 Manage your booking anytime on Tokiotours — use your Booking Reference (<strong style="color:${AMBER};">${safePnr}</strong>) and Email (${mailto}) to review or update your itinerary.

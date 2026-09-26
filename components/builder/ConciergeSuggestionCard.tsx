@@ -2,6 +2,7 @@
 
 import { pbFileUrl } from "@/lib/pocketbase/client";
 import type { SeasonalMatch } from "@/lib/seasonalMatcher";
+import { BoxGradingGlow } from "@/components/branding/BoxGradingGlow";
 
 export function ConciergeSuggestionCard({
   match,
@@ -21,8 +22,9 @@ export function ConciergeSuggestionCard({
   const tourId = h.suggested_tour_id;
 
   return (
-    <div className="mt-2 overflow-hidden rounded-xl border border-[#075473]/55 bg-gradient-to-br from-[#FDF7F3] to-[#F7F1E4] p-3 shadow-[0_4px_16px_rgba(7, 84, 115,0.12)]">
-      <div className="flex gap-3">
+    <div className="relative mt-2 overflow-hidden rounded-xl border border-white/10 bg-[#0D1117]/80 p-3 backdrop-blur-md">
+      <BoxGradingGlow />
+      <div className="relative z-10 flex gap-3">
         {photo ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
@@ -31,7 +33,7 @@ export function ConciergeSuggestionCard({
             className="h-14 w-14 shrink-0 rounded-lg object-cover"
           />
         ) : (
-          <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-lg bg-[#0B1F3A]/8 text-lg">
+          <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/5 text-lg">
             ✨
           </div>
         )}
@@ -55,7 +57,7 @@ export function ConciergeSuggestionCard({
               type="button"
               disabled={tourAlreadyAdded}
               onClick={() => onAddTour(tourId)}
-              className="mt-2 rounded-full border border-zinc-600 bg-zinc-900 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-[#0B1F3A] hover:text-white disabled:cursor-default disabled:border-[#075473]/50 disabled:bg-zinc-950 disabled:text-[#F3D9C4]"
+              className="mt-2 rounded-full border border-white/15 bg-[#054F70] px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-[#043d57] disabled:cursor-default disabled:border-[#075473]/50 disabled:bg-zinc-900 disabled:text-[#F3D9C4]"
             >
               {tourAlreadyAdded
                 ? "Recommended tour added"

@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { FileText, Plane } from "lucide-react";
+import { FileText, Luggage, Receipt, Send } from "lucide-react";
 import {
   fetchBuilderConfig,
   type BuilderConfig,
@@ -13,6 +13,8 @@ import { submitBookingRequest } from "@/lib/bookingRequest";
 import { calculateCityDateRanges } from "@/lib/dateCascade";
 import { allocateFleet } from "@/lib/vehicleAllocator";
 import { useBuilderStore } from "@/store/useBuilderStore";
+import { useItineraryStore } from "@/store/useItineraryStore";
+import { usePreBuilderStore } from "@/store/usePreBuilderStore";
 import { BottomNav } from "@/components/builder/BottomNav";
 import { RevolutCheckoutModal } from "@/components/checkout/RevolutCheckoutModal";
 import {
@@ -34,6 +36,7 @@ import { PriceSummaryFooter } from "@/components/builder/PriceSummaryFooter";
 import { DossierSectionOutline } from "@/components/builder/DossierSectionOutline";
 import { NewBookingResetButton } from "@/components/builder/NewBookingResetButton";
 import { GoldLight } from "@/components/branding/GoldLight";
+import { IdleHeroMascot } from "@/components/branding/IdleHeroMascot";
 
 type ViewMode = "dossier" | "invoice";
 
@@ -45,6 +48,11 @@ export default function ItineraryPageClient() {
   const ensureTempBookingRef = useBuilderStore((s) => s.ensureTempBookingRef);
   const officialBookingRef = useBuilderStore((s) => s.officialBookingRef);
   const confirmBookingRef = useBuilderStore((s) => s.confirmBookingRef);
+  const clientName = useItineraryStore((s) => s.clientName);
+  const preName = usePreBuilderStore(
+    (s) => s.fullName || s.lastPayload?.fullName || ""
+  );
+  const customerName = (clientName || preName || "").trim() || "Guest";
   const [config, setConfig] = useState<BuilderConfig | null>(null);
   const [activeView, setActiveView] = useState<ViewMode>("dossier");
   const [isCheckoutModalOpen, setIsCheckoutModalOpen] = useState(false);
@@ -285,16 +293,27 @@ export default function ItineraryPageClient() {
             <header className="group relative overflow-hidden rounded-2xl border border-white/10 bg-[#0A1017]/80 p-5 shadow-2xl backdrop-blur-md sm:p-6">
               <GoldLight color="#F6A724" active />
               <div className="relative z-10 space-y-4 text-left">
-              <div>
-                <p className="font-mono text-[10px] font-bold tracking-widest text-amber-400 uppercase">
-                  My Itinerary
-                </p>
-                <h1 className="mt-1 font-godiva text-2xl tracking-wide text-white uppercase md:text-3xl">
-                  Your Japan Journey
-                </h1>
-                <p className="mt-1 text-xs text-zinc-400">
-                  Switch between travel dossier and private quotation.
-                </p>
+              <div className="relative flex items-start justify-between gap-3">
+                <div className="min-w-0 flex-1 pr-20 sm:pr-28">
+                  <p className="text-[0.65rem] font-semibold uppercase tracking-[0.35em] text-[#F6A724]">
+                    Builder M · Itinerary
+                  </p>
+                  <h1 className="mt-1 font-godiva text-3xl uppercase tracking-wider text-white">
+                    {customerName}
+                  </h1>
+                  <h1 className="mt-0.5 font-godiva text-[1.125rem] uppercase tracking-wider text-white/90">
+                    Multi Day Tour Dossier
+                  </h1>
+                  <p className="mt-1 text-sm text-white/55">
+                    Day-by-day Japan route and private multi-day quotation.
+                  </p>
+                </div>
+                <IdleHeroMascot
+                  activeSrc="/brand/mascot-phone.png"
+                  idleSrc="/brand/mascot-time.png"
+                  idleMs={7_000}
+                  className="pointer-events-none absolute -right-1 -bottom-4 z-[1] h-28 w-auto select-none object-contain sm:-right-2 sm:h-36 md:h-40"
+                />
               </div>
 
               <div
@@ -305,21 +324,24 @@ export default function ItineraryPageClient() {
                 <ToggleBtn
                   active={activeView === "dossier"}
                   onClick={() => setMode("dossier")}
-                  icon={<Plane className="h-3.5 w-3.5" />}
+                  icon={<Luggage className="h-3.5 w-3.5" />}
                   label="Travel Dossier"
                 />
                 <ToggleBtn
                   active={activeView === "invoice"}
                   onClick={requestInvoiceView}
-                  icon={<FileText className="h-3.5 w-3.5" />}
-                  label="Invoice / Print"
+                  icon={<Receipt className="h-3.5 w-3.5" />}
+                  label="Invoice"
                 />
                 <button
                   type="button"
                   onClick={requestSendPdf}
-                  className="rounded-xl bg-[#075473] px-3.5 py-2 text-[11px] font-bold tracking-wider text-white uppercase"
+                  aria-label="Send PDF"
+                  title="Send / PDF"
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-[#075473] px-3 py-2 text-white transition-all hover:bg-[#064560]"
                 >
-                  Send / Print
+                  <Send className="h-3.5 w-3.5" aria-hidden />
+                  <FileText className="h-3.5 w-3.5" aria-hidden />
                 </button>
                 <Link
                   href="/builder"

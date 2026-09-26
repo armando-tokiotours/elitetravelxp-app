@@ -3,6 +3,7 @@
 import { BUILDER_S_HERO_CONFIG } from "@/config/teamConfig";
 import { useBuilderAccordionOptional } from "@/components/builder/BuilderAccordion";
 import { canOpenBuilderStep } from "@/lib/builderSteps";
+import { TimelineProgressMascot } from "@/components/branding/TimelineProgressMascot";
 
 const SECTIONS = BUILDER_S_HERO_CONFIG.steps;
 
@@ -39,62 +40,65 @@ export function SingleDayProgressBar() {
     SECTIONS.length <= 1 ? 0 : (lastReached / (SECTIONS.length - 1)) * 100;
 
   return (
-    <div className="sticky top-0 z-40 border-b border-[#2C2C2E] bg-[#000000] px-4 py-3.5 shadow-xl backdrop-blur-md sm:px-6">
-      <nav aria-label="Single-day builder progress">
-        <ol className="relative flex items-start justify-between gap-1">
-          <span
-            aria-hidden
-            className="absolute left-[10%] right-[10%] top-[14px] h-[2px] bg-[#2C2C2E]"
-          />
-          <span
-            aria-hidden
-            className="absolute left-[10%] top-[14px] h-[2px] bg-[#182536] transition-[width] duration-300"
-            style={{ width: `${(progressPct / 100) * 80}%` }}
-          />
-          {statuses.map((sec) => (
-            <li
-              key={sec.id}
-              className="relative z-[1] flex min-w-0 flex-1 flex-col items-center"
-            >
-              <button
-                type="button"
-                disabled={sec.locked}
-                onClick={() => {
-                  if (sec.locked) {
-                    accordion?.showToast(
-                      "Complete the previous steps before unlocking this section."
-                    );
-                    return;
-                  }
-                  const opened = accordion?.tryOpenSection(sec.number);
-                  if (opened === false) return;
-                  document
-                    .getElementById(sec.sectionId)
-                    ?.scrollIntoView({ behavior: "smooth", block: "start" });
-                }}
-                className={`flex w-full flex-col items-center gap-1 text-center ${
-                  sec.locked
-                    ? "pointer-events-none cursor-not-allowed opacity-40"
-                    : ""
-                }`}
+    <div className="sticky top-0 z-40 overflow-visible border-b border-[#2C2C2E] bg-[#000000] px-3 py-3.5 shadow-xl backdrop-blur-md sm:px-6">
+      <div className="flex items-start gap-2 overflow-visible sm:gap-3">
+        <nav aria-label="Single-day builder progress" className="min-w-0 flex-1">
+          <ol className="relative flex items-start justify-between gap-1">
+            <span
+              aria-hidden
+              className="absolute left-[10%] right-[10%] top-[14px] h-[2px] bg-[#2C2C2E]"
+            />
+            <span
+              aria-hidden
+              className="absolute left-[10%] top-[14px] h-[2px] bg-[#182536] transition-[width] duration-300"
+              style={{ width: `${(progressPct / 100) * 80}%` }}
+            />
+            {statuses.map((sec) => (
+              <li
+                key={sec.id}
+                className="relative z-[1] flex min-w-0 flex-1 flex-col items-center"
               >
-                <Node kind={sec.kind === "locked" ? "upcoming" : sec.kind} />
-                <span
-                  className={`max-w-full pt-1 text-[10px] font-semibold leading-tight tracking-tight sm:text-[11px] ${
-                    sec.kind === "current"
-                      ? "text-[#075473]"
-                      : sec.kind === "done"
-                        ? "text-white"
-                        : "text-zinc-400"
+                <button
+                  type="button"
+                  disabled={sec.locked}
+                  onClick={() => {
+                    if (sec.locked) {
+                      accordion?.showToast(
+                        "Complete the previous steps before unlocking this section."
+                      );
+                      return;
+                    }
+                    const opened = accordion?.tryOpenSection(sec.number);
+                    if (opened === false) return;
+                    document
+                      .getElementById(sec.sectionId)
+                      ?.scrollIntoView({ behavior: "smooth", block: "start" });
+                  }}
+                  className={`flex w-full flex-col items-center gap-1 text-center ${
+                    sec.locked
+                      ? "pointer-events-none cursor-not-allowed opacity-40"
+                      : ""
                   }`}
                 >
-                  {sec.label}
-                </span>
-              </button>
-            </li>
-          ))}
-        </ol>
-      </nav>
+                  <Node kind={sec.kind === "locked" ? "upcoming" : sec.kind} />
+                  <span
+                    className={`max-w-full pt-1 text-[10px] font-semibold leading-tight tracking-tight sm:text-[11px] ${
+                      sec.kind === "current"
+                        ? "text-[#075473]"
+                        : sec.kind === "done"
+                          ? "text-white"
+                          : "text-zinc-400"
+                    }`}
+                  >
+                    {sec.label}
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ol>
+        </nav>
+        <TimelineProgressMascot className="mt-3 -mb-5 sm:mt-4" />
+      </div>
     </div>
   );
 }

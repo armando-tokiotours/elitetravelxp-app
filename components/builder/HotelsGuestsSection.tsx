@@ -26,6 +26,7 @@ import {
   totalHotelRooms,
 } from "@/lib/hotelCalculator";
 import { BoxGradingGlow } from "@/components/branding/BoxGradingGlow";
+import { GoldLight } from "@/components/branding/GoldLight";
 import { SectionBlock } from "./ui";
 import { SectionContinue } from "./SectionContinue";
 import { useLazyModalMount } from "./modals/useLazyModalMount";
@@ -367,9 +368,14 @@ function HotelsSummaryWidget({
             return (
             <li
                 key={id || `hotel-city-${cityName(id)}`}
-                className="flex items-center gap-3 rounded-xl border border-zinc-800 bg-zinc-950/80 px-3 py-2"
+                className="group relative flex items-center gap-3 overflow-hidden rounded-xl border border-zinc-800 bg-zinc-950/80 px-3 py-2"
               >
-                <span className="h-10 w-10 shrink-0 overflow-hidden rounded-lg">
+                <GoldLight
+                  color="#F6A724"
+                  placement="top-center"
+                  active={pref.needsHotel}
+                />
+                <span className="relative z-10 h-10 w-10 shrink-0 overflow-hidden rounded-lg">
                   <CityThumb
                     city={cityById(id)}
                     name={cityName(id)}
@@ -378,7 +384,7 @@ function HotelsSummaryWidget({
                     className="h-full w-full object-cover"
                   />
                 </span>
-                <span className="min-w-0 flex-1 overflow-hidden">
+                <span className="relative z-10 min-w-0 flex-1 overflow-hidden">
                   <span className="block break-words text-sm font-semibold leading-tight text-white">
                     {cityName(id)}
                   </span>

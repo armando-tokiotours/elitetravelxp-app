@@ -52,6 +52,9 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=builder --chown=nextjs:nodejs /app/config ./config
 # Apple Wallet pass model (icons + pass.json template)
 COPY --from=builder --chown=nextjs:nodejs /app/passModels ./passModels
+# Puppeteer must be complete on disk (standalone tracing often drops CJS build)
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules/puppeteer-core ./node_modules/puppeteer-core
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules/@puppeteer ./node_modules/@puppeteer
 
 USER nextjs
 

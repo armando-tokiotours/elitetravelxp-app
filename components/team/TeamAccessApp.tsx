@@ -28,7 +28,7 @@ import {
 } from "@/components/navigation/AppSidebar";
 import { SiteBrandingPanel } from "@/components/team/SiteBrandingPanel";
 import { HotelRatesUploader } from "@/components/team/HotelRatesUploader";
-import { SeasonalityPanel } from "@/components/team/SeasonalityPanel";
+import { SeasonalityHub } from "@/components/team/SeasonalityHub";
 import { ToursCsvSync } from "@/components/team/ToursCsvSync";
 import { TeamConfigDashboard } from "@/components/team/TeamConfigDashboard";
 import { formatTourTierSummary } from "@/lib/tourPricing";
@@ -238,7 +238,7 @@ export function TeamAccessApp() {
         ) : tab === "rules" ? (
           <RulesOfLogicPanel getClient={getClient} />
         ) : tab === "seasonality" ? (
-          <SeasonalityPanel getClient={getClient} />
+          <SeasonalityHub getClient={getClient} />
         ) : tab === "branding" ? (
           <SiteBrandingPanel getClient={getClient} />
         ) : tab === "email_settings" ? (

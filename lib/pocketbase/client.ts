@@ -3,6 +3,10 @@ import {
   calculateTourPrice,
   type TourPriceGuests,
 } from "@/lib/tourPricing";
+import {
+  setSeasonalParticleRules,
+  setSeasonalCharacterRules,
+} from "@/lib/seasonality";
 
 export function getPbBaseUrl(): string {
   // Prefer explicit env (set in .env.local for local, Docker build args for VPS).
@@ -542,6 +546,38 @@ export interface PbSeasonTier {
   is_active?: boolean;
 }
 
+/** Ambient FX windows — Team Access → Seasonality → Particles */
+export interface PbSeasonalParticle {
+  id: string;
+  season: "sakura" | "snow" | "momiji";
+  label: string;
+  start_month: number;
+  start_day: number;
+  end_month: number;
+  end_day: number;
+  icon?: string;
+  sort_order?: number;
+  is_active?: boolean;
+  collectionId: string;
+}
+
+/** Climate mascots — Team Access → Seasonality → Characters */
+export type ClimateSeasonKey = "default" | "winter" | "summer" | "rain";
+
+export interface PbSeasonalCharacter {
+  id: string;
+  key: ClimateSeasonKey;
+  label: string;
+  start_month?: number;
+  start_day?: number;
+  end_month?: number;
+  end_day?: number;
+  mascot?: string;
+  sort_order?: number;
+  is_active?: boolean;
+  collectionId: string;
+}
+
 export interface PbTransitMode {
   id: string;
   label: string;
@@ -720,6 +756,8 @@ export interface BuilderConfig {
   chauffeurRates: PbChauffeurRate[];
   seasonalHighlights: PbSeasonalHighlight[];
   seasonTiers: PbSeasonTier[];
+  seasonalParticles: PbSeasonalParticle[];
+  seasonalCharacters: PbSeasonalCharacter[];
   branding: PbSiteBranding | null;
   rules: SystemRulesMap;
 }
@@ -784,6 +822,8 @@ export async function fetchBuilderConfig(
     chauffeurRates,
     seasonalHighlightsRaw,
     seasonTiersRaw,
+    seasonalParticlesRaw,
+    seasonalCharactersRaw,
     brandingRows,
     settingsRows,
     legacyRules,
@@ -832,6 +872,18 @@ export async function fetchBuilderConfig(
       .getFullList<PbSeasonTier>({ sort: "sort_order,month,start_day" })
       .catch(() => [] as PbSeasonTier[]),
     pb
+      .collection("seasonal_particles")
+      .getFullList<PbSeasonalParticle>({
+        sort: "sort_order,start_month,start_day",
+      })
+      .catch(() => [] as PbSeasonalParticle[]),
+    pb
+      .collection("seasonal_characters")
+      .getFullList<PbSeasonalCharacter>({
+        sort: "sort_order,key",
+      })
+      .catch(() => [] as PbSeasonalCharacter[]),
+    pb
       .collection("site_branding")
       .getFullList<PbSiteBranding>()
       .catch(() => [] as PbSiteBranding[]),
@@ -851,6 +903,12 @@ export async function fetchBuilderConfig(
     (h) => h.is_active !== false
   );
   const seasonTiers = seasonTiersRaw.filter((t) => t.is_active !== false);
+  const seasonalParticles = seasonalParticlesRaw.filter(
+    (p) => p.is_active !== false
+  );
+  const seasonalCharacters = seasonalCharactersRaw.filter(
+    (c) => c.is_active !== false
+  );
   const hubs = hubsRaw.filter((h) => h.is_active !== false);
 
   const rules = {
@@ -865,6 +923,10 @@ export async function fetchBuilderConfig(
     rules.seasonal_multiplier = String(1 + pct / 100);
   }
 
+  // Sync ambient FX date windows for TimingSelector / DurationEditor
+  setSeasonalParticleRules(seasonalParticles);
+  setSeasonalCharacterRules(seasonalCharacters);
+
   return {
     cities,
     accommodations,
@@ -878,6 +940,8 @@ export async function fetchBuilderConfig(
     chauffeurRates,
     seasonalHighlights,
     seasonTiers,
+    seasonalParticles,
+    seasonalCharacters,
     branding: brandingRows[0] ?? null,
     rules,
   };

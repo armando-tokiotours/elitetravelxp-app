@@ -182,7 +182,7 @@ export const useSingleDayBuilderStore = create<SingleDayBuilderState>()(
       setPreferredTourLanguage: (preferredTourLanguage) =>
         set({ preferredTourLanguage: preferredTourLanguage || "EN" }),
       setMeetingPoint: (meetingPoint) =>
-        set({ meetingPoint: String(meetingPoint || "").trim() }),
+        set({ meetingPoint: String(meetingPoint ?? "") }),
       setPreferredMovement: (preferredMovement) => set({ preferredMovement }),
       setExperiencesStepDone: (experiencesStepDone) =>
         set({ experiencesStepDone }),

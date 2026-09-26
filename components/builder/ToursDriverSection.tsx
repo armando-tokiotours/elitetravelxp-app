@@ -94,15 +94,18 @@ export function ToursDriverSection({
       summary={summary}
     >
       {conciergeLocked ? (
-        <div className="mb-4 rounded-2xl border border-[#075473]/40 bg-[#075473]/15 px-4 py-3">
-          <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-accent-500">
-            ✨ Elite Concierge Active
-          </p>
-          <p className="mt-1.5 text-sm leading-relaxed text-zinc-300">
-            Individual tours and experiences are deactivated. Your specialist
-            will curate day-by-day itinerary, tours, and logistics with a
-            bespoke quotation before final booking.
-          </p>
+        <div className="group relative mb-4 overflow-hidden rounded-2xl border border-[#075473]/40 bg-[#075473]/15 px-4 py-3">
+          <GoldLight color="#F6A724" placement="top-center" active />
+          <div className="relative z-10">
+            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#F6A724]">
+              ✨ Elite Concierge Active
+            </p>
+            <p className="mt-1.5 text-sm leading-relaxed text-zinc-300">
+              Individual tours and experiences are deactivated. Your specialist
+              will curate day-by-day itinerary, tours, and logistics with a
+              bespoke quotation before final booking.
+            </p>
+          </div>
         </div>
       ) : null}
 

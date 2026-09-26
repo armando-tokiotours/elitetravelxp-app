@@ -52,7 +52,7 @@ export function PaceDetailModal({
       {pace ? (
         <motion.div
           key="pace-explainer"
-          className="fixed inset-0 z-[120] flex items-center justify-center tokio-modal-backdrop bg-[#05080C]/50 p-4 backdrop-blur-sm"
+          className="fixed inset-0 z-[120] flex items-stretch justify-center bg-[#05080C]/50 backdrop-blur-sm"
           role="dialog"
           aria-modal="true"
           aria-label={pace.title}
@@ -67,7 +67,7 @@ export function PaceDetailModal({
             onClick={onClose}
           />
           <motion.div
-            className="relative z-[1] flex max-h-[90dvh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-950 shadow-2xl"
+            className="relative z-[1] flex h-[100dvh] max-h-[100dvh] w-full max-w-lg flex-col overflow-hidden border border-zinc-800 bg-zinc-950 shadow-2xl sm:rounded-2xl md:max-w-2xl"
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 16 }}

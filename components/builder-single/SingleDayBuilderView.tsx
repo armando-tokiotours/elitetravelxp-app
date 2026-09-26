@@ -38,6 +38,7 @@ import { SingleDayTripDurationSection } from "@/components/builder-s/SingleDayTr
 import { SingleDayExperiencesSection } from "@/components/builder-s/SingleDayExperiencesSection";
 import { MovementDetailModal } from "@/components/builder-s/MovementDetailModal";
 import { CityLanguageSelect } from "@/components/builder/CityLanguageSelect";
+import { GoldLight } from "@/components/branding/GoldLight";
 import { SingleDayBuilderHero } from "@/components/builder-single/SingleDayBuilderHero";
 import { SingleDayProgressBar } from "@/components/builder-single/SingleDayProgressBar";
 import {
@@ -61,10 +62,16 @@ const TRANSPORT_OPTIONS: {
   id: IntraCityTransport;
   label: string;
   icon: typeof Footprints;
+  spotlight: string;
 }[] = [
-  { id: "walk", label: "Walking", icon: Footprints },
-  { id: "subway", label: "Subway", icon: Train },
-  { id: "private_driver", label: "Private driver", icon: Car },
+  { id: "walk", label: "Walking", icon: Footprints, spotlight: "#DC6E8A" },
+  { id: "subway", label: "Subway", icon: Train, spotlight: "#054F70" },
+  {
+    id: "private_driver",
+    label: "Private driver",
+    icon: Car,
+    spotlight: "#F6A724",
+  },
 ];
 
 const START_TIMES = [
@@ -441,6 +448,9 @@ export function SingleDayBuilderView() {
                     type="text"
                     value={meetingPoint}
                     onChange={(e) => setMeetingPoint(e.target.value)}
+                    onBlur={() =>
+                      setMeetingPoint(meetingPoint.replace(/\s+/g, " ").trim())
+                    }
                     placeholder="e.g. Park Hyatt Tokyo lobby · Tokyo Station Yaesu"
                     className="w-full rounded-xl border border-white/15 bg-[#121212] px-3 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-[#075473]"
                   />
@@ -475,14 +485,21 @@ export function SingleDayBuilderView() {
                           key={opt.id}
                           type="button"
                           onClick={() => setMovementModal(opt.id)}
-                          className={`${GLASS_CARD} flex flex-col items-center gap-1.5 px-2 py-3 text-[10px] transition ${
+                          className={`group relative overflow-hidden ${GLASS_CARD} flex flex-col items-center gap-1.5 px-2 py-3 text-[10px] transition ${
                             on
                               ? "ring-2 ring-[#075473] text-white"
                               : "text-white/70 hover:border-white/30"
                           }`}
                         >
-                          <Icon className="h-4 w-4 text-cyan-400" />
-                          {opt.label}
+                          <GoldLight
+                            color={opt.spotlight}
+                            placement="top-center"
+                            active={on}
+                          />
+                          <span className="relative z-10 flex flex-col items-center gap-1.5">
+                            <Icon className="h-4 w-4 text-cyan-400" />
+                            {opt.label}
+                          </span>
                         </button>
                       );
                     })}

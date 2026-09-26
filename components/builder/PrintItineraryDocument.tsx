@@ -112,12 +112,12 @@ export function PrintItineraryDocument({
   return (
     <div
       id="itinerary-invoice-content"
-      className={`print-document text-[#0B1F3A] ${
-        embedded ? "" : "min-h-screen bg-[#F5F0E8]"
+      className={`print-document text-white ${
+        embedded ? "" : "min-h-screen bg-[#05080C]"
       }`}
     >
       {!embedded && showToolbar ? (
-        <div className="no-print border-b border-[#E8E2D9] bg-[#FBF8F2] px-4 py-4">
+        <div className="no-print border-b border-white/10 bg-[#0D1117] px-4 py-4">
           <div className="mx-auto flex max-w-3xl flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-3">
               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -130,13 +130,13 @@ export function PrintItineraryDocument({
                 <p className="text-[0.65rem] font-semibold uppercase tracking-[0.3em] text-[#075473]">
                   TOKIOTOURS
                 </p>
-                <h1 className="font-display text-2xl">View / Print Itinerary</h1>
+                <h1 className="font-display text-2xl text-white">View / Print Itinerary</h1>
               </div>
             </div>
             <div className="flex flex-wrap gap-2">
               <Link
                 href="/builder"
-                className="rounded-full border border-[#D9D2C7] px-4 py-2 text-sm"
+                className="rounded-full border border-white/15 px-4 py-2 text-sm text-white/80"
               >
                 ← Edit builder
               </Link>
@@ -166,13 +166,13 @@ export function PrintItineraryDocument({
       >
         <header className="border-b border-[#075473]/40 pb-6">
           <div className="text-center sm:text-left">
-            <p className="text-[0.7rem] font-semibold uppercase tracking-[0.4em] text-[#E60F43]">
+            <p className="text-[0.7rem] font-semibold uppercase tracking-[0.4em] text-[#F6A724]">
               Private Quotation
             </p>
-            <h2 className="mt-2 font-display text-[1.44rem] leading-tight text-[#0B1F3A] sm:text-4xl sm:leading-none">
+            <h2 className="mt-2 font-display text-[1.44rem] leading-tight text-white sm:text-4xl sm:leading-none">
               Japan Journey Design
             </h2>
-            <p className="mt-2 text-sm text-[#8A8278]">
+            <p className="mt-2 text-sm text-white/55">
               Prepared for your review ·{" "}
               {new Date().toLocaleDateString("en-GB", {
                 day: "numeric",
@@ -461,11 +461,11 @@ export function PrintItineraryDocument({
         </section>
 
         {quote ? (
-          <section className="mt-8 rounded-2xl border border-[#075473]/45 bg-[#FDF7F3] p-6 text-center print:border print:bg-white">
-            <p className="text-[0.65rem] font-semibold uppercase tracking-[0.3em] text-[#075473]">
+          <section className="mt-8 rounded-2xl border border-[#075473]/50 bg-[#075473]/20 p-6 text-center print:border print:bg-white">
+            <p className="text-[0.65rem] font-semibold uppercase tracking-[0.3em] text-[#00B4D8]">
               Experience Japan Range
             </p>
-            <p className="mt-2 font-display text-3xl text-[#0B1F3A]">
+            <p className="mt-2 font-display text-3xl text-white print:text-[#0B1F3A]">
               {formatUsd(quote.min)} – {formatUsd(quote.max)}
             </p>
             {(() => {
@@ -473,20 +473,20 @@ export function PrintItineraryDocument({
               const minPP = Math.round(quote.min / guests);
               const maxPP = Math.round(quote.max / guests);
               return (
-                <p className="mt-1 text-sm text-[#5C6570]">
+                <p className="mt-1 text-sm text-white/60 print:text-[#5C6570]">
                   Est. {formatUsd(minPP)} – {formatUsd(maxPP)} per person
                   {guests > 1 ? ` · ${guests} guests` : ""}
                 </p>
               );
             })()}
-            <p className="mt-2 text-xs text-[#8A8278]">
+            <p className="mt-2 text-xs text-white/45 print:text-[#8A8278]">
               Indicative range based on current Source of Truth pricing. Final
               quotation confirmed by your TOKIOTOURS consultant.
             </p>
             {state.isEliteConcierge ||
             state.experienceService === "concierge" ? (
-              <p className="mt-3 rounded-xl border border-[#075473]/40 bg-accent-50 px-3 py-2 text-left text-xs leading-relaxed text-accent-900">
-                <span className="font-bold uppercase tracking-wide">
+              <p className="mt-3 rounded-xl border border-[#F6A724]/35 bg-[#F6A724]/10 px-3 py-2 text-left text-xs leading-relaxed text-white/85 print:border-[#075473]/40 print:bg-accent-50 print:text-accent-900">
+                <span className="font-bold uppercase tracking-wide text-[#F6A724] print:text-inherit">
                   ✨ Elite Concierge Active
                 </span>
                 <span className="mt-1 block">
@@ -500,8 +500,8 @@ export function PrintItineraryDocument({
           </section>
         ) : null}
 
-        <footer className="mt-10 border-t border-[#E8E2D9] pt-6 text-center text-xs text-[#8A8278]">
-          <p className="font-display text-lg text-[#0B1F3A]">
+        <footer className="mt-10 border-t border-white/10 pt-6 text-center text-xs text-white/50 print:border-[#E8E2D9] print:text-[#8A8278]">
+          <p className="font-display text-lg text-[#E60F43]">
             TOKIOTOURS
           </p>
           <p className="mt-1">tokiotours-app.com</p>
@@ -608,17 +608,17 @@ function CityExperienceBlock({
 
   if (isWaypoint) {
     return (
-      <div className="border-b border-[#EEE8DF] py-3 last:border-b-0">
-        <p className="text-sm font-semibold text-[#0B1F3A]">
+      <div className="border-b border-white/10 py-3 last:border-b-0 print:border-[#EEE8DF]">
+        <p className="text-sm font-semibold text-white print:text-[#0B1F3A]">
           {cityLabel}
-          <span className="ml-2 text-xs font-normal text-[#8A8278]">
+          <span className="ml-2 text-xs font-normal text-white/50 print:text-[#8A8278]">
             {loc.visitType === "arrival"
               ? "Arrival waypoint"
               : "Departure waypoint"}
           </span>
         </p>
         {transitIn ? (
-          <p className="mt-1 text-xs text-[#5C6570]">{transitIn}</p>
+          <p className="mt-1 text-xs text-white/55 print:text-[#5C6570]">{transitIn}</p>
         ) : null}
         {ticketLine ? (
           <p className="mt-0.5 text-xs text-accent-800/80">{ticketLine}</p>
@@ -628,30 +628,30 @@ function CityExperienceBlock({
   }
 
   return (
-    <div className="border-b border-[#EEE8DF] last:border-b-0">
+    <div className="border-b border-white/10 last:border-b-0 print:border-[#EEE8DF]">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
-        className="flex w-full items-center gap-3 py-3 text-left transition hover:bg-[#FDF7F3]/60 print:hidden"
+        className="flex w-full items-center gap-3 py-3 text-left transition hover:bg-white/[0.04] print:hidden"
       >
         <div className="min-w-0 flex-1">
           <div className="flex items-baseline justify-between gap-3">
-            <p className="text-sm font-semibold text-[#0B1F3A]">
+            <p className="text-sm font-semibold text-white">
               {cityLabel}
-              <span className="text-[#8A8278]">
+              <span className="text-white/50">
                 {" "}
                 · {loc.nights} Night{loc.nights === 1 ? "" : "s"}
               </span>
             </p>
             {dateLabel ? (
-              <p className="shrink-0 text-xs text-[#8A8278]">{dateLabel}</p>
+              <p className="shrink-0 text-xs text-white/50">{dateLabel}</p>
             ) : null}
           </div>
-          <p className="mt-1 text-xs text-[#8A8278]">{statusLabel}</p>
+          <p className="mt-1 text-xs text-white/50">{statusLabel}</p>
         </div>
         <ChevronDown
-          className={`h-4 w-4 shrink-0 text-[#075473]/80 transition-transform duration-200 ${
+          className={`h-4 w-4 shrink-0 text-[#F6A724]/80 transition-transform duration-200 ${
             open ? "rotate-180" : ""
           }`}
           aria-hidden
@@ -682,10 +682,10 @@ function CityExperienceBlock({
         <div className="overflow-hidden">
           <ul className="space-y-1.5 pb-3 print:pb-3">
             {transitIn ? (
-              <li className="text-xs text-[#5C6570]">{transitIn}</li>
+              <li className="text-xs text-white/55 print:text-[#5C6570]">{transitIn}</li>
             ) : null}
             {ticketLine ? (
-              <li className="text-xs text-accent-800/80">{ticketLine}</li>
+              <li className="text-xs text-[#F6A724]/80 print:text-accent-800/80">{ticketLine}</li>
             ) : null}
 
             {!concierge &&
@@ -695,7 +695,7 @@ function CityExperienceBlock({
                 return (
                   <li
                     key={`${row.tourId}-${row.scheduledDate}`}
-                    className="text-xs text-[#5C6570]"
+                    className="text-xs text-white/55 print:text-[#5C6570]"
                   >
                     {row.title}
                     {hours ? ` · ${hours}h` : ""}
@@ -707,11 +707,11 @@ function CityExperienceBlock({
               })}
 
             {concierge ? (
-              <li className="text-xs text-[#5C6570]">
+              <li className="text-xs text-white/55 print:text-[#5C6570]">
                 Tours &amp; private drivers curated 1:1 by Elite Concierge
               </li>
             ) : chauffeurDays > 0 ? (
-              <li className="text-xs text-[#5C6570]">
+              <li className="text-xs text-white/55 print:text-[#5C6570]">
                 {chauffeurDays} Day{chauffeurDays === 1 ? "" : "s"} Private
                 Chauffeur · {vehicleLine}
               </li>
@@ -721,7 +721,7 @@ function CityExperienceBlock({
             tours.length === 0 &&
             chauffeurDays === 0 &&
             !transitIn ? (
-              <li className="text-xs text-[#8A8278]">
+              <li className="text-xs text-white/40 print:text-[#8A8278]">
                 No experiences or private chauffeur days yet
               </li>
             ) : null}
@@ -740,8 +740,8 @@ function InvoiceCard({
   children: React.ReactNode;
 }) {
   return (
-    <div className="bg-card dark-card rounded-2xl border border-[#E8E2D9] bg-white p-4 sm:p-5 print:border print:shadow-none">
-      <h3 className="accent-title mb-3 text-[0.65rem] font-semibold uppercase tracking-[0.22em] text-[#075473]">
+    <div className="bg-card dark-card rounded-2xl border border-white/10 bg-[#0D1117]/80 p-4 backdrop-blur-md sm:p-5 print:border print:bg-white print:shadow-none">
+      <h3 className="accent-title mb-3 text-[0.65rem] font-semibold uppercase tracking-[0.22em] text-[#F6A724] print:text-[#075473]">
         {title}
       </h3>
       <div>{children}</div>
@@ -751,12 +751,12 @@ function InvoiceCard({
 
 function DetailRow({ left, right }: { left: string; right: string }) {
   return (
-    <div className="detail-row flex w-full items-center justify-between gap-3 border-b border-[#F0EBE3] py-1.5 last:border-b-0 sm:gap-4 sm:py-2">
-      <span className="detail-row-label min-w-0 shrink-0 leading-tight text-[#5C6570] sm:shrink">
+    <div className="detail-row flex w-full items-center justify-between gap-3 border-b border-white/10 py-1.5 last:border-b-0 sm:gap-4 sm:py-2 print:border-[#F0EBE3]">
+      <span className="detail-row-label min-w-0 shrink-0 leading-tight text-white/55 sm:shrink print:text-[#5C6570]">
         {left}
       </span>
       {right ? (
-        <span className="detail-row-value min-w-0 flex-1 break-words text-right font-semibold leading-tight text-[#0B1F3A]">
+        <span className="detail-row-value min-w-0 flex-1 break-words text-right font-semibold leading-tight text-white print:text-[#0B1F3A]">
           {right}
         </span>
       ) : null}
@@ -791,8 +791,8 @@ function SectionSubtotal({
 
   if (isZero && isExperiences) {
     return (
-      <div className="mt-4 border-t border-zinc-200 pt-4 font-bold text-[#0B1F3A]">
-        <span className="text-xs uppercase tracking-wider text-zinc-500">
+      <div className="mt-4 border-t border-white/10 pt-4 font-bold text-white print:border-zinc-200 print:text-[#0B1F3A]">
+        <span className="text-xs uppercase tracking-wider text-white/50 print:text-zinc-500">
           {labelNode}: €0 (Self-Arranged)
         </span>
       </div>
@@ -800,8 +800,8 @@ function SectionSubtotal({
   }
 
   return (
-    <div className="mt-4 flex items-start justify-between gap-3 border-t border-zinc-200 pt-4 font-bold text-[#0B1F3A]">
-      <span className="text-xs uppercase tracking-wider text-zinc-500">
+    <div className="mt-4 flex items-start justify-between gap-3 border-t border-white/10 pt-4 font-bold text-white print:border-zinc-200 print:text-[#0B1F3A]">
+      <span className="text-xs uppercase tracking-wider text-white/50 print:text-zinc-500">
         {labelNode}
       </span>
       <span className="shrink-0 text-sm">

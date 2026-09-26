@@ -166,7 +166,7 @@ export function SingleDayTripDetailModal({
       {open ? (
         <motion.div
           key="single-day-tour-detail"
-          className="fixed inset-0 z-[110] flex items-end justify-center bg-[#05080C]/55 backdrop-blur-sm sm:items-center sm:p-2"
+          className="fixed inset-0 z-[110] flex items-stretch justify-center bg-[#05080C]/55 backdrop-blur-sm"
           role="dialog"
           aria-modal="true"
           aria-label="Configure tour details"
@@ -182,7 +182,7 @@ export function SingleDayTripDetailModal({
             onClick={onClose}
           />
           <motion.div
-            className="relative z-[1] flex max-h-[min(96dvh,44rem)] w-full max-w-lg flex-col overflow-hidden rounded-t-3xl border border-white/10 bg-[#05080C]/88 shadow-2xl backdrop-blur-3xl sm:rounded-2xl"
+            className="relative z-[1] flex h-[100dvh] max-h-[100dvh] w-full max-w-lg flex-col overflow-hidden border border-white/10 bg-[#05080C]/88 shadow-2xl backdrop-blur-3xl sm:rounded-2xl md:max-w-4xl lg:max-w-5xl"
             initial={{ opacity: 0, y: 24 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 24 }}
@@ -298,7 +298,7 @@ export function SingleDayTripDetailModal({
                 ) : null}
               </div>
 
-              <div className="flex flex-col gap-4 sm:grid sm:grid-cols-2 sm:gap-3">
+              <div className="flex flex-col gap-4 md:grid md:grid-cols-2 md:gap-4">
                 <DatePickerField
                   value={tourDate}
                   onChange={(next) => {
