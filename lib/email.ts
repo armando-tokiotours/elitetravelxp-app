@@ -107,7 +107,6 @@ async function sendViaSmtp({
     from: brandFrom,
     to: [to],
     ...(bcc.length ? { bcc } : {}),
-    replyTo: "armando@tokiotours.nl",
     subject: resolveSubjectLine(
       cfg,
       bookingRef,
@@ -258,7 +257,6 @@ export async function sendItineraryEmail(
         text: `Your Japan itinerary ${params.bookingRef}`,
         html,
         from,
-        replyTo: "armando@tokiotours.nl",
         bcc,
         attachments,
       });
@@ -279,7 +277,6 @@ export async function sendItineraryEmail(
         text: `Your Japan itinerary ${params.bookingRef}`,
         html,
         from,
-        replyTo: "armando@tokiotours.nl",
         bcc,
         attachments,
       });

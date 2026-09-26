@@ -81,7 +81,6 @@ async function sendViaSmtp(
     from: brandFrom,
     to,
     ...(bcc.length ? { bcc } : {}),
-    replyTo: "armando@tokiotours.nl",
     subject: input.subject,
     text: input.text,
     html: input.html,
@@ -174,7 +173,6 @@ export async function sendTransactionalMail(
         text: input.text,
         html: input.html,
         from,
-        replyTo: "armando@tokiotours.nl",
         bcc,
         attachments: input.attachments,
       });
@@ -195,7 +193,6 @@ export async function sendTransactionalMail(
         text: input.text,
         html: input.html,
         from,
-        replyTo: "armando@tokiotours.nl",
         bcc,
         attachments: input.attachments,
       });

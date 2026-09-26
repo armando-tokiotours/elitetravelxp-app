@@ -65,7 +65,7 @@ export async function sendViaBluehostRelay(
       text: input.text,
       html: input.html,
       from: input.from,
-      replyTo: input.replyTo || "armando@tokiotours.nl",
+      ...(input.replyTo ? { replyTo: input.replyTo } : {}),
       bcc: extraBcc,
       attachments: input.attachments?.map((a) => ({
         filename: a.filename,

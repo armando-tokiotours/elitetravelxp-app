@@ -226,8 +226,8 @@ Review your booking brief: ${resumeUrl}`;
 }
 
 /**
- * Dual dispatch: guest boarding-pass confirmation + dedicated concierge lead alert.
- * Does not throw on mail failure — returns per-recipient results so PB save can succeed.
+ * Draft boarding-pass: one guest email with team on BCC (no Reply-To).
+ * Does not throw on mail failure — returns results so PB save can succeed.
  */
 export async function sendDraftBoardingPassEmails(
   params: DraftBoardingPassParams
@@ -237,7 +237,7 @@ export async function sendDraftBoardingPassEmails(
   errors: string[];
 }> {
   const cfg = getActiveEmailConfig();
-  const teamTo =
+  const teamBcc =
     envVal("BUSINESS_CONCIERGE_EMAIL") ||
     cfg.routing.bccRecipient ||
     "armando@tokiotours.nl";
@@ -253,29 +253,19 @@ export async function sendDraftBoardingPassEmails(
       subject: `Draft Reservation Pass · ${ref}`,
       text: buildDraftBoardingPassText(params, "guest"),
       html: buildDraftBoardingPassHtml(params, "guest"),
-      skipTeamBcc: true,
+      // Draft process: team watches via BCC only (not a separate To / Reply-To).
+      skipTeamBcc: false,
+      bcc: teamBcc && teamBcc.toLowerCase() !== guestTo ? [teamBcc] : [],
     });
-    if (guest.sent) guestSent = true;
-    else if (guest.reason) errors.push(guest.reason);
+    if (guest.sent) {
+      guestSent = true;
+      teamSent = Boolean(guest.bcc?.length);
+    } else if (guest.reason) {
+      errors.push(guest.reason);
+    }
   } catch (err) {
     errors.push(
       err instanceof Error ? err.message : "Guest boarding-pass email failed."
-    );
-  }
-
-  try {
-    const team = await sendTransactionalMail({
-      to: teamTo,
-      subject: `New Draft Lead · ${ref} · ${params.fullName.trim()}`,
-      text: buildDraftBoardingPassText(params, "team"),
-      html: buildDraftBoardingPassHtml(params, "team"),
-      skipTeamBcc: true,
-    });
-    if (team.sent) teamSent = true;
-    else if (team.reason) errors.push(team.reason);
-  } catch (err) {
-    errors.push(
-      err instanceof Error ? err.message : "Team boarding-pass email failed."
     );
   }
 

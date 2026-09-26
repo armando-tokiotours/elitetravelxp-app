@@ -55,7 +55,6 @@ export async function POST(req: Request) {
           "If you received this, external delivery via Bluehost webmail works.",
         ].join("\n"),
         from: "Tokiotours Concierge <no_reply@tokiotours.com>",
-        replyTo: "armando@tokiotours.nl",
       });
       return NextResponse.json({
         ok: true,
@@ -77,7 +76,6 @@ export async function POST(req: Request) {
           "If you received this, external delivery via Bluehost PHP works.",
         ].join("\n"),
         from: "Tokiotours Concierge <no_reply@tokiotours.com>",
-        replyTo: "armando@tokiotours.nl",
       });
       return NextResponse.json({
         ok: true,

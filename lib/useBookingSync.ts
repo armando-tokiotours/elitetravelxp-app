@@ -1,7 +1,7 @@
 /**
  * Booking sync / full restart helpers for Builder M + S + Pre-Elite.
  * "Start another brief" / "Restart New Booking" → purge, mint JPN- PNR,
- * email manage link, return to landing.
+ * return to landing (no auto-email in draft — use Save & Email).
  */
 
 import { useBuilderStore } from "@/store/useBuilderStore";
@@ -208,8 +208,8 @@ export type FullBookingResetResult = {
 };
 
 /**
- * Full restart: capture identity → purge storage/stores → mint JPN- PNR →
- * email manage link for the NEW ref when email is known.
+ * Full restart: capture identity → purge storage/stores → mint JPN- PNR.
+ * Does not auto-email during draft/reset — guest must Save & Email explicitly.
  */
 export async function performFullBookingReset(): Promise<FullBookingResetResult> {
   const identity = captureBookingIdentity();
@@ -221,27 +221,10 @@ export async function performFullBookingReset(): Promise<FullBookingResetResult>
 
   const newRef = mintFreshBookingRef();
 
-  let emailSent = false;
-  let emailError: string | undefined;
-  if (identity.email) {
-    const result = await emailNewBookingAccessLink({
-      email: identity.email,
-      bookingRef: newRef,
-      customerName: identity.customerName,
-      tourType: identity.tourType,
-      tourDate: null,
-      adults: 2,
-      children: 0,
-    });
-    emailSent = result.sent;
-    emailError = result.error;
-  }
-
   return {
     newRef,
     priorRef: identity.priorRef,
-    emailSent,
-    emailError,
+    emailSent: false,
     email: identity.email,
   };
 }

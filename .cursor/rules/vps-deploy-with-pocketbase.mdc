@@ -1,19 +1,27 @@
 ---
-description: When deploying to VPS, also sync PocketBase data and public brand files
+description: VPS deploy — code + brand assets by default; never wipe VPS booking data unless asked
 alwaysApply: true
 ---
 
-# VPS deploy habit (for now)
+# VPS deploy habit
 
 When the user asks to **push GitHub and/or VPS**:
 
 1. **Commit + push** code to `origin/main` (GitHub).
-2. **Rsync code** to `tokiotours-vps:/root/elitetravelxp-app/` and `docker compose up -d --build` (keep remote `.env`).
-3. **Also push PocketBase data** with:
+2. **Rsync code** to `tokiotours-vps:/root/elitetravelxp-app/` and rebuild with the **VPS** compose file (keep remote `.env`):
    ```bash
-   I_UNDERSTAND_REPLACE_VPS_DATA=yes npm run pb:push
+   docker compose -f docker-compose.vps.yml up -d --build
    ```
-   This replaces VPS `pb_data` (records + uploaded photos) with local `backend/pb_data`.
-4. Include **public brand assets** already in the repo (`public/brand/*`, hero background, etc.) in the git/rsync deploy — do not leave them local-only.
+   Do not use plain `docker compose up` on the VPS (port 8090 conflicts with other stacks; VPS maps PB to **8091**).
+3. Include **public brand assets** in the git/rsync deploy (`public/brand/*`, icons, SVG characters, hero images, etc.) — design files ship with code.
+4. **Do NOT run `pb:push`** by default. VPS `pb_data` holds live bookings/leads with unique PNRs and related records — leave it alone.
 
-Do not skip the PocketBase push unless the user explicitly says code-only.
+## PocketBase data replace (explicit only)
+
+Only replace VPS PocketBase data when the user clearly asks, e.g. “push including PB data”, “pb:push”, or “replace VPS data”:
+
+```bash
+I_UNDERSTAND_REPLACE_VPS_DATA=yes npm run pb:push
+```
+
+That overwrites VPS records **and** PocketBase-uploaded files with local `backend/pb_data`. Never do this for a normal “push” of design/code work.
