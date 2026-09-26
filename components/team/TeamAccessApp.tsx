@@ -33,6 +33,14 @@ import { ToursCsvSync } from "@/components/team/ToursCsvSync";
 import { TeamConfigDashboard } from "@/components/team/TeamConfigDashboard";
 import { formatTourTierSummary } from "@/lib/tourPricing";
 import { optimizeFileForUpload } from "@/lib/optimizeUploadClient";
+import { StaffLoginCard } from "@/components/staff/StaffPortalShell";
+import { StaffUsersPanel } from "@/components/staff/StaffUsersPanel";
+import {
+  ROLE_LABELS,
+  canAccessTeamAccess,
+  homePathForRole,
+} from "@/lib/staffRoles";
+import { useRouter } from "next/navigation";
 
 type PbClient = PocketBase;
 
@@ -71,6 +79,7 @@ function TeamShell({
 }
 
 export function TeamAccessApp() {
+  const router = useRouter();
   const [ready, setReady] = useState(false);
   const [tab, setTab] = useState<
     | "truth"
@@ -82,15 +91,10 @@ export function TeamAccessApp() {
   >("truth");
   const isAuthenticated = useTeamAuth((s) => s.isAuthenticated);
   const email = useTeamAuth((s) => s.email);
-  const login = useTeamAuth((s) => s.login);
+  const role = useTeamAuth((s) => s.role);
   const logout = useTeamAuth((s) => s.logout);
   const hydrateAuth = useTeamAuth((s) => s.hydrateAuth);
   const getClient = useTeamAuth((s) => s.getClient);
-
-  const [emailInput, setEmailInput] = useState("");
-  const [password, setPassword] = useState("");
-  const [authError, setAuthError] = useState<string | null>(null);
-  const [authLoading, setAuthLoading] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -105,6 +109,13 @@ export function TeamAccessApp() {
     };
   }, [hydrateAuth]);
 
+  useEffect(() => {
+    if (!ready || !isAuthenticated) return;
+    if (!canAccessTeamAccess(role) && role) {
+      router.replace(homePathForRole(role));
+    }
+  }, [ready, isAuthenticated, role, router]);
+
   if (!ready) {
     return (
       <TeamShell title="Team Access">
@@ -117,65 +128,35 @@ export function TeamAccessApp() {
     return (
       <TeamShell title="Team Access">
         <main className="mx-auto max-w-md px-4 py-10">
-          <div className="rounded-2xl border border-zinc-800/80 bg-zinc-900/60 p-6 shadow-sm">
-            <h2 className="font-display text-2xl text-white">Team login</h2>
-            <p className="mt-2 text-sm text-zinc-400">
-              Sign in with PocketBase admin credentials to manage Source of Truth,
-              Rules of Logic, and team users.
-            </p>
-            <p className="mt-1 text-[11px] text-zinc-500">
-              PocketBase: {getPbBaseUrl()}
-            </p>
-            <form
-              className="mt-6 space-y-4"
-              onSubmit={async (e) => {
-                e.preventDefault();
-                setAuthLoading(true);
-                setAuthError(null);
-                try {
-                  await login(emailInput.trim(), password);
-                } catch (err) {
-                  setAuthError(
-                    `${formatPbError(err)} · ${getPbBaseUrl()}`
-                  );
-                } finally {
-                  setAuthLoading(false);
-                }
-              }}
-            >
-              <label className="block text-xs uppercase tracking-wider text-zinc-400">
-                Email
-                <input
-                  type="email"
-                  required
-                  value={emailInput}
-                  onChange={(e) => setEmailInput(e.target.value)}
-                  className="mt-1 w-full rounded-xl border border-zinc-700 bg-zinc-950 px-3 py-2.5 text-sm text-zinc-100 outline-none focus:border-[#075473]"
-                />
-              </label>
-              <label className="block text-xs uppercase tracking-wider text-zinc-400">
-                Password
-                <input
-                  type="password"
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="mt-1 w-full rounded-xl border border-zinc-700 bg-zinc-950 px-3 py-2.5 text-sm text-zinc-100 outline-none focus:border-[#075473]"
-                />
-              </label>
-              {authError ? (
-                <p className="text-sm text-red-400">{authError}</p>
-              ) : null}
-              <button
-                type="submit"
-                disabled={authLoading}
-                className="w-full rounded-full bg-accent-500 py-3 text-sm font-semibold text-white disabled:opacity-50"
-              >
-                {authLoading ? "Signing in…" : "Enter Team Access"}
-              </button>
-            </form>
-          </div>
+          <StaffLoginCard
+            title="Team login"
+            subtitle="Owner / Ops manage Source of Truth here. Other roles are redirected to their portal after sign-in."
+          />
+          <p className="mt-4 text-center text-xs text-zinc-500">
+            Field portals:{" "}
+            <Link href="/ops" className="text-[#075473] hover:underline">
+              /ops
+            </Link>
+            ,{" "}
+            <Link href="/guide" className="text-[#075473] hover:underline">
+              /guide
+            </Link>
+            ,{" "}
+            <Link href="/agency" className="text-[#075473] hover:underline">
+              /agency
+            </Link>
+          </p>
         </main>
+      </TeamShell>
+    );
+  }
+
+  if (!canAccessTeamAccess(role)) {
+    return (
+      <TeamShell title="Team Access">
+        <p className="p-8 text-center text-sm text-zinc-400">
+          Redirecting to your portal…
+        </p>
       </TeamShell>
     );
   }
@@ -186,11 +167,17 @@ export function TeamAccessApp() {
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-zinc-800/80 pb-4">
           <div className="flex flex-wrap items-center gap-3">
             <Link
-              href="/admin"
+              href="/ops"
               className="flex items-center gap-1.5 rounded-xl border border-zinc-800 bg-[#1C1C1E] px-3.5 py-1.5 text-xs font-bold text-zinc-300 transition hover:border-[#075473] hover:text-white"
             >
               <span aria-hidden>←</span>
-              <span>Back to Leads / Admin</span>
+              <span>Ops board</span>
+            </Link>
+            <Link
+              href="/admin"
+              className="flex items-center gap-1.5 rounded-xl border border-zinc-800 bg-[#1C1C1E] px-3.5 py-1.5 text-xs font-bold text-zinc-300 transition hover:border-[#075473] hover:text-white"
+            >
+              <span>Leads / Admin</span>
             </Link>
             <Link
               href="/builder"
@@ -200,15 +187,15 @@ export function TeamAccessApp() {
               <span>Exit to Trip Builder</span>
             </Link>
           </div>
-          <div className="flex flex-wrap items-center gap-3">
-            <span className="text-xs text-zinc-400">
-              Signed in as{" "}
-              <strong className="text-white">{email}</strong>
-            </span>
+          <div className="text-right text-xs text-zinc-500">
+            <p>
+              {email}
+              {role ? ` · ${ROLE_LABELS[role]}` : ""}
+            </p>
             <button
               type="button"
               onClick={logout}
-              className="rounded-xl border border-zinc-800 bg-[#1C1C1E] px-3 py-1.5 text-xs font-bold text-zinc-300 transition hover:text-red-400"
+              className="mt-1 font-semibold text-zinc-300 hover:text-red-400"
             >
               Sign out
             </button>
@@ -257,7 +244,7 @@ export function TeamAccessApp() {
         ) : tab === "email_settings" ? (
           <TeamConfigDashboard />
         ) : (
-          <UsersPanel getClient={getClient} currentEmail={email} />
+          <StaffUsersPanel getClient={getClient} currentEmail={email} />
         )}
       </main>
     </TeamShell>

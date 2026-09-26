@@ -9,7 +9,6 @@ import {
   Compass,
   Home,
   LogOut,
-  Settings,
   Ticket,
   User,
   Wrench,
@@ -30,8 +29,7 @@ export type AppNavId =
   | "builder"
   | "discover"
   | "manage"
-  | "itinerary"
-  | "admin";
+  | "itinerary";
 
 export interface AppNavItem {
   id: AppNavId;
@@ -81,23 +79,11 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
     label: "My Saved Itineraries",
     icon: Bookmark,
   },
-  {
-    id: "admin",
-    href: "/admin",
-    label: "Team Access / Admin",
-    icon: Settings,
-  },
 ];
-
-function isAdminPath(pathname: string): boolean {
-  return pathname === "/admin" || pathname.startsWith("/admin/");
-}
 
 function isNavActive(pathname: string, item: AppNavItem): boolean {
   if (!item.href) return false;
   if (item.id === "home") return pathname === "/";
-  if (item.id === "admin")
-    return isAdminPath(pathname) || pathname.startsWith("/team-access");
   if (item.id === "builder")
     return (
       pathname === "/builder" ||
@@ -266,18 +252,12 @@ function NavLinkList({
                   }`
             }
           >
-            {item.id === "admin" ? (
-              <span className="text-base leading-none" aria-hidden>
-                ⚙️
-              </span>
-            ) : (
-              <Icon
-                className={`h-5 w-5 shrink-0 ${
-                  active ? "text-[#075473]" : "text-zinc-500"
-                }`}
-                aria-hidden
-              />
-            )}
+            <Icon
+              className={`h-5 w-5 shrink-0 ${
+                active ? "text-[#075473]" : "text-zinc-500"
+              }`}
+              aria-hidden
+            />
             {variant === "drawer" ? (
               <span className={active ? "font-semibold" : ""}>{label}</span>
             ) : (
@@ -359,13 +339,6 @@ function AccountFooter({
             </p>
           </div>
         </button>
-        <Link
-          href="/admin"
-          className="mt-3 flex items-center justify-between px-1 py-2 text-xs text-zinc-400 transition hover:text-white"
-        >
-          <span>Team Access</span>
-          <span className="font-semibold text-accent-500">Sign in</span>
-        </Link>
       </div>
     );
   }
@@ -439,16 +412,6 @@ function AccountFooter({
           </div>
         </NavLabel>
       </button>
-      <Link
-        href="/admin"
-        title="Team Access / Admin"
-        className={`mt-1 flex items-center gap-2 rounded-xl py-2 text-sm text-zinc-400 transition hover:bg-zinc-900 hover:text-white ${railBtnLayout}`}
-      >
-        <Settings className="h-4 w-4 shrink-0" aria-hidden />
-        <NavLabel rail={rail} expanded={expanded}>
-          Team Access / Admin
-        </NavLabel>
-      </Link>
     </div>
   );
 }

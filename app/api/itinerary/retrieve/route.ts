@@ -128,6 +128,9 @@ export async function POST(request: Request) {
             ? sel.itineraryData
             : "";
 
+      const { findConciergeAgentByPnr } = await import("@/lib/conciergeAgent");
+      const concierge = await findConciergeAgentByPnr(lead.booking_ref || pnr);
+
       return NextResponse.json({
         ok: true,
         bookingRef: lead.booking_ref || pnr,
@@ -136,6 +139,9 @@ export async function POST(request: Request) {
         contactEmail: lead.email,
         source: "bookings_and_leads",
         type: lead.type,
+        conciergeAgent: concierge
+          ? { name: concierge.name, id: concierge.id || undefined }
+          : null,
         quote: null,
         departureDate: null,
         emailSentCount: Number(lead.email_sent_count) || 0,

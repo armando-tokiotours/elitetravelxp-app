@@ -121,6 +121,34 @@ function safeEmail(email: string): string {
     .replace(/"/g, "");
 }
 
+/** Non-blocking ops_hub register after a successful BAL write. */
+function syncOpsHubFromBal(opts: {
+  pnr: string;
+  detailId: string;
+  status?: string | null;
+  primaryCity?: string | null;
+  tourDate?: string | null;
+  guests?: BookingLeadGuests | null;
+}): void {
+  void import("@/lib/opsHub")
+    .then(({ upsertOpsHubFromDirect, formatGuestSummary }) =>
+      upsertOpsHubFromDirect({
+        pnr: opts.pnr,
+        detailId: opts.detailId,
+        status: opts.status,
+        primaryCity: opts.primaryCity,
+        tourDate: opts.tourDate,
+        guestSummary: formatGuestSummary(opts.guests),
+      })
+    )
+    .catch((err) => {
+      console.warn(
+        "[ops_hub] skipped:",
+        err instanceof Error ? err.message : err
+      );
+    });
+}
+
 /** Build lightweight multi-day selections from Builder M state. */
 export function buildMultiDaySelections(
   state: Pick<
@@ -290,6 +318,7 @@ export async function upsertBookingsAndLeads(
     email,
     type: input.type,
     status: requestedStatus,
+    source: "direct",
     primary_city: primaryCity,
     guests,
     duration_value: durationNum,
@@ -373,6 +402,14 @@ export async function upsertBookingsAndLeads(
         patch,
         { requestKey: null }
       );
+      void syncOpsHubFromBal({
+        pnr: bookingRef,
+        detailId: updated.id,
+        status: String(nextStatus),
+        primaryCity,
+        tourDate: tourDateRaw || null,
+        guests,
+      });
       return { ok: true, id: updated.id, created: false };
     }
 
@@ -389,6 +426,14 @@ export async function upsertBookingsAndLeads(
     const created = await pb
       .collection("bookings_and_leads")
       .create(createFields, { requestKey: null });
+    void syncOpsHubFromBal({
+      pnr: bookingRef,
+      detailId: created.id,
+      status: requestedStatus,
+      primaryCity,
+      tourDate: tourDateRaw || null,
+      guests,
+    });
     return { ok: true, id: created.id, created: true };
   } catch (err) {
     const message =
@@ -458,6 +503,7 @@ export async function recordBookingLeadEmailSent(opts: {
         email,
         type,
         status: "lead",
+        source: "direct",
         primary_city: "Tokyo",
         guests: { adults: 2, kids: 0 },
         duration_value: type === "single_day" ? 6 : 1,
@@ -475,6 +521,15 @@ export async function recordBookingLeadEmailSent(opts: {
       },
       { requestKey: null }
     );
+    if (created?.id) {
+      void syncOpsHubFromBal({
+        pnr: bookingRef,
+        detailId: created.id,
+        status: "lead",
+        primaryCity: "Tokyo",
+        guests: { adults: 2, kids: 0 },
+      });
+    }
     return {
       ok: true,
       emailSentCount: 1,

@@ -41,6 +41,7 @@ import { TRAVEL_STYLES, labelFor } from "@/lib/preEliteBuilder";
 import { travelStyleTierRules } from "@/lib/preEliteHydrate";
 import { DossierSectionOutline } from "@/components/builder/DossierSectionOutline";
 import { JapanBookingPass } from "@/components/dossier/JapanBookingPass";
+import { useConciergeAgentName } from "@/lib/useConciergeAgentName";
 import {
   buildDossierQrUrl,
   buildRouteBreakdown,
@@ -126,6 +127,7 @@ export function TravelDossierView({
     confirmedBookingRef: state.confirmedBookingRef,
     bookingStatus: state.bookingStatus,
   });
+  const conciergeAgentName = useConciergeAgentName(pnrCode);
   const routeBreakdown = buildRouteBreakdown(state.locations, cityName);
   const experienceType = experienceTierLabel(
     state.experienceService,
@@ -169,6 +171,7 @@ export function TravelDossierView({
         routeBreakdown={routeBreakdown}
         status={mapBookingStatusToPass(state.bookingStatus)}
         qrValue={buildDossierQrUrl(pnrCode, "/builder/itinerary")}
+        conciergeAgentName={conciergeAgentName}
       />
 
       {afterSummary}

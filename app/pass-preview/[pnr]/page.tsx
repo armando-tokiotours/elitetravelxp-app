@@ -19,11 +19,13 @@ import { isIOSChrome } from "@/lib/wallet/iosWallet";
 import { useBuilderStore } from "@/store/useBuilderStore";
 import { useItineraryStore } from "@/store/useItineraryStore";
 import { getCityName } from "@/lib/cityLabels";
+import { useConciergeAgentName } from "@/lib/useConciergeAgentName";
 
 function PassPreviewInner() {
   const params = useParams();
   const searchParams = useSearchParams();
   const pnrParam = String(params?.pnr || "").toUpperCase();
+  const conciergeAgentName = useConciergeAgentName(pnrParam);
   const [showSafariHint, setShowSafariHint] = useState(
     searchParams.get("openInSafari") === "1"
   );
@@ -92,7 +94,15 @@ function PassPreviewInner() {
     };
   }, [state, clientName, departureIso, pnrParam]);
 
-  const pass = stashed || fromStore;
+  const pass = useMemo(() => {
+    const base = stashed || fromStore;
+    if (!base) return null;
+    return {
+      ...base,
+      conciergeAgentName:
+        conciergeAgentName || base.conciergeAgentName || null,
+    };
+  }, [stashed, fromStore, conciergeAgentName]);
 
   const copySafariLink = async () => {
     if (!safariUrl) return;

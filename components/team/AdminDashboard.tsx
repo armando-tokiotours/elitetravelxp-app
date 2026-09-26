@@ -11,10 +11,18 @@ import {
 import { BookingsManagementTable } from "@/components/team/BookingsManagementTable";
 import { TeamConfigDashboard } from "@/components/team/TeamConfigDashboard";
 import { useTeamAuth } from "@/store/useTeamAuth";
+import { StaffLoginCard } from "@/components/staff/StaffPortalShell";
+import {
+  ROLE_LABELS,
+  canAccessAdmin,
+  homePathForRole,
+} from "@/lib/staffRoles";
+import { useRouter } from "next/navigation";
 
 type PrimaryTab = "bookings" | "email";
 
 function AdminDashboardInner() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const initialTab =
     searchParams.get("tab") === "email" ? "email" : "bookings";
@@ -25,15 +33,10 @@ function AdminDashboardInner() {
 
   const isAuthenticated = useTeamAuth((s) => s.isAuthenticated);
   const email = useTeamAuth((s) => s.email);
-  const login = useTeamAuth((s) => s.login);
+  const role = useTeamAuth((s) => s.role);
   const logout = useTeamAuth((s) => s.logout);
   const hydrateAuth = useTeamAuth((s) => s.hydrateAuth);
   const getClient = useTeamAuth((s) => s.getClient);
-
-  const [emailInput, setEmailInput] = useState("");
-  const [password, setPassword] = useState("");
-  const [authError, setAuthError] = useState<string | null>(null);
-  const [authLoading, setAuthLoading] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -52,6 +55,13 @@ function AdminDashboardInner() {
     const t = searchParams.get("tab");
     if (t === "email" || t === "bookings") setActiveAdminTab(t);
   }, [searchParams]);
+
+  useEffect(() => {
+    if (!ready || !isAuthenticated) return;
+    if (!canAccessAdmin(role) && role) {
+      router.replace(homePathForRole(role));
+    }
+  }, [ready, isAuthenticated, role, router]);
 
   return (
     <>
@@ -79,57 +89,14 @@ function AdminDashboardInner() {
           {!ready ? (
             <p className="py-16 text-center text-sm text-zinc-400">Loading…</p>
           ) : !isAuthenticated ? (
-            <div className="mx-auto max-w-md rounded-2xl border border-[#2C2C2E] bg-[#1C1C1E] p-6">
-              <h2 className="font-display text-2xl text-white">Team login</h2>
-              <p className="mt-2 text-sm text-zinc-400">
-                Sign in with PocketBase admin credentials to manage bookings and
-                email/SMTP settings.
-              </p>
-              <form
-                className="mt-5 space-y-3"
-                onSubmit={async (e) => {
-                  e.preventDefault();
-                  setAuthLoading(true);
-                  setAuthError(null);
-                  try {
-                    await login(emailInput.trim(), password);
-                  } catch (err) {
-                    setAuthError(
-                      err instanceof Error ? err.message : "Login failed"
-                    );
-                  } finally {
-                    setAuthLoading(false);
-                  }
-                }}
-              >
-                <input
-                  type="email"
-                  required
-                  value={emailInput}
-                  onChange={(e) => setEmailInput(e.target.value)}
-                  placeholder="Admin email"
-                  className="w-full rounded-xl border border-[#2C2C2E] bg-[#121212] px-3 py-2.5 text-sm text-white outline-none focus:border-[#075473]"
-                />
-                <input
-                  type="password"
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Password"
-                  className="w-full rounded-xl border border-[#2C2C2E] bg-[#121212] px-3 py-2.5 text-sm text-white outline-none focus:border-[#075473]"
-                />
-                {authError ? (
-                  <p className="text-xs text-amber-300">{authError}</p>
-                ) : null}
-                <button
-                  type="submit"
-                  disabled={authLoading}
-                  className="w-full rounded-full bg-[#075473] py-2.5 text-sm font-semibold text-white disabled:opacity-60"
-                >
-                  {authLoading ? "Signing in…" : "Sign in"}
-                </button>
-              </form>
-            </div>
+            <StaffLoginCard
+              title="Team login"
+              subtitle="Owner / Ops manage bookings and email settings. Other roles go to their portal after sign-in."
+            />
+          ) : !canAccessAdmin(role) ? (
+            <p className="py-16 text-center text-sm text-zinc-400">
+              Redirecting to your portal…
+            </p>
           ) : (
             <>
               <div className="mb-6 flex flex-wrap items-center justify-between gap-3 border-b border-zinc-800 pb-6">
@@ -143,8 +110,15 @@ function AdminDashboardInner() {
                   <p className="mt-1 text-sm text-zinc-400">
                     Signed in as{" "}
                     <strong className="text-white">{email}</strong>
+                    {role ? ` · ${ROLE_LABELS[role]}` : ""}
                   </p>
                   <div className="mt-3 flex flex-wrap items-center gap-2">
+                    <Link
+                      href="/ops"
+                      className="flex items-center gap-1.5 rounded-xl border border-zinc-800 bg-[#1C1C1E] px-3.5 py-1.5 text-xs font-bold text-zinc-300 transition hover:border-[#075473] hover:text-white"
+                    >
+                      <span>Ops board</span>
+                    </Link>
                     <Link
                       href="/team-access"
                       className="flex items-center gap-1.5 rounded-xl border border-zinc-800 bg-[#1C1C1E] px-3.5 py-1.5 text-xs font-bold text-zinc-300 transition hover:border-[#075473] hover:text-white"

@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Add to Apple Wallet badge (US-UK RGB).
+  Source filename: US-UK_Add_to_Apple_Wallet_RGB_101421.svg
+  Artwork © Apple Inc.  use only per Apple Wallet Marketing Artwork License /
+  https://developer.apple.com/wallet/add-to-apple-wallet-guidelines/
+  Replace this file with Apples official download when available from your Developer account.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 150 46" role="img" aria-label="Add to Apple Wallet">
+  <title>Add to Apple Wallet</title>
+  <rect width="150" height="46" rx="6" ry="6" fill="#000000"/>
+  <!-- Wallet glyph -->
+  <g transform="translate(10,8)">
+    <rect x="0.5" y="4" width="24" height="18" rx="2.5" fill="#DEDBCE"/>
+    <path fill="#40A5D9" d="M2.2 6.2h20.6c.6 0 1.1.5 1.1 1.1v2.4H1.1V7.3c0-.6.5-1.1 1.1-1.1z"/>
+    <path fill="#FFB003" fill-rule="evenodd" d="M3.4 9.8h18.2c.5 0 .9.4.9.9v2.2H2.5v-2.2c0-.5.4-.9.9-.9z"/>
+    <path fill="#40C740" fill-rule="evenodd" d="M4.6 13.2h15.8c.4 0 .8.4.8.8v2.1H3.8v-2.1c0-.4.4-.8.8-.8z"/>
+    <path fill="#F26D5F" fill-rule="evenodd" d="M5.8 16.5h13.4c.4 0 .7.3.7.7v1.6c0 .9-.7 1.6-1.6 1.6H6.7c-.9 0-1.6-.7-1.6-1.6v-1.6c0-.4.3-.7.7-.7z"/>
+    <rect x="0.5" y="4" width="24" height="18" rx="2.5" fill="none" stroke="#A6A6A6" stroke-width="0.6"/>
+  </g>
+  <!-- Typography (SF-style system stack approximation) -->
+  <g fill="#FFFFFF" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', Helvetica, Arial, sans-serif">
+    <text x="42" y="18" font-size="9.5" font-weight="400">Add to</text>
+    <text x="42" y="34" font-size="13.5" font-weight="600">ÿ&#xA0;Wallet</text>
+  </g>
+</svg>

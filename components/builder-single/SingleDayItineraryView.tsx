@@ -25,6 +25,7 @@ import {
 import { useBuilderStore } from "@/store/useBuilderStore";
 import { useItineraryStore } from "@/store/useItineraryStore";
 import { JapanBookingPass } from "@/components/dossier/JapanBookingPass";
+import { useConciergeAgentName } from "@/lib/useConciergeAgentName";
 import {
   buildDossierQrUrl,
   buildSingleDayHighlights,
@@ -142,6 +143,7 @@ export function SingleDayItineraryView() {
     confirmedBookingRef,
     bookingStatus,
   });
+  const conciergeAgentName = useConciergeAgentName(pnrCode);
   const passDate = dateLabel === "Date TBD" ? "" : dateLabel.toUpperCase();
   const pickup = startTime || "09:00";
   const highlights = buildSingleDayHighlights({
@@ -176,6 +178,7 @@ export function SingleDayItineraryView() {
         endDateText={passDate}
         status={mapBookingStatusToPass(bookingStatus)}
         qrValue={buildDossierQrUrl(pnrCode, "/builder-single/itinerary")}
+        conciergeAgentName={conciergeAgentName}
       />
 
       <SingleDayTimelineInfographic

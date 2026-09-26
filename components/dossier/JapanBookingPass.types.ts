@@ -39,6 +39,8 @@ export interface BookingPassProps {
   routeBreakdown?: RouteBreakdownItem[];
 
   status?: BookingPassStatus;
+  /** Concierge agent name for direct bookings (shown near PNR). */
+  conciergeAgentName?: string | null;
   qrValue?: string;
   actions?: ReactNode;
   onDownloadWalletPass?: () => void;

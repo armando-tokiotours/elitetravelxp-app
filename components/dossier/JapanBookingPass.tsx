@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
-import { Apple, Loader2, RotateCcw } from "lucide-react";
+import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
+import { Loader2, RotateCcw } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import {
   downloadAppleWalletPass,
@@ -34,6 +35,7 @@ export function JapanBookingPass({
   endTime = "15:00",
   singleDayHighlights,
   status = "IN_PROGRESS",
+  conciergeAgentName,
   qrValue,
   actions,
   onDownloadWalletPass,
@@ -42,7 +44,14 @@ export function JapanBookingPass({
 }: BookingPassProps) {
   const [walletBusy, setWalletBusy] = useState(false);
   const [walletMsg, setWalletMsg] = useState<string | null>(null);
+  const [showDraftModal, setShowDraftModal] = useState(false);
+  const [portalReady, setPortalReady] = useState(false);
   const isSingle = tripType === "single";
+  const isConfirmed = String(status || "").toUpperCase() === "CONFIRMED";
+
+  useEffect(() => {
+    setPortalReady(true);
+  }, []);
 
   const resolvedQr =
     qrValue ||
@@ -54,7 +63,7 @@ export function JapanBookingPass({
     .split(/\s+/)
     .filter(Boolean);
 
-  const handleAppleWallet = () => {
+  const runConfirmedWalletDownload = () => {
     if (onDownloadWalletPass) {
       onDownloadWalletPass();
       return;
@@ -94,16 +103,76 @@ export function JapanBookingPass({
     }
   };
 
-  const handleGoogleWallet = () => {
-    setWalletMsg(null);
-    // Same manual file until Google Wallet save URL is configured
-    window.location.href = `/api/wallet/pass-file?pnr=${encodeURIComponent(pnrCode)}&format=pdf`;
+  const handleAppleWalletClick = () => {
+    // Draft / in-progress: show notice — active Wallet pass requires CONFIRMED.
+    if (!isConfirmed) {
+      setShowDraftModal(true);
+      return;
+    }
+    runConfirmedWalletDownload();
   };
 
   const leftCode = isSingle ? startTime || "09:00" : originCode;
   const leftLabel = isSingle ? "START / PICKUP" : originLabel;
   const rightCode = isSingle ? endTime || "15:00" : destinationCode;
   const rightLabel = isSingle ? "FINISH / DROP-OFF" : destinationLabel;
+
+  const draftModal =
+    showDraftModal && portalReady
+      ? createPortal(
+          <div
+            className="fixed inset-0 z-[80] flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="wallet-draft-title"
+            onClick={() => setShowDraftModal(false)}
+          >
+            <div
+              className="relative max-w-sm rounded-2xl border border-amber-500/30 bg-[#0A1017] p-6 text-center shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full border border-amber-500/20 bg-amber-500/10 text-xl text-amber-400">
+                🎫
+              </div>
+
+              <h3
+                id="wallet-draft-title"
+                className="font-godiva text-base font-bold tracking-wider text-white uppercase"
+              >
+                Pass Pending Confirmation
+              </h3>
+
+              <p className="mt-2 text-xs leading-relaxed text-zinc-300">
+                Your booking reference{" "}
+                <span className="font-mono font-bold text-cyan-400">
+                  {pnrCode}
+                </span>{" "}
+                is currently in{" "}
+                <span className="font-bold text-amber-400">
+                  {String(status || "DRAFT").toUpperCase()}
+                </span>{" "}
+                status.
+              </p>
+
+              <p className="mt-2 rounded-xl border border-white/5 bg-zinc-900/60 p-3 text-[11px] leading-relaxed text-zinc-400">
+                To activate your official Apple Wallet pass, your itinerary
+                request must be reviewed and changed to{" "}
+                <span className="font-bold text-emerald-400">CONFIRMED</span>{" "}
+                status by our concierge team.
+              </p>
+
+              <button
+                type="button"
+                onClick={() => setShowDraftModal(false)}
+                className="mt-5 w-full rounded-xl bg-cyan-700 py-2.5 text-xs font-bold tracking-wider text-white uppercase shadow-lg transition-all hover:bg-cyan-600 active:scale-95"
+              >
+                Understood
+              </button>
+            </div>
+          </div>,
+          document.body
+        )
+      : null;
 
   const ticket = (
     <div className="relative w-full overflow-hidden rounded-2xl border border-white/10 bg-[#0A1017]/90 text-white shadow-2xl">
@@ -141,9 +210,7 @@ export function JapanBookingPass({
             <div>
               <span
                 className={`font-black font-mono tracking-wider text-white ${
-                  isSingle
-                    ? "text-xl md:text-2xl"
-                    : "text-2xl md:text-3xl"
+                  isSingle ? "text-xl md:text-2xl" : "text-2xl md:text-3xl"
                 }`}
               >
                 {leftCode}
@@ -177,9 +244,7 @@ export function JapanBookingPass({
             <div className="text-right">
               <span
                 className={`font-black font-mono tracking-wider text-white ${
-                  isSingle
-                    ? "text-xl md:text-2xl"
-                    : "text-2xl md:text-3xl"
+                  isSingle ? "text-xl md:text-2xl" : "text-2xl md:text-3xl"
                 }`}
               >
                 {rightCode}
@@ -287,6 +352,14 @@ export function JapanBookingPass({
             <span className="block font-mono text-lg font-bold tracking-wider text-[#F6A724]">
               {pnrCode}
             </span>
+            {conciergeAgentName ? (
+              <p className="mt-1.5 text-[10px] leading-snug text-zinc-400">
+                Your concierge:{" "}
+                <span className="font-semibold text-cyan-300">
+                  {conciergeAgentName}
+                </span>
+              </p>
+            ) : null}
           </div>
 
           <div className="rounded-xl border border-white/20 bg-white p-2.5 shadow-lg">
@@ -300,36 +373,27 @@ export function JapanBookingPass({
             />
           </div>
 
-          <div className="flex w-full flex-col gap-2">
+          <div className="flex w-full flex-col items-center justify-center gap-2 pt-1">
             <button
               type="button"
-              onClick={handleAppleWallet}
+              onClick={handleAppleWalletClick}
               disabled={walletBusy}
-              className="flex w-full items-center justify-center gap-1.5 rounded-xl border border-zinc-700 bg-black px-3 py-2.5 text-[10px] font-bold tracking-wider text-white uppercase shadow-md transition-all hover:bg-zinc-900 active:scale-95 disabled:opacity-60"
+              className="transition-opacity hover:opacity-90 focus:outline-none active:scale-95 disabled:opacity-60"
+              aria-label="Add to Apple Wallet"
             >
               {walletBusy ? (
-                <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" />
+                <span className="inline-flex h-10 items-center gap-2 rounded-md bg-black px-4 text-[10px] font-bold tracking-wider text-white uppercase">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  Preparing…
+                </span>
               ) : (
-                <Apple className="h-3.5 w-3.5 shrink-0 text-white" />
-              )}
-              <span>Download Japan Pass</span>
-            </button>
-            <button
-              type="button"
-              onClick={handleGoogleWallet}
-              className="flex w-full items-center justify-center gap-1.5 rounded-xl border border-[#4285F4]/40 bg-[#1A73E8] px-3 py-2.5 text-[10px] font-bold tracking-wider text-white uppercase shadow-md transition-all hover:bg-[#1967D2] active:scale-95"
-            >
-              <svg
-                viewBox="0 0 24 24"
-                className="h-3.5 w-3.5 shrink-0"
-                aria-hidden
-              >
-                <path
-                  fill="currentColor"
-                  d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14.5v-9l7 4.5-7 4.5z"
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src="/brand/add-to-apple-wallet.svg"
+                  alt="Add to Apple Wallet"
+                  className="h-10 w-auto object-contain"
                 />
-              </svg>
-              <span>Download for Google</span>
+              )}
             </button>
           </div>
 
@@ -339,12 +403,14 @@ export function JapanBookingPass({
             </p>
           ) : (
             <p className="text-[9px] leading-snug text-zinc-500">
-              Saves a PDF pass file you can keep or share. Apple Wallet install
-              needs signing certificates on the server.
+              {isConfirmed
+                ? "Add this pass to Apple Wallet on your iPhone."
+                : "Wallet pass activates after concierge marks this booking Confirmed."}
             </p>
           )}
         </div>
       </div>
+      {draftModal}
     </div>
   );
 

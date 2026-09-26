@@ -12,7 +12,6 @@ const LINKS = [
   { href: "/builder", label: "Trip Builder" },
   { href: "/discover", label: "Discover Experiences" },
   { href: "/builder/itinerary", label: "My Saved Itineraries" },
-  { href: "/admin", label: "Team Access / Admin" },
 ] as const;
 
 export function AppShell({
@@ -235,11 +234,7 @@ export function AppShell({
               const active =
                 link.href === "/builder"
                   ? pathname === "/builder"
-                  : link.href === "/admin"
-                    ? pathname === "/admin" ||
-                      pathname.startsWith("/admin/") ||
-                      pathname.startsWith("/team-access")
-                    : pathname.startsWith(link.href);
+                  : pathname.startsWith(link.href);
               return (
                 <Link
                   key={link.href}
