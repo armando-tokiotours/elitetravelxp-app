@@ -15,7 +15,7 @@ export const BRAND_DIFFERENCE_TITLE = "The TOKIOTOURS Difference";
 
 export const BRAND_EMAIL_FROM = "no_reply@tokiotours.com";
 
-export const BRAND_MAIL_FROM = `TOKIOTOURS <${BRAND_EMAIL_FROM}>`;
+export const BRAND_MAIL_FROM = `Tokiotours Concierge <${BRAND_EMAIL_FROM}>`;
 
 export const BRAND_CONSULTANT = "TOKIOTOURS consultant";
 

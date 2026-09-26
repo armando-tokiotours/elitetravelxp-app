@@ -7,6 +7,14 @@ import {
   resolveTeamBcc,
   resolveTeamMailFrom,
 } from "@/lib/emailConfigStore";
+import {
+  mailRelayConfigured,
+  sendViaBluehostRelay,
+} from "@/lib/mailRelay";
+import {
+  bluehostWebmailConfigured,
+  sendViaBluehostWebmail,
+} from "@/lib/bluehostWebmail";
 import { createSmtpTransport } from "@/lib/smtpTransport";
 
 interface SendItineraryParams {
@@ -47,9 +55,14 @@ export function resolveSmtpConfigured(): boolean {
   return Boolean(host && user && pass);
 }
 
-/** Mail is ready if SMTP or Resend is configured. */
+/** Mail is ready if Bluehost webmail, PHP relay, SMTP, or Resend is configured. */
 export function resolveMailConfigured(): boolean {
-  return resolveSmtpConfigured() || Boolean(resolveResendApiKey());
+  return (
+    bluehostWebmailConfigured() ||
+    mailRelayConfigured() ||
+    resolveSmtpConfigured() ||
+    Boolean(resolveResendApiKey())
+  );
 }
 
 export class MailDispatchError extends Error {
@@ -89,10 +102,12 @@ async function sendViaSmtp({
   });
 
   const bcc = resolveTeamBcc(to, cfg);
+  const brandFrom = "Tokiotours Concierge <no_reply@tokiotours.com>";
   const info = await transporter.sendMail({
-    from: resolveTeamMailFrom(cfg),
+    from: brandFrom,
     to: [to],
     ...(bcc.length ? { bcc } : {}),
+    replyTo: "armando@tokiotours.nl",
     subject: resolveSubjectLine(
       cfg,
       bookingRef,
@@ -107,6 +122,10 @@ async function sendViaSmtp({
       adults: adults ?? 2,
       children: children ?? 0,
     }),
+    envelope: {
+      from: "no_reply@tokiotours.com",
+      to: [to, ...bcc],
+    },
     attachments:
       pdfBuffer && pdfBuffer.length > 0
         ? [
@@ -193,8 +212,9 @@ async function sendViaResend({
 }
 
 /**
- * Transactional itinerary email — prefers Bluehost cPanel SMTP from the
- * JSON/team config store, otherwise Resend. Always BCC team alert.
+ * Transactional itinerary email.
+ * Prefer Bluehost Roundcube webmail (external delivery as no_reply@tokiotours.com),
+ * then PHP relay / Resend / SMTP.
  */
 export async function sendItineraryEmail(
   params: SendItineraryParams
@@ -202,24 +222,100 @@ export async function sendItineraryEmail(
   // Touch facade so hot-reloaded JSON is always current
   void TEAM_EMAIL_CONFIG.smtp;
 
-  if (resolveSmtpConfigured()) {
+  const cfg = getActiveEmailConfig();
+  const from = "Tokiotours Concierge <no_reply@tokiotours.com>";
+  const bcc = resolveTeamBcc(params.to, cfg);
+  const subject = resolveSubjectLine(
+    cfg,
+    params.bookingRef,
+    params.customerName || "Valued Guest"
+  );
+  const html = buildProposalHtml(cfg, {
+    fullName: params.customerName || "Valued Guest",
+    bookingRef: params.bookingRef,
+    customerEmail: params.to,
+    tourType: params.tourType ?? "multi_day",
+    tourDate: params.tourDate ?? null,
+    adults: params.adults ?? 2,
+    children: params.children ?? 0,
+  });
+  const attachments =
+    params.pdfBuffer && params.pdfBuffer.length > 0
+      ? [
+          {
+            filename: `Japan-Itinerary-${params.bookingRef || "draft"}.pdf`,
+            content: params.pdfBuffer,
+            contentType: "application/pdf",
+          },
+        ]
+      : undefined;
+
+  if (bluehostWebmailConfigured()) {
     try {
-      return await sendViaSmtp(params);
-    } catch (smtpErr) {
-      console.error("[email] Bluehost SMTP failed, trying Resend…", smtpErr);
-      if (resolveResendApiKey()) {
-        return await sendViaResend(params);
-      }
-      throw smtpErr instanceof MailDispatchError
-        ? smtpErr
-        : new MailDispatchError(
-            smtpErr instanceof Error
-              ? smtpErr.message
-              : "Failed to dispatch email via Bluehost SMTP",
-            500
-          );
+      await sendViaBluehostWebmail({
+        to: params.to,
+        subject,
+        text: `Your Japan itinerary ${params.bookingRef}`,
+        html,
+        from,
+        replyTo: "armando@tokiotours.nl",
+        bcc,
+        attachments,
+      });
+      return {};
+    } catch (webmailErr) {
+      console.error(
+        "[email] Bluehost webmail failed, trying next…",
+        webmailErr
+      );
     }
   }
 
-  return sendViaResend(params);
+  if (mailRelayConfigured()) {
+    try {
+      const relay = await sendViaBluehostRelay({
+        to: params.to,
+        subject,
+        text: `Your Japan itinerary ${params.bookingRef}`,
+        html,
+        from,
+        replyTo: "armando@tokiotours.nl",
+        bcc,
+        attachments,
+      });
+      return { id: relay.id };
+    } catch (relayErr) {
+      console.error(
+        "[email] Bluehost PHP relay failed, trying next…",
+        relayErr
+      );
+    }
+  }
+
+  if (resolveResendApiKey()) {
+    try {
+      return await sendViaResend(params);
+    } catch (resendErr) {
+      console.error("[email] Resend failed, trying SMTP…", resendErr);
+      if (!resolveSmtpConfigured()) {
+        throw resendErr instanceof MailDispatchError
+          ? resendErr
+          : new MailDispatchError(
+              resendErr instanceof Error
+                ? resendErr.message
+                : "Failed to dispatch email via Resend",
+              500
+            );
+      }
+    }
+  }
+
+  if (resolveSmtpConfigured()) {
+    return await sendViaSmtp(params);
+  }
+
+  throw new MailDispatchError(
+    "Mail not configured. Set MAIL_RELAY_URL + MAIL_RELAY_SECRET, RESEND_API_KEY, or SMTP_*.",
+    401
+  );
 }

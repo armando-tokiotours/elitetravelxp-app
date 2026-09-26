@@ -1,4 +1,4 @@
-# VPS stack for Hostinger — sits behind host Nginx (ports 80/443 already used).
+# VPS stack — sits behind host Nginx (ports 80/443 already used).
 # Web :3200 · PocketBase :8091
 services:
   web:

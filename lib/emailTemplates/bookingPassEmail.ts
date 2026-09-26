@@ -142,7 +142,7 @@ export function generateBookingEmailHtml(
     resolveCtaUrl(origin, pnrCode, guestEmail, data.ctaUrl)
   );
   const walletUrl = escapeHtml(
-    `${origin}/api/wallet/apple/generate?pnr=${encodeURIComponent(pnrCode)}`
+    `${origin}/api/wallet/pass-file?pnr=${encodeURIComponent(pnrCode)}`
   );
   const heroUrl = escapeHtml(`${origin}/brand/email-1.jpg`);
   const footerUrl = escapeHtml(`${origin}/brand/email-2.png`);
@@ -208,7 +208,7 @@ export function generateBookingEmailHtml(
                     ? `<tr>
                   <td align="center" style="padding:6px 0 0;">
                     <a href="${walletUrl}" style="background-color:#000000;color:#ffffff;border:1px solid #475569;padding:10px 20px;text-decoration:none;font-weight:bold;font-size:12px;border-radius:10px;display:inline-block;">
-                      &#63743; SAVE TO APPLE WALLET
+                      DOWNLOAD JAPAN PASS
                     </a>
                   </td>
                 </tr>`

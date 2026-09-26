@@ -62,7 +62,6 @@ export function JapanBookingPass({
     setWalletBusy(true);
     setWalletMsg(null);
     try {
-      // CriOS → pass-preview; Safari/desktop → direct .pkpass navigation
       downloadAppleWalletPass({
         pnrCode,
         guestName: nameParts.join(" "),
@@ -84,24 +83,21 @@ export function JapanBookingPass({
         status,
         qrValue: resolvedQr,
       });
+      setWalletMsg("Downloading your Japan Pass file…");
     } catch (err) {
       setWalletBusy(false);
       if (err instanceof WalletPassFallbackError) {
         window.location.assign(err.previewUrl);
-        setWalletMsg(
-          err.reason === "chrome_ios"
-            ? "Chrome on iPhone can’t add Apple Wallet passes — copy the link and open it in Safari."
-            : "Opened pass preview."
-        );
         return;
       }
-      window.location.href = `/api/wallet/apple/generate?pnr=${encodeURIComponent(pnrCode)}`;
+      window.location.href = `/api/wallet/pass-file?pnr=${encodeURIComponent(pnrCode)}`;
     }
   };
 
   const handleGoogleWallet = () => {
     setWalletMsg(null);
-    window.location.href = `/api/wallet/google/generate?pnr=${encodeURIComponent(pnrCode)}`;
+    // Same manual file until Google Wallet save URL is configured
+    window.location.href = `/api/wallet/pass-file?pnr=${encodeURIComponent(pnrCode)}&format=pdf`;
   };
 
   const leftCode = isSingle ? startTime || "09:00" : originCode;
@@ -316,7 +312,7 @@ export function JapanBookingPass({
               ) : (
                 <Apple className="h-3.5 w-3.5 shrink-0 text-white" />
               )}
-              <span>Add to Apple Wallet</span>
+              <span>Download Japan Pass</span>
             </button>
             <button
               type="button"
@@ -333,7 +329,7 @@ export function JapanBookingPass({
                   d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14.5v-9l7 4.5-7 4.5z"
                 />
               </svg>
-              <span>Add to Google Wallet</span>
+              <span>Download for Google</span>
             </button>
           </div>
 
@@ -341,7 +337,12 @@ export function JapanBookingPass({
             <p className="text-[9px] leading-snug text-zinc-400" role="status">
               {walletMsg}
             </p>
-          ) : null}
+          ) : (
+            <p className="text-[9px] leading-snug text-zinc-500">
+              Saves a PDF pass file you can keep or share. Apple Wallet install
+              needs signing certificates on the server.
+            </p>
+          )}
         </div>
       </div>
     </div>

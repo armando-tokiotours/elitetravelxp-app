@@ -172,6 +172,12 @@ function PassPreviewInner() {
         )}
 
         <div className="flex flex-wrap justify-center gap-2">
+          <a
+            href={`/api/wallet/pass-file?pnr=${encodeURIComponent(pnrParam)}`}
+            className="rounded-xl bg-black px-4 py-2.5 text-[11px] font-bold tracking-wider text-white uppercase border border-zinc-600"
+          >
+            Download Japan Pass PDF
+          </a>
           <Link
             href={`/builder/itinerary?ref=${encodeURIComponent(pnrParam)}&view=dossier`}
             className="rounded-xl bg-[#075473] px-4 py-2.5 text-[11px] font-bold tracking-wider text-white uppercase"

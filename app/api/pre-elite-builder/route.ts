@@ -7,12 +7,11 @@ import {
   parseItineraryData,
   type PreEliteDraft,
 } from "@/lib/preEliteBuilder";
-import { sendDraftBoardingPassEmails } from "@/lib/preEliteBoardingPassEmail";
 
 /**
  * Saves a pre-elite qualification lead to PocketBase `bookings`.
- * Does not read or write the trip builder's booking_requests collection.
- * After draft save, dispatches boarding-pass emails to guest + concierge.
+ * Does not send email — guest must click "Save & Email" on /pre-build
+ * (avoids duplicate boarding-pass mails when reopening via Manage).
  */
 export async function POST(request: Request) {
   try {
@@ -32,7 +31,10 @@ export async function POST(request: Request) {
       whatsapp: String(body?.whatsapp || ""),
       timing: normalizeTiming(
         tripType === "single_day"
-          ? { ...normalizeTiming(body?.timing ?? body?.dates ?? null), totalDays: 1 }
+          ? {
+              ...normalizeTiming(body?.timing ?? body?.dates ?? null),
+              totalDays: 1,
+            }
           : body?.timing ?? body?.dates ?? null
       ),
       adults: Number(body?.adults),
@@ -77,17 +79,6 @@ export async function POST(request: Request) {
       itinerary_data: payload.itineraryData,
     });
 
-    const mail = await sendDraftBoardingPassEmails({
-      bookingRef: payload.bookingRef,
-      fullName: payload.fullName,
-      email: payload.email,
-      itineraryData: itinerary,
-    });
-
-    if (mail.errors.length) {
-      console.warn("[pre-elite-builder] boarding-pass mail:", mail.errors);
-    }
-
     return NextResponse.json({
       ok: true,
       id: record.id,
@@ -97,9 +88,9 @@ export async function POST(request: Request) {
       status: payload.status,
       itineraryData: payload.itineraryData,
       mail: {
-        guestSent: mail.guestSent,
-        teamSent: mail.teamSent,
-        errors: mail.errors,
+        guestSent: false,
+        teamSent: false,
+        errors: [],
       },
     });
   } catch (err) {

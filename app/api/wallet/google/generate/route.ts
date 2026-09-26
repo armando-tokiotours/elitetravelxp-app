@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { publicAbsoluteUrl } from "@/lib/publicSiteOrigin";
 
 export const runtime = "nodejs";
 
@@ -21,7 +22,10 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: "pnr is required." }, { status: 400 });
   }
 
-  const previewUrl = `${url.origin}/pass-preview/${encodeURIComponent(pnr)}?wallet=google`;
+  const previewUrl = publicAbsoluteUrl(
+    `/pass-preview/${encodeURIComponent(pnr)}?wallet=google`,
+    req
+  );
 
   const saveUrl = process.env.GOOGLE_WALLET_SAVE_URL?.trim();
   if (saveUrl) {

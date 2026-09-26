@@ -3,6 +3,10 @@
  * Stores PNR + email + ID snapshots — never full catalog blobs.
  */
 
+import {
+  formatCitiesList,
+  formatDurationLabel,
+} from "@/lib/bookingLeadAudit";
 import { getAdminPocketBase } from "@/lib/pocketbase/admin";
 import type { BuilderState } from "@/store/useBuilderStore";
 import type { SingleDayBuilderState } from "@/store/useSingleDayBuilderStore";
@@ -69,8 +73,15 @@ export interface BookingsAndLeadsUpsertInput {
   tourDate?: string | null;
   guests: BookingLeadGuests;
   durationValue?: number;
+  /** Explicit display label; auto-derived when omitted. */
+  durationLabel?: string;
+  /** "Tokyo, Kyoto, Hakone" — derived from cities when omitted. */
+  citiesList?: string;
+  cityNames?: string[];
   selections: BookingLeadSelections;
   dossierPdfUrl?: string | null;
+  /** When true, also bumps email_sent_count + email timestamps. */
+  recordEmailSent?: boolean;
 }
 
 export interface BookingsAndLeadsRecord {
@@ -83,8 +94,15 @@ export interface BookingsAndLeadsRecord {
   tour_date?: string;
   guests: BookingLeadGuests;
   duration_value?: number;
+  duration_label?: string;
+  cities_list?: string;
   selections: BookingLeadSelections;
   dossier_pdf_url?: string;
+  first_email_sent_at?: string;
+  last_email_sent_at?: string;
+  email_sent_count?: number;
+  save_version?: number;
+  last_saved_at?: string;
   created?: string;
   updated?: string;
 }
@@ -253,20 +271,33 @@ export async function upsertBookingsAndLeads(
 
   const tourDateRaw = input.tourDate ? String(input.tourDate).slice(0, 10) : "";
   const requestedStatus: BookingLeadStatus = input.status || "lead";
+  const nowIso = new Date().toISOString();
+  const durationNum =
+    input.durationValue != null && Number.isFinite(input.durationValue)
+      ? Number(input.durationValue)
+      : 0;
+  const primaryCity =
+    String(input.primaryCity || "").trim() || "Tokyo";
+  const citiesList =
+    String(input.citiesList || "").trim() ||
+    formatCitiesList(primaryCity, input.cityNames);
+  const durationLabel =
+    String(input.durationLabel || "").trim() ||
+    formatDurationLabel(input.type, durationNum);
 
   const fields: Record<string, unknown> = {
     booking_ref: bookingRef,
     email,
     type: input.type,
     status: requestedStatus,
-    primary_city: String(input.primaryCity || "").trim() || "Tokyo",
+    primary_city: primaryCity,
     guests,
-    duration_value:
-      input.durationValue != null && Number.isFinite(input.durationValue)
-        ? Number(input.durationValue)
-        : 0,
+    duration_value: durationNum,
+    duration_label: durationLabel,
+    cities_list: citiesList,
     selections: selectionsPayload,
     dossier_pdf_url: String(input.dossierPdfUrl || "").trim(),
+    last_saved_at: nowIso,
   };
   // Omit empty tour_date — PB date fields reject ""
   if (tourDateRaw) fields.tour_date = tourDateRaw;
@@ -281,8 +312,14 @@ export async function upsertBookingsAndLeads(
 
   try {
     const pb = await getAdminPocketBase();
-    let existing: { id: string; email?: string; status?: string } | null =
-      null;
+    let existing: {
+      id: string;
+      email?: string;
+      status?: string;
+      save_version?: number;
+      email_sent_count?: number;
+      first_email_sent_at?: string;
+    } | null = null;
     try {
       // Prefer exact PNR + email; fall back to PNR-only (unique index).
       existing = await pb
@@ -314,26 +351,139 @@ export async function upsertBookingsAndLeads(
         nextStatus = String(existing.status);
       }
 
+      const prevVersion = Number(existing.save_version) || 0;
+      const patch: Record<string, unknown> = {
+        ...fields,
+        email: email || existing.email,
+        status: nextStatus,
+        save_version: prevVersion + 1,
+      };
+
+      if (input.recordEmailSent) {
+        const prevCount = Number(existing.email_sent_count) || 0;
+        patch.email_sent_count = prevCount + 1;
+        patch.last_email_sent_at = nowIso;
+        if (!existing.first_email_sent_at) {
+          patch.first_email_sent_at = nowIso;
+        }
+      }
+
       const updated = await pb.collection("bookings_and_leads").update(
         existing.id,
-        {
-          ...fields,
-          email: email || existing.email,
-          status: nextStatus,
-        },
+        patch,
         { requestKey: null }
       );
       return { ok: true, id: updated.id, created: false };
     }
 
+    const createFields: Record<string, unknown> = {
+      ...fields,
+      save_version: 1,
+      email_sent_count: input.recordEmailSent ? 1 : 0,
+    };
+    if (input.recordEmailSent) {
+      createFields.first_email_sent_at = nowIso;
+      createFields.last_email_sent_at = nowIso;
+    }
+
     const created = await pb
       .collection("bookings_and_leads")
-      .create(fields, { requestKey: null });
+      .create(createFields, { requestKey: null });
     return { ok: true, id: created.id, created: true };
   } catch (err) {
     const message =
       err instanceof Error ? err.message : "bookings_and_leads upsert failed";
     console.warn("[bookings_and_leads]", message);
+    return { ok: false, error: message };
+  }
+}
+
+/**
+ * Bump email audit counters for an existing PNR (Save & Email / resend).
+ * Creates a minimal lead row if the builder snapshot does not exist yet.
+ */
+export async function recordBookingLeadEmailSent(opts: {
+  bookingRef: string;
+  email: string;
+  type?: BookingLeadType;
+  fullName?: string;
+  itinerarySnippet?: Record<string, unknown>;
+}): Promise<{ ok: boolean; emailSentCount?: number; error?: string }> {
+  const bookingRef = safeRef(opts.bookingRef);
+  const email = safeEmail(opts.email);
+  if (!bookingRef || !email) {
+    return { ok: false, error: "booking_ref and email are required." };
+  }
+
+  const type: BookingLeadType =
+    opts.type === "single_day" ? "single_day" : "multi_day";
+  const nowIso = new Date().toISOString();
+
+  try {
+    const pb = await getAdminPocketBase();
+    let existing: {
+      id: string;
+      email_sent_count?: number;
+      first_email_sent_at?: string;
+      type?: string;
+    } | null = null;
+    try {
+      existing = await pb
+        .collection("bookings_and_leads")
+        .getFirstListItem(`booking_ref="${bookingRef}"`, {
+          requestKey: null,
+        });
+    } catch {
+      existing = null;
+    }
+
+    if (existing) {
+      const nextCount = (Number(existing.email_sent_count) || 0) + 1;
+      const patch: Record<string, unknown> = {
+        email_sent_count: nextCount,
+        last_email_sent_at: nowIso,
+      };
+      if (!existing.first_email_sent_at) {
+        patch.first_email_sent_at = nowIso;
+      }
+      await pb
+        .collection("bookings_and_leads")
+        .update(existing.id, patch, { requestKey: null });
+      return { ok: true, emailSentCount: nextCount };
+    }
+
+    const created = await pb.collection("bookings_and_leads").create(
+      {
+        booking_ref: bookingRef,
+        email,
+        type,
+        status: "lead",
+        primary_city: "Tokyo",
+        guests: { adults: 2, kids: 0 },
+        duration_value: type === "single_day" ? 6 : 1,
+        duration_label: formatDurationLabel(
+          type,
+          type === "single_day" ? 6 : 1
+        ),
+        cities_list: "Tokyo",
+        selections: opts.itinerarySnippet || { _v: 1, source: "pre_elite" },
+        save_version: 1,
+        email_sent_count: 1,
+        first_email_sent_at: nowIso,
+        last_email_sent_at: nowIso,
+        last_saved_at: nowIso,
+      },
+      { requestKey: null }
+    );
+    return {
+      ok: true,
+      emailSentCount: 1,
+      ...(created?.id ? {} : {}),
+    };
+  } catch (err) {
+    const message =
+      err instanceof Error ? err.message : "email audit update failed";
+    console.warn("[recordBookingLeadEmailSent]", message);
     return { ok: false, error: message };
   }
 }

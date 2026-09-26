@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Download, Loader2, RefreshCw, Search } from "lucide-react";
 import type PocketBase from "pocketbase";
 import {
@@ -13,6 +13,10 @@ import type {
   BookingLeadType,
 } from "@/lib/bookingsAndLeads";
 import {
+  formatAuditSentLabel,
+  formatDurationLabel,
+} from "@/lib/bookingLeadAudit";
+import {
   LOCAL_LEADS_STORAGE_KEYS,
   patchLocalLeadStatus,
 } from "@/lib/syncBookingLead";
@@ -23,12 +27,21 @@ type LeadRow = {
   id: string;
   booking_ref?: string;
   email?: string;
+  guest_name?: string;
   status?: string;
   type?: BookingLeadType | string;
   primary_city?: string;
   tour_date?: string;
+  end_date?: string;
   guests?: { adults?: number; kids?: number };
   duration_value?: number;
+  duration_label?: string;
+  cities_list?: string;
+  email_sent_count?: number;
+  save_version?: number;
+  first_email_sent_at?: string;
+  last_email_sent_at?: string;
+  last_saved_at?: string;
   quote_min?: number;
   quote_max?: number;
   selections?: Record<string, unknown>;
@@ -83,21 +96,6 @@ function statusBadgeClass(status: BookingStatus) {
   return "border-zinc-600/50 bg-zinc-800/80 text-zinc-400";
 }
 
-/** Relative timestamp for SUBMITTED column (e.g. "2 mins ago"). */
-function formatRelativeSubmitted(iso?: string): string {
-  if (!iso) return "—";
-  const t = Date.parse(iso);
-  if (!Number.isFinite(t)) return "—";
-  const mins = Math.max(0, Math.floor((Date.now() - t) / 60_000));
-  if (mins < 1) return "just now";
-  if (mins < 60) return `${mins} min${mins === 1 ? "" : "s"} ago`;
-  const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours} hour${hours === 1 ? "" : "s"} ago`;
-  const days = Math.floor(hours / 24);
-  if (days < 7) return `${days} day${days === 1 ? "" : "s"} ago`;
-  return new Date(t).toLocaleDateString();
-}
-
 function extractQuote(r: Record<string, unknown>): {
   quote_min?: number;
   quote_max?: number;
@@ -124,6 +122,111 @@ function formatQuote(row: LeadRow): string | null {
   if (min != null && min > 0) return `Est. ${formatUsd(min)}`;
   if (max != null && max > 0) return `Est. ${formatUsd(max)}`;
   return null;
+}
+
+/** Dates / Quote column — never put city names here. */
+function formatDatesQuote(row: LeadRow): { dates: string; quote: string | null } {
+  const start = row.tour_date ? String(row.tour_date).slice(0, 10) : "";
+  const end = row.end_date ? String(row.end_date).slice(0, 10) : "";
+  const sel =
+    row.selections && typeof row.selections === "object" ? row.selections : {};
+  const selEnd =
+    typeof sel.endDate === "string"
+      ? String(sel.endDate).slice(0, 10)
+      : typeof sel.departureDate === "string"
+        ? String(sel.departureDate).slice(0, 10)
+        : "";
+  const endResolved = end || selEnd;
+  let dates = "—";
+  if (start && endResolved && endResolved !== start) {
+    dates = `${start} - ${endResolved}`;
+  } else if (start) {
+    dates = start;
+  }
+  return { dates, quote: formatQuote(row) };
+}
+
+function resolveDuration(row: LeadRow): string {
+  if (row.duration_label?.trim()) return row.duration_label.trim();
+  return (
+    formatDurationLabel(row.type, row.duration_value) || "—"
+  );
+}
+
+function resolveCities(row: LeadRow): string {
+  if (row.cities_list?.trim()) return row.cities_list.trim();
+  if (row.primary_city?.trim()) return row.primary_city.trim();
+  const sel =
+    row.selections && typeof row.selections === "object" ? row.selections : {};
+  if (typeof sel.cityFocus === "string" && sel.cityFocus.trim()) {
+    return sel.cityFocus.trim();
+  }
+  return "—";
+}
+
+function resolveGuestName(row: LeadRow): string {
+  if (row.guest_name?.trim()) return row.guest_name.trim();
+  const sel =
+    row.selections && typeof row.selections === "object" ? row.selections : {};
+  const fromSel = String(
+    sel.guestName || sel.fullName || sel.contactName || ""
+  ).trim();
+  return fromSel || "—";
+}
+
+function formatAuditInfo(row: LeadRow): string {
+  const v = Number(row.save_version) || 0;
+  const sent = formatAuditSentLabel(
+    row.last_email_sent_at || row.first_email_sent_at
+  );
+  if (!v && sent === "—") return "—";
+  if (!v) return `Sent: ${sent}`;
+  return `v${v} | Sent: ${sent}`;
+}
+
+function csvEscape(value: unknown): string {
+  const s = String(value ?? "");
+  return `"${s.replace(/"/g, '""')}"`;
+}
+
+function exportBookingsToCSV(bookingsList: LeadRow[]) {
+  const headers =
+    "PNR,Guest Name,Email,Source,Dates,Duration,Cities,Version,First Email Sent,Last Saved\n";
+  const rows = bookingsList
+    .map((b) => {
+      const { dates } = formatDatesQuote(b);
+      const source =
+        b.type === "single_day"
+          ? "BUILDER S"
+          : b.type === "multi_day"
+            ? "BUILDER M"
+            : "";
+      return [
+        b.booking_ref || "",
+        resolveGuestName(b),
+        b.email || "",
+        source,
+        dates,
+        resolveDuration(b),
+        resolveCities(b),
+        `v${Number(b.save_version) || 0}`,
+        b.first_email_sent_at || "",
+        b.last_saved_at || b.updated || b.created || "",
+      ]
+        .map(csvEscape)
+        .join(",");
+    })
+    .join("\n");
+
+  const blob = new Blob([headers + rows], { type: "text/csv;charset=utf-8" });
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `Tokiotours_Bookings_Export_${new Date()
+    .toISOString()
+    .slice(0, 10)}.csv`;
+  a.click();
+  window.URL.revokeObjectURL(url);
 }
 
 function readLocalLeads(): LeadRow[] {
@@ -172,6 +275,24 @@ function readLocalLeads(): LeadRow[] {
               : typeof r.durationValue === "number"
                 ? r.durationValue
                 : undefined,
+          duration_label: String(r.duration_label || r.durationLabel || ""),
+          cities_list: String(r.cities_list || r.citiesList || ""),
+          guest_name: String(r.guest_name || r.guestName || r.full_name || ""),
+          email_sent_count:
+            typeof r.email_sent_count === "number"
+              ? r.email_sent_count
+              : undefined,
+          save_version:
+            typeof r.save_version === "number" ? r.save_version : undefined,
+          first_email_sent_at: r.first_email_sent_at
+            ? String(r.first_email_sent_at)
+            : undefined,
+          last_email_sent_at: r.last_email_sent_at
+            ? String(r.last_email_sent_at)
+            : undefined,
+          last_saved_at: r.last_saved_at
+            ? String(r.last_saved_at)
+            : undefined,
           ...q,
           selections:
             r.selections && typeof r.selections === "object"
@@ -234,6 +355,9 @@ export function BookingsManagementTable({
   const [pdfBusyId, setPdfBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
+  const [typeFilter, setTypeFilter] = useState<"all" | "multi_day" | "single_day">(
+    "all"
+  );
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -456,21 +580,25 @@ export function BookingsManagementTable({
   };
 
   const q = query.trim().toLowerCase();
-  const filtered = !q
-    ? rows
-    : rows.filter((r) =>
-        [
-          r.booking_ref,
-          r.email,
-          r.primary_city,
-          r.status,
-          r.type,
-          r.type === "single_day" ? "builder s" : "",
-          r.type === "multi_day" ? "builder m" : "",
-        ]
-          .filter(Boolean)
-          .some((v) => String(v).toLowerCase().includes(q))
-      );
+  const filtered = useMemo(() => {
+    return rows.filter((r) => {
+      if (typeFilter !== "all" && r.type !== typeFilter) return false;
+      if (!q) return true;
+      return [
+        r.booking_ref,
+        r.email,
+        r.guest_name,
+        r.primary_city,
+        r.cities_list,
+        r.status,
+        r.type,
+        r.type === "single_day" ? "builder s" : "",
+        r.type === "multi_day" ? "builder m" : "",
+      ]
+        .filter(Boolean)
+        .some((v) => String(v).toLowerCase().includes(q));
+    });
+  }, [rows, q, typeFilter]);
 
   return (
     <div className="space-y-4">
@@ -485,30 +613,54 @@ export function BookingsManagementTable({
             dossier PDF.
           </p>
         </div>
-        <button
-          type="button"
-          onClick={() => void load()}
-          disabled={loading}
-          className="inline-flex items-center gap-2 rounded-full border border-zinc-700 px-3 py-1.5 text-xs font-semibold text-zinc-300 transition hover:border-zinc-500 hover:text-white disabled:opacity-60"
-        >
-          {loading ? (
-            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-          ) : (
-            <RefreshCw className="h-3.5 w-3.5" />
-          )}
-          Refresh
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => exportBookingsToCSV(filtered)}
+            disabled={filtered.length === 0}
+            className="inline-flex items-center gap-2 rounded-full border border-cyan-500/40 bg-cyan-500/10 px-3 py-1.5 text-xs font-semibold text-cyan-300 transition hover:bg-cyan-500/20 disabled:opacity-60"
+          >
+            <Download className="h-3.5 w-3.5" />
+            Export CSV
+          </button>
+          <button
+            type="button"
+            onClick={() => void load()}
+            disabled={loading}
+            className="inline-flex items-center gap-2 rounded-full border border-zinc-700 px-3 py-1.5 text-xs font-semibold text-zinc-300 transition hover:border-zinc-500 hover:text-white disabled:opacity-60"
+          >
+            {loading ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <RefreshCw className="h-3.5 w-3.5" />
+            )}
+            Refresh
+          </button>
+        </div>
       </div>
 
-      <label className="relative block max-w-md">
-        <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-zinc-500" />
-        <input
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Filter by PNR, email, city, status…"
-          className="w-full rounded-xl border border-[#2C2C2E] bg-[#121212] py-2.5 pl-9 pr-3 text-sm text-white outline-none placeholder:text-zinc-600 focus:border-[#075473]"
-        />
-      </label>
+      <div className="flex flex-wrap items-center gap-3">
+        <label className="relative block min-w-[16rem] flex-1 max-w-md">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-zinc-500" />
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Filter by PNR, email, city, status…"
+            className="w-full rounded-xl border border-[#2C2C2E] bg-[#121212] py-2.5 pl-9 pr-3 text-sm text-white outline-none placeholder:text-zinc-600 focus:border-[#075473]"
+          />
+        </label>
+        <select
+          value={typeFilter}
+          onChange={(e) =>
+            setTypeFilter(e.target.value as "all" | "multi_day" | "single_day")
+          }
+          className="rounded-xl border border-[#2C2C2E] bg-[#121212] px-3 py-2.5 text-sm text-white outline-none focus:border-[#075473]"
+        >
+          <option value="all">All trip types</option>
+          <option value="multi_day">Builder M</option>
+          <option value="single_day">Builder S</option>
+        </select>
+      </div>
 
       {error ? (
         <p className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-200">
@@ -522,10 +674,12 @@ export function BookingsManagementTable({
             <tr>
               <th className="px-4 py-3 font-semibold">PNR</th>
               <th className="px-4 py-3 font-semibold">Guest / Email</th>
-              <th className="px-4 py-3 font-semibold">Status</th>
               <th className="px-4 py-3 font-semibold">Source</th>
               <th className="px-4 py-3 font-semibold">Dates / Quote</th>
-              <th className="px-4 py-3 font-semibold">Submitted</th>
+              <th className="px-4 py-3 font-semibold">Duration</th>
+              <th className="px-4 py-3 font-semibold">Cities</th>
+              <th className="px-4 py-3 font-semibold">Audit Info</th>
+              <th className="px-4 py-3 font-semibold">Status</th>
               <th className="px-4 py-3 font-semibold">Actions</th>
             </tr>
           </thead>
@@ -533,7 +687,7 @@ export function BookingsManagementTable({
             {loading && rows.length === 0 ? (
               <tr>
                 <td
-                  colSpan={7}
+                  colSpan={9}
                   className="px-4 py-10 text-center text-zinc-500"
                 >
                   <Loader2 className="mx-auto mb-2 h-5 w-5 animate-spin text-[#075473]" />
@@ -543,7 +697,7 @@ export function BookingsManagementTable({
             ) : filtered.length === 0 ? (
               <tr>
                 <td
-                  colSpan={7}
+                  colSpan={9}
                   className="px-4 py-10 text-center text-zinc-500"
                 >
                   No bookings or leads found.
@@ -554,10 +708,8 @@ export function BookingsManagementTable({
                 const status = normalizeBookingStatus(row.status);
                 const pnr = String(row.booking_ref || "—").toUpperCase();
                 const email = row.email || "No email";
-                const quoteLabel = formatQuote(row);
-                const dateLabel = row.tour_date
-                  ? String(row.tour_date).slice(0, 10)
-                  : null;
+                const guestName = resolveGuestName(row);
+                const { dates, quote } = formatDatesQuote(row);
                 const busyKey = row.id || String(row.booking_ref);
                 const saving = savingId === busyKey;
                 const pdfBusy = pdfBusyId === busyKey;
@@ -579,10 +731,27 @@ export function BookingsManagementTable({
                       ) : null}
                     </td>
                     <td className="px-4 py-3">
-                      <p className="text-white">{email}</p>
+                      <p className="text-white">{guestName}</p>
+                      <p className="text-xs text-zinc-400">{email}</p>
                       <p className="text-xs text-zinc-500">
                         {formatGuests(row.guests)}
                       </p>
+                    </td>
+                    <td className="px-4 py-3">{sourceBadge(row.type)}</td>
+                    <td className="px-4 py-3 text-xs text-zinc-400">
+                      <p>{dates}</p>
+                      {quote ? (
+                        <p className="mt-0.5 text-[#075473]">{quote}</p>
+                      ) : null}
+                    </td>
+                    <td className="px-4 py-3 text-xs text-zinc-300">
+                      {resolveDuration(row)}
+                    </td>
+                    <td className="px-4 py-3 text-xs text-zinc-300">
+                      {resolveCities(row)}
+                    </td>
+                    <td className="px-4 py-3 text-xs text-zinc-500">
+                      {formatAuditInfo(row)}
                     </td>
                     <td className="px-4 py-3">
                       <span
@@ -592,29 +761,6 @@ export function BookingsManagementTable({
                           ? "Confirmed ✓"
                           : bookingStatusLabel(status)}
                       </span>
-                    </td>
-                    <td className="px-4 py-3">{sourceBadge(row.type)}</td>
-                    <td className="px-4 py-3 text-xs text-zinc-400">
-                      {dateLabel ? (
-                        <p>
-                          {dateLabel}
-                          {row.duration_value
-                            ? ` · ${row.duration_value}${
-                                row.type === "single_day" ? "h" : "d"
-                              }`
-                            : ""}
-                        </p>
-                      ) : row.primary_city ? (
-                        <p>{row.primary_city}</p>
-                      ) : (
-                        <p>—</p>
-                      )}
-                      {quoteLabel ? (
-                        <p className="mt-0.5 text-[#075473]">{quoteLabel}</p>
-                      ) : null}
-                    </td>
-                    <td className="px-4 py-3 text-xs text-zinc-500">
-                      {formatRelativeSubmitted(row.created)}
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex flex-wrap items-center gap-2">

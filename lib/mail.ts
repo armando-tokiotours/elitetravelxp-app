@@ -4,7 +4,15 @@ import {
   resolveTeamBcc,
   resolveTeamMailFrom,
 } from "@/lib/emailConfigStore";
+import {
+  bluehostWebmailConfigured,
+  sendViaBluehostWebmail,
+} from "@/lib/bluehostWebmail";
 import { resolveResendApiKey } from "@/lib/email";
+import {
+  mailRelayConfigured,
+  sendViaBluehostRelay,
+} from "@/lib/mailRelay";
 import { createSmtpTransport } from "@/lib/smtpTransport";
 
 export type SendMailAttachment = {
@@ -67,8 +75,10 @@ async function sendViaSmtp(
     pass,
   });
 
+  const brandFrom = "Tokiotours Concierge <no_reply@tokiotours.com>";
+
   const info = await transporter.sendMail({
-    from,
+    from: brandFrom,
     to,
     ...(bcc.length ? { bcc } : {}),
     replyTo: "armando@tokiotours.nl",
@@ -76,7 +86,7 @@ async function sendViaSmtp(
     text: input.text,
     html: input.html,
     envelope: {
-      from: cfg.smtp.user,
+      from: "no_reply@tokiotours.com",
       to: [...to, ...bcc],
     },
     attachments: input.attachments?.map((a) => ({
@@ -93,7 +103,7 @@ async function sendViaSmtp(
     response: info.response,
     envelope: info.envelope,
     to,
-    from,
+    from: brandFrom,
   });
 
   if (Array.isArray(info.rejected) && info.rejected.length > 0) {
@@ -137,53 +147,97 @@ async function sendViaResend(
 }
 
 /**
- * Prefer Bluehost cPanel SMTP when configured; fall back to Resend.
- * (Resend alone fails when tokiotours.com is not verified on resend.com.)
+ * Outbound order:
+ * 1) Bluehost Roundcube webmail — delivers to Gmail as no_reply@tokiotours.com
+ * 2) Bluehost PHP relay (MAIL_RELAY_*) if uploaded to public_html
+ * 3) Resend — when API key + verified domain
+ * 4) Bluehost SMTP last — 250 OK but often never reaches external inboxes
  */
 export async function sendTransactionalMail(
   input: SendMailInput
 ): Promise<{ sent: boolean; reason?: string; id?: string; bcc?: string[] }> {
   const cfg = getActiveEmailConfig();
-  const from = resolveTeamMailFrom(cfg);
+  const from =
+    resolveTeamMailFrom(cfg).includes("@tokiotours.com")
+      ? resolveTeamMailFrom(cfg)
+      : "Tokiotours Concierge <no_reply@tokiotours.com>";
   const to = Array.isArray(input.to) ? input.to : [input.to];
   const bcc = resolveBccForRecipients(to, input.bcc, input.skipTeamBcc);
   const resendKey = resolveResendApiKey();
+  const errors: string[] = [];
+
+  if (bluehostWebmailConfigured()) {
+    try {
+      await sendViaBluehostWebmail({
+        to,
+        subject: input.subject,
+        text: input.text,
+        html: input.html,
+        from,
+        replyTo: "armando@tokiotours.nl",
+        bcc,
+        attachments: input.attachments,
+      });
+      return { sent: true, bcc };
+    } catch (webmailErr) {
+      const msg =
+        webmailErr instanceof Error ? webmailErr.message : String(webmailErr);
+      errors.push(`webmail: ${msg}`);
+      console.error("[mail] Bluehost webmail failed, trying next…", msg);
+    }
+  }
+
+  if (mailRelayConfigured()) {
+    try {
+      const relay = await sendViaBluehostRelay({
+        to,
+        subject: input.subject,
+        text: input.text,
+        html: input.html,
+        from,
+        replyTo: "armando@tokiotours.nl",
+        bcc,
+        attachments: input.attachments,
+      });
+      return { sent: true, id: relay.id, bcc };
+    } catch (relayErr) {
+      const msg =
+        relayErr instanceof Error ? relayErr.message : String(relayErr);
+      errors.push(`relay: ${msg}`);
+      console.error("[mail] Bluehost PHP relay failed, trying next…", msg);
+    }
+  }
+
+  if (resendKey) {
+    try {
+      return await sendViaResend(input, from, to, bcc, resendKey);
+    } catch (resendErr) {
+      const msg =
+        resendErr instanceof Error ? resendErr.message : String(resendErr);
+      errors.push(`resend: ${msg}`);
+      console.error("[mail] Resend failed, trying SMTP…", msg);
+    }
+  }
 
   if (smtpReady()) {
     try {
       return await sendViaSmtp(input, from, to, bcc);
     } catch (smtpErr) {
-      console.error(
-        "[mail] Bluehost SMTP failed, trying Resend…",
-        smtpErr instanceof Error ? smtpErr.message : smtpErr
-      );
-      if (resendKey) {
-        try {
-          return await sendViaResend(input, from, to, bcc, resendKey);
-        } catch (resendErr) {
-          const smtpMsg =
-            smtpErr instanceof Error ? smtpErr.message : String(smtpErr);
-          const resendMsg =
-            resendErr instanceof Error ? resendErr.message : String(resendErr);
-          throw new Error(
-            `SMTP failed (${smtpMsg}); Resend also failed (${resendMsg}).`
-          );
-        }
-      }
-      throw smtpErr instanceof Error
-        ? smtpErr
-        : new Error(String(smtpErr));
+      const msg =
+        smtpErr instanceof Error ? smtpErr.message : String(smtpErr);
+      errors.push(`smtp: ${msg}`);
+      throw new Error(`All mail paths failed (${errors.join("; ")})`);
     }
   }
 
-  if (resendKey) {
-    return await sendViaResend(input, from, to, bcc, resendKey);
+  if (errors.length) {
+    throw new Error(`All mail paths failed (${errors.join("; ")})`);
   }
 
   return {
     sent: false,
     reason:
-      "Mail not configured. Check Team Email Settings / SMTP_* env or RESEND_API_KEY.",
+      "Mail not configured. Set MAIL_RELAY_URL + MAIL_RELAY_SECRET (preferred), RESEND_API_KEY, or SMTP_*.",
   };
 }
 

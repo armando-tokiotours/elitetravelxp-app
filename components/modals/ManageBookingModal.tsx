@@ -74,6 +74,7 @@ function restorePreBuilderFromBrief(opts: {
   fullName: string;
   email: string;
   itineraryData: string;
+  emailSentCount?: number;
 }) {
   const parsed = parseItineraryData(opts.itineraryData);
   const payload: PreEliteBookingPayload = {
@@ -83,6 +84,21 @@ function restorePreBuilderFromBrief(opts: {
     status: "draft",
     itineraryData: opts.itineraryData,
   };
+
+  // Opening via Manage / email link → already saved + email was delivered.
+  try {
+    if (typeof window !== "undefined" && opts.bookingRef) {
+      window.localStorage.setItem(
+        `tokiotours:proposal-sent:${opts.bookingRef.trim().toUpperCase()}`,
+        JSON.stringify({
+          email: opts.email.trim().toLowerCase(),
+          sentAt: new Date().toISOString(),
+        })
+      );
+    }
+  } catch {
+    /* ignore */
+  }
 
   usePreBuilderStore.setState({
     ...(parsed
@@ -104,6 +120,8 @@ function restorePreBuilderFromBrief(opts: {
     submittedAt: new Date().toISOString(),
     lastPayload: payload,
     step: 5,
+    isAlreadySaved: true,
+    emailSentCount: Math.max(1, Number(opts.emailSentCount) || 1),
   });
 }
 
@@ -185,6 +203,7 @@ async function hydrateFromLead(opts: {
       fullName,
       email: opts.email || "",
       itineraryData: embedded,
+      emailSentCount: 1,
     });
   }
 }
@@ -266,6 +285,11 @@ export function ManageBookingModal({
           itineraryData?: string;
           status?: string;
         } | null;
+        emailSentCount?: number;
+        leadAudit?: {
+          emailSentCount?: number;
+          saveVersion?: number;
+        } | null;
       };
 
       if (res.ok && data.ok && data.state) {
@@ -298,6 +322,10 @@ export function ManageBookingModal({
             fullName: data.preElite.fullName || "",
             email: data.preElite.email || cleanEmail,
             itineraryData: data.preElite.itineraryData,
+            emailSentCount:
+              data.emailSentCount ??
+              data.leadAudit?.emailSentCount ??
+              1,
           });
         }
 

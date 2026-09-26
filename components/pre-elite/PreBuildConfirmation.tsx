@@ -17,6 +17,7 @@ import { hydrateStoresFromPreEliteBrief } from "@/lib/preEliteHydrate";
 import { useModalDismiss } from "@/hooks/useModalDismiss";
 import { useBuilderStore } from "@/store/useBuilderStore";
 import { useSingleDayBuilderStore } from "@/store/useSingleDayBuilderStore";
+import { usePreBuilderStore } from "@/store/usePreBuilderStore";
 
 /** Prefer SVG under /svg — upright until email dispatches, then bow. */
 const MASCOT_UPRIGHT = "/svg/mascot-card.svg";
@@ -85,15 +86,24 @@ export function PreBuildConfirmation({
   const [resendOpen, setResendOpen] = useState(false);
   const [saveGateOpen, setSaveGateOpen] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
+  const emailSentCount = usePreBuilderStore((s) => s.emailSentCount);
+  const bumpEmailSentCount = usePreBuilderStore((s) => s.bumpEmailSentCount);
 
   const data = parseItineraryData(itineraryData);
   const isSingleDay = data?.tripType === "single_day";
   const firstName = (fullName || "").trim().split(/\s+/)[0] || "";
   const emailOnFile = (email || "").trim().toLowerCase();
 
+  /** Unlock Trip Builder when email already went out (Save & Email or Manage link). */
+  const builderUnlocked =
+    isEmailSent ||
+    emailSentCount >= 1 ||
+    Boolean(readProposalSent(bookingRef));
+
   useEffect(() => {
-    setIsEmailSent(Boolean(readProposalSent(bookingRef)));
-  }, [bookingRef]);
+    const prior = Boolean(readProposalSent(bookingRef)) || emailSentCount >= 1;
+    setIsEmailSent(prior);
+  }, [bookingRef, emailSentCount]);
 
   useEffect(() => {
     // Clear any leftover html2pdf overlay from a prior hung save.
@@ -130,7 +140,7 @@ export function PreBuildConfirmation({
   useModalDismiss(saveGateOpen, closeSaveGateModal);
 
   const openBuilder = () => {
-    if (!isEmailSent && !readProposalSent(bookingRef)) {
+    if (!builderUnlocked) {
       setSaveGateOpen(true);
       return;
     }
@@ -206,7 +216,7 @@ export function PreBuildConfirmation({
   /** First click sends; later clicks open the re-send confirm modal. */
   const onSaveEmailClick = () => {
     if (sending) return;
-    if (isEmailSent || readProposalSent(bookingRef)) {
+    if (builderUnlocked) {
       setIsEmailSent(true);
       setResendOpen(true);
       return;
@@ -258,6 +268,11 @@ export function PreBuildConfirmation({
       }
       markProposalSent(bookingRef, to);
       setIsEmailSent(true);
+      bumpEmailSentCount(
+        typeof payload?.emailSentCount === "number"
+          ? payload.emailSentCount
+          : undefined
+      );
       setResendOpen(false);
       const okMsg = resend
         ? "Email resent — check your inbox and spam folder."
@@ -337,8 +352,8 @@ export function PreBuildConfirmation({
             <div className="pointer-events-none absolute -top-16 -left-2 z-30 h-32 w-32 select-none">
               <AnimatePresence mode="wait">
                 <motion.img
-                  key={isEmailSent ? "bow" : "upright"}
-                  src={isEmailSent ? MASCOT_BOW : MASCOT_UPRIGHT}
+                  key={builderUnlocked ? "bow" : "upright"}
+                  src={builderUnlocked ? MASCOT_BOW : MASCOT_UPRIGHT}
                   alt="Tokiotours Mascot"
                   initial={{ opacity: 0, scale: 0.9 }}
                   animate={{ opacity: 1, scale: 1 }}
@@ -400,7 +415,7 @@ export function PreBuildConfirmation({
           {/* RIGHT COLUMN (≈2/3): Header & Greeting Text Block */}
           <div className="col-span-7 space-y-1 pt-1 pl-1">
             <span className="block text-[10px] font-bold tracking-widest text-amber-400 uppercase">
-              {isEmailSent
+              {builderUnlocked
                 ? "We've Got Your Request"
                 : "Prepared For Review"}
             </span>
@@ -410,12 +425,12 @@ export function PreBuildConfirmation({
               </h2>
             ) : null}
             <h3 className="font-godiva text-sm leading-tight font-bold tracking-wide text-white uppercase">
-              {isEmailSent
+              {builderUnlocked
                 ? "Your Brief Is With Us!"
                 : "We're Ready To Save Your Brief"}
             </h3>
             <p className="pt-1 text-[11px] leading-relaxed text-zinc-400">
-              {isEmailSent
+              {builderUnlocked
                 ? "We've got your ideas saved. Keep this reference handy — your concierge will use it to design your trip."
                 : "Review your selections below. Click Save & Email to send a copy directly to your inbox."}
             </p>

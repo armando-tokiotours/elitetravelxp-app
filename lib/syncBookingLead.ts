@@ -29,6 +29,13 @@ export type CachedBookingLead = {
   tour_date?: string | null;
   guests?: { adults: number; kids: number };
   duration_value?: number;
+  duration_label?: string;
+  cities_list?: string;
+  email_sent_count?: number;
+  save_version?: number;
+  first_email_sent_at?: string;
+  last_email_sent_at?: string;
+  last_saved_at?: string;
   quote_min?: number;
   quote_max?: number;
   selections?: Record<string, unknown>;
@@ -163,6 +170,10 @@ export async function syncMultiDayBookingLead(opts: {
   if (!email || !bookingRef) return false;
 
   const primaryCity = primaryCityFromMultiDay(opts.state, opts.cityNames);
+  const cityNamesList = (opts.state.locations || [])
+    .map((l) => opts.cityNames?.[l.cityId] || "")
+    .filter(Boolean);
+  if (!cityNamesList.length && primaryCity) cityNamesList.push(primaryCity);
   const guests = {
     adults: opts.state.adults,
     kids: opts.state.children,
@@ -180,6 +191,7 @@ export async function syncMultiDayBookingLead(opts: {
     tour_date: opts.state.arrivalDate,
     guests,
     duration_value: opts.state.durationDays,
+    cities_list: cityNamesList.join(", "),
     selections: selections as unknown as Record<string, unknown>,
     ...q,
   });
@@ -197,6 +209,8 @@ export async function syncMultiDayBookingLead(opts: {
         tourDate: opts.state.arrivalDate,
         guests,
         durationValue: opts.state.durationDays,
+        citiesList: cityNamesList.join(", "),
+        cityNames: cityNamesList,
         selections: {
           ...selections,
           ...q,
@@ -253,6 +267,7 @@ export async function syncSingleDayBookingLead(opts: {
     tour_date: opts.state.tourDate,
     guests,
     duration_value: opts.state.tourHours,
+    cities_list: opts.state.cityFocus || "",
     selections: selections as unknown as Record<string, unknown>,
     ...q,
   });
@@ -270,6 +285,8 @@ export async function syncSingleDayBookingLead(opts: {
         tourDate: opts.state.tourDate,
         guests,
         durationValue: opts.state.tourHours,
+        citiesList: opts.state.cityFocus || "",
+        cityNames: opts.state.cityFocus ? [opts.state.cityFocus] : [],
         selections: {
           ...selections,
           ...q,

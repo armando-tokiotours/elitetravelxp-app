@@ -5,6 +5,7 @@ import {
   generatePkpassBuffer,
   hasLocalApplePassCerts,
 } from "@/lib/wallet/generatePkpass";
+import { publicAbsoluteUrl, publicSiteOrigin } from "@/lib/publicSiteOrigin";
 
 export const runtime = "nodejs";
 
@@ -51,10 +52,8 @@ export function parsePayload(
   };
 }
 
-function minimalPayloadFromPnr(pnr: string): ApplePassPayload {
-  const origin =
-    process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") ||
-    "https://tokiotours-app.com";
+function minimalPayloadFromPnr(pnr: string, req?: Request): ApplePassPayload {
+  const origin = publicSiteOrigin(req);
   return {
     pnrCode: pnr,
     guestName: "GUEST",
@@ -88,21 +87,29 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: "pnr is required." }, { status: 400 });
   }
 
-  const payload = minimalPayloadFromPnr(pnr);
-  const previewUrl = `${url.origin}/pass-preview/${encodeURIComponent(pnr)}`;
+  const payload = minimalPayloadFromPnr(pnr, req);
+  const previewUrl = publicAbsoluteUrl(
+    `/api/wallet/pass-file?pnr=${encodeURIComponent(pnr)}`,
+    req
+  );
 
   try {
     const buf = await generatePkpassBuffer(payload);
     if (buf) {
       return new NextResponse(buf as unknown as BodyInit, {
         status: 200,
-        headers: pkpassHeaders(pnr),
+        headers: {
+          "Content-Type": "application/vnd.apple.pkpass",
+          "Content-Disposition": `attachment; filename="Tokiotours-${pnr}.pkpass"`,
+          "Cache-Control": "no-cache, no-store, must-revalidate",
+        },
       });
     }
   } catch (err) {
     console.error("[wallet] GET generate failed:", err);
   }
 
+  // No signed .pkpass → downloadable PDF for manual keep
   return NextResponse.redirect(previewUrl, 302);
 }
 

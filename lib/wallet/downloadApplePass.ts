@@ -41,23 +41,34 @@ function stashPassPayload(payload: ApplePassPayload): void {
   }
 }
 
+/** Absolute download URL for the manual pass file (PDF, or .pkpass when signed). */
+export function walletPassFileUrl(pnrCode: string): string {
+  return `/api/wallet/pass-file?pnr=${encodeURIComponent(pnrCode)}&download=1`;
+}
+
 /**
- * Trigger native iOS Wallet sheet via direct navigation to the .pkpass URL.
- * Do NOT fetch()+blob() — Safari will not hand blob: URLs to Apple Wallet.
+ * Download a pass file the guest can save manually.
+ * Prefer this over Safari Wallet sheet until Apple signing certs are live —
+ * always triggers a file download (PDF today; .pkpass when configured).
  */
 export function downloadAppleWalletPass(payload: ApplePassPayload): void {
   stashPassPayload(payload);
 
-  // Chrome / Firefox / Edge on iOS cannot register .pkpass into Wallet
+  // Always download a file (PDF or signed .pkpass). Wallet sheet is unreliable
+  // without certs / on Chrome iOS; manual file is the reliable path.
+  window.location.href = walletPassFileUrl(payload.pnrCode);
+}
+
+/** @deprecated Prefer downloadAppleWalletPass — kept for Chrome Safari-hint callers. */
+export function openAppleWalletOrPreview(payload: ApplePassPayload): void {
+  stashPassPayload(payload);
   if (isIOSChrome()) {
     throw new WalletPassFallbackError(
       walletPassPreviewUrl(payload.pnrCode, { chromeHint: true }),
       "chrome_ios"
     );
   }
-
-  // Direct location change — Safari intercepts application/vnd.apple.pkpass
-  window.location.href = `/api/wallet/apple/generate?pnr=${encodeURIComponent(payload.pnrCode)}`;
+  window.location.href = walletPassFileUrl(payload.pnrCode);
 }
 
 export function readStashedPassPayload(

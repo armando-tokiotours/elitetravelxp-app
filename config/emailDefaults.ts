@@ -58,7 +58,7 @@ export const EMAIL_CONFIG_DEFAULTS: StoredEmailConfig = {
     pass: "",
   },
   routing: {
-    fromName: "TOKIOTOURS",
+    fromName: "Tokiotours Concierge",
     fromAddress: "no_reply@tokiotours.com",
     bccRecipient: "armando@tokiotours.nl",
   },

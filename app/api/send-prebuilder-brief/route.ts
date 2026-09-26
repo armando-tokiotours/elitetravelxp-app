@@ -1,10 +1,12 @@
 import { NextResponse } from "next/server";
 import { parseItineraryData } from "@/lib/preEliteBuilder";
 import { sendDraftBoardingPassEmails } from "@/lib/preEliteBoardingPassEmail";
+import { recordBookingLeadEmailSent } from "@/lib/bookingsAndLeads";
 
 /**
- * Sends Draft Boarding Pass / Reservation Intent emails to guest + concierge.
- * Called after a pre-elite qualification is saved (status: draft).
+ * Sends Draft Boarding Pass emails to guest + concierge.
+ * Only invoked from explicit "Save & Email" / resend on /pre-build.
+ * Updates bookings_and_leads email audit counters.
  */
 export async function POST(request: Request) {
   try {
@@ -44,11 +46,29 @@ export async function POST(request: Request) {
       itineraryData: itinerary,
     });
 
+    let emailSentCount: number | undefined;
+    if (result.guestSent || result.teamSent) {
+      const audit = await recordBookingLeadEmailSent({
+        bookingRef,
+        email,
+        type: itinerary.tripType === "single_day" ? "single_day" : "multi_day",
+        fullName,
+        itinerarySnippet: {
+          _v: 1,
+          source: "pre_elite",
+          tripType: itinerary.tripType,
+          timing: itinerary.timing,
+        },
+      });
+      emailSentCount = audit.emailSentCount;
+    }
+
     return NextResponse.json({
       ok: result.guestSent || result.teamSent,
       guestSent: result.guestSent,
       teamSent: result.teamSent,
       errors: result.errors,
+      emailSentCount,
     });
   } catch (err) {
     const message =

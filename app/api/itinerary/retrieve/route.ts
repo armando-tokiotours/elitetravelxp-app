@@ -138,6 +138,15 @@ export async function POST(request: Request) {
         type: lead.type,
         quote: null,
         departureDate: null,
+        emailSentCount: Number(lead.email_sent_count) || 0,
+        leadAudit: {
+          emailSentCount: Number(lead.email_sent_count) || 0,
+          saveVersion: Number(lead.save_version) || 0,
+          lastEmailSentAt: lead.last_email_sent_at || null,
+          lastSavedAt: lead.last_saved_at || null,
+          citiesList: lead.cities_list || null,
+          durationLabel: lead.duration_label || null,
+        },
         state,
         singleDay:
           lead.type === "single_day"
@@ -177,6 +186,16 @@ export async function POST(request: Request) {
         type: tripType,
         quote: null,
         departureDate: null,
+        // Email link implies at least one message was sent for this PNR.
+        emailSentCount: 1,
+        leadAudit: {
+          emailSentCount: 1,
+          saveVersion: 0,
+          lastEmailSentAt: null,
+          lastSavedAt: null,
+          citiesList: null,
+          durationLabel: null,
+        },
         state: {
           confirmedBookingRef: preElite.bookingRef,
           tripMode: tripType === "single_day" ? "single_day" : "multi_day",
