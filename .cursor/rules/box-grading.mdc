@@ -1,0 +1,29 @@
+---
+description: Box grading glow preset — navy + amber radial accents on glass cards
+alwaysApply: true
+---
+
+# Box grading
+
+When the user says **box grading** (or “apply box grading” to a named card/box):
+
+1. Use `BoxGradingGlow` from `@/components/branding/BoxGradingGlow`.
+2. Parent card: `relative overflow-hidden` (glass ok: `border-white/10 bg-[#0D1117]/70` etc.).
+3. Put content in `relative z-10` above the glow.
+4. **Do not** use crimson `#E60F43` for box grading.
+
+## Locked measurements (`BOX_GRADING`)
+
+| Layer | Color | Size | Position | Opacity | Blur |
+|-------|-------|------|----------|---------|------|
+| Blue (left) | `#054F70` | 250×250px | `-top-[4.5rem] -left-[4.5rem]` | 0.45 | blur-2xl |
+| Amber (right) | `#F6A724` | 134×134px | `-top-8 -right-8` | 0.36 | blur-2xl |
+
+Tune only via `BOX_GRADING` / `BoxGradingGlow` so every graded box stays in sync.
+
+# Drag-row crimson (cities / tours)
+
+For Builder M city reorder cards and Builder S tour/route drag rows:
+
+- Use `CrimsonGlow` with `placement="left-drag"`
+- Color `#E60F43`, left corner, **opacity 30%** (`opacity-30`)

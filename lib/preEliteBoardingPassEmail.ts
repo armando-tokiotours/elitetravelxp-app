@@ -8,7 +8,6 @@ import {
   type PreEliteItineraryData,
 } from "@/lib/preEliteBuilder";
 import { envVal } from "@/lib/email";
-import { getActiveEmailConfig } from "@/lib/emailConfigStore";
 import { sendTransactionalMail } from "@/lib/mail";
 import { renderBookingPassCardHtml, generateBookingEmailHtml } from "@/lib/emailTemplates/bookingPassEmail";
 
@@ -226,7 +225,8 @@ Review your booking brief: ${resumeUrl}`;
 }
 
 /**
- * Draft boarding-pass: one guest email with team on BCC (no Reply-To).
+ * Draft boarding-pass: guest only — no team CC/BCC until explicit
+ * Send / Print on the finished itinerary (dossier / invoice).
  * Does not throw on mail failure — returns results so PB save can succeed.
  */
 export async function sendDraftBoardingPassEmails(
@@ -236,16 +236,10 @@ export async function sendDraftBoardingPassEmails(
   teamSent: boolean;
   errors: string[];
 }> {
-  const cfg = getActiveEmailConfig();
-  const teamBcc =
-    envVal("BUSINESS_CONCIERGE_EMAIL") ||
-    cfg.routing.bccRecipient ||
-    "armando@tokiotours.nl";
   const guestTo = params.email.trim().toLowerCase();
   const ref = params.bookingRef.trim();
   const errors: string[] = [];
   let guestSent = false;
-  let teamSent = false;
 
   try {
     const guest = await sendTransactionalMail({
@@ -253,13 +247,11 @@ export async function sendDraftBoardingPassEmails(
       subject: `Draft Reservation Pass · ${ref}`,
       text: buildDraftBoardingPassText(params, "guest"),
       html: buildDraftBoardingPassHtml(params, "guest"),
-      // Draft process: team watches via BCC only (not a separate To / Reply-To).
-      skipTeamBcc: false,
-      bcc: teamBcc && teamBcc.toLowerCase() !== guestTo ? [teamBcc] : [],
+      // Draft / pre-build: guest inbox only — no team copy yet.
+      skipTeamBcc: true,
     });
     if (guest.sent) {
       guestSent = true;
-      teamSent = Boolean(guest.bcc?.length);
     } else if (guest.reason) {
       errors.push(guest.reason);
     }
@@ -269,5 +261,5 @@ export async function sendDraftBoardingPassEmails(
     );
   }
 
-  return { guestSent, teamSent, errors };
+  return { guestSent, teamSent: false, errors };
 }

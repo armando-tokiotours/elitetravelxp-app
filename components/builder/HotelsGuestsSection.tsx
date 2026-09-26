@@ -25,6 +25,7 @@ import {
   suggestedHotelRooms,
   totalHotelRooms,
 } from "@/lib/hotelCalculator";
+import { BoxGradingGlow } from "@/components/branding/BoxGradingGlow";
 import { SectionBlock } from "./ui";
 import { SectionContinue } from "./SectionContinue";
 import { useLazyModalMount } from "./modals/useLazyModalMount";
@@ -332,8 +333,10 @@ function HotelsSummaryWidget({
       type="button"
       onClick={onClick}
       disabled={orderedCityIds.length === 0}
-      className="group w-full rounded-[1.35rem] border border-zinc-800 bg-[#1C1C1E] p-4 text-left transition hover:border-[#075473]/45 hover:bg-[#222226] disabled:cursor-not-allowed disabled:opacity-60 sm:p-5"
+      className="group relative w-full overflow-hidden rounded-[1.35rem] border border-zinc-800 bg-[#1C1C1E] p-4 text-left transition hover:border-[#075473]/45 hover:bg-[#222226] disabled:cursor-not-allowed disabled:opacity-60 sm:p-5"
     >
+      <BoxGradingGlow />
+      <div className="relative z-10">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-zinc-500">
@@ -414,6 +417,7 @@ function HotelsSummaryWidget({
           className="h-4 w-4 shrink-0 text-zinc-600 transition group-hover:text-[#075473]"
           aria-hidden
         />
+      </div>
       </div>
     </button>
   );

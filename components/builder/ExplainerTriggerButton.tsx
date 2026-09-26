@@ -83,7 +83,7 @@ export function ExplainerTriggerButton({
         type="button"
         onClick={() => setOpen(true)}
         aria-label={`Watch: ${title}`}
-        className={`relative flex h-16 w-full cursor-pointer items-center overflow-hidden rounded-xl px-4 shadow-sm md:h-20 ${className}`}
+        className={`relative flex h-32 w-full cursor-pointer items-center overflow-hidden rounded-xl px-4 shadow-sm md:h-40 ${className}`}
       >
         <span
           className={`absolute inset-0 bg-cover bg-center transition-opacity ${
@@ -104,10 +104,10 @@ export function ExplainerTriggerButton({
 
         <span className="relative z-10 flex w-full items-center gap-3 md:gap-4">
           <span
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-zinc-900 text-white shadow md:h-10 md:w-10"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-zinc-900/90 text-white shadow md:h-12 md:w-12"
             aria-hidden
           >
-            <span className="ml-0.5 text-sm font-bold md:text-base">▶</span>
+            <span className="ml-0.5 text-base font-bold md:text-lg">▶</span>
           </span>
           <span className="min-w-0 flex flex-col text-left">
             <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#F29727]">

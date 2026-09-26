@@ -39,6 +39,7 @@ import {
   APP_SIDEBAR_RAIL_PAD,
   MobileAppNav,
 } from "@/components/navigation/AppSidebar";
+import { CrimsonGlow } from "@/components/branding/CrimsonGlow";
 
 type ProfileTab = "tours" | "experiences" | "matches" | "places";
 
@@ -324,7 +325,9 @@ export function DiscoverFeed() {
         ) : (
           <>
             {/* Destination header */}
-            <div className="mx-auto mt-3 flex max-w-lg items-center gap-6 rounded-2xl border border-zinc-800/80 bg-[#0D1117]/60 p-4 text-white backdrop-blur-md lg:max-w-none">
+            <div className="relative mx-auto mt-3 flex max-w-lg items-center gap-6 overflow-hidden rounded-2xl border border-white/10 bg-[#0A1017]/80 p-4 text-white shadow-2xl backdrop-blur-md lg:max-w-none">
+              <CrimsonGlow placement="right" />
+              <div className="relative z-10 flex w-full items-center gap-6">
               {cityImg ? (
                 <div className="h-24 w-24 flex-shrink-0 overflow-hidden rounded-2xl border-2 border-[#075473] shadow-xl sm:h-28 sm:w-28">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -368,6 +371,7 @@ export function DiscoverFeed() {
                     {cityBio}
                   </p>
                 ) : null}
+              </div>
               </div>
             </div>
 

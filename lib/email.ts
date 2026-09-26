@@ -20,12 +20,39 @@ import { createSmtpTransport } from "@/lib/smtpTransport";
 interface SendItineraryParams {
   to: string;
   bookingRef: string;
-  pdfBuffer: Buffer;
+  /** Primary PDF (legacy single attachment). */
+  pdfBuffer?: Buffer;
+  /** Optional named PDFs (dossier / invoice). When set, preferred over pdfBuffer. */
+  pdfAttachments?: Array<{ filename: string; content: Buffer }>;
   customerName?: string;
   tourType?: "single_day" | "multi_day" | null;
   tourDate?: string | null;
   adults?: number;
   children?: number;
+}
+
+function resolvePdfAttachments(
+  params: SendItineraryParams
+): Array<{ filename: string; content: Buffer; contentType: string }> {
+  if (params.pdfAttachments?.length) {
+    return params.pdfAttachments
+      .filter((a) => a.content && a.content.length > 0)
+      .map((a) => ({
+        filename: a.filename,
+        content: a.content,
+        contentType: "application/pdf",
+      }));
+  }
+  if (params.pdfBuffer && params.pdfBuffer.length > 0) {
+    return [
+      {
+        filename: `Japan-Itinerary-${params.bookingRef || "draft"}.pdf`,
+        content: params.pdfBuffer,
+        contentType: "application/pdf",
+      },
+    ];
+  }
+  return [];
 }
 
 /** Strip accidental quotes from .env values (common Docker/dotenv pitfall). */
@@ -74,16 +101,16 @@ export class MailDispatchError extends Error {
   }
 }
 
-async function sendViaSmtp({
-  to,
-  bookingRef,
-  pdfBuffer,
-  customerName,
-  tourType,
-  tourDate,
-  adults,
-  children,
-}: SendItineraryParams): Promise<{ id?: string }> {
+async function sendViaSmtp(params: SendItineraryParams): Promise<{ id?: string }> {
+  const {
+    to,
+    bookingRef,
+    customerName,
+    tourType,
+    tourDate,
+    adults,
+    children,
+  } = params;
   const cfg = getActiveEmailConfig();
   const { host, port, user, pass, secure } = cfg.smtp;
   if (!host || !user || !pass) {
@@ -103,6 +130,7 @@ async function sendViaSmtp({
 
   const bcc = resolveTeamBcc(to, cfg);
   const brandFrom = "Tokiotours Concierge <no_reply@tokiotours.com>";
+  const attachments = resolvePdfAttachments(params);
   const info = await transporter.sendMail({
     from: brandFrom,
     to: [to],
@@ -125,31 +153,22 @@ async function sendViaSmtp({
       from: "no_reply@tokiotours.com",
       to: [to, ...bcc],
     },
-    attachments:
-      pdfBuffer && pdfBuffer.length > 0
-        ? [
-            {
-              filename: `Japan-Itinerary-${bookingRef || "draft"}.pdf`,
-              content: pdfBuffer,
-              contentType: "application/pdf",
-            },
-          ]
-        : undefined,
+    attachments: attachments.length ? attachments : undefined,
   });
 
   return { id: typeof info.messageId === "string" ? info.messageId : undefined };
 }
 
-async function sendViaResend({
-  to,
-  bookingRef,
-  pdfBuffer,
-  customerName,
-  tourType,
-  tourDate,
-  adults,
-  children,
-}: SendItineraryParams): Promise<{ id?: string }> {
+async function sendViaResend(params: SendItineraryParams): Promise<{ id?: string }> {
+  const {
+    to,
+    bookingRef,
+    customerName,
+    tourType,
+    tourDate,
+    adults,
+    children,
+  } = params;
   const RESEND_KEY = resolveResendApiKey();
   if (!RESEND_KEY) {
     throw new MailDispatchError(
@@ -167,6 +186,7 @@ async function sendViaResend({
   const cfg = getActiveEmailConfig();
   const resend = new Resend(RESEND_KEY);
   const bcc = resolveTeamBcc(to, cfg);
+  const attachments = resolvePdfAttachments(params);
   const result = await resend.emails.send({
     from: resolveTeamMailFrom(cfg),
     to: [to],
@@ -185,15 +205,12 @@ async function sendViaResend({
       adults: adults ?? 2,
       children: children ?? 0,
     }),
-    attachments:
-      pdfBuffer && pdfBuffer.length > 0
-        ? [
-            {
-              filename: `Japan-Itinerary-${bookingRef || "draft"}.pdf`,
-              content: pdfBuffer,
-            },
-          ]
-        : undefined,
+    attachments: attachments.length
+      ? attachments.map((a) => ({
+          filename: a.filename,
+          content: a.content,
+        }))
+      : undefined,
   });
 
   if (result.error) {
@@ -238,16 +255,7 @@ export async function sendItineraryEmail(
     adults: params.adults ?? 2,
     children: params.children ?? 0,
   });
-  const attachments =
-    params.pdfBuffer && params.pdfBuffer.length > 0
-      ? [
-          {
-            filename: `Japan-Itinerary-${params.bookingRef || "draft"}.pdf`,
-            content: params.pdfBuffer,
-            contentType: "application/pdf",
-          },
-        ]
-      : undefined;
+  const attachments = resolvePdfAttachments(params);
 
   if (bluehostWebmailConfigured()) {
     try {

@@ -14,6 +14,7 @@ import {
   useBuilderStore,
   type ExperienceService,
 } from "@/store/useBuilderStore";
+import { GoldLight } from "@/components/branding/GoldLight";
 import { SectionBlock } from "./ui";
 import { ExplainerTriggerButton } from "./ExplainerTriggerButton";
 import { useLazyModalMount } from "./modals/useLazyModalMount";
@@ -214,14 +215,17 @@ function PathwayCard({
       onClick={onClick}
       aria-pressed={selected}
       disabled={disabled && kind === "tailored"}
-      className={`group flex min-h-[9.5rem] flex-col rounded-[1.35rem] border p-4 text-left transition sm:min-h-[10.5rem] ${
+      className={`group relative flex min-h-[9.5rem] flex-col overflow-hidden rounded-[1.35rem] border p-4 text-left transition sm:min-h-[10.5rem] ${
         disabled && kind === "tailored"
           ? "cursor-not-allowed border-zinc-800 bg-zinc-950 opacity-45"
           : selected
-            ? "border-[#075473] bg-[#1C1C1E] ring-1 ring-[#075473]/40"
-            : "border-zinc-800 bg-[#1C1C1E] hover:border-[#075473]/45 hover:bg-[#222226]"
+            ? "border-[#C4A574]/55 bg-[#1C1C1E]"
+            : "border-zinc-800 bg-[#1C1C1E] hover:border-[#C4A574]/40 hover:bg-[#1C1C1E]"
       }`}
     >
+      <GoldLight active={selected} />
+
+      <div className="relative z-10 flex min-h-0 flex-1 flex-col">
       <div className="flex items-start justify-between gap-2">
         <p className="text-[10px] font-medium uppercase tracking-wider text-zinc-500 md:text-xs">
           {kind === "concierge" ? "Premium" : "Self-guided"}
@@ -269,7 +273,7 @@ function PathwayCard({
       <div className="mt-3 flex items-center justify-between gap-2 border-t border-zinc-800/80 pt-3 sm:mt-4">
         <span
           className={`text-xs font-medium ${
-            selected ? "text-[#075473]" : "text-zinc-500"
+            selected ? "text-[#F6A724]" : "text-zinc-500"
           }`}
         >
           {selected
@@ -277,9 +281,14 @@ function PathwayCard({
             : actionLabel ?? "Open"}
         </span>
         <ChevronRight
-          className="h-4 w-4 shrink-0 text-zinc-600 transition group-hover:text-[#075473]"
+          className={`h-4 w-4 shrink-0 transition ${
+            selected
+              ? "text-[#F6A724]"
+              : "text-zinc-600 group-hover:text-[#F6A724]"
+          }`}
           aria-hidden
         />
+      </div>
       </div>
     </button>
   );

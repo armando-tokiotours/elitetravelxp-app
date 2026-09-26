@@ -13,6 +13,7 @@ import { coerceTransitType } from "@/store/useBuilderStore";
 import { isTransitHubStop } from "@/lib/transitHubs";
 import { allowedVisitTypesForIndex } from "@/lib/locationRules";
 import { useHybridTooltip } from "@/hooks/useHybridTooltip";
+import { CrimsonGlow } from "@/components/branding/CrimsonGlow";
 import { ConciergeSuggestionCard } from "./ConciergeSuggestionCard";
 import { CityThumb } from "./CityThumb";
 
@@ -81,10 +82,11 @@ export function CityAccordionItem({
       <Reorder.Item
         value={loc}
         dragListener={false}
-        className="w-full overflow-visible rounded-2xl border border-zinc-700 bg-zinc-900/80"
+        className="relative w-full overflow-hidden rounded-2xl border border-zinc-700 bg-zinc-900/80"
       >
+        <CrimsonGlow placement="left-drag" />
         <div
-          className="flex items-center gap-3 px-3 py-3"
+          className="relative z-10 flex items-center gap-3 px-3 py-3"
           title="Auto-set from Step 2 (Arrival/Departure)"
         >
           <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-zinc-700 bg-zinc-800 text-lg">
@@ -110,10 +112,11 @@ export function CityAccordionItem({
       value={loc}
       dragListener={false}
       dragControls={controls}
-      className="w-full overflow-visible rounded-2xl border border-zinc-800 bg-zinc-900 shadow-[0_2px_12px_rgba(11,31,58,0.04)]"
+      className="relative w-full overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-900 shadow-[0_2px_12px_rgba(11,31,58,0.04)]"
     >
+      <CrimsonGlow placement="left-drag" />
       {expanded ? (
-        <div>
+        <div className="relative z-10">
           <div className="relative overflow-hidden rounded-t-2xl">
             <div className="absolute left-2 top-2 z-10">
               <DragHandle controls={controls} onLight />
@@ -270,7 +273,7 @@ export function CityAccordionItem({
           </div>
         </div>
       ) : (
-        <div className="flex items-stretch gap-0">
+        <div className="relative z-10 flex items-stretch gap-0">
           <div className="flex items-center pl-2">
             <DragHandle controls={controls} />
           </div>

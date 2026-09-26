@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { Info } from "lucide-react";
 import { useSeasonalFxStore } from "@/store/useSeasonalFxStore";
 import { particleSeasonFromDate } from "@/lib/seasonality";
+import { BoxGradingGlow } from "@/components/branding/BoxGradingGlow";
 
 type SeasonalityCardProps = {
   arrivalDate: string | null;
@@ -53,12 +54,14 @@ export function SeasonalityCard({
         if (hasInsight) onOpenExplain?.();
       }}
       disabled={!hasInsight && !particleSeasonFromDate(arrivalDate)}
-      className={`flex min-h-[44px] flex-col justify-center rounded-xl border border-[#075473]/40 bg-zinc-900/80 p-3 text-left backdrop-blur-sm transition-all ${
+      className={`relative flex min-h-[44px] flex-col justify-center overflow-hidden rounded-xl border border-[#075473]/40 bg-zinc-900/80 p-3 text-left backdrop-blur-sm transition-all ${
         hasInsight || particleSeasonFromDate(arrivalDate)
           ? "cursor-pointer hover:bg-zinc-800/90"
           : "cursor-default opacity-80"
       }`}
     >
+      <BoxGradingGlow />
+      <div className="relative z-10">
       <p className="text-[10px] font-medium uppercase tracking-[0.14em] text-zinc-500">
         Seasonality
       </p>
@@ -100,6 +103,7 @@ export function SeasonalityCard({
           </motion.p>
         )}
       </AnimatePresence>
+      </div>
     </button>
   );
 }

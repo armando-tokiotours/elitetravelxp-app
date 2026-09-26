@@ -17,6 +17,7 @@ import {
 } from "@/lib/experiencesPlaces";
 import { calculateTimeSlots } from "@/lib/singleDayTimeSlots";
 import { resolveSingleDayReelPoster } from "@/config/mediaConfig";
+import { CrimsonGlow } from "@/components/branding/CrimsonGlow";
 import {
   useSingleDayBuilderStore,
   type SingleDaySelectedExperience,
@@ -169,7 +170,9 @@ export function SingleDayRouteModal({
                         value={row}
                         className="list-none"
                       >
-                        <div className="flex cursor-grab items-stretch gap-3 rounded-2xl border border-white/10 bg-[#0D1117]/90 p-3 active:cursor-grabbing">
+                        <div className="relative flex cursor-grab items-stretch gap-3 overflow-hidden rounded-2xl border border-white/10 bg-[#0D1117]/90 p-3 active:cursor-grabbing">
+                          <CrimsonGlow placement="left-drag" />
+                          <div className="relative z-10 flex w-full items-stretch gap-3">
                           <div className="flex flex-col items-center justify-center gap-1 text-zinc-500">
                             <GripVertical className="h-5 w-5" aria-hidden />
                             <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#075473] text-[10px] font-bold text-white">
@@ -206,6 +209,7 @@ export function SingleDayRouteModal({
                           >
                             <X className="h-3.5 w-3.5" />
                           </button>
+                          </div>
                         </div>
                       </Reorder.Item>
                     );

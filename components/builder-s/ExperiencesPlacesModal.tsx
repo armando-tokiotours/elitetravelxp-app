@@ -36,6 +36,7 @@ import {
 } from "@/lib/experiencesPlaces";
 import { calculateTimeSlots } from "@/lib/singleDayTimeSlots";
 import { resolveSingleDayReelPoster } from "@/config/mediaConfig";
+import { CrimsonGlow } from "@/components/branding/CrimsonGlow";
 import {
   useSingleDayBuilderStore,
   type SingleDaySelectedExperience,
@@ -286,12 +287,14 @@ export function ExperiencesPlacesModal({
                         onDragStart={() => onDragStart(index)}
                         onDragOver={(e) => onDragOver(e, index)}
                         onDragEnd={onDragEnd}
-                        className={`flex cursor-grab items-center gap-2 rounded-xl border border-white/10 bg-[#0D1117]/80 px-2.5 py-2 active:cursor-grabbing ${
+                        className={`relative flex cursor-grab items-center gap-2 overflow-hidden rounded-xl border border-white/10 bg-[#0D1117]/80 px-2.5 py-2 active:cursor-grabbing ${
                           dragIndex === index
                             ? "opacity-70 ring-1 ring-[#075473]"
                             : ""
                         }`}
                       >
+                        <CrimsonGlow placement="left-drag" />
+                        <div className="relative z-10 flex min-w-0 flex-1 items-center gap-2">
                         <GripVertical className="h-4 w-4 shrink-0 text-white/35" />
                         <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#075473] text-[10px] font-bold text-white">
                           {index + 1}
@@ -305,6 +308,7 @@ export function ExperiencesPlacesModal({
                         <span className="shrink-0 text-[10px] font-semibold text-[#F6A724]">
                           {formatDurationBadge(row.duration_hours)}
                         </span>
+                        </div>
                       </li>
                     );
                   })}

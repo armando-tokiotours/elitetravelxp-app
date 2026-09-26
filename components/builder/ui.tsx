@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Lock } from "lucide-react";
 import { useBuilderStore } from "@/store/useBuilderStore";
+import { CrimsonGlow } from "@/components/branding/CrimsonGlow";
 import { useBuilderAccordionOptional } from "./BuilderAccordion";
 
 const GOLD = "#075473";
@@ -62,17 +63,18 @@ export function SectionBlock({
     <section
       id={id}
       aria-disabled={locked || undefined}
-      className={`scroll-mt-24 overflow-hidden rounded-2xl border border-white/10 bg-[#05080C]/80 p-0 shadow-2xl backdrop-blur-xl ${
+      className={`relative scroll-mt-24 overflow-hidden rounded-2xl border border-white/10 bg-[#05080C]/80 p-0 shadow-2xl backdrop-blur-xl ${
         locked ? "opacity-50" : ""
       }`}
     >
+      {isOpen ? <CrimsonGlow placement="bottom-right" /> : null}
       <button
         type="button"
         onClick={onToggle}
         aria-expanded={isOpen}
         aria-disabled={locked}
         disabled={locked}
-        className={`flex w-full items-center gap-3 px-4 py-4 text-left transition sm:gap-3.5 sm:px-5 sm:py-5 ${
+        className={`relative z-10 flex w-full items-center gap-3 px-4 py-4 text-left transition sm:gap-3.5 sm:px-5 sm:py-5 ${
           locked
             ? "cursor-not-allowed"
             : "hover:bg-white/[0.04]"
@@ -154,7 +156,7 @@ export function SectionBlock({
             transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
             className="overflow-hidden"
           >
-            <div className="border-t border-white/10 bg-[#0D1117]/40 px-4 pb-5 pt-4 sm:px-5 sm:pb-6">
+            <div className="relative z-10 border-t border-white/10 bg-[#0D1117]/40 px-4 pb-5 pt-4 sm:px-5 sm:pb-6">
               {children}
             </div>
           </motion.div>

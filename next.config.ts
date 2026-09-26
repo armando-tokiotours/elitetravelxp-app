@@ -5,7 +5,14 @@ const nextConfig: NextConfig = {
   // Allow opening the local app via 127.0.0.1 as well as localhost
   // (Next 16 blocks cross-origin /_next assets otherwise → stuck "Loading…").
   allowedDevOrigins: ["127.0.0.1"],
-  serverExternalPackages: ["pdfkit", "nodemailer", "resend", "sharp"],
+  serverExternalPackages: [
+    "pdfkit",
+    "nodemailer",
+    "resend",
+    "sharp",
+    "puppeteer-core",
+    "qrcode",
+  ],
   images: {
     formats: ["image/avif", "image/webp"],
     minimumCacheTTL: 31536000,

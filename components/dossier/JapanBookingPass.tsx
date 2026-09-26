@@ -176,6 +176,15 @@ export function JapanBookingPass({
 
   const ticket = (
     <div className="relative w-full overflow-hidden rounded-2xl border border-white/10 bg-[#0A1017]/90 text-white shadow-2xl">
+      {/* Top-right crimson/magenta radial glow — matches pass badge premium vibe */}
+      <div
+        className="pointer-events-none absolute -top-16 -right-16 z-0 h-64 w-64 select-none rounded-full opacity-35 blur-3xl"
+        style={{
+          background:
+            "radial-gradient(circle, #E60F43 0%, rgba(230,15,67,0) 70%)",
+        }}
+        aria-hidden
+      />
       <div
         className="absolute top-1/2 -left-3 z-10 hidden h-6 w-6 -translate-y-1/2 rounded-full border border-white/10 bg-[#04080C] md:block"
         aria-hidden
@@ -185,7 +194,7 @@ export function JapanBookingPass({
         aria-hidden
       />
 
-      <div className="grid grid-cols-1 md:grid-cols-12">
+      <div className="relative z-10 grid grid-cols-1 md:grid-cols-12">
         <div className="space-y-4 border-b border-dashed border-white/15 p-6 md:col-span-8 md:border-r md:border-b-0">
           <div className="flex items-center justify-between gap-2">
             <div className="flex min-w-0 items-center gap-2">

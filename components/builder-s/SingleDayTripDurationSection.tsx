@@ -5,6 +5,7 @@ import { useState } from "react";
 import { Pencil } from "lucide-react";
 import type { PbSeasonTier } from "@/lib/pocketbase/client";
 import { SectionBlock } from "@/components/builder/ui";
+import { BoxGradingGlow } from "@/components/branding/BoxGradingGlow";
 import { useLazyModalMount } from "@/components/builder/modals/useLazyModalMount";
 import {
   formatSingleDayDisplayDate,
@@ -60,16 +61,20 @@ export function SingleDayTripDurationSection({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="w-full cursor-pointer rounded-2xl border border-white/10 bg-[#0D1117]/70 p-5 text-left backdrop-blur-md transition-all hover:border-[#075473]/40 hover:bg-[#0D1117]/90"
+        className="relative w-full cursor-pointer overflow-hidden rounded-2xl border border-white/10 bg-[#0D1117]/70 p-5 text-left backdrop-blur-md transition-all hover:border-[#075473]/40 hover:bg-[#0D1117]/90"
       >
-        <div className="flex items-start justify-between gap-3">
-          <h3 className="text-sm font-semibold uppercase tracking-wider text-zinc-400">
-            Single-day overview
-          </h3>
-          <Pencil className="h-4 w-4 shrink-0 text-zinc-500" aria-hidden />
+        {/* Box grading: navy left + amber right */}
+        <BoxGradingGlow />
+        <div className="relative z-10">
+          <div className="flex items-start justify-between gap-3">
+            <h3 className="text-sm font-semibold uppercase tracking-wider text-zinc-400">
+              Single-day overview
+            </h3>
+            <Pencil className="h-4 w-4 shrink-0 text-zinc-500" aria-hidden />
+          </div>
+          <p className="mt-3 text-lg font-medium text-white">{row1}</p>
+          <p className="mt-1 text-sm text-zinc-400">{row2}</p>
         </div>
-        <p className="mt-3 text-lg font-medium text-white">{row1}</p>
-        <p className="mt-1 text-sm text-zinc-400">{row2}</p>
       </button>
 
       <button

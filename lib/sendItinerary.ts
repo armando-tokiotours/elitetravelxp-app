@@ -28,6 +28,10 @@ export type SendItineraryBody = {
   bookingRef?: string;
   /** Optional client-rendered PDF (base64) — skips server pdfkit when set. */
   pdfBase64?: string;
+  /** Named client PDFs (dossier / invoice). Preferred when present. */
+  pdfs?: Array<{ kind?: string; filename: string; base64: string }>;
+  /** Which docs the guest chose to email. */
+  sendDocs?: { dossier?: boolean; invoice?: boolean };
 };
 
 async function allocateUniquePnr(
@@ -163,7 +167,11 @@ export async function handleSendItinerary(
         console.error("[send-itinerary] booking_requests create failed:", detail);
         // Continue without PB row — still email if we have a PDF
         record = { id: "" };
-        if (!pdfBase64) {
+        const hasClientPdf =
+          Boolean(pdfBase64) ||
+          (Array.isArray(body.pdfs) &&
+            body.pdfs.some((p) => String(p?.base64 || "").trim()));
+        if (!hasClientPdf) {
           return NextResponse.json(
             {
               error: `Failed to create record: ${detail}`,
@@ -200,7 +208,7 @@ export async function handleSendItinerary(
         bookingRef,
         email: contactEmail,
         type: state.tripMode === "single_day" ? "single_day" : "multi_day",
-        status: "quoted",
+        status: "in_progress",
         primaryCity: primaryCityFromMultiDay(state, cityNames),
         tourDate: state.arrivalDate,
         guests: {
@@ -228,11 +236,52 @@ export async function handleSendItinerary(
       await advanceBookingToInProgress(ref);
     }
 
-    // Prefer client-rendered PDF; fall back to pdfkit only when needed
-    let pdf: Buffer;
-    if (pdfBase64) {
+    // Prefer mobile Chromium PDFs (phone-friendly). Fall back to client/pdfkit.
+    let namedPdfs: Array<{ filename: string; content: Buffer }> = [];
+    if (Array.isArray(body.pdfs)) {
+      for (const p of body.pdfs) {
+        const base64 = String(p?.base64 || "").trim();
+        const filename = String(p?.filename || "").trim();
+        if (!base64 || !filename) continue;
+        const content = Buffer.from(base64, "base64");
+        if (content.length > 0) namedPdfs.push({ filename, content });
+      }
+    }
+
+    try {
+      const { buildMobileItineraryPdfs } = await import(
+        "@/lib/pdf/buildMobileItineraryPdfs"
+      );
+      const { mobilePdfAvailable } = await import("@/lib/pdf/mobilePdfEngine");
+      if (mobilePdfAvailable()) {
+        const mobile = await buildMobileItineraryPdfs({
+          bookingRef,
+          contactName,
+          contactEmail,
+          state,
+          quote,
+          departureDate,
+          cityNames,
+          sendDocs: body.sendDocs,
+        });
+        if (mobile.length) {
+          namedPdfs = mobile.map((p) => ({
+            filename: p.filename,
+            content: p.content,
+          }));
+        }
+      }
+    } catch (mobileErr) {
+      console.warn(
+        "[send-itinerary] mobile PDF engine failed, using fallback:",
+        mobileErr
+      );
+    }
+
+    let pdf: Buffer | undefined;
+    if (namedPdfs.length === 0 && pdfBase64) {
       pdf = Buffer.from(pdfBase64, "base64");
-    } else {
+    } else if (namedPdfs.length === 0) {
       pdf = await buildItineraryPdf({
         bookingRef,
         contactName,
@@ -252,6 +301,7 @@ export async function handleSendItinerary(
         to: contactEmail,
         bookingRef,
         pdfBuffer: pdf,
+        pdfAttachments: namedPdfs.length ? namedPdfs : undefined,
         customerName: contactName || undefined,
         tourType:
           state.tripMode === "single_day" ? "single_day" : "multi_day",

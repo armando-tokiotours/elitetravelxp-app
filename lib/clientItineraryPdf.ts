@@ -2,18 +2,33 @@
 
 /**
  * Client-side itinerary PDF via html2pdf.js —
- * always targets #itinerary-invoice-content (never the Send PDF modal).
+ * targets invoice and/or dossier DOM (never the Send PDF modal).
  */
+
+export type PdfCaptureTarget = "invoice" | "dossier";
 
 const INVOICE_ID = "itinerary-invoice-content";
 
 function resolveInvoiceElement(): HTMLElement | null {
   return (
     document.getElementById(INVOICE_ID) ||
-    document.getElementById("itinerary-dossier-view") ||
-    document.getElementById("itinerary-print-view") ||
     (document.querySelector(".print-document") as HTMLElement | null)
   );
+}
+
+function resolveDossierElement(): HTMLElement | null {
+  return (
+    document.getElementById("itinerary-dossier-view") ||
+    document.getElementById("single-day-dossier-view") ||
+    document.getElementById("itinerary-print-view")
+  );
+}
+
+function resolveCaptureElement(target: PdfCaptureTarget): HTMLElement | null {
+  if (target === "dossier") {
+    return resolveDossierElement() || resolveInvoiceElement();
+  }
+  return resolveInvoiceElement() || resolveDossierElement();
 }
 
 /** Temporarily bring off-screen invoice into layout for capture. */
@@ -58,15 +73,17 @@ function prepareOffscreenCapture(element: HTMLElement): () => void {
   };
 }
 
-function pdfFilename(bookingRef: string): string {
+function pdfFilename(bookingRef: string, target?: PdfCaptureTarget): string {
   const safe = (bookingRef || "draft").replace(/[^\w.-]+/g, "_");
+  if (target === "dossier") return `Japan_Travel_Dossier_${safe}.pdf`;
+  if (target === "invoice") return `Japan_Invoice_${safe}.pdf`;
   return `Japan_Itinerary_${safe}.pdf`;
 }
 
-function html2pdfOptions(bookingRef: string) {
+function html2pdfOptions(bookingRef: string, target?: PdfCaptureTarget) {
   return {
     margin: 10,
-    filename: pdfFilename(bookingRef),
+    filename: pdfFilename(bookingRef, target),
     image: { type: "jpeg" as const, quality: 0.95 },
     html2canvas: {
       scale: 2,
@@ -99,16 +116,19 @@ async function loadHtml2Pdf(): Promise<
 }
 
 export async function captureItineraryPdfBlob(
-  bookingRef = "draft"
+  bookingRef = "draft",
+  target: PdfCaptureTarget = "invoice"
 ): Promise<Blob> {
   document.body.classList.add("print-capturing");
   let restoreOffscreen: (() => void) | null = null;
 
   try {
-    const element = resolveInvoiceElement();
+    const element = resolveCaptureElement(target);
     if (!element) {
       throw new Error(
-        "Itemized invoice not found (#itinerary-invoice-content). Open Invoice / Print first."
+        target === "dossier"
+          ? "Travel dossier not found. Open Travel Dossier first."
+          : "Itemized invoice not found (#itinerary-invoice-content). Open Invoice / Print first."
       );
     }
 
@@ -118,7 +138,7 @@ export async function captureItineraryPdfBlob(
 
     const html2pdf = await loadHtml2Pdf();
     const blob = (await html2pdf()
-      .set(html2pdfOptions(bookingRef))
+      .set(html2pdfOptions(bookingRef, target))
       .from(element)
       .outputPdf("blob")) as Blob;
 
@@ -132,15 +152,20 @@ export async function captureItineraryPdfBlob(
   }
 }
 
-export async function downloadItineraryPdf(bookingRef: string): Promise<void> {
+export async function downloadItineraryPdf(
+  bookingRef: string,
+  target: PdfCaptureTarget = "invoice"
+): Promise<void> {
   document.body.classList.add("print-capturing");
   let restoreOffscreen: (() => void) | null = null;
 
   try {
-    const element = resolveInvoiceElement();
+    const element = resolveCaptureElement(target);
     if (!element) {
       throw new Error(
-        "Itemized invoice not found (#itinerary-invoice-content). Open Invoice / Print first."
+        target === "dossier"
+          ? "Travel dossier not found. Open Travel Dossier first."
+          : "Itemized invoice not found (#itinerary-invoice-content). Open Invoice / Print first."
       );
     }
 
@@ -150,7 +175,7 @@ export async function downloadItineraryPdf(bookingRef: string): Promise<void> {
 
     const html2pdf = await loadHtml2Pdf();
     await html2pdf()
-      .set(html2pdfOptions(bookingRef))
+      .set(html2pdfOptions(bookingRef, target))
       .from(element)
       .save();
   } finally {
@@ -159,10 +184,7 @@ export async function downloadItineraryPdf(bookingRef: string): Promise<void> {
   }
 }
 
-export async function itineraryPdfToBase64(
-  bookingRef?: string
-): Promise<string> {
-  const blob = await captureItineraryPdfBlob(bookingRef || "draft");
+async function blobToBase64(blob: Blob): Promise<string> {
   const buffer = await blob.arrayBuffer();
   let binary = "";
   const bytes = new Uint8Array(buffer);
@@ -173,12 +195,57 @@ export async function itineraryPdfToBase64(
   return btoa(binary);
 }
 
+export async function itineraryPdfToBase64(
+  bookingRef?: string,
+  target: PdfCaptureTarget = "invoice"
+): Promise<string> {
+  const blob = await captureItineraryPdfBlob(bookingRef || "draft", target);
+  return blobToBase64(blob);
+}
+
+export type SendDocSelection = {
+  dossier: boolean;
+  invoice: boolean;
+};
+
+/** Capture selected docs as base64 PDFs for email attachment. */
+export async function captureSelectedPdfsBase64(
+  bookingRef: string,
+  selection: SendDocSelection
+): Promise<Array<{ kind: PdfCaptureTarget; base64: string; filename: string }>> {
+  const out: Array<{
+    kind: PdfCaptureTarget;
+    base64: string;
+    filename: string;
+  }> = [];
+  const ref = bookingRef || "draft";
+
+  if (selection.dossier) {
+    const base64 = await itineraryPdfToBase64(ref, "dossier");
+    out.push({
+      kind: "dossier",
+      base64,
+      filename: pdfFilename(ref, "dossier"),
+    });
+  }
+  if (selection.invoice) {
+    const base64 = await itineraryPdfToBase64(ref, "invoice");
+    out.push({
+      kind: "invoice",
+      base64,
+      filename: pdfFilename(ref, "invoice"),
+    });
+  }
+  return out;
+}
+
 /** Local save — prefers html2pdf.js; falls back to print isolation CSS. */
 export async function printItineraryLocally(
-  bookingRef = "draft"
+  bookingRef = "draft",
+  target: PdfCaptureTarget = "invoice"
 ): Promise<void> {
   try {
-    await downloadItineraryPdf(bookingRef);
+    await downloadItineraryPdf(bookingRef, target);
   } catch {
     document.body.classList.add("print-capturing");
     const cleanup = () => {

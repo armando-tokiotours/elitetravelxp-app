@@ -213,7 +213,7 @@ export function HubConfigModal({
               <button
                 type="button"
                 onClick={onClose}
-                className="w-full rounded-full bg-[#1BA58A] py-3 text-sm font-semibold text-white transition hover:bg-[#159377]"
+                className="w-full rounded-full bg-[#054F70] py-3 text-sm font-semibold text-white transition hover:bg-[#043d57]"
               >
                 Done
               </button>

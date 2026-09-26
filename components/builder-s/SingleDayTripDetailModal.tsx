@@ -412,7 +412,7 @@ export function SingleDayTripDetailModal({
                 type="button"
                 onClick={onClose}
                 disabled={!canDone}
-                className="w-full rounded-full bg-[#1CA67F] py-3 text-sm font-semibold text-white transition hover:bg-[#178f6d] disabled:cursor-not-allowed disabled:opacity-40"
+                className="w-full rounded-full bg-[#054F70] py-3 text-sm font-semibold text-white transition hover:bg-[#043d57] disabled:cursor-not-allowed disabled:opacity-40"
               >
                 Done
               </button>

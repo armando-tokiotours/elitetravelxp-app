@@ -7,6 +7,7 @@ import { ArrowLeft, Check, Sparkles } from "lucide-react";
 import { ELITE_CONCIERGE_FEE } from "@/lib/eliteConcierge";
 import { useBuilderStore } from "@/store/useBuilderStore";
 import { useSiteBrandingStore } from "@/store/useSiteBrandingStore";
+import { BoxGradingGlow } from "@/components/branding/BoxGradingGlow";
 import { RefundPolicyModal } from "@/components/modals/RefundPolicyModal";
 import { LazyVideo } from "@/components/ui/LazyVideo";
 
@@ -214,8 +215,9 @@ export function ConciergeEditorModal({
                 <p className="mt-1.5 text-sm text-zinc-500">{depositLine}</p>
               </div>
 
-              <div className="overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-900/80">
-                <div className="flex items-center gap-2 border-b border-zinc-800 px-4 py-3">
+              <div className="relative overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-900/80">
+                <BoxGradingGlow />
+                <div className="relative z-10 flex items-center gap-2 border-b border-zinc-800 px-4 py-3">
                   <Sparkles
                     className="h-4 w-4 shrink-0 text-[#F6A724]"
                     aria-hidden
@@ -224,7 +226,7 @@ export function ConciergeEditorModal({
                     {inclusionTitle}
                   </h5>
                 </div>
-                <div className="space-y-3 px-4 py-4 text-sm leading-relaxed text-zinc-400">
+                <div className="relative z-10 space-y-3 px-4 py-4 text-sm leading-relaxed text-zinc-400">
                   {renderBodyBlocks(inclusionBody)}
                 </div>
               </div>

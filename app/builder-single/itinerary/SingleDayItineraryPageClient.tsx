@@ -26,6 +26,7 @@ import {
   MobileAppNav,
 } from "@/components/navigation/AppSidebar";
 import { NewBookingResetButton } from "@/components/builder/NewBookingResetButton";
+import { CrimsonGlow } from "@/components/branding/CrimsonGlow";
 
 type ViewMode = "dossier" | "invoice";
 
@@ -226,7 +227,7 @@ export default function SingleDayItineraryPageClient() {
   }
 
   return (
-    <div className="builder-theme min-h-screen overflow-x-hidden bg-[#0B1728] pb-44 text-white md:pb-36">
+    <div className="builder-theme relative z-10 min-h-screen overflow-x-hidden bg-transparent pb-44 text-white md:pb-36">
       <AppSidebar
         brandEyebrow="TOKIOTOURS"
         brandTitle="Single-Day Itinerary"
@@ -234,7 +235,9 @@ export default function SingleDayItineraryPageClient() {
       />
 
       <div className={APP_SIDEBAR_RAIL_PAD}>
-        <header className="no-print border-b border-white/10 bg-[#0D1117]/90 px-4 py-5 backdrop-blur-md">
+        <header className="no-print relative mx-auto mt-4 max-w-3xl overflow-hidden rounded-2xl border border-white/10 bg-[#0A1017]/80 px-4 py-5 shadow-2xl backdrop-blur-md sm:px-5">
+          <CrimsonGlow placement="top-right" />
+          <div className="relative z-10">
           <div className="mb-3 flex items-center gap-3 lg:hidden">
             <MobileAppNav
               brandEyebrow="TOKIOTOURS"
@@ -268,27 +271,35 @@ export default function SingleDayItineraryPageClient() {
               icon={<FileText className="h-3.5 w-3.5" />}
               label="Invoice / Print"
             />
+            <button
+              type="button"
+              onClick={requestSendPdf}
+              className="rounded-xl bg-[#075473] px-3.5 py-2 text-[11px] font-bold tracking-wider text-white uppercase"
+            >
+              Send / Print
+            </button>
             <Link
               href="/builder-single"
               className="inline-flex items-center gap-1.5 rounded-xl border border-zinc-700 bg-black/30 px-3.5 py-2 text-[11px] font-bold tracking-wider text-zinc-300 uppercase transition-all hover:bg-black/60"
             >
               ← Continue editing
             </Link>
-            {activeView === "invoice" ? (
-              <button
-                type="button"
-                onClick={requestSendPdf}
-                className="rounded-xl bg-[#075473] px-3.5 py-2 text-[11px] font-bold tracking-wider text-white uppercase"
-              >
-                Save & Email →
-              </button>
-            ) : null}
             <NewBookingResetButton variant="nav" />
+          </div>
           </div>
         </header>
 
         <main className="mx-auto w-full max-w-3xl overflow-x-hidden px-4 py-6 pb-40 md:pb-28">
-          {activeView === "dossier" ? <SingleDayItineraryView /> : null}
+          <div
+            className={
+              activeView === "dossier"
+                ? undefined
+                : "invoice-capture-offscreen pointer-events-none fixed left-[-10000px] top-0 z-[-1] w-[800px] bg-[#0D1117]"
+            }
+            aria-hidden={activeView !== "dossier"}
+          >
+            <SingleDayItineraryView />
+          </div>
 
           <div
             className={

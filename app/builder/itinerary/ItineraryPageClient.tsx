@@ -33,6 +33,7 @@ import {
 import { PriceSummaryFooter } from "@/components/builder/PriceSummaryFooter";
 import { DossierSectionOutline } from "@/components/builder/DossierSectionOutline";
 import { NewBookingResetButton } from "@/components/builder/NewBookingResetButton";
+import { GoldLight } from "@/components/branding/GoldLight";
 
 type ViewMode = "dossier" | "invoice";
 
@@ -281,7 +282,9 @@ export default function ItineraryPageClient() {
             label="Section 1: Hero & Nav"
             className="no-print my-4"
           >
-            <header className="space-y-4 text-left">
+            <header className="group relative overflow-hidden rounded-2xl border border-white/10 bg-[#0A1017]/80 p-5 shadow-2xl backdrop-blur-md sm:p-6">
+              <GoldLight color="#F6A724" active />
+              <div className="relative z-10 space-y-4 text-left">
               <div>
                 <p className="font-mono text-[10px] font-bold tracking-widest text-amber-400 uppercase">
                   My Itinerary
@@ -311,37 +314,34 @@ export default function ItineraryPageClient() {
                   icon={<FileText className="h-3.5 w-3.5" />}
                   label="Invoice / Print"
                 />
-                {activeView === "invoice" ? (
-                  <>
-                    <Link
-                      href="/builder"
-                      className="inline-flex items-center gap-1.5 rounded-xl border border-zinc-700 bg-black/30 px-3.5 py-2 text-[11px] font-bold tracking-wider text-zinc-300 uppercase transition-all hover:bg-black/60"
-                    >
-                      ← Edit builder
-                    </Link>
-                    <button
-                      type="button"
-                      onClick={requestSendPdf}
-                      className="rounded-xl bg-[#075473] px-3.5 py-2 text-[11px] font-bold tracking-wider text-white uppercase"
-                    >
-                      Send / Save PDF
-                    </button>
-                  </>
-                ) : (
-                  <Link
-                    href="/builder"
-                    className="inline-flex items-center gap-1.5 rounded-xl border border-zinc-700 bg-black/30 px-3.5 py-2 text-[11px] font-bold tracking-wider text-zinc-300 uppercase transition-all hover:bg-black/60"
-                  >
-                    ← Continue editing
-                  </Link>
-                )}
+                <button
+                  type="button"
+                  onClick={requestSendPdf}
+                  className="rounded-xl bg-[#075473] px-3.5 py-2 text-[11px] font-bold tracking-wider text-white uppercase"
+                >
+                  Send / Print
+                </button>
+                <Link
+                  href="/builder"
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-zinc-700 bg-black/30 px-3.5 py-2 text-[11px] font-bold tracking-wider text-zinc-300 uppercase transition-all hover:bg-black/60"
+                >
+                  ← Continue editing
+                </Link>
                 <NewBookingResetButton variant="nav" />
+              </div>
               </div>
             </header>
           </DossierSectionOutline>
 
           <main className="mt-6 w-full overflow-x-hidden pb-8">
-            {activeView === "dossier" ? (
+            <div
+              className={
+                activeView === "dossier"
+                  ? undefined
+                  : "invoice-capture-offscreen pointer-events-none fixed left-[-10000px] top-0 z-[-1] w-[800px] bg-[#0D1117]"
+              }
+              aria-hidden={activeView !== "dossier"}
+            >
               <TravelDossierView
                 state={state}
                 config={config}
@@ -351,19 +351,21 @@ export default function ItineraryPageClient() {
                 arrivalHub={arrivalHub}
                 departureHub={departureHub}
                 afterSummary={
-                  <PriceSummaryFooter
-                    placement="inline"
-                    quoteMin={quote?.min ?? null}
-                    quoteMax={quote?.max ?? null}
-                    minPerPerson={minPerPerson}
-                    maxPerPerson={maxPerPerson}
-                    totalGuests={totalGuests}
-                    onRequestPay={handleRequestPay}
-                    requestDisabled={!quote}
-                  />
+                  activeView === "dossier" ? (
+                    <PriceSummaryFooter
+                      placement="inline"
+                      quoteMin={quote?.min ?? null}
+                      quoteMax={quote?.max ?? null}
+                      minPerPerson={minPerPerson}
+                      maxPerPerson={maxPerPerson}
+                      totalGuests={totalGuests}
+                      onRequestPay={handleRequestPay}
+                      requestDisabled={!quote}
+                    />
+                  ) : null
                 }
               />
-            ) : null}
+            </div>
 
             {/* Always mount full itemized invoice for PDF/print capture (off-screen on dossier). */}
             <div

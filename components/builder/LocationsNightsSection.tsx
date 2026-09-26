@@ -27,6 +27,7 @@ import {
   overnightNightsTotal,
   overnightStopCount,
 } from "@/lib/transitHubs";
+import { BoxGradingGlow } from "@/components/branding/BoxGradingGlow";
 import { SectionContinue } from "./SectionContinue";
 import { SectionBlock } from "./ui";
 import { useLazyModalMount } from "./modals/useLazyModalMount";
@@ -315,8 +316,10 @@ function RouteSummaryWidget({
     <button
       type="button"
       onClick={onClick}
-      className="group w-full rounded-[1.35rem] border border-zinc-800 bg-[#1C1C1E] p-4 text-left transition hover:border-[#075473]/45 hover:bg-[#222226] sm:p-5"
+      className="group relative w-full overflow-hidden rounded-[1.35rem] border border-zinc-800 bg-[#1C1C1E] p-4 text-left transition hover:border-[#075473]/45 hover:bg-[#222226] sm:p-5"
     >
+      <BoxGradingGlow />
+      <div className="relative z-10">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-zinc-500">
@@ -426,6 +429,7 @@ function RouteSummaryWidget({
           className="h-4 w-4 shrink-0 text-zinc-600 transition group-hover:text-[#075473]"
           aria-hidden
         />
+      </div>
       </div>
     </button>
   );

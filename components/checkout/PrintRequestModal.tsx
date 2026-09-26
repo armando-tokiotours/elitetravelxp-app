@@ -20,12 +20,13 @@ import { useItineraryStore } from "@/store/useItineraryStore";
 import { usePreBuilderStore } from "@/store/usePreBuilderStore";
 import {
   downloadItineraryPdf,
-  itineraryPdfToBase64,
   printItineraryLocally,
+  type SendDocSelection,
 } from "@/lib/clientItineraryPdf";
 import { BookingTermsModal } from "@/components/checkout/BookingTermsModal";
 import { activeBookingRef } from "@/utils/pnr";
 import { useModalDismiss } from "@/hooks/useModalDismiss";
+import { EMAIL_CONFIG_DEFAULTS } from "@/config/emailDefaults";
 
 export type PrintRequestResult = {
   bookingRef: string;
@@ -52,21 +53,28 @@ function resolveKnownName(): string {
   return (it.clientName || pre.fullName || pre.lastPayload?.fullName || "").trim();
 }
 
+function teamBccLabel(): string {
+  return EMAIL_CONFIG_DEFAULTS.routing.bccRecipient || "armando@tokiotours.nl";
+}
+
 /**
- * Send / Save PDF — emails via Bluehost cPanel SMTP / Resend, with instant local PDF.
- * Opens with BookingTermsModal acknowledgment before the email / download form.
+ * Send / Print — pick dossier and/or invoice, email guest + team BCC,
+ * advance lead Draft → In Progress.
  */
 export function PrintRequestModal({
   isOpen,
   onClose,
   onSuccess,
   skipTerms = false,
+  /** Local print button — off on Builder M/S itinerary; on for export/designer tools. */
+  showLocalPrint = false,
 }: {
   isOpen: boolean;
   onClose: () => void;
   onSuccess?: (result: PrintRequestResult) => void;
   /** When true, skip the deposit/how-it-works gate (already acknowledged upstream). */
   skipTerms?: boolean;
+  showLocalPrint?: boolean;
 }) {
   const state = useBuilderStore();
   const departureDate = useBuilderStore((s) => s.departureDate);
@@ -85,6 +93,10 @@ export function PrintRequestModal({
   const [showDirectDownload, setShowDirectDownload] = useState(false);
   const [pdfRef, setPdfRef] = useState(state.tempBookingRef || "TMP-DRAFT");
   const [termsAccepted, setTermsAccepted] = useState(skipTerms);
+  const [sendDocs, setSendDocs] = useState<SendDocSelection>({
+    dossier: true,
+    invoice: true,
+  });
 
   useModalDismiss(isOpen && termsAccepted, () => {
     setBusy(false);
@@ -134,6 +146,7 @@ export function PrintRequestModal({
     setError(null);
     setSuccess(null);
     setShowDirectDownload(false);
+    setSendDocs({ dossier: true, invoice: true });
 
     const knownEmail = resolveKnownEmail();
     const knownName = resolveKnownName();
@@ -164,7 +177,9 @@ export function PrintRequestModal({
 
   const runLocalPdf = async (ref: string) => {
     try {
-      await downloadItineraryPdf(ref);
+      if (sendDocs.invoice) await downloadItineraryPdf(ref, "invoice");
+      else if (sendDocs.dossier) await downloadItineraryPdf(ref, "dossier");
+      else await downloadItineraryPdf(ref, "invoice");
     } catch (err) {
       console.warn("[PrintRequestModal] html2pdf failed, using print()", err);
       await printItineraryLocally(ref);
@@ -181,7 +196,7 @@ export function PrintRequestModal({
         open
         onConfirm={() => setTermsAccepted(true)}
         onCancel={handleDismiss}
-        confirmLabel="I Understand — Proceed to Invoice / Download PDF →"
+        confirmLabel="I Understand — Proceed to Send / Print →"
         cancelLabel="Back to Builder"
       />
     );
@@ -224,6 +239,12 @@ export function PrintRequestModal({
     const to = email.trim().toLowerCase();
     const displayName = name.trim();
 
+    if (!sendDocs.dossier && !sendDocs.invoice) {
+      setError("Select Travel Dossier, Invoice, or both to email.");
+      setBusy(false);
+      return;
+    }
+
     if (!to || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) {
       setError("Enter a valid email address to receive your itinerary.");
       setBusy(false);
@@ -235,13 +256,8 @@ export function PrintRequestModal({
     setClientEmail(to);
     if (displayName) setClientName(displayName);
 
-    let clientPdfBase64: string | undefined;
-    try {
-      clientPdfBase64 = await itineraryPdfToBase64(pdfRef);
-    } catch {
-      clientPdfBase64 = undefined;
-    }
-
+    // Server Send path builds mobile Chromium PDFs (430px dark theme).
+    // No client html2pdf required for email attachments.
     try {
       const res = await fetch("/api/send-itinerary", {
         method: "POST",
@@ -256,7 +272,7 @@ export function PrintRequestModal({
           departureDate: departureDate(),
           cityNames,
           tempBookingRef: state.tempBookingRef,
-          pdfBase64: clientPdfBase64,
+          sendDocs,
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -274,7 +290,7 @@ export function PrintRequestModal({
                     bookingRef: ref,
                     email: to,
                     state: useSingleDayBuilderStore.getState(),
-                    status: "quoted",
+                    status: "in_progress",
                     quote: quote ? { min: quote.min, max: quote.max } : null,
                   })
               );
@@ -284,7 +300,7 @@ export function PrintRequestModal({
                 email: to,
                 state,
                 cityNames,
-                status: "quoted",
+                status: "in_progress",
                 quote: quote ? { min: quote.min, max: quote.max } : null,
               });
             }
@@ -306,13 +322,22 @@ export function PrintRequestModal({
 
       dualWriteLead();
 
+      const bcc = teamBccLabel();
+      const parts = [
+        sendDocs.dossier ? "dossier" : null,
+        sendDocs.invoice ? "invoice" : null,
+      ]
+        .filter(Boolean)
+        .join(" + ");
       setSuccess(
-        "✓ Proposal emailed to you and copy sent to armando@tokiotours.nl"
+        `✓ ${parts} emailed to you (team copy → ${bcc}). Status: In Progress.`
       );
-      try {
-        await runLocalPdf(ref);
-      } catch {
-        /* email already succeeded */
+      if (showLocalPrint) {
+        try {
+          await runLocalPdf(ref);
+        } catch {
+          /* email already succeeded */
+        }
       }
       setBusy(false);
       onSuccess?.({
@@ -320,7 +345,7 @@ export function PrintRequestModal({
         mailSent: Boolean(data.mailSent ?? data.success),
         message:
           data.message ||
-          `Proposal emailed to ${to} (BCC armando@tokiotours.nl). Reference: ${ref}`,
+          `Emailed ${parts} to ${to} (BCC ${bcc}). Reference: ${ref}`,
       });
       // Close immediately so Done sheet is not trapped under this modal
       onClose();
@@ -355,7 +380,7 @@ export function PrintRequestModal({
         <div className="flex items-start justify-between gap-3">
           <div>
             <p className="text-[0.65rem] font-semibold uppercase tracking-[0.3em] text-[#075473]">
-              Send / Save PDF
+              Send / Print
             </p>
             <h2
               id="print-request-title"
@@ -364,8 +389,8 @@ export function PrintRequestModal({
               Email your itinerary
             </h2>
             <p className="mt-1 text-sm text-[#5C6570]">
-              We’ll save your trip, email your dossier, and download a PDF to
-              this device.
+              Choose dossier and/or invoice. We email you, BCC the concierge
+              team, and move this booking to In Progress.
             </p>
           </div>
           <button
@@ -389,6 +414,42 @@ export function PrintRequestModal({
         </div>
 
         <form onSubmit={handleSendPdf} className="mt-5 space-y-3">
+          <fieldset className="rounded-xl border border-[#E8E2D9] bg-[#FBF8F2] px-3.5 py-3">
+            <legend className="px-1 text-xs font-semibold uppercase tracking-wider text-[#8A8278]">
+              Send by email
+            </legend>
+            <div className="mt-1 space-y-2">
+              <label className="flex cursor-pointer items-center gap-2.5 text-sm text-[#0B1F3A]">
+                <input
+                  type="checkbox"
+                  checked={sendDocs.dossier}
+                  onChange={(e) =>
+                    setSendDocs((s) => ({ ...s, dossier: e.target.checked }))
+                  }
+                  disabled={busy}
+                  className="h-4 w-4 rounded border-[#D9D2C7] text-[#075473] focus:ring-[#075473]"
+                />
+                Travel Dossier
+              </label>
+              <label className="flex cursor-pointer items-center gap-2.5 text-sm text-[#0B1F3A]">
+                <input
+                  type="checkbox"
+                  checked={sendDocs.invoice}
+                  onChange={(e) =>
+                    setSendDocs((s) => ({ ...s, invoice: e.target.checked }))
+                  }
+                  disabled={busy}
+                  className="h-4 w-4 rounded border-[#D9D2C7] text-[#075473] focus:ring-[#075473]"
+                />
+                Invoice / Quotation
+              </label>
+            </div>
+            <p className="mt-2 text-[11px] leading-relaxed text-[#8A8278]">
+              Team copy goes to {teamBccLabel()} only on this send — not during
+              draft / pre-build.
+            </p>
+          </fieldset>
+
           <label className="block">
             <span className="text-xs font-semibold uppercase tracking-wider text-[#8A8278]">
               Full name
@@ -505,40 +566,42 @@ export function PrintRequestModal({
 
           <button
             type="submit"
-            disabled={busy || localBusy}
+            disabled={busy || localBusy || (!sendDocs.dossier && !sendDocs.invoice)}
             className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-[#0B1F3A] py-3 text-sm font-semibold text-white disabled:opacity-60"
           >
             {busy ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin" />
-                Sending your itinerary...
+                Sending…
               </>
             ) : (
               <>
                 <Mail className="h-4 w-4" />
-                Confirm &amp; Email My Itinerary
+                Confirm &amp; Email Selected
               </>
             )}
           </button>
 
-          <button
-            type="button"
-            disabled={busy || localBusy}
-            onClick={() => void handleLocalSave()}
-            className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-[#D9D2C7] bg-white py-3 text-sm font-semibold text-[#0B1F3A] disabled:opacity-60"
-          >
-            {localBusy && !showDirectDownload ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Preparing PDF…
-              </>
-            ) : (
-              <>
-                <Printer className="h-4 w-4" />
-                Print / Save as PDF (Local)
-              </>
-            )}
-          </button>
+          {showLocalPrint ? (
+            <button
+              type="button"
+              disabled={busy || localBusy}
+              onClick={() => void handleLocalSave()}
+              className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-[#D9D2C7] bg-white py-3 text-sm font-semibold text-[#0B1F3A] disabled:opacity-60"
+            >
+              {localBusy && !showDirectDownload ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Preparing PDF…
+                </>
+              ) : (
+                <>
+                  <Printer className="h-4 w-4" />
+                  Print / Save as PDF (Local)
+                </>
+              )}
+            </button>
+          ) : null}
         </form>
       </div>
     </div>
