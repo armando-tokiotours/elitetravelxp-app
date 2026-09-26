@@ -27,7 +27,7 @@ export async function POST(request: Request) {
 
     const lead = await findBookingsAndLeadsByRef(pnr);
     if (lead) {
-      const sel = (lead.selections || {}) as Record<string, unknown>;
+      const sel = (lead.selections || {}) as unknown as Record<string, unknown>;
       const nameFromSel = String(
         sel.fullName || sel.guestName || sel.contactName || ""
       ).trim();

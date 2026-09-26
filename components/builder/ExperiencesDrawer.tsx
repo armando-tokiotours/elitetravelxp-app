@@ -237,7 +237,7 @@ export function ExperiencesDrawer({
                   const recommended = isBestMatchTour(tour, experienceProfile);
                   return (
                     <TourDetailPanel
-                      key={tour.id}
+                      key={tour.id?.trim() || `tour-${tour.title || "item"}`}
                       tour={tour}
                       guests={guests}
                       recommended={recommended}

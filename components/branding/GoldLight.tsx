@@ -71,8 +71,8 @@ function hotHighlightFrom(color: string): string {
 function washGradient(
   color: string,
   at: string,
-  ellipseX = GOLD_LIGHT.ellipseX,
-  ellipseY = GOLD_LIGHT.ellipseY
+  ellipseX: string = GOLD_LIGHT.ellipseX,
+  ellipseY: string = GOLD_LIGHT.ellipseY
 ): string {
   const { washCoreOpacity, washMidOpacity } = GOLD_LIGHT;
   return `radial-gradient(ellipse ${ellipseX} ${ellipseY} at ${at}, ${rgba(color, washCoreOpacity)} 0%, ${rgba(color, washMidOpacity)} 32%, ${rgba(color, 0)} 70%)`;

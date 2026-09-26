@@ -242,7 +242,13 @@ export function TailoredExperiencesModal({
     }
     // Keep expansion only if the open key still exists — never auto-open a city
     setExpandedKey((prev) =>
-      prev && stayStops.some((l) => l.key === prev) ? prev : null
+      prev &&
+      stayStops.some((l, index) => {
+        const k = l.key?.trim() || `stay-${index}-${l.cityId || "city"}`;
+        return k === prev;
+      })
+        ? prev
+        : null
     );
   }, [stayStops]);
 
@@ -449,9 +455,9 @@ export function TailoredExperiencesModal({
               {seasonalMatches.length > 0 ? (
                 <div className="space-y-2">
                   <FieldLabel>Concierge suggestions</FieldLabel>
-                  {seasonalMatches.map((m) => (
+                  {seasonalMatches.map((m, index) => (
                     <ConciergeSuggestionCard
-                      key={`${m.highlight.id}-${m.cityId}-tours`}
+                      key={`season-${index}-${m.highlight?.id || "h"}-${m.cityId || "c"}`}
                       match={m}
                       tourAlreadyAdded={
                         !!m.highlight.suggested_tour_id &&
@@ -510,13 +516,16 @@ export function TailoredExperiencesModal({
                   </p>
                 ) : (
                   <div className="mt-2 flex flex-col gap-3">
-                    {stayStops.map((stop) => {
+                    {stayStops.map((stop, index) => {
                       const city = cityMap[stop.cityId];
                       const name =
                         cityNames[stop.cityId] ?? city?.name ?? "City";
                       const cityRows = selectedToursMap[stop.cityId] ?? [];
                       const citySelections =
                         chauffeurSelections[stop.cityId] ?? {};
+                      const accordionKey =
+                        stop.key?.trim() ||
+                        `stay-${index}-${stop.cityId || "city"}`;
                       const driverDayCount = Object.values(
                         citySelections
                       ).filter((sel) => isBillableChauffeurDay(sel)).length;
@@ -540,13 +549,13 @@ export function TailoredExperiencesModal({
 
                       return (
                         <CityExperienceAccordion
-                          key={stop.key || `stay-${stop.cityId}-${name}`}
+                          key={accordionKey}
                           city={city}
                           cityName={name}
-                          expanded={expandedKey === stop.key}
+                          expanded={expandedKey === accordionKey}
                           onToggle={() =>
                             setExpandedKey((k) =>
-                              k === stop.key ? null : stop.key
+                              k === accordionKey ? null : accordionKey
                             )
                           }
                           experienceCount={cityRows.length}
@@ -885,7 +894,7 @@ function CityExperienceAccordion({
             <div className="space-y-2 rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-3">
               {orderedTours.length > 0 ? (
                 <ul className="space-y-1">
-                  {orderedTours.map((tour) => {
+                  {orderedTours.map((tour, index) => {
                     const dayOpt = dayOptions.find(
                       (d) => d.date === tour.scheduledDate
                     );
@@ -894,7 +903,7 @@ function CityExperienceAccordion({
                       : "Day ?";
                     return (
                       <li
-                        key={`${tour.tourId}-${tour.scheduledDate}`}
+                        key={`${tour.tourId || "tour"}-${tour.scheduledDate || "day"}-${index}`}
                         className="truncate text-xs text-zinc-300"
                       >
                         {dayBit} · {tour.title}

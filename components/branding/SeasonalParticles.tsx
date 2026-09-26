@@ -219,20 +219,24 @@ export function SeasonalParticlesHost() {
         if (getSeasonalParticleRules().length === 0) {
           const rows = await getPocketBase()
             .collection("seasonal_particles")
-            .getFullList({ sort: "sort_order,start_month,start_day" });
+            .getFullList<import("@/lib/pocketbase/client").PbSeasonalParticle>({
+              sort: "sort_order,start_month,start_day",
+            });
           if (!cancelled) {
             setSeasonalParticleRules(
-              rows.filter((r: { is_active?: boolean }) => r.is_active !== false) as import("@/lib/pocketbase/client").PbSeasonalParticle[]
+              rows.filter((r) => r.is_active !== false)
             );
           }
         }
         if (getSeasonalCharacterRules().length === 0) {
           const chars = await getPocketBase()
             .collection("seasonal_characters")
-            .getFullList({ sort: "sort_order,key" });
+            .getFullList<import("@/lib/pocketbase/client").PbSeasonalCharacter>({
+              sort: "sort_order,key",
+            });
           if (!cancelled) {
             setSeasonalCharacterRules(
-              chars.filter((r: { is_active?: boolean }) => r.is_active !== false) as import("@/lib/pocketbase/client").PbSeasonalCharacter[]
+              chars.filter((r) => r.is_active !== false)
             );
           }
         }
