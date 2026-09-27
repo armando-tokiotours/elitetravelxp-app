@@ -239,7 +239,7 @@ export function TravelDossierView({
               const originalIndex = state.locations.indexOf(loc);
               return (
                 <LocationSegment
-                  key={loc.key}
+                  key={loc.key?.trim() || `stay-${loc.cityId || "city"}-${stayIndex}`}
                   loc={loc}
                   index={stayIndex}
                   next={nextStay}
@@ -424,12 +424,12 @@ function LocationSegment({
                 className="absolute top-3 bottom-1 left-[7px] w-px bg-gradient-to-b from-[#F6A724]/80 via-[#075473]/55 to-transparent"
                 aria-hidden
               />
-              {tours.map((row) => {
+              {tours.map((row, tourIndex) => {
                 const tour = config?.tours.find((t) => t.id === row.tourId);
                 const hours = tour?.duration_hours ?? row.duration_hours;
                 return (
                   <li
-                    key={`${row.tourId}-${row.scheduledDate}`}
+                    key={`${row.tourId || "tour"}-${row.scheduledDate || "undated"}-${tourIndex}`}
                     className="relative flex items-start gap-2 text-sm"
                   >
                     <CircleDot className="mt-0.5 h-4 w-4 shrink-0 text-[#F6A724]" />

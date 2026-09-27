@@ -255,7 +255,7 @@ export function CityTransportModal({
                             mode === "full_day" || mode === "by_tour";
                           return (
                             <li
-                              key={day.date}
+                              key={day.date || `day-${day.tripDay}`}
                               className="rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-3"
                             >
                               <p className="mb-2.5 text-sm font-medium text-white">

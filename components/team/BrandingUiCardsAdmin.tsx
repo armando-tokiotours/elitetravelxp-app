@@ -168,7 +168,7 @@ export function BrandingUiCardsAdmin({
       useSiteBrandingStore.setState({ loaded: false, itemsByKey: {} });
       setMsg(`Saved “${saved.key}”.`);
     } catch (e) {
-      setError(e instanceof Error ? e.message : formatPbError(e));
+      setError(formatPbError(e));
     } finally {
       setSavingKey(null);
     }

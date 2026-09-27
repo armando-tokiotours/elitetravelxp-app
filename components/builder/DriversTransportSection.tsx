@@ -68,7 +68,10 @@ export function DriversTransportSection({
       if (loc.nights <= 0) continue;
       if (seen.has(loc.cityId)) continue;
       seen.add(loc.cityId);
-      stops.push({ key: loc.key || loc.cityId, cityId: loc.cityId });
+      stops.push({
+        key: loc.key?.trim() || loc.cityId || `driver-${seen.size}`,
+        cityId: loc.cityId,
+      });
     }
     return stops;
   }, [locations]);
@@ -233,7 +236,7 @@ export function DriversTransportSection({
 
             return (
               <button
-                key={stop.key || `driver-${stop.cityId}-${name}`}
+                key={stop.key?.trim() || `driver-${stop.cityId || "city"}-${name}`}
                 type="button"
                 onClick={() => setActiveCityId(stop.cityId)}
                 className="flex w-full items-center gap-3 rounded-2xl border border-zinc-800 bg-zinc-900 p-3 text-left transition hover:border-[#075473]/40 hover:bg-zinc-800/80 sm:p-4"

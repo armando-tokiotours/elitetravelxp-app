@@ -331,9 +331,9 @@ export function HotelsEditorModal({
                 </p>
               ) : (
                 <div className="flex flex-col gap-4">
-                  {orderedCityIds.map((cityId) => (
+                  {orderedCityIds.map((cityId, index) => (
                     <CityHotelCard
-                      key={cityId}
+                      key={cityId || `hotel-city-${index}`}
                       cityId={cityId}
                       city={cityById(cityId)}
                       cityName={cityName(cityId)}

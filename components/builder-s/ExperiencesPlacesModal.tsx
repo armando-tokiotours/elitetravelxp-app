@@ -282,7 +282,7 @@ export function ExperiencesPlacesModal({
                     const slot = timedStops[index];
                     return (
                       <li
-                        key={row.tourId}
+                        key={row.tourId?.trim() || `selected-${index}-${row.title || "tour"}`}
                         draggable
                         onDragStart={() => onDragStart(index)}
                         onDragOver={(e) => onDragOver(e, index)}
@@ -354,7 +354,7 @@ export function ExperiencesPlacesModal({
                   No items in this category for {selectedCity.name} yet.
                 </p>
               ) : (
-                filtered.map((item) => {
+                filtered.map((item, index) => {
                   const booked = selectedRows.some(
                     (r) => r.tourId === item.id
                   );
@@ -383,7 +383,7 @@ export function ExperiencesPlacesModal({
 
                   return (
                     <article
-                      key={item.id}
+                      key={item.id?.trim() || `feed-${index}-${item.title || "item"}`}
                       className={`overflow-hidden rounded-2xl border transition ${
                         booked
                           ? "border-[#1BA58A]/60 bg-[#0D1117]/90"

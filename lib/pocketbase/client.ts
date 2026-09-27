@@ -379,8 +379,12 @@ export interface PbBrandingUiItem {
   subtitle?: string;
   description?: string;
   media?: string;
-  /** Video poster / hero still */
+  /** Video poster / hero still · also Pre-Builder story slide 2 */
   poster?: string;
+  /** Pre-Builder story slide 3 (image or video) */
+  slide3?: string;
+  /** Pre-Builder selected-card background (image or video) */
+  card?: string;
   cta_primary?: string;
   cta_secondary?: string;
   inclusion_title?: string;
@@ -408,11 +412,12 @@ export function brandingUiMediaUrl(
   thumb?: string
 ): string {
   if (!row?.media || !row.id) return "";
+  const isVideo = /\.(mp4|webm|mov|m4v)(\?|$)/i.test(row.media);
   return pbFileUrl(
     String(row.collectionId ?? "branding_ui_items"),
     row.id,
     row.media,
-    thumb ? { thumb, format: "webp" } : undefined
+    !isVideo && thumb ? { thumb, format: "webp" } : undefined
   );
 }
 
@@ -421,11 +426,43 @@ export function brandingUiPosterUrl(
   thumb = "600x400"
 ): string {
   if (!row?.poster || !row.id) return "";
+  const isVideo = /\.(mp4|webm|mov|m4v)(\?|$)/i.test(row.poster);
   return pbFileUrl(
     String(row.collectionId ?? "branding_ui_items"),
     row.id,
     row.poster,
-    { thumb, format: "webp" }
+    // Videos have no image thumbs — requesting thumb/webp breaks playback
+    !isVideo && thumb ? { thumb, format: "webp" } : undefined
+  );
+}
+
+/** Pre-Builder story slide 3 (image or video). */
+export function brandingUiSlide3Url(
+  row: PbBrandingUiItem | null | undefined,
+  thumb?: string
+): string {
+  if (!row?.slide3 || !row.id) return "";
+  const isVideo = /\.(mp4|webm|mov|m4v)(\?|$)/i.test(row.slide3);
+  return pbFileUrl(
+    String(row.collectionId ?? "branding_ui_items"),
+    row.id,
+    row.slide3,
+    !isVideo && thumb ? { thumb, format: "webp" } : undefined
+  );
+}
+
+/** Pre-Builder selected-card background (image or video). */
+export function brandingUiCardUrl(
+  row: PbBrandingUiItem | null | undefined,
+  thumb?: string
+): string {
+  if (!row?.card || !row.id) return "";
+  const isVideo = /\.(mp4|webm|mov|m4v)(\?|$)/i.test(row.card);
+  return pbFileUrl(
+    String(row.collectionId ?? "branding_ui_items"),
+    row.id,
+    row.card,
+    !isVideo && thumb ? { thumb, format: "webp" } : undefined
   );
 }
 

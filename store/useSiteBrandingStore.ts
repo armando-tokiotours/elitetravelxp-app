@@ -5,6 +5,8 @@ import { SINGLE_DAY_BUILDER_CONFIG } from "@/config/mediaConfig";
 import {
   brandingUiMediaUrl,
   brandingUiPosterUrl,
+  brandingUiSlide3Url,
+  brandingUiCardUrl,
   fetchBrandingUiItems,
   type PbBrandingUiItem,
 } from "@/lib/pocketbase/client";
@@ -45,8 +47,12 @@ export interface ResolvedBrandingUiItem {
   /** Absolute or site-relative URL for card / modal media */
   mediaUrl: string;
   isVideo: boolean;
-  /** Poster for video items */
+  /** Poster for video items · Pre-Builder story slide 2 */
   posterUrl: string;
+  /** Pre-Builder story slide 3 */
+  slide3Url: string;
+  /** Pre-Builder selected-card background */
+  cardUrl: string;
   recordId: string | null;
 }
 
@@ -84,6 +90,8 @@ function resolveItem(
         : isVideo
           ? ""
           : mediaUrl);
+  const slide3Url = brandingUiSlide3Url(row);
+  const cardUrl = brandingUiCardUrl(row);
 
   return {
     key,
@@ -100,6 +108,8 @@ function resolveItem(
     mediaUrl,
     isVideo,
     posterUrl,
+    slide3Url,
+    cardUrl,
     recordId: row?.id ?? null,
   };
 }

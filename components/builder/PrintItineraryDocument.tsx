@@ -336,7 +336,7 @@ export function PrintItineraryDocument({
                 No hotel stays configured yet.
               </p>
             ) : (
-              stayLocations.map((loc) => {
+              stayLocations.map((loc, i) => {
                 const prefRaw = state.cityHotels[loc.cityId];
                 const pref = prefRaw
                   ? normalizeCityHotelPref(
@@ -351,7 +351,7 @@ export function PrintItineraryDocument({
                 if (!wantsHotel) {
                   return (
                     <DetailRow
-                      key={loc.key}
+                      key={loc.key?.trim() || `hotel-self-${loc.cityId || "city"}-${i}`}
                       left={`${cityName(loc.cityId)} (${loc.nights} Night${
                         loc.nights === 1 ? "" : "s"
                       })`}
@@ -375,7 +375,7 @@ export function PrintItineraryDocument({
                   : null;
                 return (
                   <DetailRow
-                    key={loc.key}
+                    key={loc.key?.trim() || `hotel-${loc.cityId || "city"}-${i}`}
                     left={`${cityName(loc.cityId)} (${loc.nights} Night${
                       loc.nights === 1 ? "" : "s"
                     })`}
@@ -436,7 +436,7 @@ export function PrintItineraryDocument({
                 ) : null}
                 {state.locations.map((loc, i) => (
                 <CityExperienceBlock
-                  key={loc.key}
+                  key={loc.key?.trim() || `route-${loc.cityId || "city"}-${i}`}
                   loc={loc}
                   index={i}
                   prev={state.locations[i - 1]}
@@ -689,12 +689,12 @@ function CityExperienceBlock({
             ) : null}
 
             {!concierge &&
-              tours.map((row) => {
+              tours.map((row, tourIndex) => {
                 const catalog = config?.tours.find((t) => t.id === row.tourId);
                 const hours = catalog?.duration_hours ?? row.duration_hours;
                 return (
                   <li
-                    key={`${row.tourId}-${row.scheduledDate}`}
+                    key={`${row.tourId || "tour"}-${row.scheduledDate || "undated"}-${tourIndex}`}
                     className="text-xs text-white/55 print:text-[#5C6570]"
                   >
                     {row.title}

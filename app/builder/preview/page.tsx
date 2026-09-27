@@ -70,7 +70,7 @@ export default function PreviewPage() {
 
             return (
               <article
-                key={loc.key}
+                key={loc.key?.trim() || `preview-${loc.cityId || "city"}-${i}`}
                 className="overflow-hidden rounded-2xl border border-[#E8E2D9] bg-white shadow-sm"
               >
                 {img ? (

@@ -232,12 +232,12 @@ export function ExperiencesDrawer({
                   {activeTab === "tours" ? "tour" : "activity"}.
                 </p>
               ) : (
-                filteredTours.map((tour) => {
+                filteredTours.map((tour, index) => {
                   const booked = selectedById[tour.id];
                   const recommended = isBestMatchTour(tour, experienceProfile);
                   return (
                     <TourDetailPanel
-                      key={tour.id?.trim() || `tour-${tour.title || "item"}`}
+                      key={`${tour.id?.trim() || "tour"}-${index}-${tour.title || "item"}`}
                       tour={tour}
                       guests={guests}
                       recommended={recommended}

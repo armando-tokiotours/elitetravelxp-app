@@ -28,8 +28,10 @@ import {
   preEliteBrandingKey,
   readPreEliteQuizLocalCache,
   resolvePreEliteStory,
-  PRE_ELITE_QUIZ_LS_KEY,
+  resolvePreEliteCardMedia,
+  PRE_ELITE_QUIZ_LOCAL_KEY,
 } from "@/lib/preEliteBranding";
+import { isVideoFilename } from "@/lib/brandingUi";
 import { StoryExplanationModal } from "@/components/pre-elite/StoryExplanationModal";
 import { TimingSelector } from "@/components/pre-elite/TimingSelector";
 import { usePreBuilderStore } from "@/store/usePreBuilderStore";
@@ -134,7 +136,7 @@ export function PreEliteBuilderClient() {
   useEffect(() => {
     setLocalQuiz(readPreEliteQuizLocalCache());
     const onStorage = (e: StorageEvent) => {
-      if (e.key === PRE_ELITE_QUIZ_LS_KEY) {
+      if (e.key === PRE_ELITE_QUIZ_LOCAL_KEY) {
         setLocalQuiz(readPreEliteQuizLocalCache());
       }
     };
@@ -373,6 +375,14 @@ export function PreEliteBuilderClient() {
                             localQuiz[id] || null
                           )
                         }
+                        resolveCard={(id, svgUrl) =>
+                          resolvePreEliteCardMedia(
+                            id,
+                            getBrandingItem(preEliteBrandingKey(id)),
+                            localQuiz[id] || null,
+                            svgUrl
+                          )
+                        }
                         onOpenStory={openStory}
                       />
                     )}
@@ -386,6 +396,14 @@ export function PreEliteBuilderClient() {
                             id,
                             getBrandingItem(preEliteBrandingKey(id)),
                             localQuiz[id] || null
+                          )
+                        }
+                        resolveCard={(id, svgUrl) =>
+                          resolvePreEliteCardMedia(
+                            id,
+                            getBrandingItem(preEliteBrandingKey(id)),
+                            localQuiz[id] || null,
+                            svgUrl
                           )
                         }
                         onOpenStory={openStory}
@@ -402,6 +420,14 @@ export function PreEliteBuilderClient() {
                             localQuiz[id] || null
                           )
                         }
+                        resolveCard={(id, svgUrl) =>
+                          resolvePreEliteCardMedia(
+                            id,
+                            getBrandingItem(preEliteBrandingKey(id)),
+                            localQuiz[id] || null,
+                            svgUrl
+                          )
+                        }
                         onOpenStory={openStory}
                       />
                     )}
@@ -415,6 +441,14 @@ export function PreEliteBuilderClient() {
                             id,
                             getBrandingItem(preEliteBrandingKey(id)),
                             localQuiz[id] || null
+                          )
+                        }
+                        resolveCard={(id, svgUrl) =>
+                          resolvePreEliteCardMedia(
+                            id,
+                            getBrandingItem(preEliteBrandingKey(id)),
+                            localQuiz[id] || null,
+                            svgUrl
                           )
                         }
                         onOpenStory={openStory}
@@ -523,6 +557,7 @@ function ChoiceList({
   selected,
   onOpenStory,
   resolveCopy,
+  resolveCard,
 }: {
   options: readonly {
     id: string;
@@ -536,6 +571,10 @@ function ChoiceList({
   multiple?: boolean;
   onOpenStory: (id: string) => void;
   resolveCopy?: (id: string) => StoryExplanation | null;
+  resolveCard?: (
+    id: string,
+    svgUrl?: string
+  ) => { url: string; isVideo: boolean };
 }) {
   const isOn = (id: string) =>
     Array.isArray(selected) ? selected.includes(id) : selected === id;
@@ -556,14 +595,15 @@ function ChoiceList({
         const title = story?.title || option.title;
         const description = option.description;
         const badgeTag = option.eyebrow;
-        const slide = story?.slides?.[0];
-        const videoUrl = slide?.videoUrl?.trim() || "";
-        /** Prefer dedicated SVG card art for instant selected-state swaps. */
-        const svgUrl = option.svgUrl?.trim() || "";
-        const imageFallback =
-          svgUrl ||
-          slide?.imageUrl?.trim() ||
-          "/svg/style-premium-comfort.svg";
+        const card = resolveCard?.(option.id, option.svgUrl) || {
+          url:
+            option.svgUrl?.trim() ||
+            story?.slides?.[0]?.imageUrl ||
+            "/svg/style-premium-comfort.svg",
+          isVideo: false,
+        };
+        const cardUrl = card.url;
+        const cardIsVideo = card.isVideo || isVideoFilename(cardUrl);
         const spotlight = CHOICE_SPOTLIGHT[option.id];
         const accent = spotlight?.color || "#22D3EE";
         const accentRgb = (() => {
@@ -594,24 +634,23 @@ function ChoiceList({
                 : undefined
             }
           >
-            {/* Selected background — SVG first for crisp instant swaps; video optional */}
+            {/* Selected background — Team Access card photo wins over SVG */}
             {on ? (
               <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
-                {videoUrl && !svgUrl ? (
+                {cardIsVideo ? (
                   <video
-                    key={videoUrl}
-                    src={videoUrl}
+                    key={cardUrl}
+                    src={cardUrl}
                     autoPlay
                     loop
                     muted
                     playsInline
-                    poster={imageFallback}
                     className="h-full w-full object-cover"
                   />
                 ) : (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
-                    src={imageFallback}
+                    src={cardUrl}
                     alt=""
                     className="h-full w-full scale-105 object-cover transition-transform duration-500"
                   />

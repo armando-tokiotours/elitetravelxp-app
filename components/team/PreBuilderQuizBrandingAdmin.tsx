@@ -7,6 +7,8 @@ import { isVideoFilename } from "@/lib/brandingUi";
 import {
   brandingUiMediaUrl,
   brandingUiPosterUrl,
+  brandingUiSlide3Url,
+  brandingUiCardUrl,
   type PbBrandingUiItem,
 } from "@/lib/pocketbase/client";
 import {
@@ -29,16 +31,27 @@ type OptionDraft = {
   slide1Caption: string;
   slide2Title: string;
   slide2Caption: string;
+  slide3Title: string;
+  slide3Caption: string;
   mediaFile: File | null;
   posterFile: File | null;
+  slide3File: File | null;
+  cardFile: File | null;
   mediaPreview: string;
   posterPreview: string;
+  slide3Preview: string;
+  cardPreview: string;
 };
 
-function emptyDraft(optionId: string, title: string, description: string): OptionDraft {
+function emptyDraft(
+  optionId: string,
+  title: string,
+  description: string
+): OptionDraft {
   const story = getStoryExplanation(optionId);
   const s1 = story?.slides[0];
   const s2 = story?.slides[1];
+  const s3 = story?.slides[2];
   return {
     recordId: null,
     title,
@@ -47,10 +60,18 @@ function emptyDraft(optionId: string, title: string, description: string): Optio
     slide1Caption: s1?.caption || "",
     slide2Title: s2?.title || "",
     slide2Caption: s2?.caption || "",
+    slide3Title: s3?.title || "Moment 3",
+    slide3Caption:
+      s3?.caption ||
+      "A closer look at how this choice shapes your Japan days.",
     mediaFile: null,
     posterFile: null,
+    slide3File: null,
+    cardFile: null,
     mediaPreview: s1?.videoUrl || s1?.imageUrl || "",
     posterPreview: s2?.videoUrl || s2?.imageUrl || "",
+    slide3Preview: s3?.videoUrl || s3?.imageUrl || "",
+    cardPreview: "",
   };
 }
 
@@ -64,6 +85,8 @@ function draftFromRow(
   if (!row) return base;
   const media = brandingUiMediaUrl(row) || base.mediaPreview;
   const poster = brandingUiPosterUrl(row) || base.posterPreview;
+  const slide3 = brandingUiSlide3Url(row) || base.slide3Preview;
+  const card = brandingUiCardUrl(row) || base.cardPreview;
   return {
     recordId: row.id,
     title: row.title?.trim() || base.title,
@@ -72,10 +95,16 @@ function draftFromRow(
     slide1Caption: row.inclusion_body?.trim() || base.slide1Caption,
     slide2Title: row.cta_secondary?.trim() || base.slide2Title,
     slide2Caption: row.credit_body?.trim() || base.slide2Caption,
+    slide3Title: row.inclusion_title?.trim() || base.slide3Title,
+    slide3Caption: row.credit_title?.trim() || base.slide3Caption,
     mediaFile: null,
     posterFile: null,
+    slide3File: null,
+    cardFile: null,
     mediaPreview: media,
     posterPreview: poster,
+    slide3Preview: slide3,
+    cardPreview: card,
   };
 }
 
@@ -154,8 +183,12 @@ export function PreBuilderQuizBrandingAdmin({
       fd.append("inclusion_body", draft.slide1Caption);
       fd.append("cta_secondary", draft.slide2Title);
       fd.append("credit_body", draft.slide2Caption);
+      fd.append("inclusion_title", draft.slide3Title);
+      fd.append("credit_title", draft.slide3Caption);
       if (draft.mediaFile) fd.append("media", draft.mediaFile);
       if (draft.posterFile) fd.append("poster", draft.posterFile);
+      if (draft.slide3File) fd.append("slide3", draft.slide3File);
+      if (draft.cardFile) fd.append("card", draft.cardFile);
 
       let saved: PbBrandingUiItem;
       if (draft.recordId) {
@@ -171,15 +204,21 @@ export function PreBuilderQuizBrandingAdmin({
 
       const mediaUrl = brandingUiMediaUrl(saved) || draft.mediaPreview;
       const posterUrl = brandingUiPosterUrl(saved) || draft.posterPreview;
+      const slide3Url = brandingUiSlide3Url(saved) || draft.slide3Preview;
+      const cardUrl = brandingUiCardUrl(saved) || draft.cardPreview;
       writePreEliteQuizLocalEntry(optionId, {
         title: draft.title,
         subtitle: draft.subtitle,
         mediaUrl,
         posterUrl,
+        slide3Url,
+        cardUrl,
         slide1Title: draft.slide1Title,
         slide1Caption: draft.slide1Caption,
         slide2Title: draft.slide2Title,
         slide2Caption: draft.slide2Caption,
+        slide3Title: draft.slide3Title,
+        slide3Caption: draft.slide3Caption,
       });
       useSiteBrandingStore.setState({ loaded: false, itemsByKey: {} });
 
@@ -187,19 +226,27 @@ export function PreBuilderQuizBrandingAdmin({
         recordId: saved.id,
         mediaFile: null,
         posterFile: null,
+        slide3File: null,
+        cardFile: null,
         mediaPreview: mediaUrl,
         posterPreview: posterUrl,
+        slide3Preview: slide3Url,
+        cardPreview: cardUrl,
       });
-      setMsg(`Saved “${draft.title}”. Pre-Builder quiz will use the new media.`);
+      setMsg(
+        `Saved “${draft.title}”. Card photo + 3 story slides update on Pre-Builder.`
+      );
     } catch (e) {
-      setError(e instanceof Error ? e.message : formatPbError(e));
+      setError(formatPbError(e));
     } finally {
       setSavingId(null);
     }
   };
 
   if (loading) {
-    return <p className="text-sm text-zinc-400">Loading Pre-Builder quiz branding…</p>;
+    return (
+      <p className="text-sm text-zinc-400">Loading Pre-Builder quiz branding…</p>
+    );
   }
 
   const activeSection =
@@ -213,12 +260,13 @@ export function PreBuilderQuizBrandingAdmin({
           Pre-Builder Match Quiz
         </h2>
         <p className="mt-1 text-sm text-zinc-400">
-          Swap story media, titles, and descriptions for each quiz option.
-          Saves to PocketBase{" "}
-          <code className="text-zinc-300">branding_ui_items</code> (
-          <code className="text-zinc-300">pre_elite_*</code>) and mirrors to
-          localStorage for instant live updates on{" "}
-          <code className="text-zinc-300">/pre-elite-builder</code>.
+          Upload a{" "}
+          <strong className="font-semibold text-zinc-200">card photo</strong>{" "}
+          (shown when that option is selected) plus{" "}
+          <strong className="font-semibold text-zinc-200">3 story slides</strong>
+          . Each can be image or video (MP4 / WebM, up to 50MB). Saves to
+          PocketBase and updates{" "}
+          <code className="text-zinc-300">/pre-elite-builder</code> live.
         </p>
       </div>
 
@@ -267,13 +315,30 @@ export function PreBuilderQuizBrandingAdmin({
                   {opt.title}
                 </p>
                 <p className="mt-0.5 text-xs text-zinc-500">
-                  key · {preEliteBrandingKey(opt.id)}
+                  key · {preEliteBrandingKey(opt.id)} · card + 3 slides
                 </p>
 
-                <div className="mt-4 grid gap-4 lg:grid-cols-2">
+                <div className="mt-4">
                   <MediaSlot
-                    label="Story slide 1 / 2"
+                    label="Card photo (selected on Pre-Builder)"
+                    preview={d.cardPreview}
+                    pendingFile={d.cardFile}
+                    onFile={(f) => {
+                      patchDraft(opt.id, {
+                        cardFile: f,
+                        cardPreview: f
+                          ? URL.createObjectURL(f)
+                          : d.cardPreview,
+                      });
+                    }}
+                  />
+                </div>
+
+                <div className="mt-4 grid gap-4 lg:grid-cols-3">
+                  <MediaSlot
+                    label="Slide 1 / 3"
                     preview={d.mediaPreview}
+                    pendingFile={d.mediaFile}
                     onFile={(f) => {
                       patchDraft(opt.id, {
                         mediaFile: f,
@@ -284,14 +349,28 @@ export function PreBuilderQuizBrandingAdmin({
                     }}
                   />
                   <MediaSlot
-                    label="Story slide 2 / 2"
+                    label="Slide 2 / 3"
                     preview={d.posterPreview}
+                    pendingFile={d.posterFile}
                     onFile={(f) => {
                       patchDraft(opt.id, {
                         posterFile: f,
                         posterPreview: f
                           ? URL.createObjectURL(f)
                           : d.posterPreview,
+                      });
+                    }}
+                  />
+                  <MediaSlot
+                    label="Slide 3 / 3"
+                    preview={d.slide3Preview}
+                    pendingFile={d.slide3File}
+                    onFile={(f) => {
+                      patchDraft(opt.id, {
+                        slide3File: f,
+                        slide3Preview: f
+                          ? URL.createObjectURL(f)
+                          : d.slide3Preview,
                       });
                     }}
                   />
@@ -320,57 +399,53 @@ export function PreBuilderQuizBrandingAdmin({
                       className="mt-1 w-full rounded-xl border border-zinc-700 bg-zinc-900 px-3 py-2.5 text-sm text-zinc-100"
                     />
                   </label>
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <label className="block text-xs uppercase tracking-wider text-zinc-400">
-                      Slide 1 title
-                      <input
-                        type="text"
-                        value={d.slide1Title}
-                        onChange={(e) =>
-                          patchDraft(opt.id, { slide1Title: e.target.value })
-                        }
-                        className="mt-1 w-full rounded-xl border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-100"
-                      />
-                    </label>
-                    <label className="block text-xs uppercase tracking-wider text-zinc-400">
-                      Slide 2 title
-                      <input
-                        type="text"
-                        value={d.slide2Title}
-                        onChange={(e) =>
-                          patchDraft(opt.id, { slide2Title: e.target.value })
-                        }
-                        className="mt-1 w-full rounded-xl border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-100"
-                      />
-                    </label>
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    {(
+                      [
+                        ["slide1Title", "Slide 1 title", d.slide1Title],
+                        ["slide2Title", "Slide 2 title", d.slide2Title],
+                        ["slide3Title", "Slide 3 title", d.slide3Title],
+                      ] as const
+                    ).map(([key, label, value]) => (
+                      <label
+                        key={key}
+                        className="block text-xs uppercase tracking-wider text-zinc-400"
+                      >
+                        {label}
+                        <input
+                          type="text"
+                          value={value}
+                          onChange={(e) =>
+                            patchDraft(opt.id, { [key]: e.target.value })
+                          }
+                          className="mt-1 w-full rounded-xl border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-100"
+                        />
+                      </label>
+                    ))}
                   </div>
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <label className="block text-xs uppercase tracking-wider text-zinc-400">
-                      Slide 1 caption
-                      <textarea
-                        rows={2}
-                        value={d.slide1Caption}
-                        onChange={(e) =>
-                          patchDraft(opt.id, {
-                            slide1Caption: e.target.value,
-                          })
-                        }
-                        className="mt-1 w-full rounded-xl border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-100"
-                      />
-                    </label>
-                    <label className="block text-xs uppercase tracking-wider text-zinc-400">
-                      Slide 2 caption
-                      <textarea
-                        rows={2}
-                        value={d.slide2Caption}
-                        onChange={(e) =>
-                          patchDraft(opt.id, {
-                            slide2Caption: e.target.value,
-                          })
-                        }
-                        className="mt-1 w-full rounded-xl border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-100"
-                      />
-                    </label>
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    {(
+                      [
+                        ["slide1Caption", "Slide 1 caption", d.slide1Caption],
+                        ["slide2Caption", "Slide 2 caption", d.slide2Caption],
+                        ["slide3Caption", "Slide 3 caption", d.slide3Caption],
+                      ] as const
+                    ).map(([key, label, value]) => (
+                      <label
+                        key={key}
+                        className="block text-xs uppercase tracking-wider text-zinc-400"
+                      >
+                        {label}
+                        <textarea
+                          rows={2}
+                          value={value}
+                          onChange={(e) =>
+                            patchDraft(opt.id, { [key]: e.target.value })
+                          }
+                          className="mt-1 w-full rounded-xl border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-100"
+                        />
+                      </label>
+                    ))}
                   </div>
                 </div>
 
@@ -394,13 +469,17 @@ export function PreBuilderQuizBrandingAdmin({
 function MediaSlot({
   label,
   preview,
+  pendingFile,
   onFile,
 }: {
   label: string;
   preview: string;
+  pendingFile?: File | null;
   onFile: (f: File | null) => void;
 }) {
-  const isVideo = isVideoFilename(preview);
+  const isVideo =
+    (pendingFile ? pendingFile.type.startsWith("video/") : false) ||
+    isVideoFilename(preview);
   return (
     <div>
       <p className="mb-1 text-xs uppercase tracking-wider text-zinc-400">
@@ -431,10 +510,13 @@ function MediaSlot({
         )}
         <input
           type="file"
-          accept="image/jpeg,image/webp,image/png,video/mp4,video/webm,.jpg,.webp,.mp4"
+          accept="image/jpeg,image/webp,image/png,video/mp4,video/webm,video/quicktime,.mov,.m4v,.jpg,.webp,.mp4,.webm"
           className="mt-3 block w-full text-xs text-zinc-300"
           onChange={(e) => onFile(e.target.files?.[0] ?? null)}
         />
+        <p className="mt-1.5 text-[10px] text-zinc-500">
+          Image or video · MP4 · 9:16 · under 50MB
+        </p>
       </div>
     </div>
   );

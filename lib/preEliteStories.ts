@@ -144,6 +144,13 @@ const STORIES: Record<string, StoryExplanation> = {
           "Tea ceremonies, sumo culture, and etiquette cues your host explains in the moment.",
         imageUrl: "/photo/season-mid.jpg",
       },
+      {
+        id: "ch-3",
+        title: "Respectful pacing",
+        caption:
+          "Enough time at each site to feel the place — not a checklist dash.",
+        imageUrl: "/photo/pace-relaxed.jpg",
+      },
     ],
   },
   food_culinary: {
@@ -167,6 +174,13 @@ const STORIES: Record<string, StoryExplanation> = {
           "Street food walks, sake tasting, and reserved fine dining when you want the full spectrum.",
         imageUrl: "/images/matcher-poster-hero.webp",
         videoUrl: GUIDE_VIDEO,
+      },
+      {
+        id: "fc-3",
+        title: "Host-led reservations",
+        caption:
+          "We handle the hard-to-book tables so you can focus on the meal.",
+        imageUrl: "/images/concierge-poster-card.webp",
       },
     ],
   },
@@ -192,6 +206,13 @@ const STORIES: Record<string, StoryExplanation> = {
           "Vibrant corners timed for light and crowd flow — built for the shots you actually want.",
         imageUrl: "/images/matcher-poster-card.webp",
       },
+      {
+        id: "mp-3",
+        title: "Night energy, day clarity",
+        caption:
+          "Daytime culture blocks paired with evenings that match your pace.",
+        imageUrl: "/brand/hero-background.jpg",
+      },
     ],
   },
   nature_day_trips: {
@@ -215,6 +236,13 @@ const STORIES: Record<string, StoryExplanation> = {
         caption:
           "Hidden villages and shoreline walks beyond the standard tourist loop.",
         imageUrl: "/photo/season-low.jpg",
+      },
+      {
+        id: "nd-3",
+        title: "Return rested",
+        caption:
+          "Day trips timed so you are back for dinner without feeling drained.",
+        imageUrl: "/photo/pace-relaxed.jpg",
       },
     ],
   },
@@ -240,6 +268,13 @@ const STORIES: Record<string, StoryExplanation> = {
           "We handle transfers and queues so the family stays present for the moments that matter.",
         imageUrl: "/images/concierge-poster-card.webp",
       },
+      {
+        id: "fam-3",
+        title: "One itinerary, many ages",
+        caption:
+          "Shared highlights with optional splits when energy levels diverge.",
+        imageUrl: "/images/matcher-poster-card.webp",
+      },
     ],
   },
   romantic: {
@@ -263,6 +298,13 @@ const STORIES: Record<string, StoryExplanation> = {
         caption:
           "Chauffeur timing, suite logistics, and experiences that stay soft and unhurried.",
         imageUrl: "/brand/hero-japan-pagoda.jpg",
+      },
+      {
+        id: "rom-3",
+        title: "Evenings designed for two",
+        caption:
+          "Sunset viewpoints and private tables without the group-tour feel.",
+        imageUrl: "/photo/season-mid.jpg",
       },
     ],
   },
@@ -288,6 +330,13 @@ const STORIES: Record<string, StoryExplanation> = {
           "You set the curiosity. We remove the language and logistics friction.",
         imageUrl: "/images/matcher-poster-hero.webp",
       },
+      {
+        id: "solo-3",
+        title: "Company when you want it",
+        caption:
+          "A private host who can fade back when you need quiet exploration.",
+        imageUrl: "/photo/pace-relaxed.jpg",
+      },
     ],
   },
   first_time: {
@@ -311,6 +360,13 @@ const STORIES: Record<string, StoryExplanation> = {
         caption:
           "First-visit highlights without tourist-trap detours or exhausting schedules.",
         imageUrl: "/brand/hero-background.jpg",
+      },
+      {
+        id: "ft-3",
+        title: "Smooth from day one",
+        caption:
+          "Arrival logistics and first-day orientation so Japan never feels chaotic.",
+        imageUrl: "/images/concierge-poster-hero.webp",
       },
     ],
   },
@@ -336,6 +392,13 @@ const STORIES: Record<string, StoryExplanation> = {
           "Menus, etiquette, and local rules are translated in real time so nothing feels awkward.",
         imageUrl: "/images/concierge-poster-card.webp",
       },
+      {
+        id: "lt-3",
+        title: "Clarity at every transfer",
+        caption:
+          "Tickets, platforms, and timing explained before you need them.",
+        imageUrl: "/photo/pace-moderate.jpg",
+      },
     ],
   },
   tourist_traps: {
@@ -358,6 +421,13 @@ const STORIES: Record<string, StoryExplanation> = {
         title: "Crowd-aware timing",
         caption:
           "Arrive when the light is good and the crowds are thinner — not when the tour buses do.",
+        imageUrl: "/brand/hero-japan-pagoda.jpg",
+      },
+      {
+        id: "tt-3",
+        title: "Better alternatives nearby",
+        caption:
+          "Iconic views from quieter angles — same magic, fewer crowds.",
         imageUrl: "/brand/hero-japan-pagoda.jpg",
       },
     ],
@@ -384,6 +454,13 @@ const STORIES: Record<string, StoryExplanation> = {
         imageUrl: "/images/matcher-poster-card.webp",
         videoUrl: GUIDE_VIDEO,
       },
+      {
+        id: "ad-3",
+        title: "Neighborhood tables",
+        caption:
+          "Places locals actually book — with a host who can order with confidence.",
+        imageUrl: "/photo/season-high.jpg",
+      },
     ],
   },
   packed_itinerary: {
@@ -407,6 +484,13 @@ const STORIES: Record<string, StoryExplanation> = {
         caption:
           "Fewer forced moves. More time where the day actually feels good.",
         imageUrl: "/photo/season-low.jpg",
+      },
+      {
+        id: "pi-3",
+        title: "Breathing room built in",
+        caption:
+          "White space between highlights so the trip feels luxurious, not rushed.",
+        imageUrl: "/photo/pace-relaxed.jpg",
       },
     ],
   },

@@ -244,7 +244,7 @@ export function TailoredExperiencesModal({
     setExpandedKey((prev) =>
       prev &&
       stayStops.some((l, index) => {
-        const k = l.key?.trim() || `stay-${index}-${l.cityId || "city"}`;
+        const k = `stay-${index}-${l.key?.trim() || l.cityId || "city"}`;
         return k === prev;
       })
         ? prev
@@ -523,9 +523,9 @@ export function TailoredExperiencesModal({
                       const cityRows = selectedToursMap[stop.cityId] ?? [];
                       const citySelections =
                         chauffeurSelections[stop.cityId] ?? {};
-                      const accordionKey =
-                        stop.key?.trim() ||
-                        `stay-${index}-${stop.cityId || "city"}`;
+                      const accordionKey = `stay-${index}-${
+                        stop.key?.trim() || stop.cityId || "city"
+                      }`;
                       const driverDayCount = Object.values(
                         citySelections
                       ).filter((sel) => isBillableChauffeurDay(sel)).length;
@@ -725,10 +725,12 @@ export function TailoredExperiencesModal({
         </motion.div>
       ) : null}
       <ExperienceProfilerModal
+        key="tailored-quiz"
         open={quizOpen}
         onClose={() => setQuizOpen(false)}
       />
       <ActivityMatchReelModal
+        key="tailored-reel"
         open={reelOpen}
         onClose={() => setReelOpen(false)}
         slides={reelSlides}

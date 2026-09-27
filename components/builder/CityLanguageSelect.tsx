@@ -37,8 +37,8 @@ export function CityLanguageSelect({
           aria-label={`Preferred tour language for ${cityName}`}
           className="w-full cursor-pointer appearance-none rounded-xl border border-white/15 bg-[#0D1117]/90 py-2.5 pl-3 pr-10 text-xs text-white backdrop-blur-md outline-none transition focus:border-[#1BA58A]"
         >
-          {options.map((opt) => (
-            <option key={opt.code} value={opt.code}>
+          {options.map((opt, index) => (
+            <option key={opt.code || `lang-${index}`} value={opt.code}>
               {opt.label}
             </option>
           ))}

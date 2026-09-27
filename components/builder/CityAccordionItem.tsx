@@ -260,9 +260,9 @@ export function CityAccordionItem({
               ) : null}
             </div>
 
-            {suggestions.map((m) => (
+            {suggestions.map((m, index) => (
               <ConciergeSuggestionCard
-                key={`${m.highlight.id}-${m.cityId}`}
+                key={`season-${index}-${m.highlight?.id || "h"}-${m.cityId || "c"}`}
                 match={m}
                 tourAlreadyAdded={
                   !!m.highlight.suggested_tour_id &&

@@ -276,7 +276,7 @@ export function SiteBrandingPanel({ getClient }: { getClient: () => PbClient }) 
         ].join(" ")
       );
     } catch (e) {
-      setError(e instanceof Error ? e.message : formatPbError(e));
+      setError(formatPbError(e));
     } finally {
       setSaving(false);
     }
@@ -345,7 +345,7 @@ export function SiteBrandingPanel({ getClient }: { getClient: () => PbClient }) 
       useSiteBrandingStore.setState({ loaded: false, itemsByKey: {} });
       setSdMsg(["Builder S hero saved.", ...notes].join(" "));
     } catch (e) {
-      setSdError(e instanceof Error ? e.message : formatPbError(e));
+      setSdError(formatPbError(e));
     } finally {
       setSdSaving(false);
     }
