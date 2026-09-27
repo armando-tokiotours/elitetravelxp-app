@@ -338,7 +338,7 @@ export function emptyDraft(): PreEliteDraft {
     email: "",
     whatsapp: "",
     timing: emptyTiming(),
-    adults: 2,
+    adults: 1,
     children: 0,
   };
 }

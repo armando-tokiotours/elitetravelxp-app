@@ -1,0 +1,55 @@
+{
+  "version": 1,
+  "adults": {
+    "duck": {
+      "right": 24.4,
+      "bottom": 37,
+      "height": 76,
+      "z": 8
+    },
+    "shiba": {
+      "right": 36.5,
+      "bottom": 37,
+      "height": 76,
+      "z": 6
+    },
+    "cat": {
+      "right": 60.5,
+      "bottom": 37,
+      "height": 68,
+      "z": 5
+    },
+    "red": {
+      "right": 54,
+      "bottom": 71.5,
+      "height": 58,
+      "z": 3
+    },
+    "panda": {
+      "right": 34.5,
+      "bottom": 72,
+      "height": 58,
+      "z": 2
+    }
+  },
+  "chicks": [
+    {
+      "right": 21.8,
+      "bottom": 36.4,
+      "height": 69,
+      "z": 14
+    },
+    {
+      "right": 51.3,
+      "bottom": 36.4,
+      "height": 66,
+      "z": 15
+    },
+    {
+      "right": 36.9,
+      "bottom": 35.6,
+      "height": 68,
+      "z": 13
+    }
+  ]
+}

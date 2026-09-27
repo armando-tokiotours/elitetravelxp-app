@@ -9,10 +9,15 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { SystemMessageFox } from "@/components/branding/SystemMessageFox";
 import { useBuilderStore } from "@/store/useBuilderStore";
 import { canOpenBuilderStep } from "@/lib/builderSteps";
 import { getSingleDayHighestUnlocked } from "@/lib/singleDaySteps";
 import { useSingleDayBuilderStore } from "@/store/useSingleDayBuilderStore";
+import {
+  dismissSystemMessage,
+  showSystemMessage,
+} from "@/store/useSystemMessageStore";
 
 type AccordionCtx = {
   openSection: number | null;
@@ -29,6 +34,7 @@ type AccordionCtx = {
   tryOpenSection: (n: number) => boolean;
   /** Effective unlock ceiling for this builder (M or S). */
   highestUnlockedStep: number;
+  /** @deprecated Prefer showSystemMessage — kept for callers reading toast */
   toast: string | null;
   showToast: (message: string) => void;
   clearToast: () => void;
@@ -51,7 +57,6 @@ export function BuilderAccordionProvider({
   unlockAll?: boolean;
 }) {
   const [openSection, setOpenSection] = useState<number | null>(defaultOpen);
-  const [toast, setToast] = useState<string | null>(null);
   const multiDayUnlocked = useBuilderStore((s) => s.highestUnlockedStep);
 
   const tourDate = useSingleDayBuilderStore((s) => s.tourDate);
@@ -88,16 +93,10 @@ export function BuilderAccordionProvider({
   const effectiveUnlocked = unlockAll ? singleDayUnlocked : multiDayUnlocked;
 
   const showToast = useCallback((message: string) => {
-    setToast(message);
+    showSystemMessage({ text: message, tone: "error" });
   }, []);
 
-  const clearToast = useCallback(() => setToast(null), []);
-
-  useEffect(() => {
-    if (!toast) return;
-    const t = window.setTimeout(() => setToast(null), 3800);
-    return () => window.clearTimeout(t);
-  }, [toast]);
+  const clearToast = useCallback(() => dismissSystemMessage(), []);
 
   // If unlock clamps down, close a locked-open section
   useEffect(() => {
@@ -151,7 +150,7 @@ export function BuilderAccordionProvider({
       advanceTo,
       tryOpenSection,
       highestUnlockedStep: effectiveUnlocked,
-      toast,
+      toast: null,
       showToast,
       clearToast,
     }),
@@ -162,7 +161,6 @@ export function BuilderAccordionProvider({
       advanceTo,
       tryOpenSection,
       effectiveUnlocked,
-      toast,
       showToast,
       clearToast,
     ]
@@ -171,14 +169,7 @@ export function BuilderAccordionProvider({
   return (
     <BuilderAccordionContext.Provider value={value}>
       {children}
-      {toast ? (
-        <div
-          role="status"
-          className="fixed bottom-[7.5rem] left-1/2 z-[60] w-[min(92vw,28rem)] -translate-x-1/2 rounded-xl border border-[#075473]/50 bg-[#1a1510] px-4 py-3 text-center text-sm text-[#F3D9C4] shadow-lg md:bottom-28"
-        >
-          ⚠️ {toast}
-        </div>
-      ) : null}
+      <SystemMessageFox />
     </BuilderAccordionContext.Provider>
   );
 }

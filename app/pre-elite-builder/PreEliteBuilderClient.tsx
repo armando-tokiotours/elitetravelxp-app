@@ -33,6 +33,7 @@ import {
 } from "@/lib/preEliteBranding";
 import { isVideoFilename } from "@/lib/brandingUi";
 import { StoryExplanationModal } from "@/components/pre-elite/StoryExplanationModal";
+import { GuestPartyMascots } from "@/components/pre-elite/GuestPartyMascots";
 import { TimingSelector } from "@/components/pre-elite/TimingSelector";
 import { usePreBuilderStore } from "@/store/usePreBuilderStore";
 import {
@@ -235,6 +236,10 @@ export function PreEliteBuilderClient() {
 
   const goBack = () => {
     setError(null);
+    // Leaving Step 5 → reset party counters to default (1 adult, 0 kids)
+    if (step === 5) {
+      draft.setContact({ adults: 1, children: 0 });
+    }
     draft.setStep(Math.max(1, step - 1));
   };
 
@@ -322,28 +327,54 @@ export function PreEliteBuilderClient() {
         <>
           {/* Fixed hero through progress line — always visible on steps 1–5 */}
           <div className="relative z-40 mx-auto w-full max-w-3xl shrink-0 px-5 pt-6">
-            <div className="relative min-h-[7.5rem] overflow-visible sm:min-h-[8.5rem]">
+            <div
+              className={
+                step === 5
+                  ? "relative min-h-[9.5rem] overflow-visible sm:min-h-[10.5rem]"
+                  : "relative min-h-[7.5rem] overflow-visible sm:min-h-[8.5rem]"
+              }
+            >
+              {/* Guest party behind the cat-hood kid — Step 5 only; kid unchanged */}
+              <GuestPartyMascots
+                adults={draft.adults}
+                children={draft.children}
+                visible={step === 5}
+              />
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 key={heroMascot.key}
                 src={heroMascot.src}
                 alt=""
                 aria-hidden
-                className="pointer-events-none absolute -right-2 -top-4 z-0 h-36 w-auto select-none object-contain opacity-95 sm:-right-4 sm:-top-6 sm:h-44 md:h-48"
+                className="pointer-events-none absolute -right-2 -top-4 z-20 h-36 w-auto select-none object-contain opacity-95 sm:-right-4 sm:-top-6 sm:h-44 md:h-48"
               />
               <div className="relative z-10">
                 <p className="text-xs tracking-[0.22em] text-[#1CA67F] uppercase">
                   Step {step} of 5
                 </p>
-                <h1 className="mt-3 max-w-[70%] font-display text-3xl text-white sm:max-w-none sm:text-4xl">
-                  {STEP_TITLES[step - 1]}
+                <h1 className="mt-3 max-w-[70%] font-display text-3xl leading-tight text-white sm:max-w-none sm:text-4xl">
+                  {step === 5 ? (
+                    <>
+                      Contact &
+                      <br />
+                      Timing
+                    </>
+                  ) : (
+                    STEP_TITLES[step - 1]
+                  )}
                 </h1>
-                <p className="mt-3 max-w-xl pr-24 text-sm leading-relaxed text-white/60 sm:pr-32">
+                <p className="mt-2 max-w-xl pr-24 text-sm leading-relaxed text-white/60 sm:pr-32">
                   {stepBlurb}
                 </p>
               </div>
             </div>
-            <div className="relative z-10 mt-6 h-1 overflow-hidden rounded-full bg-white/10">
+            <div
+              className={
+                step === 5
+                  ? "relative z-10 mt-3 h-1 overflow-hidden rounded-full bg-white/10"
+                  : "relative z-10 mt-6 h-1 overflow-hidden rounded-full bg-white/10"
+              }
+            >
               <div
                 className="h-full rounded-full bg-[#075473] transition-all"
                 style={{ width: `${(step / 5) * 100}%` }}
@@ -353,7 +384,13 @@ export function PreEliteBuilderClient() {
 
           {/* Scrollable options / form only */}
           <div className="min-h-0 flex-1 overflow-y-auto">
-            <div className="mx-auto max-w-3xl px-5 pb-10 pt-6">
+            <div
+              className={
+                step === 5
+                  ? "mx-auto max-w-3xl px-5 pb-10 pt-3"
+                  : "mx-auto max-w-3xl px-5 pb-10 pt-6"
+              }
+            >
               <div className="relative overflow-visible rounded-3xl border border-zinc-800/80 bg-[#0D1117]/80 p-5 backdrop-blur-md sm:p-7">
                 <AnimatePresence mode="wait">
                   <motion.div
@@ -855,7 +892,11 @@ function ContactFields({
               min={1}
               max={20}
               value={adults}
-              onChange={(e) => onChange({ adults: Number(e.target.value) })}
+              onChange={(e) =>
+                onChange({
+                  adults: Math.max(1, Math.min(20, Number(e.target.value) || 1)),
+                })
+              }
               className={inputClass}
             />
           </Field>
@@ -865,7 +906,14 @@ function ContactFields({
               min={0}
               max={20}
               value={children}
-              onChange={(e) => onChange({ children: Number(e.target.value) })}
+              onChange={(e) =>
+                onChange({
+                  children: Math.max(
+                    0,
+                    Math.min(20, Number(e.target.value) || 0)
+                  ),
+                })
+              }
               className={inputClass}
             />
           </Field>

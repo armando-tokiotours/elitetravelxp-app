@@ -1,6 +1,7 @@
 "use client";
 
 import type PocketBase from "pocketbase";
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { formatPbError } from "@/lib/pocketbase/admin-schema";
 import { isVideoFilename } from "@/lib/brandingUi";
@@ -255,19 +256,27 @@ export function PreBuilderQuizBrandingAdmin({
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="font-display text-2xl text-zinc-100">
-          Pre-Builder Match Quiz
-        </h2>
-        <p className="mt-1 text-sm text-zinc-400">
-          Upload a{" "}
-          <strong className="font-semibold text-zinc-200">card photo</strong>{" "}
-          (shown when that option is selected) plus{" "}
-          <strong className="font-semibold text-zinc-200">3 story slides</strong>
-          . Each can be image or video (MP4 / WebM, up to 50MB). Saves to
-          PocketBase and updates{" "}
-          <code className="text-zinc-300">/pre-elite-builder</code> live.
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 className="font-display text-2xl text-zinc-100">
+            Pre-Builder Match Quiz
+          </h2>
+          <p className="mt-1 text-sm text-zinc-400">
+            Upload a{" "}
+            <strong className="font-semibold text-zinc-200">card photo</strong>{" "}
+            (shown when that option is selected) plus{" "}
+            <strong className="font-semibold text-zinc-200">3 story slides</strong>
+            . Each can be image or video (MP4 / WebM, up to 50MB). Saves to
+            PocketBase and updates{" "}
+            <code className="text-zinc-300">/pre-elite-builder</code> live.
+          </p>
+        </div>
+        <Link
+          href="/team-access/layout-builder"
+          className="shrink-0 rounded-xl border border-[#075473] bg-[#075473]/20 px-4 py-2 text-xs font-bold uppercase tracking-[0.14em] text-[#7dd3fc] transition hover:bg-[#075473]/35"
+        >
+          Guest party layout →
+        </Link>
       </div>
 
       {error ? (
@@ -321,6 +330,7 @@ export function PreBuilderQuizBrandingAdmin({
                 <div className="mt-4">
                   <MediaSlot
                     label="Card photo (selected on Pre-Builder)"
+                    variant="card"
                     preview={d.cardPreview}
                     pendingFile={d.cardFile}
                     onFile={(f) => {
@@ -337,6 +347,7 @@ export function PreBuilderQuizBrandingAdmin({
                 <div className="mt-4 grid gap-4 lg:grid-cols-3">
                   <MediaSlot
                     label="Slide 1 / 3"
+                    variant="story"
                     preview={d.mediaPreview}
                     pendingFile={d.mediaFile}
                     onFile={(f) => {
@@ -350,6 +361,7 @@ export function PreBuilderQuizBrandingAdmin({
                   />
                   <MediaSlot
                     label="Slide 2 / 3"
+                    variant="story"
                     preview={d.posterPreview}
                     pendingFile={d.posterFile}
                     onFile={(f) => {
@@ -363,6 +375,7 @@ export function PreBuilderQuizBrandingAdmin({
                   />
                   <MediaSlot
                     label="Slide 3 / 3"
+                    variant="story"
                     preview={d.slide3Preview}
                     pendingFile={d.slide3File}
                     onFile={(f) => {
@@ -471,41 +484,91 @@ function MediaSlot({
   preview,
   pendingFile,
   onFile,
+  variant = "story",
 }: {
   label: string;
   preview: string;
   pendingFile?: File | null;
   onFile: (f: File | null) => void;
+  /** card = wide Pre-Builder row · story = tall 9:16 overlay */
+  variant?: "card" | "story";
 }) {
   const isVideo =
     (pendingFile ? pendingFile.type.startsWith("video/") : false) ||
     isVideoFilename(preview);
+  const isCard = variant === "card";
+  const hint = isCard
+    ? "Image or video · landscape 16:9 (≈1600×900) · under 50MB — matches selected card strip"
+    : "Image or video · portrait 9:16 (1080×1920) · under 50MB — matches story window";
+
   return (
     <div>
       <p className="mb-1 text-xs uppercase tracking-wider text-zinc-400">
         {label}
       </p>
-      <div className="overflow-hidden rounded-xl border border-dashed border-zinc-700 bg-zinc-900 p-3">
-        {preview ? (
-          isVideo ? (
-            <video
-              src={preview}
-              className="mx-auto aspect-[9/16] max-h-48 w-auto rounded-lg object-cover"
-              muted
-              playsInline
-              controls
-            />
-          ) : (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={preview}
-              alt=""
-              className="mx-auto aspect-[9/16] max-h-48 w-auto rounded-lg object-cover"
-            />
-          )
+      <div className="rounded-xl border border-dashed border-zinc-700 bg-zinc-900 p-3">
+        {isCard ? (
+          <div className="overflow-hidden rounded-xl border border-white/10 bg-black">
+            {preview ? (
+              isVideo ? (
+                <video
+                  src={preview}
+                  className="aspect-[16/7] w-full max-h-36 object-cover"
+                  muted
+                  playsInline
+                  controls
+                />
+              ) : (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={preview}
+                  alt=""
+                  className="aspect-[16/7] w-full max-h-36 object-cover"
+                />
+              )
+            ) : (
+              <div className="flex aspect-[16/7] max-h-36 w-full items-center justify-center text-xs text-zinc-500">
+                No media yet
+              </div>
+            )}
+          </div>
         ) : (
-          <div className="flex h-28 items-center justify-center text-xs text-zinc-500">
-            No media yet
+          /* Phone-shaped story preview — same ratio as StoryExplanationModal */
+          <div className="flex justify-center">
+            <div className="relative w-full max-w-[10.5rem] overflow-hidden rounded-[1.25rem] border border-white/15 bg-black shadow-lg ring-1 ring-black/40">
+              <div className="absolute left-2 right-2 top-2 z-10 flex gap-0.5">
+                <div className="h-0.5 flex-1 rounded-full bg-[#075473]" />
+                <div className="h-0.5 flex-1 rounded-full bg-white/25" />
+                <div className="h-0.5 flex-1 rounded-full bg-white/25" />
+              </div>
+              {preview ? (
+                isVideo ? (
+                  <video
+                    src={preview}
+                    className="aspect-[9/16] w-full object-cover"
+                    muted
+                    playsInline
+                    controls
+                  />
+                ) : (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={preview}
+                    alt=""
+                    className="aspect-[9/16] w-full object-cover"
+                  />
+                )
+              ) : (
+                <div className="flex aspect-[9/16] w-full items-center justify-center text-[11px] text-zinc-500">
+                  No media yet
+                </div>
+              )}
+              <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent px-2 pb-2.5 pt-8">
+                <p className="truncate text-center text-[9px] font-semibold uppercase tracking-wider text-white/90">
+                  Story preview
+                </p>
+              </div>
+            </div>
           </div>
         )}
         <input
@@ -514,9 +577,7 @@ function MediaSlot({
           className="mt-3 block w-full text-xs text-zinc-300"
           onChange={(e) => onFile(e.target.files?.[0] ?? null)}
         />
-        <p className="mt-1.5 text-[10px] text-zinc-500">
-          Image or video · MP4 · 9:16 · under 50MB
-        </p>
+        <p className="mt-1.5 text-[10px] text-zinc-500">{hint}</p>
       </div>
     </div>
   );

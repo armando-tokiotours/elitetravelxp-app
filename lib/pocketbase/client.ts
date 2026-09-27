@@ -423,7 +423,7 @@ export function brandingUiMediaUrl(
 
 export function brandingUiPosterUrl(
   row: PbBrandingUiItem | null | undefined,
-  thumb = "600x400"
+  thumb?: string
 ): string {
   if (!row?.poster || !row.id) return "";
   const isVideo = /\.(mp4|webm|mov|m4v)(\?|$)/i.test(row.poster);
@@ -431,7 +431,8 @@ export function brandingUiPosterUrl(
     String(row.collectionId ?? "branding_ui_items"),
     row.id,
     row.poster,
-    // Videos have no image thumbs — requesting thumb/webp breaks playback
+    // No default landscape thumb — Pre-Builder story slide 2 is 9:16;
+    // requesting 600x400 was cropping portraits in Team Access + stories.
     !isVideo && thumb ? { thumb, format: "webp" } : undefined
   );
 }
