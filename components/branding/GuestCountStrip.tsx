@@ -13,7 +13,7 @@ const STRIP_DUCK_SRC = "/brand/guest-duck.webp";
 /**
  * Inline guest characters beside Adults / Kids steppers.
  * Adults: 1 large pointing main + smaller party animals as count rises
- * (full-body duck here, not peek). Kids: chicks @ 1.8× prior size.
+ * (full-body duck here, not peek). Kids: up to 3 chicks shown (count can go higher).
  */
 export function GuestCountStrip({
   kind,
@@ -23,7 +23,7 @@ export function GuestCountStrip({
   count: number;
 }) {
   if (kind === "kids") {
-    const n = Math.max(0, Math.min(4, Math.round(count) || 0));
+    const n = Math.max(0, Math.min(3, Math.round(count) || 0));
     if (n === 0) {
       return <div className="min-w-0 flex-1" aria-hidden />;
     }

@@ -79,7 +79,10 @@ export function TimelineProgressMascot({
       }}
       className={`relative z-20 flex h-[3.575rem] w-[3.575rem] shrink-0 cursor-pointer items-end justify-center overflow-visible sm:h-[3.9rem] sm:w-[3.9rem] ${className}`}
     >
-      <HiBubble show={showHi} className="-left-6 -top-12 w-[4.75rem] sm:-top-14 sm:w-[5.5rem]" />
+      <HiBubble
+        show={showHi}
+        className="-left-1 -top-5 w-[4.75rem] sm:left-0 sm:-top-6 sm:w-[5.5rem]"
+      />
       <MascotHiZoom showHi={showHi} className="pointer-events-none absolute inset-0 flex items-end justify-center">
         {(Object.keys(POSES) as Pose[]).map((p) => (
           // eslint-disable-next-line @next/next/no-img-element

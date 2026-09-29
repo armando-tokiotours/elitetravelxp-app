@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "multi": {
+    "barPct": 72.64,
+    "gapBeforePct": 0,
+    "mascotPct": 21.85,
+    "gapAfterPct": 5.51,
+    "align": "start",
+    "nudgePct": -20,
+    "scalePct": 118
+  },
+  "single": {
+    "barPct": 70.87,
+    "gapBeforePct": 0,
+    "mascotPct": 12.07,
+    "gapAfterPct": 17.06,
+    "align": "start",
+    "nudgePct": -20,
+    "scalePct": 121
+  }
+}

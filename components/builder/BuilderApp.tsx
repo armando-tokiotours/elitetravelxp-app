@@ -275,7 +275,7 @@ export function BuilderApp() {
             {/* Transparent overlap — sits in the soft gradient (no solid edge / hard cut) */}
             <div className="relative z-20 -mt-20 w-full bg-transparent sm:-mt-28">
               <div className="px-3 pb-8 sm:px-4">
-                <div className="tokio-glass-sheet mx-auto max-w-3xl rounded-t-3xl border border-white/10">
+                <div className="tokio-glass-sheet mx-auto max-w-3xl overflow-visible rounded-t-3xl border border-white/10">
                   <div className="overflow-hidden rounded-t-3xl px-5 py-5 sm:px-6">
                     <div className="flex items-start justify-between gap-4">
                       <div className="min-w-0">

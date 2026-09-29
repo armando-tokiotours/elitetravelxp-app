@@ -275,7 +275,7 @@ export function SingleDayBuilderView() {
             {/* Glass sheet overlaps hero fade — same as multi-day BuilderApp */}
             <div className="relative z-20 -mt-20 w-full bg-transparent sm:-mt-28">
               <div className="mx-auto w-full max-w-2xl px-4 pb-8 sm:max-w-3xl">
-                <div className="tokio-glass-sheet w-full rounded-t-3xl border border-white/10 bg-[#0A1017]/95 text-left shadow-2xl backdrop-blur-md">
+                <div className="tokio-glass-sheet w-full overflow-visible rounded-t-3xl border border-white/10 bg-[#0A1017]/95 text-left shadow-2xl backdrop-blur-md">
                   <div className="rounded-t-3xl px-5 pt-6 pb-5 sm:px-6">
                     <div className="flex items-start justify-between gap-4 pt-1">
                       <div className="min-w-0">

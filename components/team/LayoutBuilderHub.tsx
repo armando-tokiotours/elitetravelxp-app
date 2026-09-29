@@ -4,6 +4,7 @@ import { BrandCharactersCatalog } from "@/components/team/BrandCharactersCatalog
 import { GuestPartyLayoutBuilder } from "@/components/team/GuestPartyLayoutBuilder";
 import { FoxMessagesEditor } from "@/components/team/FoxMessagesEditor";
 import { HiBubbleEditor } from "@/components/team/HiBubbleEditor";
+import { TimelineMascotLayoutEditor } from "@/components/team/TimelineMascotLayoutEditor";
 import { TokioClockLoader } from "@/components/common/TokioClockLoader";
 import { useState } from "react";
 import Link from "next/link";
@@ -14,19 +15,21 @@ type HubTab =
   | "heroes"
   | "clock_loader"
   | "fox_messages"
-  | "hi_bubble";
+  | "hi_bubble"
+  | "timeline_mascot";
 
 const TABS: { id: HubTab; label: string }[] = [
   { id: "characters", label: "Characters" },
   { id: "guest_party", label: "Guest party" },
   { id: "heroes", label: "Heroes" },
+  { id: "timeline_mascot", label: "Timeline mascot" },
   { id: "clock_loader", label: "Bar loader" },
   { id: "fox_messages", label: "Fox messages" },
   { id: "hi_bubble", label: "HI bubble" },
 ];
 /**
- * Team Access layout hub — characters (weight + replace), guest party positions, heroes,
- * plus live previews for TokioClockLoader, SystemMessageFox, and HI bubble.
+ * Team Access layout hub — characters, guest party, timeline mascot (M/S),
+ * heroes, loaders, fox messages, and HI bubble.
  */
 export function LayoutBuilderHub({
   initialTab = "characters",
@@ -83,6 +86,7 @@ export function LayoutBuilderHub({
       {tab === "clock_loader" ? <ClockLoaderPreview /> : null}
       {tab === "fox_messages" ? <FoxMessagesEditor /> : null}
       {tab === "hi_bubble" ? <HiBubbleEditor /> : null}
+      {tab === "timeline_mascot" ? <TimelineMascotLayoutEditor /> : null}
     </div>
   );
 }

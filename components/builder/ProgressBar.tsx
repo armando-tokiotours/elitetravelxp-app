@@ -8,42 +8,48 @@ import {
   isBuilderStepComplete,
 } from "@/lib/builderSteps";
 import { useBuilderAccordionOptional } from "./BuilderAccordion";
-import { TimelineProgressMascot } from "@/components/branding/TimelineProgressMascot";
+import { TimelineMascotRow } from "@/components/branding/TimelineMascotRow";
 
 const SECTIONS = [
   {
     id: "duration",
     label: "Duration",
+    shortLabel: "Duration",
     href: "#section-duration",
     number: 1,
   },
   {
     id: "arrival",
     label: "Arrival / Departure",
+    shortLabel: "Arrival",
     href: "#section-arrival",
     number: 2,
   },
   {
     id: "locations",
     label: "Locations & Nights",
+    shortLabel: "Places",
     href: "#section-locations",
     number: 3,
   },
   {
     id: "hotels",
     label: "Hotels",
+    shortLabel: "Hotels",
     href: "#section-hotels",
     number: 4,
   },
   {
     id: "tours",
     label: "Tours & Experiences",
+    shortLabel: "Tours",
     href: "#section-tours",
     number: 5,
   },
   {
     id: "drivers",
     label: "Drivers & Transport",
+    shortLabel: "Drivers",
     href: "#section-drivers",
     number: 6,
   },
@@ -122,70 +128,68 @@ export function StickyProgressBar() {
     SECTIONS.length <= 1 ? 0 : (lastReached / (SECTIONS.length - 1)) * 100;
 
   return (
-    <div className="sticky top-0 z-40 overflow-visible border-b border-[#2C2C2E] bg-[#000000] px-3 py-3.5 shadow-xl backdrop-blur-md sm:px-6">
-      <div className="flex items-start gap-2 overflow-visible sm:gap-3">
-        <nav aria-label="Trip builder progress" className="min-w-0 flex-1">
-          <ol className="relative flex items-start justify-between gap-1">
-            {/* Track */}
-            <span
-              aria-hidden
-              className="absolute left-[10%] right-[10%] top-[14px] h-[2px] bg-[#2C2C2E]"
-            />
-            {/* Completed path */}
-            <span
-              aria-hidden
-              className="absolute left-[10%] top-[14px] h-[2px] bg-[#182536] transition-[width] duration-300"
-              style={{ width: `${(progressPct / 100) * 80}%` }}
-            />
-            {statuses.map((sec) => (
-              <li
-                key={sec.id}
-                className="relative z-[1] flex min-w-0 flex-1 flex-col items-center"
+    <div className="sticky top-0 z-40 overflow-visible border-b border-[#2C2C2E] bg-[#000000] px-2 py-2.5 shadow-xl backdrop-blur-md sm:px-4 sm:py-3">
+      <TimelineMascotRow variant="multi">
+        <ol className="relative flex items-start justify-between gap-0.5">
+          {/* Track */}
+          <span
+            aria-hidden
+            className="absolute left-[8%] right-[8%] top-[12px] h-[2px] bg-[#2C2C2E]"
+          />
+          {/* Completed path */}
+          <span
+            aria-hidden
+            className="absolute left-[8%] top-[12px] h-[2px] bg-[#182536] transition-[width] duration-300"
+            style={{ width: `${(progressPct / 100) * 84}%` }}
+          />
+          {statuses.map((sec) => (
+            <li
+              key={sec.id}
+              className="relative z-[1] flex min-w-0 flex-1 flex-col items-center"
+            >
+              <button
+                type="button"
+                disabled={sec.locked}
+                onClick={() => {
+                  if (sec.locked) {
+                    accordion?.showToast(
+                      "Complete the previous steps before unlocking this section."
+                    );
+                    return;
+                  }
+                  const opened = accordion?.tryOpenSection(sec.number);
+                  if (opened === false) return;
+                  const id = BUILDER_SECTION_IDS[sec.number];
+                  if (id) {
+                    document
+                      .getElementById(id)
+                      ?.scrollIntoView({ behavior: "smooth", block: "start" });
+                  }
+                }}
+                className={`flex w-full flex-col items-center gap-0.5 text-center ${
+                  sec.locked
+                    ? "pointer-events-none cursor-not-allowed opacity-40"
+                    : ""
+                }`}
               >
-                <button
-                  type="button"
-                  disabled={sec.locked}
-                  onClick={() => {
-                    if (sec.locked) {
-                      accordion?.showToast(
-                        "Complete the previous steps before unlocking this section."
-                      );
-                      return;
-                    }
-                    const opened = accordion?.tryOpenSection(sec.number);
-                    if (opened === false) return;
-                    const id = BUILDER_SECTION_IDS[sec.number];
-                    if (id) {
-                      document
-                        .getElementById(id)
-                        ?.scrollIntoView({ behavior: "smooth", block: "start" });
-                    }
-                  }}
-                  className={`flex w-full flex-col items-center gap-1 text-center ${
-                    sec.locked
-                      ? "pointer-events-none cursor-not-allowed opacity-40"
-                      : ""
+                <Node kind={sec.kind === "locked" ? "upcoming" : sec.kind} />
+                <span
+                  className={`max-w-full pt-0.5 text-[9px] font-semibold leading-tight tracking-tight sm:text-[10px] ${
+                    sec.kind === "current"
+                      ? "text-[#075473]"
+                      : sec.kind === "done"
+                        ? "text-white"
+                        : "text-zinc-400"
                   }`}
                 >
-                  <Node kind={sec.kind === "locked" ? "upcoming" : sec.kind} />
-                  <span
-                    className={`max-w-full pt-1 text-[11px] font-semibold leading-tight tracking-tight ${
-                      sec.kind === "current"
-                        ? "text-[#075473]"
-                        : sec.kind === "done"
-                          ? "text-white"
-                          : "text-zinc-400"
-                    }`}
-                  >
-                    {sec.label}
-                  </span>
-                </button>
-              </li>
-            ))}
-          </ol>
-        </nav>
-        <TimelineProgressMascot className="mt-3 -mb-5 -ml-8 sm:mt-4 sm:-ml-10" />
-      </div>
+                  <span className="sm:hidden">{sec.shortLabel}</span>
+                  <span className="hidden sm:inline">{sec.label}</span>
+                </span>
+              </button>
+            </li>
+          ))}
+        </ol>
+      </TimelineMascotRow>
     </div>
   );
 }
@@ -194,7 +198,7 @@ function Node({ kind }: { kind: "done" | "current" | "upcoming" }) {
   if (kind === "done") {
     return (
       <span
-        className="flex h-7 w-7 items-center justify-center rounded-full bg-[#273D59] text-white shadow-sm"
+        className="flex h-6 w-6 items-center justify-center rounded-full bg-[#273D59] text-white shadow-sm sm:h-7 sm:w-7"
         aria-label="Completed"
       >
         <svg
@@ -218,19 +222,19 @@ function Node({ kind }: { kind: "done" | "current" | "upcoming" }) {
   if (kind === "current") {
     return (
       <span
-        className="flex h-7 w-7 items-center justify-center rounded-full bg-[#075473] text-[#000000] shadow-[0_0_10px_rgba(226,196,152,0.4)]"
+        className="flex h-6 w-6 items-center justify-center rounded-full bg-[#075473] text-[#000000] shadow-[0_0_10px_rgba(226,196,152,0.4)] sm:h-7 sm:w-7"
         aria-label="Current step"
       >
-        <span className="h-2 w-2 rounded-full bg-[#000000]" />
+        <span className="h-1.5 w-1.5 rounded-full bg-[#000000] sm:h-2 sm:w-2" />
       </span>
     );
   }
   return (
     <span
-      className="flex h-7 w-7 items-center justify-center rounded-full border border-zinc-800 bg-[#1C1C1E] text-zinc-500"
+      className="flex h-6 w-6 items-center justify-center rounded-full border border-zinc-800 bg-[#1C1C1E] text-zinc-500 sm:h-7 sm:w-7"
       aria-label="Upcoming step"
     >
-      <span className="h-1.5 w-1.5 rounded-full bg-zinc-500" />
+      <span className="h-1 w-1 rounded-full bg-zinc-500 sm:h-1.5 sm:w-1.5" />
     </span>
   );
 }
