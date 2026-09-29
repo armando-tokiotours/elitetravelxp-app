@@ -16,6 +16,7 @@ import { type PaceId } from "@/lib/travelPace";
 import { useSiteBrandingStore } from "@/store/useSiteBrandingStore";
 import { PaceDetailModal } from "@/components/builder/modals/PaceDetailModal";
 import { SeasonalityDetailModal } from "@/components/builder/modals/SeasonalityDetailModal";
+import { GuestCountStrip } from "@/components/branding/GuestCountStrip";
 
 const PRESETS = [10, 14, 21] as const;
 
@@ -319,12 +320,14 @@ export function DurationEditorModal({
                     value={adults}
                     onChange={setAdults}
                     min={1}
+                    kind="adults"
                   />
                   <GuestStepper
                     label="Children"
                     value={children}
                     onChange={setChildren}
                     min={0}
+                    kind="kids"
                   />
                 </div>
                 <p className="mt-1.5 text-xs text-zinc-400">
@@ -374,16 +377,19 @@ function GuestStepper({
   value,
   onChange,
   min,
+  kind,
 }: {
   label: string;
   value: number;
   onChange: (n: number) => void;
   min: number;
+  kind: "adults" | "kids";
 }) {
   return (
-    <div className="flex items-center justify-between border-b border-zinc-800 px-4 py-3.5 last:border-b-0">
-      <span className="text-sm font-medium text-white">{label}</span>
-      <div className="flex items-center gap-3">
+    <div className="flex items-center justify-between gap-2 border-b border-zinc-800 px-4 py-3.5 last:border-b-0">
+      <span className="w-16 shrink-0 text-sm font-medium text-white">{label}</span>
+      <GuestCountStrip kind={kind} count={value} />
+      <div className="flex shrink-0 items-center gap-3">
         <button
           type="button"
           aria-label={`Decrease ${label}`}

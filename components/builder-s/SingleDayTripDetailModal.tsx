@@ -25,6 +25,7 @@ import {
 import type { SeasonTierName } from "@/store/useBuilderStore";
 import { usePreBuilderStore } from "@/store/usePreBuilderStore";
 import { useSiteBrandingStore } from "@/store/useSiteBrandingStore";
+import { GuestCountStrip } from "@/components/branding/GuestCountStrip";
 
 /**
  * Builder S–only tour details modal.
@@ -226,12 +227,14 @@ export function SingleDayTripDetailModal({
                     value={adults}
                     onChange={setAdults}
                     min={1}
+                    kind="adults"
                   />
                   <GuestStepper
                     label="Kids"
                     value={children}
                     onChange={setChildren}
                     min={0}
+                    kind="kids"
                   />
                 </div>
               </div>
@@ -448,16 +451,19 @@ function GuestStepper({
   value,
   onChange,
   min,
+  kind,
 }: {
   label: string;
   value: number;
   onChange: (n: number) => void;
   min: number;
+  kind: "adults" | "kids";
 }) {
   return (
-    <div className="flex items-center justify-between gap-3 border-b border-white/5 px-4 py-3 last:border-b-0">
-      <span className="text-sm font-medium text-white">{label}</span>
-      <div className="flex items-center gap-2">
+    <div className="flex items-center justify-between gap-2 border-b border-white/5 px-4 py-3 last:border-b-0">
+      <span className="w-14 shrink-0 text-sm font-medium text-white">{label}</span>
+      <GuestCountStrip kind={kind} count={value} />
+      <div className="flex shrink-0 items-center gap-2">
         <button
           type="button"
           aria-label={`Decrease ${label}`}

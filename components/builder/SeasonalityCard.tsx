@@ -61,7 +61,7 @@ export function SeasonalityCard({
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, scale: 0.94 }}
             transition={{ duration: 0.25 }}
-            className="h-[12.75rem] w-auto object-contain object-right drop-shadow-[0_8px_16px_rgba(0,0,0,0.55)] sm:h-[15rem]"
+            className="h-[10.2rem] w-auto object-contain object-right drop-shadow-[0_8px_16px_rgba(0,0,0,0.55)] sm:h-[12rem]"
             draggable={false}
           />
         </AnimatePresence>

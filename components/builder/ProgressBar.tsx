@@ -184,7 +184,7 @@ export function StickyProgressBar() {
             ))}
           </ol>
         </nav>
-        <TimelineProgressMascot className="mt-3 -mb-5 sm:mt-4" />
+        <TimelineProgressMascot className="mt-3 -mb-5 -ml-8 sm:mt-4 sm:-ml-10" />
       </div>
     </div>
   );
