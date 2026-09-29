@@ -18,7 +18,8 @@ type Pose = keyof typeof POSES;
 /**
  * Tiny sticky-timeline mascot — look while active;
  * idle → time, then note (loops until user moves again).
- * Opacity crossfade only — no scale remount blink.
+ * Stacked opacity crossfade only — never remount/scale on pose.
+ * Activity only resets pose when leaving look (no snap blink).
  * Tap → HI bubble (2.5s) + zoom pulse.
  */
 export function TimelineProgressMascot({
@@ -31,26 +32,46 @@ export function TimelineProgressMascot({
   className?: string;
 }) {
   const [pose, setPose] = useState<Pose>("look");
+  const poseRef = useRef<Pose>("look");
   const idleRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const noteRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { showHi, triggerHi } = useMascotHiTap();
 
   useEffect(() => {
+    poseRef.current = pose;
+  }, [pose]);
+
+  useEffect(() => {
     const clear = () => {
       if (idleRef.current) clearTimeout(idleRef.current);
       if (noteRef.current) clearTimeout(noteRef.current);
+      idleRef.current = null;
+      noteRef.current = null;
     };
 
-    const bump = () => {
-      setPose("look");
+    const scheduleIdle = () => {
       clear();
       idleRef.current = setTimeout(() => {
         setPose("time");
-        noteRef.current = setTimeout(() => setPose("note"), noteAfterMs);
+        poseRef.current = "time";
+        noteRef.current = setTimeout(() => {
+          setPose("note");
+          poseRef.current = "note";
+        }, noteAfterMs);
       }, idleMs);
     };
 
-    bump();
+    const bump = () => {
+      // Only snap back when actually idle — avoids look↔look re-renders
+      // and the blinky jump when the mouse twitches during look.
+      if (poseRef.current !== "look") {
+        setPose("look");
+        poseRef.current = "look";
+      }
+      scheduleIdle();
+    };
+
+    scheduleIdle();
     window.addEventListener("mousemove", bump, { passive: true });
     window.addEventListener("mousedown", bump);
     window.addEventListener("click", bump);
@@ -83,14 +104,17 @@ export function TimelineProgressMascot({
         show={showHi}
         className="-left-1 -top-5 w-[4.75rem] sm:left-0 sm:-top-6 sm:w-[5.5rem]"
       />
-      <MascotHiZoom showHi={showHi} className="pointer-events-none absolute inset-0 flex items-end justify-center">
+      <MascotHiZoom
+        showHi={showHi}
+        className="pointer-events-none absolute inset-0 flex items-end justify-center"
+      >
         {(Object.keys(POSES) as Pose[]).map((p) => (
           // eslint-disable-next-line @next/next/no-img-element
           <img
             key={p}
             src={POSES[p]}
             alt=""
-            className={`absolute bottom-0 h-[130%] w-auto max-w-none origin-bottom object-contain drop-shadow-[0_4px_10px_rgba(0,0,0,0.55)] transition-opacity duration-300 ${
+            className={`absolute bottom-0 h-[130%] w-auto max-w-none origin-bottom object-contain drop-shadow-[0_4px_10px_rgba(0,0,0,0.55)] transition-opacity duration-700 ease-in-out ${
               pose === p ? "opacity-100" : "opacity-0"
             }`}
             draggable={false}

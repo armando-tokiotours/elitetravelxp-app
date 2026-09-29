@@ -1,18 +1,24 @@
 "use client";
 
-import { useEffect, useRef, useState, type VideoHTMLAttributes } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type VideoHTMLAttributes,
+} from "react";
 
 type Props = Omit<VideoHTMLAttributes<HTMLVideoElement>, "src" | "preload"> & {
   src: string;
-  /** Poster shown before the video enters the viewport */
+  /** Poster shown until the first frame is ready (covers progressive paint) */
   poster?: string;
   /** Root margin for IntersectionObserver (default 200px) */
   rootMargin?: string;
 };
 
 /**
- * Defers assigning video `src` until the element is near the viewport.
- * Prevents multi‑MB .mp4/.m4v downloads on initial Discover paint.
+ * Defers assigning video `src` until near the viewport, then keeps a poster
+ * overlay until `canplay` so the user never sees window-style progressive fill.
+ * Small reels: metadata preload + play as soon as ready.
  */
 export function LazyVideo({
   src,
@@ -26,6 +32,12 @@ export function LazyVideo({
 }: Props) {
   const ref = useRef<HTMLVideoElement>(null);
   const [activeSrc, setActiveSrc] = useState<string | undefined>(undefined);
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    setReady(false);
+    setActiveSrc(undefined);
+  }, [src]);
 
   useEffect(() => {
     const el = ref.current;
@@ -54,23 +66,57 @@ export function LazyVideo({
 
   useEffect(() => {
     const video = ref.current;
-    if (!video || !activeSrc || !autoPlay) return;
-    void video.play().catch(() => {
-      /* autoplay may be blocked — poster + controls remain usable */
-    });
+    if (!video || !activeSrc) return;
+
+    const markReady = () => setReady(true);
+
+    if (video.readyState >= 3) {
+      markReady();
+    } else {
+      video.addEventListener("canplay", markReady);
+      video.addEventListener("loadeddata", markReady);
+    }
+
+    if (autoPlay) {
+      void video.play().catch(() => {
+        /* autoplay may be blocked — poster stays until ready */
+      });
+    }
+
+    return () => {
+      video.removeEventListener("canplay", markReady);
+      video.removeEventListener("loadeddata", markReady);
+    };
   }, [activeSrc, autoPlay]);
 
+  const showPosterCover = Boolean(poster) && !ready;
+  const videoVisible = ready || !poster;
+
   return (
-    <video
-      ref={ref}
-      src={activeSrc}
-      poster={poster}
-      muted={muted}
-      playsInline={playsInline}
-      autoPlay={Boolean(autoPlay && activeSrc)}
-      preload="none"
-      className={className}
-      {...rest}
-    />
+    <span className={`relative block overflow-hidden ${className ?? ""}`}>
+      {showPosterCover ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={poster}
+          alt=""
+          className="absolute inset-0 z-10 h-full w-full object-cover"
+          draggable={false}
+          aria-hidden
+        />
+      ) : null}
+      <video
+        ref={ref}
+        src={activeSrc}
+        poster={poster}
+        muted={muted}
+        playsInline={playsInline}
+        autoPlay={Boolean(autoPlay && activeSrc)}
+        preload={activeSrc ? "metadata" : "none"}
+        className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-200 ${
+          videoVisible ? "opacity-100" : "opacity-0"
+        }`}
+        {...rest}
+      />
+    </span>
   );
 }
