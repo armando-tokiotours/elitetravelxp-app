@@ -440,7 +440,7 @@ export function PreEliteBuilderClient() {
                   : "mx-auto max-w-3xl px-5 pb-4 pt-2 sm:pb-8 sm:pt-4"
               }
             >
-              <div className="relative overflow-visible rounded-3xl border border-zinc-800/80 bg-[#0D1117]/80 p-5 backdrop-blur-md sm:p-7">
+              <div className="relative origin-top scale-[1.05] overflow-visible rounded-3xl border border-zinc-800/80 bg-[#0D1117]/80 p-5 backdrop-blur-md sm:p-7">
                 <AnimatePresence mode="wait">
                   <motion.div
                     key={step}
@@ -707,7 +707,7 @@ function ChoiceList({
             aria-pressed={on}
             aria-label={`Preview and select ${title}`}
             onClick={() => onOpenStory(option.id)}
-            className={`group relative w-full min-h-[7.5rem] cursor-pointer overflow-hidden rounded-2xl border p-5 text-left transition-all duration-300 ${
+            className={`group relative w-full min-h-[7.875rem] cursor-pointer overflow-hidden rounded-2xl border p-5 text-left transition-all duration-300 ${
               on
                 ? "scale-[1.01]"
                 : "border-white/10 bg-[#0A1017] opacity-60 hover:border-white/20 hover:opacity-90"

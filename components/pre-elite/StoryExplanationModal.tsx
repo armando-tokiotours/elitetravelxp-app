@@ -265,20 +265,6 @@ export function StoryExplanationModal({
                         videoReady ? "opacity-100" : "opacity-0"
                       }`}
                     />
-                    {!videoReady ? (
-                      <div className="absolute inset-x-10 top-1/2 z-10 -translate-y-1/2">
-                        <div
-                          className="h-1.5 overflow-hidden rounded-full bg-white/15"
-                          role="progressbar"
-                          aria-label="Loading video"
-                        >
-                          <div className="h-full w-2/5 animate-pulse rounded-full bg-[#075473]" />
-                        </div>
-                        <p className="mt-2 text-center text-[10px] tracking-wide text-white/50 uppercase">
-                          Charging…
-                        </p>
-                      </div>
-                    ) : null}
                   </>
                 ) : (
                   // eslint-disable-next-line @next/next/no-img-element
