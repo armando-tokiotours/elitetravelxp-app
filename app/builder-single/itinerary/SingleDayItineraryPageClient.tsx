@@ -252,7 +252,7 @@ export default function SingleDayItineraryPageClient() {
             />
           </div>
 
-          <header className="group no-print relative overflow-hidden rounded-2xl border border-white/10 bg-[#0A1017]/80 px-4 py-5 shadow-2xl backdrop-blur-md sm:px-5">
+          <header className="group no-print relative overflow-visible rounded-2xl border border-white/10 bg-[#0A1017]/80 px-4 py-5 shadow-2xl backdrop-blur-md sm:px-5">
             <GoldLight color="#F6A724" active />
             <div className="relative z-10">
           <div className="relative flex items-start justify-between gap-3">

@@ -1,6 +1,5 @@
 "use client";
 
-import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useRef, useState } from "react";
 
 const POSES = {
@@ -14,6 +13,7 @@ type Pose = keyof typeof POSES;
 /**
  * Tiny sticky-timeline mascot — look while active;
  * idle → time, then note (loops until user moves again).
+ * Opacity crossfade only — no scale remount blink.
  */
 export function TimelineProgressMascot({
   idleMs = 7_000,
@@ -66,19 +66,18 @@ export function TimelineProgressMascot({
       className={`pointer-events-none relative z-20 flex h-[3.575rem] w-[3.575rem] shrink-0 items-end justify-center overflow-visible sm:h-[3.9rem] sm:w-[3.9rem] ${className}`}
       aria-hidden
     >
-      <AnimatePresence mode="wait">
-        <motion.img
-          key={pose}
-          src={POSES[pose]}
+      {(Object.keys(POSES) as Pose[]).map((p) => (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          key={p}
+          src={POSES[p]}
           alt=""
-          initial={{ opacity: 0, y: 4, scale: 0.92 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          exit={{ opacity: 0, y: -2, scale: 0.94 }}
-          transition={{ duration: 0.28 }}
-          className="h-[130%] w-auto max-w-none origin-bottom object-contain drop-shadow-[0_4px_10px_rgba(0,0,0,0.55)]"
+          className={`absolute bottom-0 h-[130%] w-auto max-w-none origin-bottom object-contain drop-shadow-[0_4px_10px_rgba(0,0,0,0.55)] transition-opacity duration-300 ${
+            pose === p ? "opacity-100" : "opacity-0"
+          }`}
           draggable={false}
         />
-      </AnimatePresence>
+      ))}
     </div>
   );
 }

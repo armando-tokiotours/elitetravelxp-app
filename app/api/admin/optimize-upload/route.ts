@@ -1,7 +1,7 @@
 /**
  * POST /api/admin/optimize-upload
  * Images → JPEG ≤1920×1080 for PocketBase thumbs.
- * Videos → H.264 MP4 (max edge 1280, CRF 22, +faststart) for fast mobile start.
+ * Videos → JSON { videoBase64, posterBase64, … } H.264 + first-frame poster.
  */
 import { NextRequest, NextResponse } from "next/server";
 import {
@@ -12,9 +12,12 @@ import {
   isOptimizableVideo,
   optimizeUploadVideo,
 } from "@/lib/videoProcessor";
+import {
+  videoPosterCacheKey,
+  writeCachedPoster,
+} from "@/lib/videoPosterCache";
 
 export const runtime = "nodejs";
-/** Video encode can take a bit on larger uploads */
 export const maxDuration = 120;
 
 export async function POST(req: NextRequest) {
@@ -35,15 +38,33 @@ export async function POST(req: NextRequest) {
 
     if (isOptimizableVideo(file)) {
       const result = await optimizeUploadVideo(buf, file.name);
-      return new NextResponse(new Uint8Array(result.buffer), {
-        status: 200,
-        headers: {
-          "Content-Type": result.contentType,
-          "X-Optimized-Filename": result.filename,
-          "X-Optimized-Bytes": String(result.bytes),
-          "X-Optimized-Before": String(result.beforeBytes),
-          "X-Optimized-Kind": "video",
-        },
+      let posterPath = "";
+      if (result.posterBuffer && result.posterFilename) {
+        const key = videoPosterCacheKey(
+          `upload:${result.filename}:${result.bytes}`
+        );
+        const written = await writeCachedPoster(
+          key,
+          result.posterBuffer,
+          result.posterFilename
+        );
+        posterPath = written.publicPath;
+      }
+      return NextResponse.json({
+        kind: "video",
+        videoBase64: result.buffer.toString("base64"),
+        videoFilename: result.filename,
+        videoMime: result.contentType,
+        posterBase64: result.posterBuffer
+          ? result.posterBuffer.toString("base64")
+          : null,
+        posterFilename: result.posterFilename || null,
+        posterMime: result.posterFilename?.endsWith(".jpg")
+          ? "image/jpeg"
+          : "image/webp",
+        posterPath: posterPath || null,
+        bytes: result.bytes,
+        beforeBytes: result.beforeBytes,
       });
     }
 
@@ -54,7 +75,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Skip tiny already-optimized JPEGs
     if (buf.byteLength < 50_000 && file.type === "image/jpeg") {
       return new NextResponse(buf, {
         status: 200,

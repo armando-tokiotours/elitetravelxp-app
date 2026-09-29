@@ -629,7 +629,7 @@ function ChoiceList({
   resolveCard?: (
     id: string,
     svgUrl?: string
-  ) => { url: string; isVideo: boolean };
+  ) => { url: string; isVideo: boolean; posterUrl?: string };
 }) {
   const isOn = (id: string) =>
     Array.isArray(selected) ? selected.includes(id) : selected === id;
@@ -659,6 +659,7 @@ function ChoiceList({
         };
         const cardUrl = card.url;
         const cardIsVideo = card.isVideo || isVideoFilename(cardUrl);
+        const cardPoster = card.posterUrl || "";
         const spotlight = CHOICE_SPOTLIGHT[option.id];
         const accent = spotlight?.color || "#22D3EE";
         const accentRgb = (() => {
@@ -691,17 +692,29 @@ function ChoiceList({
           >
             {/* Selected background — Team Access card photo wins over SVG */}
             {on ? (
-              <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
+              <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden bg-[#0A1017]">
                 {cardIsVideo ? (
-                  <video
-                    key={cardUrl}
-                    src={cardUrl}
-                    autoPlay
-                    loop
-                    muted
-                    playsInline
-                    className="h-full w-full object-cover"
-                  />
+                  <>
+                    {cardPoster ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={cardPoster}
+                        alt=""
+                        className="absolute inset-0 h-full w-full object-cover"
+                      />
+                    ) : null}
+                    <video
+                      key={cardUrl}
+                      src={cardUrl}
+                      poster={cardPoster || undefined}
+                      autoPlay
+                      loop
+                      muted
+                      playsInline
+                      preload="metadata"
+                      className="absolute inset-0 h-full w-full object-cover"
+                    />
+                  </>
                 ) : (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img

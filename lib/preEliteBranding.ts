@@ -25,6 +25,7 @@ import {
   type StorySlide,
 } from "@/lib/preEliteStories";
 import { isVideoFilename, plainBrandingText } from "@/lib/brandingUi";
+import { videoPosterUrlForSrc } from "@/lib/videoPosterUrl";
 
 export const PRE_ELITE_BRANDING_CATEGORY = "pre_elite" as const;
 export const PRE_ELITE_BRANDING_PREFIX = "pre_elite_";
@@ -39,6 +40,8 @@ export type PreEliteBrandingOverlay = {
   slide3Url?: string;
   /** Selected choice-card background */
   cardUrl?: string;
+  /** Still for card video */
+  cardPosterUrl?: string;
   ctaPrimary?: string;
   ctaSecondary?: string;
   inclusionBody?: string;
@@ -95,6 +98,7 @@ export type PreEliteQuizLocalEntry = {
   posterUrl?: string;
   slide3Url?: string;
   cardUrl?: string;
+  cardPosterUrl?: string;
   slide1Title?: string;
   slide1Caption?: string;
   slide2Title?: string;
@@ -144,7 +148,11 @@ function applySlideMedia(
   const media = (url || "").trim();
   if (!media) return slide;
   if (isVideoFilename(media)) {
-    return { ...slide, videoUrl: media, imageUrl: slide.imageUrl };
+    const still =
+      slide.imageUrl && !isVideoFilename(slide.imageUrl)
+        ? slide.imageUrl
+        : videoPosterUrlForSrc(media);
+    return { ...slide, videoUrl: media, imageUrl: still };
   }
   return { ...slide, imageUrl: media, videoUrl: undefined };
 }
@@ -244,11 +252,21 @@ export function resolvePreEliteCardMedia(
   branding?: PreEliteBrandingOverlay | null,
   local?: PreEliteQuizLocalEntry | null,
   svgFallback?: string
-): { url: string; isVideo: boolean } {
+): { url: string; isVideo: boolean; posterUrl?: string } {
   const card =
     (local?.cardUrl || "").trim() || (branding?.cardUrl || "").trim();
+  const cardPoster =
+    (local?.cardPosterUrl || "").trim() ||
+    (branding?.cardPosterUrl || "").trim();
   if (card) {
-    return { url: card, isVideo: isVideoFilename(card) };
+    const isVideo = isVideoFilename(card);
+    return {
+      url: card,
+      isVideo,
+      posterUrl: isVideo
+        ? cardPoster || videoPosterUrlForSrc(card)
+        : undefined,
+    };
   }
   const svg = (svgFallback || "").trim();
   if (svg) {
@@ -257,13 +275,27 @@ export function resolvePreEliteCardMedia(
   const slide1 =
     (local?.mediaUrl || "").trim() || (branding?.mediaUrl || "").trim();
   if (slide1) {
-    return { url: slide1, isVideo: isVideoFilename(slide1) };
+    const isVideo = isVideoFilename(slide1);
+    return {
+      url: slide1,
+      isVideo,
+      posterUrl: isVideo ? videoPosterUrlForSrc(slide1) : undefined,
+    };
   }
   const story = getStoryExplanation(optionId);
   const s1 = story?.slides[0];
   const fromStory = (s1?.videoUrl || s1?.imageUrl || "").trim();
   if (fromStory) {
-    return { url: fromStory, isVideo: isVideoFilename(fromStory) };
+    const isVideo = isVideoFilename(fromStory);
+    return {
+      url: fromStory,
+      isVideo,
+      posterUrl: isVideo
+        ? (s1?.imageUrl && !isVideoFilename(s1.imageUrl)
+            ? s1.imageUrl
+            : videoPosterUrlForSrc(fromStory))
+        : undefined,
+    };
   }
   return { url: "/svg/style-premium-comfort.svg", isVideo: false };
 }

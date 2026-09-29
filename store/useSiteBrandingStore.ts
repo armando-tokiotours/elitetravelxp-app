@@ -7,9 +7,11 @@ import {
   brandingUiPosterUrl,
   brandingUiSlide3Url,
   brandingUiCardUrl,
+  brandingUiCardPosterUrl,
   fetchBrandingUiItems,
   type PbBrandingUiItem,
 } from "@/lib/pocketbase/client";
+import { videoPosterUrlForSrc } from "@/lib/videoPosterUrl";
 import type { PaceId } from "@/lib/travelPace";
 import type {
   ProfilerCrowdStyle,
@@ -53,6 +55,8 @@ export interface ResolvedBrandingUiItem {
   slide3Url: string;
   /** Pre-Builder selected-card background */
   cardUrl: string;
+  /** Still frame when card is a video */
+  cardPosterUrl: string;
   recordId: string | null;
 }
 
@@ -92,6 +96,11 @@ function resolveItem(
           : mediaUrl);
   const slide3Url = brandingUiSlide3Url(row);
   const cardUrl = brandingUiCardUrl(row);
+  const cardPosterPb = brandingUiCardPosterUrl(row);
+  const cardIsVideo = cardUrl ? isVideoFilename(cardUrl) : false;
+  const cardPosterUrl = cardIsVideo
+    ? cardPosterPb || videoPosterUrlForSrc(cardUrl)
+    : "";
 
   return {
     key,
@@ -110,6 +119,7 @@ function resolveItem(
     posterUrl,
     slide3Url,
     cardUrl,
+    cardPosterUrl,
     recordId: row?.id ?? null,
   };
 }

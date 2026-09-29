@@ -296,7 +296,10 @@ export function SiteBrandingPanel({ getClient }: { getClient: () => PbClient }) 
       fd.append("subtitle", sdSubtitle);
       fd.append("key", SINGLE_DAY_BUILDER_HERO_KEY);
       fd.append("category", "builder");
-      if (sdFile) fd.append("media", await optimizeFileForUpload(sdFile));
+      if (sdFile) {
+        const opt = await optimizeFileForUpload(sdFile);
+        fd.append("media", opt.file);
+      }
 
       let saved: PbBrandingUiItem;
       if (sdRecord?.id) {

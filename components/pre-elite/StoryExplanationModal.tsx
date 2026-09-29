@@ -228,16 +228,27 @@ export function StoryExplanationModal({
             {slide ? (
               <div className="absolute inset-0 z-0">
                 {slide.videoUrl ? (
-                  <video
-                    ref={videoRef}
-                    key={slide.id}
-                    src={slide.videoUrl}
-                    poster={slide.imageUrl}
-                    autoPlay
-                    muted
-                    playsInline
-                    className="h-full w-full object-cover"
-                  />
+                  <>
+                    {slide.imageUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={slide.imageUrl}
+                        alt=""
+                        className="absolute inset-0 h-full w-full object-cover"
+                      />
+                    ) : null}
+                    <video
+                      ref={videoRef}
+                      key={slide.id}
+                      src={slide.videoUrl}
+                      poster={slide.imageUrl}
+                      autoPlay
+                      muted
+                      playsInline
+                      preload="metadata"
+                      className="absolute inset-0 h-full w-full object-cover"
+                    />
+                  </>
                 ) : (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img

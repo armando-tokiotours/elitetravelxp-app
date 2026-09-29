@@ -11,8 +11,10 @@ import {
   brandingUiPosterUrl,
   brandingUiSlide3Url,
   brandingUiCardUrl,
+  brandingUiCardPosterUrl,
   type PbBrandingUiItem,
 } from "@/lib/pocketbase/client";
+import { videoPosterUrlForSrc } from "@/lib/videoPosterUrl";
 import {
   PRE_ELITE_BRANDING_CATEGORY,
   PRE_ELITE_QUIZ_SECTIONS,
@@ -187,14 +189,23 @@ export function PreBuilderQuizBrandingAdmin({
       fd.append("credit_body", draft.slide2Caption);
       fd.append("inclusion_title", draft.slide3Title);
       fd.append("credit_title", draft.slide3Caption);
-      if (draft.mediaFile)
-        fd.append("media", await optimizeFileForUpload(draft.mediaFile));
-      if (draft.posterFile)
-        fd.append("poster", await optimizeFileForUpload(draft.posterFile));
-      if (draft.slide3File)
-        fd.append("slide3", await optimizeFileForUpload(draft.slide3File));
-      if (draft.cardFile)
-        fd.append("card", await optimizeFileForUpload(draft.cardFile));
+      if (draft.mediaFile) {
+        const opt = await optimizeFileForUpload(draft.mediaFile);
+        fd.append("media", opt.file);
+      }
+      if (draft.posterFile) {
+        const opt = await optimizeFileForUpload(draft.posterFile);
+        fd.append("poster", opt.file);
+      }
+      if (draft.slide3File) {
+        const opt = await optimizeFileForUpload(draft.slide3File);
+        fd.append("slide3", opt.file);
+      }
+      if (draft.cardFile) {
+        const opt = await optimizeFileForUpload(draft.cardFile);
+        fd.append("card", opt.file);
+        if (opt.posterFile) fd.append("card_poster", opt.posterFile);
+      }
 
       let saved: PbBrandingUiItem;
       if (draft.recordId) {
@@ -212,6 +223,11 @@ export function PreBuilderQuizBrandingAdmin({
       const posterUrl = brandingUiPosterUrl(saved) || draft.posterPreview;
       const slide3Url = brandingUiSlide3Url(saved) || draft.slide3Preview;
       const cardUrl = brandingUiCardUrl(saved) || draft.cardPreview;
+      const cardPosterUrl =
+        brandingUiCardPosterUrl(saved) ||
+        (cardUrl && isVideoFilename(cardUrl)
+          ? videoPosterUrlForSrc(cardUrl)
+          : "");
       writePreEliteQuizLocalEntry(optionId, {
         title: draft.title,
         subtitle: draft.subtitle,
@@ -219,6 +235,7 @@ export function PreBuilderQuizBrandingAdmin({
         posterUrl,
         slide3Url,
         cardUrl,
+        cardPosterUrl: cardPosterUrl || undefined,
         slide1Title: draft.slide1Title,
         slide1Caption: draft.slide1Caption,
         slide2Title: draft.slide2Title,

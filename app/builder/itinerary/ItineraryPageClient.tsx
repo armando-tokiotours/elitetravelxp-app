@@ -290,7 +290,7 @@ export default function ItineraryPageClient() {
             label="Section 1: Hero & Nav"
             className="no-print my-4"
           >
-            <header className="group relative overflow-hidden rounded-2xl border border-white/10 bg-[#0A1017]/80 p-5 shadow-2xl backdrop-blur-md sm:p-6">
+            <header className="group relative overflow-visible rounded-2xl border border-white/10 bg-[#0A1017]/80 p-5 shadow-2xl backdrop-blur-md sm:p-6">
               <GoldLight color="#F6A724" active />
               <div className="relative z-10 space-y-4 text-left">
               <div className="relative flex items-start justify-between gap-3">

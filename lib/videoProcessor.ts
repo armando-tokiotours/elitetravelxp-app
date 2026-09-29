@@ -13,6 +13,9 @@ export type OptimizedVideo = {
   contentType: "video/mp4";
   bytes: number;
   beforeBytes: number;
+  /** First-frame WebP poster (for no-blink UI) */
+  posterBuffer?: Buffer;
+  posterFilename?: string;
 };
 
 const VIDEO_EXT = /\.(mp4|m4v|mov|webm|qt)$/i;
@@ -33,9 +36,72 @@ export function isOptimizableVideo(file: {
 }
 
 /** Prefer FFMPEG_PATH, then system `ffmpeg` (Docker apk). */
-function resolveFfmpegBin(): string {
+export function resolveFfmpegBin(): string {
   if (process.env.FFMPEG_PATH?.trim()) return process.env.FFMPEG_PATH.trim();
   return "ffmpeg";
+}
+
+/**
+ * Grab a sharp still from ~0.1s into the clip (WebP).
+ * Longer edge ≤1280 so posters stay light (~30–80 KB).
+ */
+export async function extractVideoPoster(
+  fileBuffer: Buffer,
+  originalName = "clip"
+): Promise<{ buffer: Buffer; filename: string }> {
+  const tmpRoot = await mkdtemp(path.join(os.tmpdir(), "tokio-poster-"));
+  const inPath = path.join(tmpRoot, "in.bin");
+  const outPath = path.join(tmpRoot, "poster.webp");
+  await writeFile(inPath, fileBuffer);
+  try {
+    const { code, stderr } = await run(resolveFfmpegBin(), [
+      "-y",
+      "-ss",
+      "0.05",
+      "-i",
+      inPath,
+      "-frames:v",
+      "1",
+      "-vf",
+      "scale='min(1280,iw)':'min(1280,ih)':force_original_aspect_ratio=decrease",
+      "-c:v",
+      "libwebp",
+      "-quality",
+      "82",
+      outPath,
+    ]);
+    if (code !== 0) {
+      // Fallback: jpeg via png pipe if webp encoder missing
+      const jpgOut = path.join(tmpRoot, "poster.jpg");
+      const r2 = await run(resolveFfmpegBin(), [
+        "-y",
+        "-ss",
+        "0.05",
+        "-i",
+        inPath,
+        "-frames:v",
+        "1",
+        "-vf",
+        "scale='min(1280,iw)':'min(1280,ih)':force_original_aspect_ratio=decrease",
+        "-q:v",
+        "3",
+        jpgOut,
+      ]);
+      if (r2.code !== 0) {
+        throw new Error(
+          `poster extract failed: ${(stderr || r2.stderr).slice(-300)}`
+        );
+      }
+      const jpg = await readFile(jpgOut);
+      const base = path.parse(originalName).name || "clip";
+      return { buffer: jpg, filename: `${base}-poster.jpg` };
+    }
+    const buffer = await readFile(outPath);
+    const base = path.parse(originalName).name || "clip";
+    return { buffer, filename: `${base}-poster.webp` };
+  } finally {
+    await rm(tmpRoot, { recursive: true, force: true }).catch(() => undefined);
+  }
 }
 
 function run(
@@ -119,12 +185,23 @@ export async function optimizeUploadVideo(
     const buffer =
       out.byteLength < beforeBytes * 1.05 ? out : fileBuffer;
     const base = path.parse(originalName).name || "clip";
+    let posterBuffer: Buffer | undefined;
+    let posterFilename: string | undefined;
+    try {
+      const poster = await extractVideoPoster(buffer, base);
+      posterBuffer = poster.buffer;
+      posterFilename = poster.filename;
+    } catch (err) {
+      console.warn("[optimizeUploadVideo] poster extract skipped", err);
+    }
     return {
       buffer,
       filename: `${base}.mp4`,
       contentType: "video/mp4",
       bytes: buffer.byteLength,
       beforeBytes,
+      posterBuffer,
+      posterFilename,
     };
   } finally {
     await rm(tmpRoot, { recursive: true, force: true }).catch(() => undefined);

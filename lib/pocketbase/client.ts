@@ -385,6 +385,8 @@ export interface PbBrandingUiItem {
   slide3?: string;
   /** Pre-Builder selected-card background (image or video) */
   card?: string;
+  /** Still frame for card video (no-blink) */
+  card_poster?: string;
   cta_primary?: string;
   cta_secondary?: string;
   inclusion_title?: string;
@@ -449,6 +451,21 @@ export function brandingUiSlide3Url(
     row.id,
     row.slide3,
     !isVideo && thumb ? { thumb, format: "webp" } : undefined
+  );
+}
+
+
+/** Still frame for Pre-Builder card video backgrounds. */
+export function brandingUiCardPosterUrl(
+  row: PbBrandingUiItem | null | undefined,
+  thumb?: string
+): string {
+  if (!row?.card_poster || !row.id) return "";
+  return pbFileUrl(
+    String(row.collectionId ?? "branding_ui_items"),
+    row.id,
+    row.card_poster,
+    thumb ? { thumb, format: "webp" } : undefined
   );
 }
 

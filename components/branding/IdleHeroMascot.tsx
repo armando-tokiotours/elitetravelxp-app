@@ -14,6 +14,7 @@ type IdleHeroMascotProps = {
 /**
  * Hero mascot that swaps to an idle pose after inactivity,
  * then returns to the active pose on mouse / scroll / click / key.
+ * Crossfade without remount/scale so the swap does not blink.
  */
 export function IdleHeroMascot({
   activeSrc = "/brand/mascot-phone.webp",
@@ -48,17 +49,26 @@ export function IdleHeroMascot({
     };
   }, [idleMs]);
 
-  const src = isIdle ? idleSrc : activeSrc;
-  const key = isIdle ? "idle" : "active";
-
   return (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img
-      key={key}
-      src={src}
-      alt=""
-      aria-hidden
-      className={className}
-    />
+    <span className={`relative inline-block ${className || ""}`} aria-hidden>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={activeSrc}
+        alt=""
+        draggable={false}
+        className={`h-full w-auto object-contain transition-opacity duration-300 ${
+          isIdle ? "opacity-0" : "opacity-100"
+        }`}
+      />
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={idleSrc}
+        alt=""
+        draggable={false}
+        className={`pointer-events-none absolute inset-0 h-full w-auto object-contain transition-opacity duration-300 ${
+          isIdle ? "opacity-100" : "opacity-0"
+        }`}
+      />
+    </span>
   );
 }

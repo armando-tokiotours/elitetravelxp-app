@@ -1176,8 +1176,8 @@ function RecordEditModal({
           const file = files[f.key];
           if (file) {
             const optimized = await optimizeFileForUpload(file);
-            fd.append(f.key, optimized);
-            if (f.legacyKey) fd.append(f.legacyKey, optimized);
+            fd.append(f.key, optimized.file);
+            if (f.legacyKey) fd.append(f.legacyKey, optimized.file);
           }
           continue;
         }
