@@ -78,7 +78,7 @@ const STEP_TITLES = [
   "Interests",
   "Motivation",
   "What to avoid",
-  "Contact & timing",
+  "Contact",
 ] as const;
 
 export function PreEliteBuilderClient() {
@@ -373,7 +373,7 @@ export function PreEliteBuilderClient() {
                       : "mt-3 max-w-[70%] font-display text-3xl leading-tight text-white sm:max-w-none sm:text-4xl"
                   }
                 >
-                  {step === 5 ? "Contact & Timing" : STEP_TITLES[step - 1]}
+                  {step === 5 ? "Contact" : STEP_TITLES[step - 1]}
                 </h1>
                 <p
                   className={
