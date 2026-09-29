@@ -1,21 +1,25 @@
 /**
- * Eager asset warmup — characters + key posters/videos for Pre-Elite / builders.
+ * Eager asset warmup — characters + story stills + key videos.
  * Call from home gate + root preloader so swaps never wait on first paint.
  */
 
 import { BRAND_CHARACTER_PRELOAD_PATHS } from "@/lib/brandCharacters";
 import { BRAND_LOGO_ICON } from "@/lib/brand";
+import { STORY_WARM_IMAGE_PATHS } from "@/lib/preEliteStories";
 
 /** Light UI images that must be in cache before trip flow feels snappy. */
 export const WARM_IMAGE_PATHS: readonly string[] = [
   ...BRAND_CHARACTER_PRELOAD_PATHS,
+  ...STORY_WARM_IMAGE_PATHS,
   BRAND_LOGO_ICON,
   "/images/peek-character-1day.png",
   "/images/peek-character.png",
   "/images/matcher-poster.webp",
   "/images/matcher-poster-card.webp",
+  "/images/matcher-poster-hero.webp",
   "/images/concierge-poster.webp",
   "/images/concierge-poster-card.webp",
+  "/images/concierge-poster-hero.webp",
 ];
 
 /** Key explainer reels — start download on home, not when a modal opens. */
@@ -76,7 +80,6 @@ function warmVideo(src: string, timeoutMs = 12_000): Promise<void> {
       },
       { once: true }
     );
-    // loadeddata is enough to avoid first-open blank on many devices
     video.addEventListener(
       "loadeddata",
       () => {

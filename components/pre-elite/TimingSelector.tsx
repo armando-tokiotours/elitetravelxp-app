@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
-import { CalendarDays, ChevronLeft, ChevronRight, Minus, Plus, X } from "lucide-react";
+import { CalendarDays, ChevronDown, ChevronLeft, ChevronRight, Minus, Plus, Search, X } from "lucide-react";
 import type { PreEliteTiming, TripType } from "@/lib/preEliteBuilder";
 import { buildTimingPayload, emptyTiming } from "@/lib/preEliteBuilder";
 import { useSeasonalFxStore } from "@/store/useSeasonalFxStore";
@@ -226,6 +226,10 @@ export function TimingSelector({ value, onChange, tripType }: Props) {
   const [totalDays, setTotalDays] = useState(() =>
     singleDay ? 1 : value.totalDays || DEFAULT_DAYS
   );
+  const [monthDropOpen, setMonthDropOpen] = useState(false);
+  const [monthQuery, setMonthQuery] = useState("");
+  const monthRootRef = useRef<HTMLDivElement>(null);
+  const monthSearchRef = useRef<HTMLInputElement>(null);
   const [view, setView] = useState(() => {
     const anchor = initialStart || today;
     return { year: anchor.getFullYear(), month: anchor.getMonth() };
@@ -244,6 +248,22 @@ export function TimingSelector({ value, onChange, tripType }: Props) {
     };
   }, [open]);
 
+  useEffect(() => {
+    if (!monthDropOpen) return;
+    const t = window.setTimeout(() => monthSearchRef.current?.focus(), 40);
+    const onDoc = (e: MouseEvent) => {
+      if (!monthRootRef.current?.contains(e.target as Node)) {
+        setMonthDropOpen(false);
+        setMonthQuery("");
+      }
+    };
+    document.addEventListener("mousedown", onDoc);
+    return () => {
+      window.clearTimeout(t);
+      document.removeEventListener("mousedown", onDoc);
+    };
+  }, [monthDropOpen]);
+
   const monthOptions = useMemo(
     () =>
       buildMonthOptions(
@@ -252,6 +272,18 @@ export function TimingSelector({ value, onChange, tripType }: Props) {
       ),
     [today]
   );
+
+  const filteredMonths = useMemo(() => {
+    const q = monthQuery.trim().toLowerCase();
+    if (!q) return monthOptions;
+    return monthOptions.filter(
+      (m) =>
+        m.label.toLowerCase().includes(q) ||
+        m.season.toLowerCase().includes(q) ||
+        m.short.toLowerCase().includes(q) ||
+        (m.peak || "").toLowerCase().includes(q)
+    );
+  }, [monthOptions, monthQuery]);
 
   const cells = useMemo(
     () => calendarCells(view.year, view.month),
@@ -342,9 +374,10 @@ export function TimingSelector({ value, onChange, tripType }: Props) {
 
   const pickMonth = (key: string) => {
     setSelectedMonthKey(key);
+    setMode("month");
     emit({
       mode: "month",
-      arrival,
+      arrival: null,
       monthKey: key,
       days: totalDays,
     });
@@ -352,7 +385,8 @@ export function TimingSelector({ value, onChange, tripType }: Props) {
     if (found) {
       useSeasonalFxStore.getState().triggerFromMonthLabel(found.label);
     }
-    setOpen(false);
+    setMonthDropOpen(false);
+    setMonthQuery("");
   };
 
   const changeDays = (days: number) => {
@@ -472,11 +506,6 @@ export function TimingSelector({ value, onChange, tripType }: Props) {
                   type="button"
                   disabled={disabled}
                   onClick={() => pickDay(day)}
-                  onTouchEnd={(e) => {
-                    if (disabled) return;
-                    e.preventDefault();
-                    pickDay(day);
-                  }}
                   className={`flex min-h-[44px] items-center justify-center rounded-lg text-sm transition ${
                     disabled
                       ? "cursor-not-allowed text-white/20"
@@ -498,45 +527,101 @@ export function TimingSelector({ value, onChange, tripType }: Props) {
           </p>
         </div>
       ) : (
-        <div className="max-h-64 overflow-y-auto rounded-xl border border-white/10 bg-black/25 p-2">
-          <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
-            {monthOptions.map((item) => {
-              const selected = selectedMonthKey === item.key;
-              return (
-                <button
-                  key={item.key}
-                  type="button"
-                  onClick={() => pickMonth(item.key)}
-                  onTouchEnd={(e) => {
-                    e.preventDefault();
-                    pickMonth(item.key);
-                  }}
-                  className={`min-h-[44px] rounded-xl border px-2.5 py-2.5 text-left transition ${
-                    selected
-                      ? "border-[#075473] bg-[#075473]/20"
-                      : "border-white/10 bg-white/[0.03] hover:border-white/25"
-                  }`}
-                >
-                  <span className="text-xs text-white">
-                    {item.season}
-                    <span className="text-white/40"> · </span>
-                    <span className="text-[#075473]">{item.short}</span>
-                  </span>
-                  {item.peak ? (
-                    <span
-                      className={`mt-1.5 inline-block rounded-full px-1.5 py-0.5 text-[9px] tracking-wide uppercase ${
-                        selected
-                          ? "bg-[#075473]/20 text-[#075473]"
-                          : "bg-white/5 text-white/50"
-                      }`}
-                    >
-                      {item.peak}
-                    </span>
-                  ) : null}
-                </button>
-              );
-            })}
-          </div>
+        <div ref={monthRootRef} className="relative">
+          <button
+            type="button"
+            aria-label="Target month or season"
+            aria-expanded={monthDropOpen}
+            onClick={() => setMonthDropOpen((o) => !o)}
+            className="flex w-full min-h-[44px] items-center gap-2 rounded-xl border border-white/10 bg-[#121212] px-3 py-2.5 text-left text-sm text-white transition hover:border-white/25"
+          >
+            <span className="min-w-0 flex-1 truncate">
+              {selectedMonthKey
+                ? (() => {
+                    const found = monthOptions.find((m) => m.key === selectedMonthKey);
+                    return found
+                      ? `${found.season} · ${found.short}`
+                      : "Choose month / season";
+                  })()
+                : "Choose month / season"}
+            </span>
+            <ChevronDown
+              className={`h-3.5 w-3.5 shrink-0 text-white/50 transition ${
+                monthDropOpen ? "rotate-180" : ""
+              }`}
+              aria-hidden
+            />
+          </button>
+
+          {monthDropOpen ? (
+            <div className="absolute left-0 right-0 top-[calc(100%+0.35rem)] z-50 overflow-hidden rounded-2xl border border-white/10 bg-[#0D1117] shadow-2xl">
+              <div className="flex items-center gap-2 border-b border-white/10 px-3 py-2">
+                <Search className="h-3.5 w-3.5 shrink-0 text-white/40" aria-hidden />
+                <input
+                  ref={monthSearchRef}
+                  value={monthQuery}
+                  onChange={(e) => setMonthQuery(e.target.value)}
+                  placeholder="Search month or season…"
+                  className="min-w-0 flex-1 bg-transparent text-sm text-white outline-none placeholder:text-white/35"
+                />
+                {monthQuery ? (
+                  <button
+                    type="button"
+                    aria-label="Clear search"
+                    onClick={() => setMonthQuery("")}
+                    className="rounded-full p-1 text-white/40 hover:text-white"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                ) : null}
+              </div>
+              <ul
+                className="max-h-52 overflow-y-auto overscroll-contain py-1"
+                role="listbox"
+              >
+                {filteredMonths.length === 0 ? (
+                  <li className="px-3 py-3 text-center text-xs text-white/40">
+                    No months match
+                  </li>
+                ) : (
+                  filteredMonths.map((item) => {
+                    const selected = selectedMonthKey === item.key;
+                    return (
+                      <li key={item.key}>
+                        <button
+                          type="button"
+                          role="option"
+                          aria-selected={selected}
+                          onClick={() => pickMonth(item.key)}
+                          className={`flex w-full items-center gap-2.5 px-3 py-2.5 text-left text-sm transition hover:bg-white/5 ${
+                            selected
+                              ? "bg-[#075473]/25 text-white"
+                              : "text-white/85"
+                          }`}
+                        >
+                          <span className="min-w-0 flex-1">
+                            <span className="block truncate font-medium">
+                              {item.season}
+                              <span className="text-white/40"> · </span>
+                              <span className="text-[#075473]">{item.short}</span>
+                            </span>
+                            {item.peak ? (
+                              <span className="mt-0.5 block truncate text-[10px] text-white/45">
+                                {item.peak}
+                              </span>
+                            ) : null}
+                          </span>
+                        </button>
+                      </li>
+                    );
+                  })
+                )}
+              </ul>
+              <p className="border-t border-white/10 px-3 py-1.5 text-[10px] text-white/35">
+                {monthOptions.length} months · scroll or type to find
+              </p>
+            </div>
+          ) : null}
         </div>
       )}
 
@@ -580,10 +665,6 @@ export function TimingSelector({ value, onChange, tripType }: Props) {
         <button
           type="button"
           onClick={() => setOpen(true)}
-          onTouchEnd={(e) => {
-            e.preventDefault();
-            setOpen(true);
-          }}
           className="col-span-3 inline-flex min-h-[40px] w-full items-center justify-center gap-2 rounded-xl border border-[#075473]/50 bg-[#075473]/15 px-2 py-2.5 text-[0.7rem] font-semibold tracking-[0.1em] text-white uppercase transition hover:bg-[#075473]/25 sm:px-4 sm:text-sm sm:tracking-[0.12em]"
         >
           <CalendarDays className="h-4 w-4 shrink-0 text-[#075473]" />

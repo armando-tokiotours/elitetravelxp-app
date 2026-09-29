@@ -11,6 +11,7 @@ import {
 
 /**
  * Instagram Stories–style vertical explanation overlay for Pre-Elite options.
+ * Poster stays visible until video canplay — no black hole while buffering.
  */
 export function StoryExplanationModal({
   open,
@@ -27,6 +28,7 @@ export function StoryExplanationModal({
   const [index, setIndex] = useState(0);
   const [imageTick, setImageTick] = useState(0);
   const [videoProgress, setVideoProgress] = useState(0);
+  const [videoReady, setVideoReady] = useState(false);
   const videoRef = useRef<HTMLVideoElement | null>(null);
 
   useEffect(() => {
@@ -38,6 +40,7 @@ export function StoryExplanationModal({
     setIndex(0);
     setImageTick(0);
     setVideoProgress(0);
+    setVideoReady(false);
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     return () => {
@@ -73,11 +76,14 @@ export function StoryExplanationModal({
   useEffect(() => {
     if (!open || !isVideo) {
       setVideoProgress(0);
+      setVideoReady(false);
       return;
     }
+    setVideoReady(false);
     const el = videoRef.current;
     if (!el) return;
 
+    const markReady = () => setVideoReady(true);
     const onTime = () => {
       const duration = el.duration || 0;
       if (duration > 0) {
@@ -89,10 +95,14 @@ export function StoryExplanationModal({
       setIndex((prev) => (prev + 1) % slides.length);
     };
 
+    if (el.readyState >= 3) markReady();
+    el.addEventListener("canplay", markReady);
+    el.addEventListener("loadeddata", markReady);
+
     el.currentTime = 0;
     setVideoProgress(0);
     void el.play().catch(() => {
-      /* autoplay may be blocked; progress still advances via timer fallback */
+      /* autoplay may be blocked — poster stays until ready */
     });
 
     el.addEventListener("timeupdate", onTime);
@@ -104,6 +114,8 @@ export function StoryExplanationModal({
     }, STORY_SLIDE_MS * 2);
 
     return () => {
+      el.removeEventListener("canplay", markReady);
+      el.removeEventListener("loadeddata", markReady);
       el.removeEventListener("timeupdate", onTime);
       el.removeEventListener("ended", onEnded);
       window.clearTimeout(fallback);
@@ -117,6 +129,7 @@ export function StoryExplanationModal({
     setIndex((next + slides.length) % slides.length);
     setImageTick((t) => t + 1);
     setVideoProgress(0);
+    setVideoReady(false);
   };
 
   return createPortal(
@@ -210,7 +223,7 @@ export function StoryExplanationModal({
               </button>
             </div>
 
-            {/* Tap zones — leave room for header controls and sticky CTA */}
+            {/* Tap zones */}
             <button
               type="button"
               className="absolute bottom-28 left-0 top-16 z-20 w-1/3"
@@ -226,7 +239,7 @@ export function StoryExplanationModal({
 
             {/* Media */}
             {slide ? (
-              <div className="absolute inset-0 z-0">
+              <div className="absolute inset-0 z-0 bg-black">
                 {slide.videoUrl ? (
                   <>
                     {slide.imageUrl ? (
@@ -234,7 +247,9 @@ export function StoryExplanationModal({
                       <img
                         src={slide.imageUrl}
                         alt=""
-                        className="absolute inset-0 h-full w-full object-cover"
+                        className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-300 ${
+                          videoReady ? "opacity-0" : "opacity-100"
+                        }`}
                       />
                     ) : null}
                     <video
@@ -245,9 +260,25 @@ export function StoryExplanationModal({
                       autoPlay
                       muted
                       playsInline
-                      preload="metadata"
-                      className="absolute inset-0 h-full w-full object-cover"
+                      preload="auto"
+                      className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-300 ${
+                        videoReady ? "opacity-100" : "opacity-0"
+                      }`}
                     />
+                    {!videoReady ? (
+                      <div className="absolute inset-x-10 top-1/2 z-10 -translate-y-1/2">
+                        <div
+                          className="h-1.5 overflow-hidden rounded-full bg-white/15"
+                          role="progressbar"
+                          aria-label="Loading video"
+                        >
+                          <div className="h-full w-2/5 animate-pulse rounded-full bg-[#075473]" />
+                        </div>
+                        <p className="mt-2 text-center text-[10px] tracking-wide text-white/50 uppercase">
+                          Charging…
+                        </p>
+                      </div>
+                    ) : null}
                   </>
                 ) : (
                   // eslint-disable-next-line @next/next/no-img-element

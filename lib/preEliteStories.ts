@@ -4,6 +4,7 @@ import {
   PAIN_POINTS,
   TRAVEL_STYLES,
 } from "@/lib/preEliteBuilder";
+import { BRAND_LOGO_ICON } from "@/lib/brand";
 
 export const STORY_SLIDE_MS = 4200;
 
@@ -24,7 +25,8 @@ export interface StoryExplanation {
   slides: StorySlide[];
 }
 
-const LOGO = "/images/tokiotours-logo.png";
+/** Light circular mark — never the heavy full emblem in story chrome. */
+const LOGO = BRAND_LOGO_ICON;
 const CONCIERGE_VIDEO = "/videos/elite-concierge-preview.mp4";
 const GUIDE_VIDEO = "/videos/activity-matcher-guide.mp4";
 
@@ -41,7 +43,7 @@ const STORIES: Record<string, StoryExplanation> = {
         title: "Private guide, local rhythm",
         caption:
           "Walk Kyoto lanes and ride the same rail lines locals use — with a host who handles every transfer.",
-        imageUrl: "/photo/pace-relaxed.jpg",
+        imageUrl: "/photo/pace-relaxed.story.webp",
         videoUrl: GUIDE_VIDEO,
       },
       {
@@ -49,7 +51,7 @@ const STORIES: Record<string, StoryExplanation> = {
         title: "Authentic immersion",
         caption:
           "Shrines, neighborhoods, and quiet side streets without a luxury car between you and the city.",
-        imageUrl: "/brand/hero-japan-pagoda.jpg",
+        imageUrl: "/brand/hero-japan-pagoda.story.webp",
       },
       {
         id: "ce-3",
@@ -87,7 +89,7 @@ const STORIES: Record<string, StoryExplanation> = {
         title: "Guide + driver as a unit",
         caption:
           "One private host, one dedicated car. The most popular balance of comfort and immersion.",
-        imageUrl: "/photo/pace-moderate.jpg",
+        imageUrl: "/photo/pace-moderate.story.webp",
       },
     ],
   },
@@ -103,7 +105,7 @@ const STORIES: Record<string, StoryExplanation> = {
         title: "Complete VIP access",
         caption:
           "Luxury chauffeur, priority entry, and discreet hosting from the first arrival to the last dinner.",
-        imageUrl: "/brand/hero-background.jpg",
+        imageUrl: "/brand/hero-background.story.webp",
         videoUrl: CONCIERGE_VIDEO,
       },
       {
@@ -111,7 +113,7 @@ const STORIES: Record<string, StoryExplanation> = {
         title: "Private dining & exclusives",
         caption:
           "High-end private dining rooms and hard-to-book experiences arranged around your preferences.",
-        imageUrl: "/photo/season-high.jpg",
+        imageUrl: "/photo/season-high.story.webp",
       },
       {
         id: "vip-3",
@@ -134,7 +136,7 @@ const STORIES: Record<string, StoryExplanation> = {
         title: "Shrines & historic districts",
         caption:
           "Guided time in temples, tea rooms, and heritage streets — with context, not just photo stops.",
-        imageUrl: "/brand/hero-japan-pagoda.jpg",
+        imageUrl: "/brand/hero-japan-pagoda.story.webp",
         videoUrl: GUIDE_VIDEO,
       },
       {
@@ -142,14 +144,14 @@ const STORIES: Record<string, StoryExplanation> = {
         title: "Living traditions",
         caption:
           "Tea ceremonies, sumo culture, and etiquette cues your host explains in the moment.",
-        imageUrl: "/photo/season-mid.jpg",
+        imageUrl: "/photo/season-mid.story.webp",
       },
       {
         id: "ch-3",
         title: "Respectful pacing",
         caption:
           "Enough time at each site to feel the place — not a checklist dash.",
-        imageUrl: "/photo/pace-relaxed.jpg",
+        imageUrl: "/photo/pace-relaxed.story.webp",
       },
     ],
   },
@@ -165,7 +167,7 @@ const STORIES: Record<string, StoryExplanation> = {
         title: "Hidden izakayas",
         caption:
           "Neighborhood counters and off-menu tables most visitors never find without a local host.",
-        imageUrl: "/photo/season-high.jpg",
+        imageUrl: "/photo/season-high.story.webp",
       },
       {
         id: "fc-2",
@@ -196,7 +198,7 @@ const STORIES: Record<string, StoryExplanation> = {
         title: "Anime, tech & nightlife",
         caption:
           "Neon districts, flagship shopping, and late-evening energy with a host who knows the rhythm.",
-        imageUrl: "/photo/pace-fast.jpg",
+        imageUrl: "/photo/pace-fast.story.webp",
         videoUrl: GUIDE_VIDEO,
       },
       {
@@ -211,7 +213,7 @@ const STORIES: Record<string, StoryExplanation> = {
         title: "Night energy, day clarity",
         caption:
           "Daytime culture blocks paired with evenings that match your pace.",
-        imageUrl: "/brand/hero-background.jpg",
+        imageUrl: "/brand/hero-background.story.webp",
       },
     ],
   },
@@ -227,7 +229,7 @@ const STORIES: Record<string, StoryExplanation> = {
         title: "Mt. Fuji & Hakone",
         caption:
           "Iconic horizons, onsen towns, and coastal air — planned so the day never feels rushed.",
-        imageUrl: "/brand/hero-background.jpg",
+        imageUrl: "/brand/hero-background.story.webp",
         videoUrl: CONCIERGE_VIDEO,
       },
       {
@@ -235,14 +237,14 @@ const STORIES: Record<string, StoryExplanation> = {
         title: "Kamakura & quiet coasts",
         caption:
           "Hidden villages and shoreline walks beyond the standard tourist loop.",
-        imageUrl: "/photo/season-low.jpg",
+        imageUrl: "/photo/season-low.story.webp",
       },
       {
         id: "nd-3",
         title: "Return rested",
         caption:
           "Day trips timed so you are back for dinner without feeling drained.",
-        imageUrl: "/photo/pace-relaxed.jpg",
+        imageUrl: "/photo/pace-relaxed.story.webp",
       },
     ],
   },
@@ -258,7 +260,7 @@ const STORIES: Record<string, StoryExplanation> = {
         title: "Built for every age",
         caption:
           "Pacing, hotel logistics, and experiences that work for kids and adults on the same day.",
-        imageUrl: "/photo/pace-moderate.jpg",
+        imageUrl: "/photo/pace-moderate.story.webp",
         videoUrl: GUIDE_VIDEO,
       },
       {
@@ -289,7 +291,7 @@ const STORIES: Record<string, StoryExplanation> = {
         title: "Exclusive & intimate",
         caption:
           "Private dining, quiet viewpoints, and evenings designed for two — never crowded by default.",
-        imageUrl: "/photo/season-high.jpg",
+        imageUrl: "/photo/season-high.story.webp",
         videoUrl: CONCIERGE_VIDEO,
       },
       {
@@ -297,14 +299,14 @@ const STORIES: Record<string, StoryExplanation> = {
         title: "Luxury that feels personal",
         caption:
           "Chauffeur timing, suite logistics, and experiences that stay soft and unhurried.",
-        imageUrl: "/brand/hero-japan-pagoda.jpg",
+        imageUrl: "/brand/hero-japan-pagoda.story.webp",
       },
       {
         id: "rom-3",
         title: "Evenings designed for two",
         caption:
           "Sunset viewpoints and private tables without the group-tour feel.",
-        imageUrl: "/photo/season-mid.jpg",
+        imageUrl: "/photo/season-mid.story.webp",
       },
     ],
   },
@@ -320,7 +322,7 @@ const STORIES: Record<string, StoryExplanation> = {
         title: "Deep local culture",
         caption:
           "One-to-one guiding that opens neighborhoods, rituals, and conversations most trips skip.",
-        imageUrl: "/photo/pace-relaxed.jpg",
+        imageUrl: "/photo/pace-relaxed.story.webp",
         videoUrl: GUIDE_VIDEO,
       },
       {
@@ -335,7 +337,7 @@ const STORIES: Record<string, StoryExplanation> = {
         title: "Company when you want it",
         caption:
           "A private host who can fade back when you need quiet exploration.",
-        imageUrl: "/photo/pace-relaxed.jpg",
+        imageUrl: "/photo/pace-relaxed.story.webp",
       },
     ],
   },
@@ -359,7 +361,7 @@ const STORIES: Record<string, StoryExplanation> = {
         title: "The icons, done right",
         caption:
           "First-visit highlights without tourist-trap detours or exhausting schedules.",
-        imageUrl: "/brand/hero-background.jpg",
+        imageUrl: "/brand/hero-background.story.webp",
       },
       {
         id: "ft-3",
@@ -382,7 +384,7 @@ const STORIES: Record<string, StoryExplanation> = {
         title: "You never navigate alone",
         caption:
           "Your host handles stations, tickets, and directions — no frantic app switching mid-transfer.",
-        imageUrl: "/photo/pace-moderate.jpg",
+        imageUrl: "/photo/pace-moderate.story.webp",
         videoUrl: GUIDE_VIDEO,
       },
       {
@@ -397,7 +399,7 @@ const STORIES: Record<string, StoryExplanation> = {
         title: "Clarity at every transfer",
         caption:
           "Tickets, platforms, and timing explained before you need them.",
-        imageUrl: "/photo/pace-moderate.jpg",
+        imageUrl: "/photo/pace-moderate.story.webp",
       },
     ],
   },
@@ -413,7 +415,7 @@ const STORIES: Record<string, StoryExplanation> = {
         title: "Skip the over-hyped loops",
         caption:
           "We route around packed Instagram lines and into places with real atmosphere.",
-        imageUrl: "/photo/season-mid.jpg",
+        imageUrl: "/photo/season-mid.story.webp",
         videoUrl: GUIDE_VIDEO,
       },
       {
@@ -421,14 +423,14 @@ const STORIES: Record<string, StoryExplanation> = {
         title: "Crowd-aware timing",
         caption:
           "Arrive when the light is good and the crowds are thinner — not when the tour buses do.",
-        imageUrl: "/brand/hero-japan-pagoda.jpg",
+        imageUrl: "/brand/hero-japan-pagoda.story.webp",
       },
       {
         id: "tt-3",
         title: "Better alternatives nearby",
         caption:
           "Iconic views from quieter angles — same magic, fewer crowds.",
-        imageUrl: "/brand/hero-japan-pagoda.jpg",
+        imageUrl: "/brand/hero-japan-pagoda.story.webp",
       },
     ],
   },
@@ -444,7 +446,7 @@ const STORIES: Record<string, StoryExplanation> = {
         title: "Beyond tourist menus",
         caption:
           "Neighborhood counters and reservation-only rooms your host books with local trust.",
-        imageUrl: "/photo/season-high.jpg",
+        imageUrl: "/photo/season-high.story.webp",
       },
       {
         id: "ad-2",
@@ -459,7 +461,7 @@ const STORIES: Record<string, StoryExplanation> = {
         title: "Neighborhood tables",
         caption:
           "Places locals actually book — with a host who can order with confidence.",
-        imageUrl: "/photo/season-high.jpg",
+        imageUrl: "/photo/season-high.story.webp",
       },
     ],
   },
@@ -475,7 +477,7 @@ const STORIES: Record<string, StoryExplanation> = {
         title: "Space to absorb Japan",
         caption:
           "We protect café pauses, hotel wind-downs, and unhurried walks — not just checklist sightseeing.",
-        imageUrl: "/photo/pace-relaxed.jpg",
+        imageUrl: "/photo/pace-relaxed.story.webp",
         videoUrl: CONCIERGE_VIDEO,
       },
       {
@@ -483,18 +485,28 @@ const STORIES: Record<string, StoryExplanation> = {
         title: "Designed, not crammed",
         caption:
           "Fewer forced moves. More time where the day actually feels good.",
-        imageUrl: "/photo/season-low.jpg",
+        imageUrl: "/photo/season-low.story.webp",
       },
       {
         id: "pi-3",
         title: "Breathing room built in",
         caption:
           "White space between highlights so the trip feels luxurious, not rushed.",
-        imageUrl: "/photo/pace-relaxed.jpg",
+        imageUrl: "/photo/pace-relaxed.story.webp",
       },
     ],
   },
 };
+
+/** Unique stills used in story slides — warm these on home. */
+export const STORY_WARM_IMAGE_PATHS: readonly string[] = Array.from(
+  new Set(
+    Object.values(STORIES).flatMap((story) => [
+      story.avatarUrl,
+      ...story.slides.map((s) => s.imageUrl).filter(Boolean),
+    ])
+  )
+);
 
 export function getStoryExplanation(optionId: string): StoryExplanation | null {
   return STORIES[optionId] ?? null;

@@ -4,7 +4,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { warmCriticalAssets, type WarmProgress } from "@/lib/assetWarmup";
 import { BRAND_LOGO_ICON } from "@/lib/brand";
 
-const SESSION_KEY = "tokio-assets-warmed-v1";
+const SESSION_KEY = "tokio-assets-warmed-v2";
 
 /**
  * Home gate: center progress bar until characters + key videos are cached.
