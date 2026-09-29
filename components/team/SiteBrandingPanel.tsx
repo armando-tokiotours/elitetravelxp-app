@@ -4,6 +4,7 @@ import type PocketBase from "pocketbase";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { formatPbError } from "@/lib/pocketbase/admin-schema";
+import { optimizeFileForUpload } from "@/lib/optimizeUploadClient";
 import {
   DEFAULT_SITE_BRANDING,
   brandingHeroUrl,
@@ -295,7 +296,7 @@ export function SiteBrandingPanel({ getClient }: { getClient: () => PbClient }) 
       fd.append("subtitle", sdSubtitle);
       fd.append("key", SINGLE_DAY_BUILDER_HERO_KEY);
       fd.append("category", "builder");
-      if (sdFile) fd.append("media", sdFile);
+      if (sdFile) fd.append("media", await optimizeFileForUpload(sdFile));
 
       let saved: PbBrandingUiItem;
       if (sdRecord?.id) {

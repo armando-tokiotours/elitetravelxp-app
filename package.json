@@ -14,6 +14,7 @@
     "pb:push": "bash scripts/pb-push-to-vps.sh",
     "media:optimize": "node scripts/optimize-existing-media.mjs",
     "media:optimize:pb": "node scripts/optimize-existing-media.mjs --pb",
+    "media:optimize:videos": "node scripts/optimize-pb-videos.cjs",
     "seed:excel": "node scripts/seed-from-excel.mjs",
     "seed": "node scripts/seed-from-excel.mjs"
   },

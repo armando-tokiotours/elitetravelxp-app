@@ -42,6 +42,7 @@ RUN apk add --no-cache \
     ca-certificates \
     ttf-freefont \
     font-noto-emoji \
+    ffmpeg \
   && addgroup --system --gid 1001 nodejs \
   && adduser --system --uid 1001 nextjs
 

@@ -3,6 +3,7 @@
 import type PocketBase from "pocketbase";
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { optimizeFileForUpload } from "@/lib/optimizeUploadClient";
 import { formatPbError } from "@/lib/pocketbase/admin-schema";
 import { isVideoFilename } from "@/lib/brandingUi";
 import {
@@ -186,10 +187,14 @@ export function PreBuilderQuizBrandingAdmin({
       fd.append("credit_body", draft.slide2Caption);
       fd.append("inclusion_title", draft.slide3Title);
       fd.append("credit_title", draft.slide3Caption);
-      if (draft.mediaFile) fd.append("media", draft.mediaFile);
-      if (draft.posterFile) fd.append("poster", draft.posterFile);
-      if (draft.slide3File) fd.append("slide3", draft.slide3File);
-      if (draft.cardFile) fd.append("card", draft.cardFile);
+      if (draft.mediaFile)
+        fd.append("media", await optimizeFileForUpload(draft.mediaFile));
+      if (draft.posterFile)
+        fd.append("poster", await optimizeFileForUpload(draft.posterFile));
+      if (draft.slide3File)
+        fd.append("slide3", await optimizeFileForUpload(draft.slide3File));
+      if (draft.cardFile)
+        fd.append("card", await optimizeFileForUpload(draft.cardFile));
 
       let saved: PbBrandingUiItem;
       if (draft.recordId) {
