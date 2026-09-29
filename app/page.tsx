@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { JapanKeyword } from "@/components/branding/JapanKeyword";
 import { ManageBookingModal } from "@/components/modals/ManageBookingModal";
+import { BRAND_LOGO_ICON } from "@/lib/brand";
 
 export default function HomePage() {
   const [manageOpen, setManageOpen] = useState(false);
@@ -14,7 +15,7 @@ export default function HomePage() {
         <div className="flex items-center gap-3">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src="/images/tokiotours-logo.png"
+            src={BRAND_LOGO_ICON}
             alt="TOKIOTOURS"
             className="h-10 w-10 rounded-full object-cover"
           />

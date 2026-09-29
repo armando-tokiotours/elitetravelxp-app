@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { PreBuildConfirmation } from "@/components/pre-elite/PreBuildConfirmation";
+import { BRAND_LOGO_ICON } from "@/lib/brand";
 import { usePreBuilderStore } from "@/store/usePreBuilderStore";
 
 /**
@@ -41,7 +42,7 @@ export default function PreBuildPage() {
             <Link href="/" className="inline-flex items-center gap-2">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src="/images/tokiotours-logo.png"
+                src={BRAND_LOGO_ICON}
                 alt=""
                 className="h-8 w-8 rounded-full object-cover"
               />
@@ -85,7 +86,7 @@ export default function PreBuildPage() {
           <Link href="/" className="inline-flex items-center gap-2">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src="/images/tokiotours-logo.png"
+              src={BRAND_LOGO_ICON}
               alt=""
               className="h-8 w-8 rounded-full object-cover"
             />

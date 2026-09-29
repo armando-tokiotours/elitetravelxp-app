@@ -21,6 +21,7 @@ import {
   type TravelStyleId,
   type TripType,
 } from "@/lib/preEliteBuilder";
+import { BRAND_LOGO_ICON } from "@/lib/brand";
 import {
   type StoryExplanation,
 } from "@/lib/preEliteStories";
@@ -319,7 +320,7 @@ export function PreEliteBuilderClient() {
           <Link href="/" className="inline-flex items-center gap-2">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src="/images/tokiotours-logo.png"
+              src={BRAND_LOGO_ICON}
               alt=""
               className="h-8 w-8 rounded-full object-cover"
             />

@@ -19,10 +19,13 @@ export const BRAND_MAIL_FROM = `Tokiotours Concierge <${BRAND_EMAIL_FROM}>`;
 
 export const BRAND_CONSULTANT = "TOKIOTOURS consultant";
 
-/** Official circular mascot emblem — prefer PNG from `1 assets/tokiotours-logo.png`. */
+/** Official circular mascot emblem — full-res for print / email (~350KB). */
 export const BRAND_LOGO_JPG = "/images/tokiotours-logo.jpg";
 export const BRAND_LOGO_PNG = "/images/tokiotours-logo.png";
 export const BRAND_LOGO = BRAND_LOGO_PNG;
+
+/** Tiny circular mark for headers / UI (~20KB) — same art as favicon. */
+export const BRAND_LOGO_ICON = "/brand/tokiotours-logo-icon.png";
 
 export const LOCAL_FONTS = {
   h1: "Godiva-Regular",

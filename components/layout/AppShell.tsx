@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 import { Ticket } from "lucide-react";
 import { ManageBookingModal } from "@/components/modals/ManageBookingModal";
+import { BRAND_LOGO_ICON } from "@/lib/brand";
 
 const LINKS = [
   { href: "/", label: "Home" },
@@ -173,9 +174,9 @@ export function AppShell({
               ) : (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
-                  src="/images/tokiotours-logo.png"
+                  src={BRAND_LOGO_ICON}
                   alt="TOKIOTOURS"
-                  className="hidden h-9 w-auto max-w-[7rem] object-contain sm:block"
+                  className="hidden h-9 w-9 rounded-full object-cover sm:block"
                 />
               )}
             </>
@@ -287,7 +288,7 @@ export function AppShell({
 }
 
 function BrandMark({ logoSrc }: { logoSrc?: string }) {
-  const src = logoSrc || "/images/tokiotours-logo.png";
+  const src = logoSrc || BRAND_LOGO_ICON;
   return (
     // eslint-disable-next-line @next/next/no-img-element
     <img
@@ -295,7 +296,7 @@ function BrandMark({ logoSrc }: { logoSrc?: string }) {
       alt="TOKIOTOURS"
       loading="eager"
       decoding="async"
-      className="h-11 w-auto max-w-[9.5rem] object-contain sm:h-12"
+      className="h-11 w-11 rounded-full object-cover sm:h-12 sm:w-12"
     />
   );
 }
