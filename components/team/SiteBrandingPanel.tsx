@@ -420,6 +420,12 @@ export function SiteBrandingPanel({ getClient }: { getClient: () => PbClient }) 
         >
           Layout &amp; characters →
         </Link>
+        <Link
+          href="/team-access/layout-builder?tab=hi_bubble"
+          className="mt-3 ml-2 inline-flex rounded-xl border border-zinc-700 bg-zinc-950 px-4 py-2 text-xs font-bold uppercase tracking-[0.14em] text-zinc-300 transition hover:border-[#075473] hover:text-[#7dd3fc]"
+        >
+          HI bubble →
+        </Link>
 
         {error ? (
           <p className="mt-3 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">

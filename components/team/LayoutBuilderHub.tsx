@@ -3,6 +3,7 @@
 import { BrandCharactersCatalog } from "@/components/team/BrandCharactersCatalog";
 import { GuestPartyLayoutBuilder } from "@/components/team/GuestPartyLayoutBuilder";
 import { FoxMessagesEditor } from "@/components/team/FoxMessagesEditor";
+import { HiBubbleEditor } from "@/components/team/HiBubbleEditor";
 import { TokioClockLoader } from "@/components/common/TokioClockLoader";
 import { useState } from "react";
 import Link from "next/link";
@@ -12,7 +13,8 @@ type HubTab =
   | "guest_party"
   | "heroes"
   | "clock_loader"
-  | "fox_messages";
+  | "fox_messages"
+  | "hi_bubble";
 
 const TABS: { id: HubTab; label: string }[] = [
   { id: "characters", label: "Characters" },
@@ -20,11 +22,11 @@ const TABS: { id: HubTab; label: string }[] = [
   { id: "heroes", label: "Heroes" },
   { id: "clock_loader", label: "Bar loader" },
   { id: "fox_messages", label: "Fox messages" },
+  { id: "hi_bubble", label: "HI bubble" },
 ];
-
 /**
  * Team Access layout hub — characters (weight + replace), guest party positions, heroes,
- * plus live previews for TokioClockLoader and SystemMessageFox.
+ * plus live previews for TokioClockLoader, SystemMessageFox, and HI bubble.
  */
 export function LayoutBuilderHub({
   initialTab = "characters",
@@ -80,6 +82,7 @@ export function LayoutBuilderHub({
       ) : null}
       {tab === "clock_loader" ? <ClockLoaderPreview /> : null}
       {tab === "fox_messages" ? <FoxMessagesEditor /> : null}
+      {tab === "hi_bubble" ? <HiBubbleEditor /> : null}
     </div>
   );
 }

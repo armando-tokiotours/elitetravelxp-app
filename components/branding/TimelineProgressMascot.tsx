@@ -19,7 +19,7 @@ type Pose = keyof typeof POSES;
  * Tiny sticky-timeline mascot — look while active;
  * idle → time, then note (loops until user moves again).
  * Opacity crossfade only — no scale remount blink.
- * Tap → HI bubble (1s) + zoom pulse.
+ * Tap → HI bubble (2.5s) + zoom pulse.
  */
 export function TimelineProgressMascot({
   idleMs = 7_000,
@@ -79,7 +79,7 @@ export function TimelineProgressMascot({
       }}
       className={`relative z-20 flex h-[3.575rem] w-[3.575rem] shrink-0 cursor-pointer items-end justify-center overflow-visible sm:h-[3.9rem] sm:w-[3.9rem] ${className}`}
     >
-      <HiBubble show={showHi} className="-left-2 -top-10 sm:-top-11" />
+      <HiBubble show={showHi} className="-left-6 -top-12 w-[4.75rem] sm:-top-14 sm:w-[5.5rem]" />
       <MascotHiZoom showHi={showHi} className="pointer-events-none absolute inset-0 flex items-end justify-center">
         {(Object.keys(POSES) as Pose[]).map((p) => (
           // eslint-disable-next-line @next/next/no-img-element

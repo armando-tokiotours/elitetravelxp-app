@@ -338,7 +338,7 @@ export function PreEliteBuilderClient() {
           <div className="h-80 rounded-3xl border border-zinc-800/80 bg-[#0D1117]/80 backdrop-blur-md" />
         </main>
       ) : (
-        <div className="flex min-h-0 flex-1 flex-col justify-center overflow-hidden">
+        <div className="flex min-h-0 flex-1 flex-col justify-center overflow-x-hidden overflow-y-visible">
           {/* Hero through progress — vertically centered with options */}
           <div
             className={
@@ -368,9 +368,12 @@ export function PreEliteBuilderClient() {
                 onKeyDown={(e) => {
                   if (e.key === "Enter" || e.key === " ") triggerHi(e);
                 }}
-                className="absolute -right-2 -top-4 z-20 cursor-pointer sm:-right-4 sm:-top-6"
+                className="absolute -right-2 -top-4 z-30 cursor-pointer overflow-visible sm:-right-4 sm:-top-6"
               >
-                <HiBubble show={showHi} className="-left-10 -top-2 sm:-left-12 sm:-top-3" />
+                <HiBubble
+                  show={showHi}
+                  className="-left-8 top-0 w-[5.5rem] sm:-left-10 sm:w-[6.5rem]"
+                />
                 <MascotHiZoom showHi={showHi} className="pointer-events-none">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img

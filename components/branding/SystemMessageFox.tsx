@@ -55,7 +55,7 @@ export function SystemMessageFox() {
 
   return (
     <div
-      className="pointer-events-none fixed bottom-[5.75rem] left-0 z-[70] w-[min(48vw,14.5rem)] max-w-[14.5rem] sm:bottom-28 sm:w-[min(42vw,15rem)]"
+      className="pointer-events-none fixed bottom-[5.75rem] left-0 z-[70] w-[min(62vw,18.85rem)] max-w-[18.85rem] sm:bottom-28 sm:w-[min(55vw,19.5rem)]"
       aria-live="polite"
     >
       <AnimatePresence mode="wait">
@@ -68,7 +68,7 @@ export function SystemMessageFox() {
             transition={{ duration: 0.28, ease: "easeOut" }}
             className="relative flex flex-col items-start"
           >
-            <div className="relative z-10 -mb-3 ml-8 flex w-[calc(100%-1.75rem)] flex-col items-start gap-1.5">
+            <div className="relative z-10 -mb-3 ml-10 flex w-[calc(100%-2.25rem)] flex-col items-start gap-2">
               <AnimatePresence initial={false}>
                 {visibleParts.map((text, i) => {
                   const isLast = i === visibleParts.length - 1;
@@ -107,7 +107,7 @@ export function SystemMessageFox() {
               animate={{ x: 0, opacity: 1 }}
               exit={{ x: -20, opacity: 0 }}
               transition={{ duration: 0.32, ease: "easeOut" }}
-              className="pointer-events-none -ml-1 h-[7.25rem] w-auto select-none object-contain object-left-bottom drop-shadow-[0_10px_18px_rgba(0,0,0,0.5)] sm:h-[8rem]"
+              className="pointer-events-none -ml-1 h-[9.425rem] w-auto select-none object-contain object-left-bottom drop-shadow-[0_10px_18px_rgba(0,0,0,0.5)] sm:h-[10.4rem]"
             />
           </motion.div>
         ) : (
@@ -140,23 +140,23 @@ function ComicBubble({
     <div className="relative inline-block max-w-full drop-shadow-[0_8px_18px_rgba(0,0,0,0.45)]">
       {/* Angular comic body — tight padding, hugs text */}
       <div
-        className="relative px-2.5 py-1.5"
+        className="relative px-3.5 py-2"
         style={{
           backgroundColor: fill,
-          border: `1.75px solid ${stroke}`,
+          border: `2px solid ${stroke}`,
           borderRadius: "2px",
           boxShadow: `inset 0 0 0 0.75px ${ring}`,
         }}
       >
-        <p className="whitespace-pre-line text-[0.78rem] font-bold leading-snug tracking-wide text-[#1a1510]">
+        <p className="whitespace-pre-line text-[1rem] font-bold leading-snug tracking-wide text-[#1a1510]">
           {lines.join("\n")}
         </p>
       </div>
 
       {/* Separate pointy tip — gap below the box, not attached to the border */}
       {showTail ? (
-        <div className="mt-1.5 flex justify-start pl-4" aria-hidden>
-          <svg className="h-[11px] w-[16px]" viewBox="0 0 22 16">
+        <div className="mt-2 flex justify-start pl-5" aria-hidden>
+          <svg className="h-[14px] w-[21px]" viewBox="0 0 22 16">
             <path
               d="M3 0 L1 15 L18 2.5 Z"
               fill={fill}

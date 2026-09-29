@@ -17,6 +17,11 @@ import { hydrateStoresFromPreEliteBrief } from "@/lib/preEliteHydrate";
 import { useModalDismiss } from "@/hooks/useModalDismiss";
 import { TokioClockLoader } from "@/components/common/TokioClockLoader";
 import { SystemMessageFox } from "@/components/branding/SystemMessageFox";
+import {
+  HiBubble,
+  MascotHiZoom,
+  useMascotHiTap,
+} from "@/components/branding/MascotHiTap";
 import { showSystemMessage } from "@/store/useSystemMessageStore";
 import { getSystemMessage } from "@/lib/systemMessages";
 import { useBuilderStore } from "@/store/useBuilderStore";
@@ -92,6 +97,7 @@ export function PreBuildConfirmation({
   const [toast, setToast] = useState<string | null>(null);
   const emailSentCount = usePreBuilderStore((s) => s.emailSentCount);
   const bumpEmailSentCount = usePreBuilderStore((s) => s.bumpEmailSentCount);
+  const { showHi, triggerHi } = useMascotHiTap();
 
   const data = parseItineraryData(itineraryData);
   const isSingleDay = data?.tripType === "single_day";
@@ -360,22 +366,33 @@ export function PreBuildConfirmation({
         <div className="relative z-10 grid grid-cols-12 items-start gap-3">
           {/* LEFT COLUMN (≈1/3): Mascot + Vertical Stacked Buttons */}
           <div className="relative col-span-5 flex flex-col items-center space-y-2">
-            {/* 1. Mascot — upright until email sent, then respectful bow */}
-            <div className="pointer-events-none absolute -top-16 -left-2 z-30 h-32 w-32 select-none">
-              <AnimatePresence mode="wait">
-                <motion.img
-                  key={builderUnlocked ? "bow" : "upright"}
-                  src={builderUnlocked ? MASCOT_BOW : MASCOT_UPRIGHT}
-                  alt="Tokiotours Mascot"
-                  initial={{ opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.92 }}
-                  transition={{ duration: 0.35, ease: [0.34, 1.56, 0.64, 1] }}
-                  className="pointer-events-none h-32 w-32 object-contain drop-shadow-[0_10px_20px_rgba(0,0,0,0.8)]"
-                  draggable={false}
-                />
-              </AnimatePresence>
-            </div>
+            {/* 1. Mascot — upright until email sent, then respectful bow · tap = HI */}
+            <button
+              type="button"
+              aria-label="Say hi"
+              onClick={triggerHi}
+              className="absolute -top-16 -left-2 z-30 h-32 w-32 cursor-pointer overflow-visible border-0 bg-transparent p-0 select-none"
+            >
+              <HiBubble
+                show={showHi}
+                className="-right-2 -top-1 w-[5.5rem] sm:w-[6.5rem]"
+              />
+              <MascotHiZoom showHi={showHi} className="pointer-events-none h-full w-full">
+                <AnimatePresence mode="wait">
+                  <motion.img
+                    key={builderUnlocked ? "bow" : "upright"}
+                    src={builderUnlocked ? MASCOT_BOW : MASCOT_UPRIGHT}
+                    alt="Tokiotours Mascot"
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.92 }}
+                    transition={{ duration: 0.35, ease: [0.34, 1.56, 0.64, 1] }}
+                    className="h-32 w-32 object-contain drop-shadow-[0_10px_20px_rgba(0,0,0,0.8)]"
+                    draggable={false}
+                  />
+                </AnimatePresence>
+              </MascotHiZoom>
+            </button>
 
             {/* Spacer under overlapping mascot — never capture clicks */}
             <div className="pointer-events-none h-16 w-full" aria-hidden />

@@ -49,7 +49,8 @@ function HubFromQuery() {
     tab === "heroes" ||
     tab === "characters" ||
     tab === "clock_loader" ||
-    tab === "fox_messages"
+    tab === "fox_messages" ||
+    tab === "hi_bubble"
       ? tab
       : "characters";
   return <LayoutBuilderHub initialTab={initial} />;

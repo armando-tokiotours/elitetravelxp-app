@@ -138,10 +138,15 @@ export const BRAND_CHARACTERS: BrandCharacterDef[] = [
   },
   {
     id: "hi-bubble",
-    label: "HI speech bubble",
+    label: "HI bubble (mascot tap)",
     path: "/brand/hi-bubble.webp",
-    category: "pre_elite",
-    usedOn: ["Mascot tap (Pre-Elite, Builders, Itinerary)"],
+    category: "system",
+    usedOn: [
+      "Pre-Elite hero tap",
+      "Pre-Build confirmation tap",
+      "Builder M/S timeline tap",
+      "Itinerary hero tap",
+    ],
     optimal: TIMELINE_OPTIMAL,
   },
   {
@@ -303,6 +308,10 @@ export const BRAND_CHARACTER_PRELOAD_PATHS: readonly string[] = [
 export function getBrandCharacter(id: string): BrandCharacterDef | undefined {
   return BRAND_CHARACTERS.find((c) => c.id === id);
 }
+
+/** Stable public path for the mascot-tap HI bubble (replaceable in Layout Builder). */
+export const HI_BUBBLE_PATH =
+  getBrandCharacter("hi-bubble")?.path ?? "/brand/hi-bubble.webp";
 
 export function formatBytes(bytes: number): string {
   if (!Number.isFinite(bytes) || bytes < 0) return "—";

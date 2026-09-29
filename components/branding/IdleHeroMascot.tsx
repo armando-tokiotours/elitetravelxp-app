@@ -20,7 +20,7 @@ type IdleHeroMascotProps = {
  * Hero mascot that swaps to an idle pose after inactivity,
  * then returns to the active pose on mouse / scroll / click / key.
  * Crossfade without remount/scale so the swap does not blink.
- * Tap → HI bubble (1s) + zoom pulse.
+ * Tap → HI bubble (2.5s) + zoom pulse.
  */
 export function IdleHeroMascot({
   activeSrc = "/brand/mascot-phone.webp",
@@ -67,7 +67,7 @@ export function IdleHeroMascot({
       }}
       className={`relative inline-block cursor-pointer ${className || ""}`}
     >
-      <HiBubble show={showHi} className="-right-1 -top-1 sm:-top-2" />
+      <HiBubble show={showHi} className="-right-1 -top-1 w-[5.5rem] sm:-top-2 sm:w-[6.5rem]" />
       <MascotHiZoom showHi={showHi} className="pointer-events-none">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
