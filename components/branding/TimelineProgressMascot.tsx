@@ -17,9 +17,8 @@ type Pose = keyof typeof POSES;
 
 /**
  * Tiny sticky-timeline mascot — look while active;
- * idle → time, then note (loops until user moves again).
- * Stacked opacity crossfade only — never remount/scale on pose.
- * Activity only resets pose when leaving look (no snap blink).
+ * idle → time, then note.
+ * Never drops the visible pose until the next image is loaded + decoded.
  * Tap → HI bubble (2.5s) + zoom pulse.
  */
 export function TimelineProgressMascot({
@@ -31,15 +30,30 @@ export function TimelineProgressMascot({
   noteAfterMs?: number;
   className?: string;
 }) {
-  const [pose, setPose] = useState<Pose>("look");
-  const poseRef = useRef<Pose>("look");
+  const [displayPose, setDisplayPose] = useState<Pose>("look");
+  const wantedRef = useRef<Pose>("look");
+  const displayRef = useRef<Pose>("look");
+  const loadedRef = useRef<Set<Pose>>(new Set());
   const idleRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const noteRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { showHi, triggerHi } = useMascotHiTap();
 
-  useEffect(() => {
-    poseRef.current = pose;
-  }, [pose]);
+  const requestPose = (next: Pose) => {
+    wantedRef.current = next;
+    if (loadedRef.current.has(next)) {
+      displayRef.current = next;
+      setDisplayPose(next);
+    }
+    // else keep previous pose visible until onLoad marks next ready
+  };
+
+  const markLoaded = (p: Pose) => {
+    loadedRef.current.add(p);
+    if (wantedRef.current === p && displayRef.current !== p) {
+      displayRef.current = p;
+      setDisplayPose(p);
+    }
+  };
 
   useEffect(() => {
     const clear = () => {
@@ -52,21 +66,16 @@ export function TimelineProgressMascot({
     const scheduleIdle = () => {
       clear();
       idleRef.current = setTimeout(() => {
-        setPose("time");
-        poseRef.current = "time";
+        requestPose("time");
         noteRef.current = setTimeout(() => {
-          setPose("note");
-          poseRef.current = "note";
+          requestPose("note");
         }, noteAfterMs);
       }, idleMs);
     };
 
     const bump = () => {
-      // Only snap back when actually idle — avoids look↔look re-renders
-      // and the blinky jump when the mouse twitches during look.
-      if (poseRef.current !== "look") {
-        setPose("look");
-        poseRef.current = "look";
+      if (wantedRef.current !== "look") {
+        requestPose("look");
       }
       scheduleIdle();
     };
@@ -114,8 +123,12 @@ export function TimelineProgressMascot({
             key={p}
             src={POSES[p]}
             alt=""
+            onLoad={() => markLoaded(p)}
+            ref={(el) => {
+              if (el?.complete && el.naturalWidth > 0) markLoaded(p);
+            }}
             className={`absolute bottom-0 h-[130%] w-auto max-w-none origin-bottom object-contain drop-shadow-[0_4px_10px_rgba(0,0,0,0.55)] transition-opacity duration-700 ease-in-out ${
-              pose === p ? "opacity-100" : "opacity-0"
+              displayPose === p ? "opacity-100" : "opacity-0"
             }`}
             draggable={false}
           />

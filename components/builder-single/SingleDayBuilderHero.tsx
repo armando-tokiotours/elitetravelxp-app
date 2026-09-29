@@ -2,34 +2,23 @@
 
 import { useEffect, useState } from "react";
 import {
-  BUILDER_S_HERO_LS_KEY,
-  SINGLE_DAY_BUILDER_CONFIG,
-  SINGLE_DAY_BUILDER_HERO_KEY,
-  SINGLE_DAY_HERO_PUBLIC_FALLBACK,
-  readBuilderSHeroLocalCache,
-  type BuilderSHeroLocalCache,
-} from "@/config/mediaConfig";
-import {
   BUILDER_S_HERO_CONFIG,
   resolveBuilderSHeroCopy,
 } from "@/config/teamConfig";
-import { isVideoFilename } from "@/lib/brandingUi";
 import {
-  fetchPublicBrandAssets,
-  type PublicBrandAssets,
-} from "@/lib/pocketbase/client";
+  BUILDER_S_HERO_LS_KEY,
+  SINGLE_DAY_BUILDER_HERO_KEY,
+  readBuilderSHeroLocalCache,
+  type BuilderSHeroLocalCache,
+} from "@/config/mediaConfig";
 import { useSiteBrandingStore } from "@/store/useSiteBrandingStore";
 
-const HERO_SCRIM_SRC = "/images/hero-scrim-overlay.png";
-/** Single-day peek character (1-Day Pass ticket) — same layout as multi-day */
+/** Single-day peek character (1-Day Pass ticket) */
 const HERO_CHARACTER_SRC = "/images/peek-character-1day.png";
 
-/** Parallax lag vs page scroll — matches multi-day BuilderHero */
-const PARALLAX_RATE = 0.35;
-
 /**
- * Single-day hero — same layout/character/orientation as multi-day BuilderHero,
- * with DAY TOUR copy and single-day media sources.
+ * Builder S hero — solid dark base + peek character + copy.
+ * No scenic photo/video/scrim (those caused the slow dark flash).
  */
 export function SingleDayBuilderHero() {
   const ensureLoaded = useSiteBrandingStore((s) => s.ensureLoaded);
@@ -37,11 +26,9 @@ export function SingleDayBuilderHero() {
   const brandingItems = useSiteBrandingStore((s) => s.itemsByKey);
   void brandingItems;
 
-  const [publicAssets, setPublicAssets] = useState<PublicBrandAssets>({});
   const [localCache, setLocalCache] = useState<BuilderSHeroLocalCache | null>(
     null
   );
-  const [scrollY, setScrollY] = useState(0);
 
   useEffect(() => {
     void ensureLoaded();
@@ -58,35 +45,7 @@ export function SingleDayBuilderHero() {
     return () => window.removeEventListener("storage", onStorage);
   }, []);
 
-  useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      const assets = await fetchPublicBrandAssets();
-      if (!cancelled) setPublicAssets(assets);
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  useEffect(() => {
-    let raf = 0;
-    const onScroll = () => {
-      cancelAnimationFrame(raf);
-      raf = requestAnimationFrame(() => {
-        setScrollY(window.scrollY || 0);
-      });
-    };
-    onScroll();
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => {
-      cancelAnimationFrame(raf);
-      window.removeEventListener("scroll", onScroll);
-    };
-  }, []);
-
   const item = getItem(SINGLE_DAY_BUILDER_HERO_KEY);
-  const mediaCfg = SINGLE_DAY_BUILDER_CONFIG.hero;
   const team = BUILDER_S_HERO_CONFIG;
   const fromPb = resolveBuilderSHeroCopy(item);
   const scriptAccent =
@@ -98,104 +57,18 @@ export function SingleDayBuilderHero() {
   const heroLine1 = team.heroLine1;
   const heroLine2 = team.heroLine2;
 
-  const mediaUrl =
-    localCache?.mediaUrl ||
-    item.mediaUrl ||
-    publicAssets.hero_single ||
-    mediaCfg.videoUrl ||
-    SINGLE_DAY_HERO_PUBLIC_FALLBACK;
-  const posterUrl =
-    (!isVideoFilename(localCache?.mediaUrl || "")
-      ? localCache?.mediaUrl
-      : "") ||
-    item.posterUrl ||
-    publicAssets.hero_single ||
-    (!isVideoFilename(mediaUrl) ? mediaUrl : "") ||
-    mediaCfg.fallbackImage ||
-    SINGLE_DAY_HERO_PUBLIC_FALLBACK;
-  const isVideo = isVideoFilename(mediaUrl);
-
-  const [videoOk, setVideoOk] = useState(false);
-
-  useEffect(() => {
-    if (!isVideo || !mediaUrl) {
-      setVideoOk(false);
-      return;
-    }
-    let cancelled = false;
-    void (async () => {
-      try {
-        const res = await fetch(mediaUrl, { method: "HEAD" });
-        if (!cancelled) setVideoOk(res.ok);
-      } catch {
-        if (!cancelled) setVideoOk(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [isVideo, mediaUrl]);
-
-  const showVideo = isVideo && videoOk;
-
   return (
     <section
       className="builder-hero relative z-10 h-[65vh] w-full min-h-[280px] overflow-hidden bg-[#05080C] sm:h-[80vh] md:min-h-[420px]"
       aria-label="Single-day builder hero"
     >
-      {/* Layer 1 — scenic background (parallax) */}
+      {/* Soft bottom fade into glass card — no photo/scrim */}
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-x-0 -top-[8%] z-0 h-[116%] w-full will-change-transform"
-        style={{
-          transform: `translate3d(0, ${scrollY * PARALLAX_RATE}px, 0)`,
-        }}
-      >
-        {showVideo ? (
-          <video
-            autoPlay
-            loop
-            muted
-            playsInline
-            poster={posterUrl}
-            className="absolute inset-0 h-full w-full object-cover object-bottom sm:object-center"
-          >
-            <source src={mediaUrl} type="video/mp4" />
-          </video>
-        ) : (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={
-              posterUrl ||
-              mediaCfg.fallbackImage ||
-              SINGLE_DAY_HERO_PUBLIC_FALLBACK
-            }
-            alt=""
-            className="builder-hero-bg absolute inset-0 h-full w-full object-cover object-bottom sm:object-[center_70%]"
-            onError={(e) => {
-              const el = e.currentTarget as HTMLImageElement;
-              if (el.src.includes("hero-single-day")) return;
-              el.src = SINGLE_DAY_HERO_PUBLIC_FALLBACK;
-            }}
-          />
-        )}
-      </div>
+        className="pointer-events-none absolute inset-0 z-10 bg-gradient-to-t from-[#05080C] via-[#05080C]/40 to-transparent"
+      />
 
-      {/* Layer 2 — dark scrim for type/character contrast */}
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0 z-10 bg-gradient-to-t from-[#05080C] via-black/40 to-transparent"
-      >
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={HERO_SCRIM_SRC}
-          alt=""
-          className="absolute inset-0 h-full w-full object-cover opacity-90 mix-blend-multiply"
-        />
-        <div className="absolute inset-x-0 bottom-0 h-28 bg-gradient-to-b from-transparent via-[#05080C]/85 to-[#05080C] sm:h-40" />
-      </div>
-
-      {/* Layer 3 — peek character (same as multi-day: flush left, bottom) */}
+      {/* Peek character */}
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src={HERO_CHARACTER_SRC}
@@ -204,7 +77,7 @@ export function SingleDayBuilderHero() {
         className="pointer-events-none absolute bottom-0 left-0 z-20 h-[230px] w-auto select-none object-contain object-left-bottom drop-shadow-[0_8px_24px_rgba(0,0,0,0.55)] sm:h-[300px]"
       />
 
-      {/* Layer 4 — hero typography (left-aligned, vertically centered) */}
+      {/* Typography */}
       <div className="absolute top-1/2 left-4 z-30 flex max-w-[85%] -translate-y-1/2 flex-col items-start text-left sm:left-12 sm:max-w-md">
         <h1 className="flex flex-col items-start text-left leading-tight">
           <span className="relative z-10 -mb-6 translate-y-1 font-beauty text-[3.3rem] font-normal leading-none text-[#E11D48] drop-shadow-[0_2px_12px_rgba(0,0,0,0.65)] sm:-mb-9 sm:translate-y-1.5 sm:text-[5.28rem]">

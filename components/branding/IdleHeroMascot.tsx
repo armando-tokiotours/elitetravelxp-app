@@ -17,9 +17,8 @@ type IdleHeroMascotProps = {
 };
 
 /**
- * Hero mascot that swaps to an idle pose after inactivity,
- * then returns to the active pose on mouse / scroll / click / key.
- * Crossfade without remount/scale so the swap does not blink.
+ * Hero mascot that swaps to an idle pose after inactivity.
+ * Keeps the previous pose visible until the idle image has loaded.
  * Tap → HI bubble (2.5s) + zoom pulse.
  */
 export function IdleHeroMascot({
@@ -28,15 +27,31 @@ export function IdleHeroMascot({
   idleMs = 7_000,
   className,
 }: IdleHeroMascotProps) {
-  const [isIdle, setIsIdle] = useState(false);
+  const [showIdle, setShowIdle] = useState(false);
+  const idleReadyRef = useRef(false);
+  const wantIdleRef = useRef(false);
   const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { showHi, triggerHi } = useMascotHiTap();
 
+  const applyIdle = (next: boolean) => {
+    wantIdleRef.current = next;
+    if (!next) {
+      setShowIdle(false);
+      return;
+    }
+    if (idleReadyRef.current) setShowIdle(true);
+  };
+
+  useEffect(() => {
+    idleReadyRef.current = false;
+    setShowIdle(false);
+  }, [idleSrc]);
+
   useEffect(() => {
     const bump = () => {
-      setIsIdle(false);
+      applyIdle(false);
       if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
-      idleTimerRef.current = setTimeout(() => setIsIdle(true), idleMs);
+      idleTimerRef.current = setTimeout(() => applyIdle(true), idleMs);
     };
     bump();
     window.addEventListener("mousemove", bump, { passive: true });
@@ -67,15 +82,18 @@ export function IdleHeroMascot({
       }}
       className={`relative inline-block cursor-pointer ${className || ""}`}
     >
-      <HiBubble show={showHi} className="-right-1 -top-1 w-[5.5rem] sm:-top-2 sm:w-[6.5rem]" />
+      <HiBubble
+        show={showHi}
+        className="-right-1 -top-1 w-[5.5rem] sm:-top-2 sm:w-[6.5rem]"
+      />
       <MascotHiZoom showHi={showHi} className="pointer-events-none">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={activeSrc}
           alt=""
           draggable={false}
-          className={`h-full w-auto object-contain transition-opacity duration-300 ${
-            isIdle ? "opacity-0" : "opacity-100"
+          className={`h-full w-auto object-contain transition-opacity duration-500 ${
+            showIdle ? "opacity-0" : "opacity-100"
           }`}
         />
         {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -83,8 +101,18 @@ export function IdleHeroMascot({
           src={idleSrc}
           alt=""
           draggable={false}
-          className={`absolute inset-0 h-full w-auto object-contain transition-opacity duration-300 ${
-            isIdle ? "opacity-100" : "opacity-0"
+          onLoad={() => {
+            idleReadyRef.current = true;
+            if (wantIdleRef.current) setShowIdle(true);
+          }}
+          ref={(el) => {
+            if (el?.complete && el.naturalWidth > 0) {
+              idleReadyRef.current = true;
+              if (wantIdleRef.current) setShowIdle(true);
+            }
+          }}
+          className={`absolute inset-0 h-full w-auto object-contain transition-opacity duration-500 ${
+            showIdle ? "opacity-100" : "opacity-0"
           }`}
         />
       </MascotHiZoom>
