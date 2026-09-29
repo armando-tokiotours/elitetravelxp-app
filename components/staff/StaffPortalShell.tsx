@@ -3,6 +3,20 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
+import {
+  Briefcase,
+  Building2,
+  Car,
+  ClipboardList,
+  CreditCard,
+  Home,
+  Map,
+  Settings2,
+  Ticket,
+  UserCircle,
+  Users,
+  Wallet,
+} from "lucide-react";
 import { getPbBaseUrl } from "@/lib/pocketbase/client";
 import {
   ROLE_LABELS,
@@ -18,46 +32,95 @@ import {
   type StaffRole,
 } from "@/lib/staffRoles";
 import { useTeamAuth } from "@/store/useTeamAuth";
+import { ShortcutTile } from "@/components/staff/ShortcutTile";
 
-function NavLink({
-  href,
-  label,
-  active,
-}: {
+type StaffNavLink = {
   href: string;
   label: string;
-  active: boolean;
-}) {
-  return (
-    <Link
-      href={href}
-      className={`rounded-lg px-3 py-2 text-sm transition ${
-        active
-          ? "bg-[#075473]/25 text-[#075473]"
-          : "text-zinc-300 hover:bg-zinc-900 hover:text-white"
-      }`}
-    >
-      {label}
-    </Link>
-  );
-}
+  icon: ReactNode;
+};
 
-function linksForRole(role: StaffRole | null) {
-  const links: Array<{ href: string; label: string }> = [];
-  if (canAccessOpsBoard(role)) links.push({ href: "/ops", label: "Ops board" });
+function linksForRole(role: StaffRole | null): StaffNavLink[] {
+  const links: StaffNavLink[] = [];
+
   if (canAccessOpsBoard(role))
-    links.push({ href: "/ops/booking", label: "Booking master" });
-  if (canAccessMoney(role)) links.push({ href: "/ops/money", label: "Money" });
-  if (canAccessAgent(role)) links.push({ href: "/agent", label: "Concierge" });
+    links.push({
+      href: "/ops",
+      label: "Ops",
+      icon: <ClipboardList className="h-5 w-5" strokeWidth={2} />,
+    });
+  if (canAccessOpsBoard(role))
+    links.push({
+      href: "/ops/booking",
+      label: "Booking",
+      icon: <Briefcase className="h-5 w-5" strokeWidth={2} />,
+    });
+  if (canAccessMoney(role))
+    links.push({
+      href: "/ops/money",
+      label: "Money",
+      icon: <Wallet className="h-5 w-5" strokeWidth={2} />,
+    });
+  if (canAccessAgent(role))
+    links.push({
+      href: "/agent",
+      label: "Concierge",
+      icon: <Users className="h-5 w-5" strokeWidth={2} />,
+    });
   if (canAccessTicketer(role))
-    links.push({ href: "/ticketer", label: "Tickets" });
-  if (canAccessGuide(role)) links.push({ href: "/guide", label: "Guide" });
-  if (canAccessDriver(role)) links.push({ href: "/driver", label: "Driver" });
-  if (canAccessAgency(role)) links.push({ href: "/agency", label: "Agency" });
-  if (role) links.push({ href: "/profile", label: "My profile" });
-  if (canAccessAdmin(role)) links.push({ href: "/admin", label: "Admin leads" });
+    links.push({
+      href: "/ticketer",
+      label: "Tickets",
+      icon: <Ticket className="h-5 w-5" strokeWidth={2} />,
+    });
+  if (canAccessGuide(role))
+    links.push({
+      href: "/guide",
+      label: "Guide",
+      icon: <UserCircle className="h-5 w-5" strokeWidth={2} />,
+    });
+  if (canAccessDriver(role))
+    links.push({
+      href: "/driver",
+      label: "Driver",
+      icon: <Car className="h-5 w-5" strokeWidth={2} />,
+    });
+  if (canAccessAgency(role))
+    links.push({
+      href: "/agency",
+      label: "Agency",
+      icon: <Building2 className="h-5 w-5" strokeWidth={2} />,
+    });
+
+  // Map — available to any authenticated staff portal user
+  if (role)
+    links.push({
+      href: "/map",
+      label: "Map",
+      icon: <Map className="h-5 w-5" strokeWidth={2} />,
+    });
+
+  if (role)
+    links.push({
+      href: "/profile",
+      label: "Profile",
+      icon: <CreditCard className="h-5 w-5" strokeWidth={2} />,
+    });
+
+  // Role-gated: Admin leads vs Content (Team Access)
+  if (canAccessAdmin(role))
+    links.push({
+      href: "/admin",
+      label: "Leads",
+      icon: <ClipboardList className="h-5 w-5" strokeWidth={2} />,
+    });
   if (canAccessTeamAccess(role))
-    links.push({ href: "/team-access", label: "Team Access" });
+    links.push({
+      href: "/team-access",
+      label: "Content",
+      icon: <Settings2 className="h-5 w-5" strokeWidth={2} />,
+    });
+
   return links;
 }
 
@@ -246,19 +309,22 @@ export function StaffPortalShell({
           ) : null}
         </div>
         {isAuthenticated && links.length > 0 ? (
-          <nav className="mx-auto flex max-w-6xl gap-1 overflow-x-auto px-4 pb-3 sm:px-6">
-            {links.map((l) => (
-              <NavLink
-                key={l.href}
-                href={l.href}
-                label={l.label}
-                active={
-                  pathname === l.href ||
-                  (l.href !== "/ops" && pathname.startsWith(l.href + "/")) ||
-                  (l.href === "/ops" && pathname === "/ops")
-                }
-              />
-            ))}
+          <nav className="mx-auto flex max-w-6xl gap-2 overflow-x-auto px-4 pb-3 sm:px-6">
+            {links.map((l) => {
+              const active =
+                pathname === l.href ||
+                (l.href !== "/ops" && pathname.startsWith(l.href + "/")) ||
+                (l.href === "/ops" && pathname === "/ops");
+              return (
+                <ShortcutTile
+                  key={l.href}
+                  href={l.href}
+                  label={l.label}
+                  icon={l.icon}
+                  active={active}
+                />
+              );
+            })}
           </nav>
         ) : null}
       </header>

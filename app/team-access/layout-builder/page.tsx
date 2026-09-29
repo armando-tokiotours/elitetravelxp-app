@@ -1,14 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   AppSidebar,
   APP_SIDEBAR_RAIL_PAD,
   MobileAppNav,
 } from "@/components/navigation/AppSidebar";
-import { GuestPartyLayoutBuilder } from "@/components/team/GuestPartyLayoutBuilder";
+import { LayoutBuilderHub } from "@/components/team/LayoutBuilderHub";
 import { StaffLoginCard } from "@/components/staff/StaffPortalShell";
 import { canAccessTeamAccess, homePathForRole } from "@/lib/staffRoles";
 import { useTeamAuth } from "@/store/useTeamAuth";
@@ -41,7 +41,17 @@ function Shell({ children }: { children: React.ReactNode }) {
   );
 }
 
-export default function GuestPartyLayoutBuilderPage() {
+function HubFromQuery() {
+  const searchParams = useSearchParams();
+  const tab = searchParams.get("tab");
+  const initial =
+    tab === "guest_party" || tab === "heroes" || tab === "characters"
+      ? tab
+      : "characters";
+  return <LayoutBuilderHub initialTab={initial} />;
+}
+
+export default function LayoutBuilderPage() {
   const router = useRouter();
   const [ready, setReady] = useState(false);
   const isAuthenticated = useTeamAuth((s) => s.isAuthenticated);
@@ -82,7 +92,7 @@ export default function GuestPartyLayoutBuilderPage() {
         <main className="mx-auto max-w-md px-4 py-10">
           <StaffLoginCard
             title="Team login"
-            subtitle="Sign in to open the guest party layout builder."
+            subtitle="Sign in to open the layout & characters builder."
           />
           <p className="mt-4 text-center text-xs text-zinc-500">
             <Link href="/team-access" className="text-[#075473] hover:underline">
@@ -106,7 +116,13 @@ export default function GuestPartyLayoutBuilderPage() {
 
   return (
     <Shell>
-      <GuestPartyLayoutBuilder />
+      <Suspense
+        fallback={
+          <p className="p-8 text-center text-sm text-zinc-400">Loading…</p>
+        }
+      >
+        <HubFromQuery />
+      </Suspense>
     </Shell>
   );
 }

@@ -315,6 +315,7 @@ export async function handleSendItinerary(
         bytes: p.content.length,
       })),
       legacyBytes: pdf?.length || 0,
+      sendDocs: body.sendDocs || null,
     });
 
     let mailSent = false;
@@ -331,8 +332,7 @@ export async function handleSendItinerary(
           state.tripMode === "single_day" ? "single_day" : "multi_day",
         tourDate:
           state.tripMode === "single_day"
-            ? // Prefer single-day tour date if present on state payload
-              String(
+            ? String(
                 (state as { tourDate?: string | null }).tourDate ||
                   state.arrivalDate ||
                   ""

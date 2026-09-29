@@ -1,6 +1,7 @@
 "use client";
 
 import type PocketBase from "pocketbase";
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { formatPbError } from "@/lib/pocketbase/admin-schema";
 import {
@@ -395,6 +396,12 @@ export function SiteBrandingPanel({ getClient }: { getClient: () => PbClient }) 
           Controls the builder navbar logo and Multi-Day / Single-Day hero
           sections. One active site_branding record plus Builder S UI card.
         </p>
+        <Link
+          href="/team-access/layout-builder?tab=heroes"
+          className="mt-4 inline-flex rounded-xl border border-[#075473] bg-[#075473]/20 px-4 py-2 text-xs font-bold uppercase tracking-[0.14em] text-[#7dd3fc] transition hover:bg-[#075473]/35"
+        >
+          Layout &amp; characters →
+        </Link>
 
         {error ? (
           <p className="mt-3 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">

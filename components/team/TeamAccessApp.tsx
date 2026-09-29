@@ -37,10 +37,20 @@ import { StaffLoginCard } from "@/components/staff/StaffPortalShell";
 import { StaffUsersPanel } from "@/components/staff/StaffUsersPanel";
 import {
   ROLE_LABELS,
+  canAccessAdmin,
+  canAccessOpsBoard,
   canAccessTeamAccess,
   homePathForRole,
 } from "@/lib/staffRoles";
 import { useRouter } from "next/navigation";
+import {
+  ClipboardList,
+  Home,
+  LayoutDashboard,
+  Map,
+  Settings2,
+} from "lucide-react";
+import { ShortcutTile } from "@/components/staff/ShortcutTile";
 
 type PbClient = PocketBase;
 
@@ -165,27 +175,31 @@ export function TeamAccessApp() {
     <TeamShell title="Admin">
       <main className="mx-auto max-w-5xl px-4 py-6 sm:px-6">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-zinc-800/80 pb-4">
-          <div className="flex flex-wrap items-center gap-3">
-            <Link
-              href="/ops"
-              className="flex items-center gap-1.5 rounded-xl border border-zinc-800 bg-[#1C1C1E] px-3.5 py-1.5 text-xs font-bold text-zinc-300 transition hover:border-[#075473] hover:text-white"
-            >
-              <span aria-hidden>←</span>
-              <span>Ops board</span>
-            </Link>
-            <Link
-              href="/admin"
-              className="flex items-center gap-1.5 rounded-xl border border-zinc-800 bg-[#1C1C1E] px-3.5 py-1.5 text-xs font-bold text-zinc-300 transition hover:border-[#075473] hover:text-white"
-            >
-              <span>Leads / Admin</span>
-            </Link>
-            <Link
+          <div className="flex flex-wrap items-center gap-2.5">
+            {canAccessOpsBoard(role) ? (
+              <ShortcutTile
+                href="/ops"
+                label="Ops"
+                icon={<ClipboardList className="h-5 w-5" strokeWidth={2} />}
+              />
+            ) : null}
+            {canAccessAdmin(role) ? (
+              <ShortcutTile
+                href="/admin"
+                label="Leads"
+                icon={<LayoutDashboard className="h-5 w-5" strokeWidth={2} />}
+              />
+            ) : null}
+            <ShortcutTile
+              href="/map"
+              label="Map"
+              icon={<Map className="h-5 w-5" strokeWidth={2} />}
+            />
+            <ShortcutTile
               href="/builder"
-              className="flex items-center gap-1.5 rounded-xl border border-zinc-800 bg-[#1C1C1E] px-3.5 py-1.5 text-xs font-bold text-zinc-400 transition hover:border-[#075473] hover:text-white"
-            >
-              <span aria-hidden>🏠</span>
-              <span>Exit to Trip Builder</span>
-            </Link>
+              label="Builder"
+              icon={<Home className="h-5 w-5" strokeWidth={2} />}
+            />
           </div>
           <div className="text-right text-xs text-zinc-500">
             <p>
@@ -202,35 +216,53 @@ export function TeamAccessApp() {
           </div>
         </div>
 
-        <div className="mb-6 flex flex-wrap gap-2">
-          <TabButton active={tab === "truth"} onClick={() => setTab("truth")}>
-            Source of Truth
-          </TabButton>
-          <TabButton active={tab === "rules"} onClick={() => setTab("rules")}>
-            Rules of Logic
-          </TabButton>
-          <TabButton
-            active={tab === "seasonality"}
-            onClick={() => setTab("seasonality")}
+        <div className="mb-6">
+          <p className="mb-2 text-[0.6rem] font-semibold uppercase tracking-[0.22em] text-zinc-500">
+            Sections
+          </p>
+          <div
+            role="tablist"
+            aria-label="Admin sections"
+            className="flex flex-wrap gap-1 border-b border-zinc-700/90"
           >
-            Seasonality
-          </TabButton>
-          <TabButton
-            active={tab === "branding"}
-            onClick={() => setTab("branding")}
-          >
-            Site Branding
-          </TabButton>
-          <TabButton active={tab === "users"} onClick={() => setTab("users")}>
-            Users
-          </TabButton>
-          <TabButton
-            active={tab === "email_settings"}
-            onClick={() => setTab("email_settings")}
-          >
-            <span aria-hidden>✉️</span>
-            <span>Email Settings</span>
-          </TabButton>
+            <SectionTab
+              active={tab === "truth"}
+              onClick={() => setTab("truth")}
+            >
+              Source of Truth
+            </SectionTab>
+            <SectionTab
+              active={tab === "rules"}
+              onClick={() => setTab("rules")}
+            >
+              Rules of Logic
+            </SectionTab>
+            <SectionTab
+              active={tab === "seasonality"}
+              onClick={() => setTab("seasonality")}
+            >
+              Seasonality
+            </SectionTab>
+            <SectionTab
+              active={tab === "branding"}
+              onClick={() => setTab("branding")}
+            >
+              Site Branding
+            </SectionTab>
+            <SectionTab
+              active={tab === "users"}
+              onClick={() => setTab("users")}
+            >
+              Users
+            </SectionTab>
+            <SectionTab
+              active={tab === "email_settings"}
+              onClick={() => setTab("email_settings")}
+            >
+              <span aria-hidden>✉️</span>
+              <span>Email Settings</span>
+            </SectionTab>
+          </div>
         </div>
 
         {tab === "truth" ? (
@@ -251,7 +283,8 @@ export function TeamAccessApp() {
   );
 }
 
-function TabButton({
+/** Principal section tabs — folder (“carpeta”) style, distinct from sub-pills. */
+function SectionTab({
   active,
   onClick,
   children,
@@ -263,11 +296,13 @@ function TabButton({
   return (
     <button
       type="button"
+      role="tab"
+      aria-selected={active}
       onClick={onClick}
-      className={`flex items-center gap-2 rounded-xl border px-4 py-2 text-xs font-bold transition ${
+      className={`relative -mb-px flex items-center gap-2 rounded-t-lg border px-4 py-2.5 text-sm font-semibold transition ${
         active
-          ? "border-[#075473] bg-[#075473] text-white shadow-md"
-          : "border-zinc-800 bg-[#1C1C1E] text-zinc-300 hover:bg-[#1C1C1E] hover:text-white"
+          ? "z-10 border-zinc-700 border-b-zinc-950 bg-zinc-950 text-white shadow-[inset_0_2px_0_0_#075473]"
+          : "border-transparent bg-transparent text-zinc-500 hover:border-zinc-800 hover:bg-zinc-900/60 hover:text-zinc-200"
       }`}
     >
       {children}

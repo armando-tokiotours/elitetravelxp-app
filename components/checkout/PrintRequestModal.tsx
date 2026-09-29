@@ -347,7 +347,23 @@ export function PrintRequestModal({
 
       if (!res.ok) {
         dualWriteLead();
-        setError("Email notice delayed, but your PDF is ready below!");
+        const detail =
+          typeof data.error === "string" && data.error.trim()
+            ? data.error
+            : "Email notice delayed, but your PDF is ready below!";
+        setError(detail);
+        setShowDirectDownload(true);
+        setSuccess(null);
+        return;
+      }
+
+      if (data.mailSent === false) {
+        dualWriteLead();
+        setError(
+          typeof data.error === "string" && data.error.trim()
+            ? data.error
+            : "Itinerary saved, but the PDF email could not be delivered. Try again or use Print."
+        );
         setShowDirectDownload(true);
         setSuccess(null);
         return;
@@ -367,7 +383,7 @@ export function PrintRequestModal({
         .filter(Boolean)
         .join(" + ");
       setSuccess(
-        `✓ ${parts} emailed to you (team copy → ${bcc}). Status: In Progress.`
+        `✓ ${parts} PDF emailed to you (team copy → ${bcc}). Status: In Progress.`
       );
       if (showLocalPrint) {
         try {

@@ -69,7 +69,12 @@ const ELEMENT_LIST: Array<{ id: SelectedId; label: string; src: string }> = [
  * Visual drag builder for Pre-Elite Step 5 guest party positions.
  * Save writes config/guestPartyLayout.json via API — live page reads it.
  */
-export function GuestPartyLayoutBuilder() {
+export function GuestPartyLayoutBuilder({
+  embedded = false,
+}: {
+  /** When true, omit outer page chrome (used inside LayoutBuilderHub). */
+  embedded?: boolean;
+}) {
   const [layout, setLayout] = useState<GuestPartyLayout>(
     structuredClone(GUEST_PARTY_LAYOUT_DEFAULTS)
   );
@@ -196,15 +201,23 @@ export function GuestPartyLayoutBuilder() {
   const sel = getSlot(layout, selected);
 
   return (
-    <div className="mx-auto max-w-5xl px-4 py-6 sm:px-6">
-      <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-        <Link
-          href="/team-access"
-          className="inline-flex items-center gap-1.5 rounded-xl border border-zinc-800 bg-[#1C1C1E] px-3.5 py-1.5 text-xs font-bold text-zinc-300 transition hover:border-[#075473] hover:text-white"
-        >
-          <span aria-hidden>←</span>
-          <span>Back to Team Admin</span>
-        </Link>
+    <div className={embedded ? "" : "mx-auto max-w-5xl px-4 py-6 sm:px-6"}>
+      <div
+        className={
+          embedded
+            ? "mb-5 flex flex-wrap items-center justify-end gap-3"
+            : "mb-5 flex flex-wrap items-center justify-between gap-3"
+        }
+      >
+        {!embedded ? (
+          <Link
+            href="/team-access"
+            className="inline-flex items-center gap-1.5 rounded-xl border border-zinc-800 bg-[#1C1C1E] px-3.5 py-1.5 text-xs font-bold text-zinc-300 transition hover:border-[#075473] hover:text-white"
+          >
+            <span aria-hidden>←</span>
+            <span>Back to Team Admin</span>
+          </Link>
+        ) : null}
         <div className="flex flex-wrap gap-2">
           <button
             type="button"
@@ -225,9 +238,15 @@ export function GuestPartyLayoutBuilder() {
       </div>
 
       <div className="mb-6">
-        <h1 className="font-display text-2xl text-white sm:text-3xl">
+        <h2
+          className={
+            embedded
+              ? "font-display text-2xl text-white sm:text-3xl"
+              : "font-display text-2xl text-white sm:text-3xl"
+          }
+        >
           Guest party layout
-        </h1>
+        </h2>
         <p className="mt-1 max-w-2xl text-sm text-zinc-400">
           Drag characters to place them. Height and z-index use the sliders.
           Positions only — no timing or guest-count rules. Saves to{" "}

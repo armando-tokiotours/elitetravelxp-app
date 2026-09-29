@@ -1,31 +1,43 @@
 "use client";
 
 import { Suspense, useEffect, useState } from "react";
-import Link from "next/link";
 import { useSearchParams } from "next/navigation";
+import {
+  ClipboardList,
+  LayoutDashboard,
+  Map,
+  Settings2,
+  Home,
+} from "lucide-react";
 import {
   AppSidebar,
   APP_SIDEBAR_RAIL_PAD,
   MobileAppNav,
 } from "@/components/navigation/AppSidebar";
 import { BookingsManagementTable } from "@/components/team/BookingsManagementTable";
-import { TeamConfigDashboard } from "@/components/team/TeamConfigDashboard";
+import { AdminSummaryPanel } from "@/components/team/AdminSummaryPanel";
+import { ShortcutTile } from "@/components/staff/ShortcutTile";
 import { useTeamAuth } from "@/store/useTeamAuth";
 import { StaffLoginCard } from "@/components/staff/StaffPortalShell";
 import {
   ROLE_LABELS,
   canAccessAdmin,
+  canAccessOpsBoard,
+  canAccessTeamAccess,
   homePathForRole,
 } from "@/lib/staffRoles";
 import { useRouter } from "next/navigation";
 
-type PrimaryTab = "bookings" | "email";
+type PrimaryTab = "bookings" | "summary";
 
 function AdminDashboardInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const initialTab =
-    searchParams.get("tab") === "email" ? "email" : "bookings";
+    searchParams.get("tab") === "summary" ||
+    searchParams.get("tab") === "email"
+      ? "summary"
+      : "bookings";
 
   const [ready, setReady] = useState(false);
   const [activeAdminTab, setActiveAdminTab] =
@@ -53,7 +65,8 @@ function AdminDashboardInner() {
 
   useEffect(() => {
     const t = searchParams.get("tab");
-    if (t === "email" || t === "bookings") setActiveAdminTab(t);
+    if (t === "summary" || t === "email") setActiveAdminTab("summary");
+    else if (t === "bookings") setActiveAdminTab("bookings");
   }, [searchParams]);
 
   useEffect(() => {
@@ -91,7 +104,7 @@ function AdminDashboardInner() {
           ) : !isAuthenticated ? (
             <StaffLoginCard
               title="Team login"
-              subtitle="Owner / Ops manage bookings and email settings. Other roles go to their portal after sign-in."
+              subtitle="Owner / Ops manage bookings and admin summary. Other roles go to their portal after sign-in."
             />
           ) : !canAccessAdmin(role) ? (
             <p className="py-16 text-center text-sm text-zinc-400">
@@ -99,8 +112,8 @@ function AdminDashboardInner() {
             </p>
           ) : (
             <>
-              <div className="mb-6 flex flex-wrap items-center justify-between gap-3 border-b border-zinc-800 pb-6">
-                <div>
+              <div className="mb-6 flex flex-wrap items-start justify-between gap-4 border-b border-zinc-800 pb-6">
+                <div className="min-w-0 flex-1">
                   <span className="block text-[10px] font-bold uppercase tracking-widest text-[#075473]">
                     PRIVATE MANAGEMENT PORTAL
                   </span>
@@ -112,27 +125,34 @@ function AdminDashboardInner() {
                     <strong className="text-white">{email}</strong>
                     {role ? ` · ${ROLE_LABELS[role]}` : ""}
                   </p>
-                  <div className="mt-3 flex flex-wrap items-center gap-2">
-                    <Link
-                      href="/ops"
-                      className="flex items-center gap-1.5 rounded-xl border border-zinc-800 bg-[#1C1C1E] px-3.5 py-1.5 text-xs font-bold text-zinc-300 transition hover:border-[#075473] hover:text-white"
-                    >
-                      <span>Ops board</span>
-                    </Link>
-                    <Link
-                      href="/team-access"
-                      className="flex items-center gap-1.5 rounded-xl border border-zinc-800 bg-[#1C1C1E] px-3.5 py-1.5 text-xs font-bold text-zinc-300 transition hover:border-[#075473] hover:text-white"
-                    >
-                      <span aria-hidden>←</span>
-                      <span>Content Admin</span>
-                    </Link>
-                    <Link
+
+                  <div className="mt-4 flex flex-wrap gap-2.5">
+                    {canAccessOpsBoard(role) ? (
+                      <ShortcutTile
+                        href="/ops"
+                        label="Ops"
+                        icon={
+                          <ClipboardList className="h-5 w-5" strokeWidth={2} />
+                        }
+                      />
+                    ) : null}
+                    {canAccessTeamAccess(role) ? (
+                      <ShortcutTile
+                        href="/team-access"
+                        label="Content"
+                        icon={<Settings2 className="h-5 w-5" strokeWidth={2} />}
+                      />
+                    ) : null}
+                    <ShortcutTile
+                      href="/map"
+                      label="Map"
+                      icon={<Map className="h-5 w-5" strokeWidth={2} />}
+                    />
+                    <ShortcutTile
                       href="/builder"
-                      className="flex items-center gap-1.5 rounded-xl border border-zinc-800 bg-[#1C1C1E] px-3.5 py-1.5 text-xs font-bold text-zinc-400 transition hover:border-[#075473] hover:text-white"
-                    >
-                      <span aria-hidden>🏠</span>
-                      <span>Exit to Trip Builder</span>
-                    </Link>
+                      label="Builder"
+                      icon={<Home className="h-5 w-5" strokeWidth={2} />}
+                    />
                   </div>
                 </div>
                 <button
@@ -154,27 +174,27 @@ function AdminDashboardInner() {
                       : "border-transparent text-zinc-400 hover:text-white"
                   }`}
                 >
-                  <span aria-hidden>📋</span>
+                  <ClipboardList className="h-3.5 w-3.5" aria-hidden />
                   <span>Bookings & Leads</span>
                 </button>
                 <button
                   type="button"
-                  onClick={() => setActiveAdminTab("email")}
+                  onClick={() => setActiveAdminTab("summary")}
                   className={`flex items-center gap-2 border-b-2 px-2 pb-3 text-xs font-bold transition ${
-                    activeAdminTab === "email"
+                    activeAdminTab === "summary"
                       ? "border-[#075473] text-[#075473]"
                       : "border-transparent text-zinc-400 hover:text-white"
                   }`}
                 >
-                  <span aria-hidden>✉️</span>
-                  <span>Email & SMTP Settings</span>
+                  <LayoutDashboard className="h-3.5 w-3.5" aria-hidden />
+                  <span>Summary</span>
                 </button>
               </div>
 
               {activeAdminTab === "bookings" ? (
                 <BookingsManagementTable getClient={getClient} />
               ) : (
-                <TeamConfigDashboard />
+                <AdminSummaryPanel getClient={getClient} />
               )}
             </>
           )}

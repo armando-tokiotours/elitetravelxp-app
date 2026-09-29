@@ -275,7 +275,7 @@ export function PreBuilderQuizBrandingAdmin({
           href="/team-access/layout-builder"
           className="shrink-0 rounded-xl border border-[#075473] bg-[#075473]/20 px-4 py-2 text-xs font-bold uppercase tracking-[0.14em] text-[#7dd3fc] transition hover:bg-[#075473]/35"
         >
-          Guest party layout →
+          Layout &amp; characters →
         </Link>
       </div>
 

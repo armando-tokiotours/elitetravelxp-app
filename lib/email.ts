@@ -256,6 +256,16 @@ export async function sendItineraryEmail(
     children: params.children ?? 0,
   });
   const attachments = resolvePdfAttachments(params);
+  const requiredAttach =
+    Boolean(params.pdfAttachments?.length) ||
+    Boolean(params.pdfBuffer && params.pdfBuffer.length > 0);
+
+  if (requiredAttach && attachments.length === 0) {
+    throw new MailDispatchError(
+      "Itinerary PDF attachment missing — refuse to send email without the dossier/invoice PDF.",
+      500
+    );
+  }
 
   if (bluehostWebmailConfigured()) {
     try {
@@ -268,12 +278,14 @@ export async function sendItineraryEmail(
         bcc,
         attachments,
       });
-      return {};
+      return { id: `webmail:${params.bookingRef}:att${attachments.length}` };
     } catch (webmailErr) {
       console.error(
         "[email] Bluehost webmail failed, trying next…",
         webmailErr
       );
+      // If PDFs were required and webmail couldn't attach, keep falling through
+      // so Resend/SMTP can still deliver with real MIME attachments.
     }
   }
 

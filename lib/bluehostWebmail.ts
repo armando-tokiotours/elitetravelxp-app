@@ -238,16 +238,21 @@ export async function sendViaBluehostWebmail(
     throw new Error("Bluehost Roundcube compose session incomplete.");
   }
 
-  // Attachments via Roundcube upload — must succeed when PDFs are required
+  // Attachments via Roundcube upload (_file). Must succeed when PDFs are required —
+  // false "OK" with empty attach is worse than falling back to SMTP/Resend.
   const wanted = input.attachments || [];
   const uploadedIds: string[] = [];
   for (const att of wanted) {
+    if (!att.content?.length) {
+      throw new Error(`Empty attachment buffer: ${att.filename}`);
+    }
     const form = new FormData();
     form.set("_token", token);
     form.set("_id", composeId);
-    form.set("_uploadid", `upload${Date.now()}`);
+    form.set("_uploadid", `upload${Date.now()}${Math.random().toString(16).slice(2, 8)}`);
+    // Roundcube expects `_file` (not `_attachments[]`)
     form.set(
-      "_attachments[]",
+      "_file",
       new Blob([new Uint8Array(att.content)], {
         type: att.contentType || "application/pdf",
       }),
@@ -266,20 +271,20 @@ export async function sendViaBluehostWebmail(
       }
     );
     const upText = await up.text();
-    const id =
-      firstMatch(upText, [
-        /"id":"([^"]+)"/,
-        /"attachment":\{[^}]*"id":"([^"]+)"/,
-        /add2attachment\(['"]([^'"]+)/,
-        /_attachments":\s*\{[^}]*"([^"]+)":\{/,
-      ]) || "";
-    if (id) uploadedIds.push(id);
-    else {
+    const id = extractRoundcubeAttachmentId(upText, att.filename);
+    if (id) {
+      uploadedIds.push(id);
+      console.info("[mail] Roundcube attachment uploaded", {
+        filename: att.filename,
+        bytes: att.content.length,
+        id,
+      });
+    } else {
       console.warn(
         "[mail] Roundcube attachment upload failed",
         att.filename,
         up.status,
-        upText.slice(0, 280)
+        upText.slice(0, 400)
       );
     }
   }
@@ -305,6 +310,7 @@ export async function sendViaBluehostWebmail(
     _subject: input.subject,
     _message: isHtml ? input.html! : input.text,
     _is_html: isHtml ? "1" : "0",
+    // Bound to compose session; also pass ids explicitly for older Roundcube
     _attachments: uploadedIds.join(","),
   });
 
@@ -338,6 +344,85 @@ export async function sendViaBluehostWebmail(
     bcc,
     subject: input.subject,
     attachments: uploadedIds.length,
+    attachmentBytes: wanted.reduce((n, a) => n + (a.content?.length || 0), 0),
   });
   return { sent: true, via: "bluehost-webmail" };
+}
+
+/**
+ * Parse Roundcube upload JSON / exec payload for a real attachment id.
+ * Avoids false positives (compose ids, tokens) that used to mark attach "OK"
+ * while the guest received no PDF.
+ */
+function extractRoundcubeAttachmentId(
+  upText: string,
+  filename: string
+): string | null {
+  const escaped = filename.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+  // Prefer JSON body
+  try {
+    const json = JSON.parse(upText) as Record<string, unknown>;
+    const candidates: unknown[] = [
+      json,
+      json.response,
+      json.data,
+      (json as { exec?: unknown }).exec,
+    ];
+    // Roundcube sometimes nests under env.attachments
+    const env = json.env as { attachments?: Record<string, { id?: string; name?: string; size?: number }> } | undefined;
+    if (env?.attachments && typeof env.attachments === "object") {
+      for (const [key, val] of Object.entries(env.attachments)) {
+        if (
+          val &&
+          (String(val.name || "").includes(filename.split(".")[0]) ||
+            String(val.name || "") === filename ||
+            key)
+        ) {
+          const id = String(val.id || key || "").trim();
+          if (id && id.length >= 4) return id;
+        }
+      }
+    }
+    for (const c of candidates) {
+      if (!c || typeof c !== "object") continue;
+      const o = c as Record<string, unknown>;
+      const id = String(o.id || o.attachment_id || "").trim();
+      const name = String(o.name || o.filename || "");
+      const size = Number(o.size || o.bytes || 0);
+      if (id && id.length >= 4 && (name.includes(filename.split(".")[0]) || size > 0)) {
+        return id;
+      }
+      if (id && id.length >= 8 && /attachment|upload/i.test(JSON.stringify(o).slice(0, 200))) {
+        return id;
+      }
+    }
+  } catch {
+    /* not JSON — fall through to regex */
+  }
+
+  // add2attachment({'id':'…','name':'…'})
+  const add2 = upText.match(
+    new RegExp(
+      `add2attachment\\(\\s*\\{[^}]*['"]id['"]\\s*:\\s*['"]([^'"]+)['"][^}]*['"]name['"]\\s*:\\s*['"][^'"]*${escaped}`,
+      "i"
+    )
+  );
+  if (add2?.[1]) return add2[1];
+
+  const add2Loose = upText.match(
+    /add2attachment\(\s*\{[^}]*['"]id['"]\s*:\s*['"]([^'"]+)['"]/i
+  );
+  if (add2Loose?.[1] && add2Loose[1].length >= 6) return add2Loose[1];
+
+  // "id":"…" near filename
+  const nearName = upText.match(
+    new RegExp(
+      `["']id["']\\s*:\\s*["']([^"']+)["'][^]{0,120}${escaped}|${escaped}[^]{0,120}["']id["']\\s*:\\s*["']([^"']+)["']`,
+      "i"
+    )
+  );
+  if (nearName?.[1] || nearName?.[2]) return nearName[1] || nearName[2];
+
+  return null;
 }
