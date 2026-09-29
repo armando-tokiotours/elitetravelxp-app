@@ -39,6 +39,7 @@ import { PhoneCountryField } from "@/components/pre-elite/PhoneCountryField";
 import { TimingSelector } from "@/components/pre-elite/TimingSelector";
 import { SystemMessageFox } from "@/components/branding/SystemMessageFox";
 import { BrandCharacterPreloader } from "@/components/branding/BrandCharacterPreloader";
+import { HoldUntilReadyMascot } from "@/components/branding/HoldUntilReadyMascot";
 import {
   HiBubble,
   MascotHiZoom,
@@ -78,6 +79,17 @@ const CHOICE_SPOTLIGHT: Record<string, ChoiceSpotlight> = {
   authentic_dining: { color: "#054F70", placement: "bottom-center" },
   packed_itinerary: { color: "#1BA58A", placement: "right-center" },
 };
+
+const PRE_ELITE_HERO_POSES = {
+  bow: "/brand/mascot-bow.webp",
+  note: "/brand/mascot-note.webp",
+  multi: "/brand/mascot-multiday.webp",
+  single: "/brand/mascot-1day-pass.webp",
+  time: "/brand/mascot-time.webp",
+  look: "/brand/mascot-look.webp",
+} as const;
+
+type PreEliteHeroPose = keyof typeof PRE_ELITE_HERO_POSES;
 
 const STEP_TITLES = [
   "Travel style",
@@ -210,17 +222,15 @@ export function PreEliteBuilderClient() {
     };
   }, [hydrated, submitted]);
 
-  const heroMascot = (() => {
-    if (showBow) return { key: "bow", src: "/brand/mascot-bow.webp" };
+  const heroPose: PreEliteHeroPose = (() => {
+    if (showBow) return "bow";
     if (step === 5) {
-      if (contactWriting) return { key: "note", src: "/brand/mascot-note.webp" };
-      if (draft.tripType === "multi_day")
-        return { key: "multi", src: "/brand/mascot-multiday.webp" };
-      if (draft.tripType === "single_day")
-        return { key: "single", src: "/brand/mascot-1day-pass.webp" };
+      if (contactWriting) return "note";
+      if (draft.tripType === "multi_day") return "multi";
+      if (draft.tripType === "single_day") return "single";
     }
-    if (isIdle) return { key: "time", src: "/brand/mascot-time.webp" };
-    return { key: "look", src: "/brand/mascot-look.webp" };
+    if (isIdle) return "time";
+    return "look";
   })();
 
   const stepBlurb =
@@ -376,14 +386,10 @@ export function PreEliteBuilderClient() {
                   className="-left-8 top-0 w-[5.5rem] sm:-left-10 sm:w-[6.5rem]"
                 />
                 <MascotHiZoom showHi={showHi} className="pointer-events-none">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    key={heroMascot.key}
-                    src={heroMascot.src}
-                    alt=""
-                    aria-hidden
-                    className="h-28 w-auto select-none object-contain opacity-95 sm:h-44 md:h-48"
-                    draggable={false}
+                  <HoldUntilReadyMascot
+                    pose={heroPose}
+                    poses={PRE_ELITE_HERO_POSES}
+                    imgClassName="h-28 w-auto select-none object-contain opacity-95 sm:h-44 md:h-48"
                   />
                 </MascotHiZoom>
               </span>
@@ -425,8 +431,8 @@ export function PreEliteBuilderClient() {
             </div>
           </div>
 
-          {/* Scrollable options / form — no flex-1 stretch (kills empty bottom void) */}
-          <div className="min-h-0 max-h-[min(62dvh,38rem)] shrink overflow-y-auto">
+          {/* Form fills remaining viewport — scroll inside, no empty black strip */}
+          <div className="min-h-0 flex-1 overflow-y-auto">
             <div
               className={
                 step === 5
