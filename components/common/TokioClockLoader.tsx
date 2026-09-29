@@ -147,7 +147,7 @@ export function TokioClockLoader({
   if (!fullScreen) return bar;
 
   return (
-    <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/70 backdrop-blur-md">
+    <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/70 backdrop-blur-md">
       {bar}
     </div>
   );

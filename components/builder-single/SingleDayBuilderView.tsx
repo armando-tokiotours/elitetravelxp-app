@@ -7,8 +7,8 @@ import { Check, Clock, Footprints, Train, Car } from "lucide-react";
 import {
   APP_SIDEBAR_RAIL_PAD,
   AppSidebar,
-  MobileAppNav,
 } from "@/components/navigation/AppSidebar";
+import { MobileTopChrome } from "@/components/navigation/MobileTopChrome";
 import { BottomNav } from "@/components/builder/BottomNav";
 import { BookingRefBadge } from "@/components/builder/BookingRefBadge";
 import {
@@ -263,17 +263,11 @@ export function SingleDayBuilderView() {
       />
       <div className={`${APP_SIDEBAR_RAIL_PAD} min-h-screen overflow-x-clip overflow-y-visible bg-[#04080C]`}>
         <div className="builder-theme relative min-h-screen overflow-x-clip overflow-y-visible bg-[#04080C] text-white [color-scheme:dark]">
-          <header className="absolute inset-x-0 top-0 z-40 flex items-center gap-2 border-b border-white/10 bg-[#0D1117]/70 px-4 py-3 backdrop-blur-md lg:hidden">
-            <MobileAppNav brandEyebrow="TOKIOTOURS" brandTitle="Builder S" />
-            <div className="min-w-0 flex-1" />
-            <Link
-              href="/"
-              className="inline-flex items-center gap-2 rounded-full border border-zinc-700/80 bg-zinc-900/90 px-4 py-2 font-godiva text-xs font-bold uppercase tracking-widest text-white shadow-lg transition-all hover:bg-[#075473] sm:text-sm"
-              aria-label="TOKIOTOURS home"
-            >
-              TOKIOTOURS
-            </Link>
-          </header>
+          <MobileTopChrome
+            brandTitle="Builder S"
+            ctaHref="/builder-single/itinerary"
+            ctaLabel="Itinerary"
+          />
 
           <div className="relative bg-[#04080C]">
             <SingleDayBuilderHero />

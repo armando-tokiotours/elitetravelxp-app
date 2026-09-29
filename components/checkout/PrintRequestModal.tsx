@@ -24,9 +24,11 @@ import {
   type SendDocSelection,
 } from "@/lib/clientItineraryPdf";
 import { BookingTermsModal } from "@/components/checkout/BookingTermsModal";
+import { TokioClockLoader } from "@/components/common/TokioClockLoader";
 import { activeBookingRef } from "@/utils/pnr";
 import { useModalDismiss } from "@/hooks/useModalDismiss";
 import { EMAIL_CONFIG_DEFAULTS } from "@/config/emailDefaults";
+import { getSystemMessage } from "@/lib/systemMessages";
 
 export type PrintRequestResult = {
   bookingRef: string;
@@ -683,6 +685,13 @@ export function PrintRequestModal({
           ) : null}
         </form>
       </div>
+      {busy || localBusy ? (
+        <TokioClockLoader
+          fullScreen
+          message={getSystemMessage("sending_pdf")}
+          subMessage="Almost there"
+        />
+      ) : null}
     </div>
   );
 }

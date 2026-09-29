@@ -332,13 +332,13 @@ export function PreEliteBuilderClient() {
           <div className="h-80 rounded-3xl border border-zinc-800/80 bg-[#0D1117]/80 backdrop-blur-md" />
         </main>
       ) : (
-        <>
-          {/* Fixed hero through progress line — always visible on steps 1–5 */}
+        <div className="flex min-h-0 flex-1 flex-col justify-center overflow-hidden">
+          {/* Hero through progress — vertically centered with options */}
           <div
             className={
               step === 5
                 ? "relative z-40 mx-auto w-full max-w-3xl shrink-0 px-5 pt-3"
-                : "relative z-40 mx-auto w-full max-w-3xl shrink-0 px-5 pt-6"
+                : "relative z-40 mx-auto w-full max-w-3xl shrink-0 px-5 pt-2"
             }
           >
             <div
@@ -401,12 +401,12 @@ export function PreEliteBuilderClient() {
           </div>
 
           {/* Scrollable options / form only */}
-          <div className="min-h-0 flex-1 overflow-y-auto">
+          <div className="min-h-0 max-h-[min(58dvh,36rem)] flex-1 overflow-y-auto">
             <div
               className={
                 step === 5
                   ? "mx-auto max-w-3xl px-5 pb-6 pt-3"
-                  : "mx-auto max-w-3xl px-5 pb-10 pt-6"
+                  : "mx-auto max-w-3xl px-5 pb-8 pt-4"
               }
             >
               <div className="relative overflow-visible rounded-3xl border border-zinc-800/80 bg-[#0D1117]/80 p-5 backdrop-blur-md sm:p-7">
@@ -572,7 +572,7 @@ export function PreEliteBuilderClient() {
               </div>
             </div>
           </div>
-        </>
+        </div>
       )}
 
       <StoryExplanationModal

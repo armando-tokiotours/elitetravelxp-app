@@ -30,13 +30,20 @@ import {
 import {
   AppSidebar,
   APP_SIDEBAR_RAIL_PAD,
-  MobileAppNav,
 } from "@/components/navigation/AppSidebar";
+import { MobileTopChrome } from "@/components/navigation/MobileTopChrome";
+import { NewBookingResetButton } from "@/components/builder/NewBookingResetButton";
+import { IdleHeroMascot } from "@/components/branding/IdleHeroMascot";
+import { showSystemMessage } from "@/store/useSystemMessageStore";
+import { getSystemMessage } from "@/lib/systemMessages";
+import {
+  fetchPaymentConfigured,
+  isMultiDayBuilderComplete,
+} from "@/lib/itineraryGates";
+import { SystemMessageFox } from "@/components/branding/SystemMessageFox";
+
 import { PriceSummaryFooter } from "@/components/builder/PriceSummaryFooter";
 import { DossierSectionOutline } from "@/components/builder/DossierSectionOutline";
-import { NewBookingResetButton } from "@/components/builder/NewBookingResetButton";
-import { GoldLight } from "@/components/branding/GoldLight";
-import { IdleHeroMascot } from "@/components/branding/IdleHeroMascot";
 
 type ViewMode = "dossier" | "invoice";
 
@@ -153,13 +160,65 @@ export default function ItineraryPageClient() {
     });
   };
 
-  const requestInvoiceView = () => {
+  const requestInvoiceView = async () => {
     if (activeView === "invoice") return;
+    const okPay = await fetchPaymentConfigured();
+    if (!okPay) {
+      showSystemMessage({
+        text: getSystemMessage("payment_not_ready"),
+        tone: "error",
+      });
+      return;
+    }
+    if (
+      !isMultiDayBuilderComplete(state.highestUnlockedStep, {
+        arrivalDate: state.arrivalDate,
+        durationDays: state.durationDays,
+        adults: state.adults,
+        children: state.children,
+        arrivalTransferId: state.arrivalTransferId,
+        departureTransferId: state.departureTransferId,
+        locations: state.locations,
+        cityHotels: state.cityHotels,
+      })
+    ) {
+      showSystemMessage({
+        text: getSystemMessage("builder_incomplete"),
+        tone: "error",
+      });
+      return;
+    }
     setTermsIntent("invoice");
     setTermsOpen(true);
   };
 
-  const requestSendPdf = () => {
+  const requestSendPdf = async () => {
+    const okPay = await fetchPaymentConfigured();
+    if (!okPay) {
+      showSystemMessage({
+        text: getSystemMessage("payment_not_ready"),
+        tone: "error",
+      });
+      return;
+    }
+    if (
+      !isMultiDayBuilderComplete(state.highestUnlockedStep, {
+        arrivalDate: state.arrivalDate,
+        durationDays: state.durationDays,
+        adults: state.adults,
+        children: state.children,
+        arrivalTransferId: state.arrivalTransferId,
+        departureTransferId: state.departureTransferId,
+        locations: state.locations,
+        cityHotels: state.cityHotels,
+      })
+    ) {
+      showSystemMessage({
+        text: getSystemMessage("builder_incomplete"),
+        tone: "error",
+      });
+      return;
+    }
     setTermsIntent("print");
     setTermsOpen(true);
   };
@@ -270,6 +329,7 @@ export default function ItineraryPageClient() {
 
   return (
     <div className="builder-theme relative z-10 min-h-screen w-full overflow-x-hidden bg-transparent pb-28 text-white md:pb-20">
+      <SystemMessageFox />
       <AppSidebar
         brandEyebrow="TOKIOTOURS"
         brandTitle="Itinerary"
@@ -277,43 +337,42 @@ export default function ItineraryPageClient() {
       />
 
       <div className={APP_SIDEBAR_RAIL_PAD}>
+        <MobileTopChrome
+          brandTitle="Itinerary"
+          ctaHref="/builder"
+          ctaLabel="Builder"
+        />
         <div className="mx-auto w-full max-w-md px-4 py-6 md:max-w-lg lg:max-w-2xl">
-          <div className="mb-3 flex items-center gap-3 lg:hidden">
-            <MobileAppNav
-              brandEyebrow="TOKIOTOURS"
-              brandTitle="Itinerary"
-            />
-          </div>
-
           {/* Section 1 — Hero header + navigation actions */}
           <DossierSectionOutline
             label="Section 1: Hero & Nav"
             className="no-print my-4"
           >
             <header className="group relative overflow-visible rounded-2xl border border-white/10 bg-[#0A1017]/80 p-5 shadow-2xl backdrop-blur-md sm:p-6">
-              <GoldLight color="#F6A724" active />
               <div className="relative z-10 space-y-4 text-left">
-              <div className="relative flex items-start justify-between gap-3">
-                <div className="min-w-0 flex-1 pr-20 sm:pr-28">
+              <div className="relative grid grid-cols-3 items-end gap-2">
+                <div className="col-span-2 min-w-0">
                   <p className="text-[0.65rem] font-semibold uppercase tracking-[0.35em] text-[#F6A724]">
                     Builder M · Itinerary
                   </p>
-                  <h1 className="mt-1 font-godiva text-3xl uppercase tracking-wider text-white">
+                  <h1 className="mt-1 break-words font-godiva text-2xl uppercase leading-tight tracking-wide text-white sm:text-3xl">
                     {customerName}
                   </h1>
-                  <h1 className="mt-0.5 font-godiva text-[1.125rem] uppercase tracking-wider text-white/90">
+                  <h2 className="mt-0.5 font-godiva text-[1.125rem] uppercase tracking-wider text-white/90">
                     Multi Day Tour Dossier
-                  </h1>
+                  </h2>
                   <p className="mt-1 text-sm text-white/55">
                     Day-by-day Japan route and private multi-day quotation.
                   </p>
                 </div>
-                <IdleHeroMascot
-                  activeSrc="/brand/mascot-phone.webp"
-                  idleSrc="/brand/mascot-time.webp"
-                  idleMs={7_000}
-                  className="pointer-events-none absolute -right-1 -bottom-4 z-[1] h-28 w-auto select-none object-contain sm:-right-2 sm:h-36 md:h-40"
-                />
+                <div className="col-span-1 flex justify-end self-end">
+                  <IdleHeroMascot
+                    activeSrc="/brand/mascot-phone.webp"
+                    idleSrc="/brand/mascot-time.webp"
+                    idleMs={7_000}
+                    className="pointer-events-none z-[1] -mb-2 h-28 w-auto select-none object-contain sm:h-36 md:h-40"
+                  />
+                </div>
               </div>
 
               <div

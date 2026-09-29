@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import {
   fetchBuilderConfig,
@@ -16,8 +15,8 @@ import { useItineraryStore } from "@/store/useItineraryStore";
 import {
   AppSidebar,
   APP_SIDEBAR_RAIL_PAD,
-  MobileAppNav,
 } from "@/components/navigation/AppSidebar";
+import { MobileTopChrome } from "@/components/navigation/MobileTopChrome";
 import { ManageBookingModal } from "@/components/modals/ManageBookingModal";
 import { ArrivalDepartureSection } from "./ArrivalDepartureSection";
 import { BuilderAccordionProvider } from "./BuilderAccordion";
@@ -264,21 +263,11 @@ export function BuilderApp() {
       />
       <div className={`${APP_SIDEBAR_RAIL_PAD} min-h-screen bg-transparent`}>
         <div className="builder-theme relative min-h-screen bg-transparent text-white [color-scheme:dark]">
-          {/* Mobile-only top chrome — never shown on md+ (sidebar is primary) */}
-          <header className="absolute inset-x-0 top-0 z-40 flex items-center gap-2 border-b border-white/10 bg-[#0D1117]/70 px-4 py-3 backdrop-blur-md lg:hidden">
-            <MobileAppNav
-              brandEyebrow="TOKIOTOURS"
-              brandTitle="Builder"
-            />
-            <div className="min-w-0 flex-1" />
-            <Link
-              href="/"
-              className="inline-flex items-center gap-2 rounded-full border border-zinc-700/80 bg-zinc-900/90 px-4 py-2 font-godiva text-xs font-bold uppercase tracking-widest text-white shadow-lg transition-all hover:bg-[#075473] sm:text-sm"
-              aria-label="TOKIOTOURS home"
-            >
-              TOKIOTOURS
-            </Link>
-          </header>
+          <MobileTopChrome
+            brandTitle="Builder"
+            ctaHref="/builder/itinerary"
+            ctaLabel="Itinerary"
+          />
 
           <div className="relative bg-transparent">
             <BuilderHero branding={config?.branding ?? null} />

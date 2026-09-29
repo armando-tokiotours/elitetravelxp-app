@@ -16,6 +16,9 @@ import {
 import { hydrateStoresFromPreEliteBrief } from "@/lib/preEliteHydrate";
 import { useModalDismiss } from "@/hooks/useModalDismiss";
 import { TokioClockLoader } from "@/components/common/TokioClockLoader";
+import { SystemMessageFox } from "@/components/branding/SystemMessageFox";
+import { showSystemMessage } from "@/store/useSystemMessageStore";
+import { getSystemMessage } from "@/lib/systemMessages";
 import { useBuilderStore } from "@/store/useBuilderStore";
 import { useSingleDayBuilderStore } from "@/store/useSingleDayBuilderStore";
 import { usePreBuilderStore } from "@/store/usePreBuilderStore";
@@ -235,6 +238,13 @@ export function PreBuildConfirmation({
     setSending(true);
     setActionErr(null);
     setActionMsg(null);
+    if (resend) {
+      showSystemMessage({
+        text: getSystemMessage("sending_again"),
+        tone: "info",
+        durationMs: 8000,
+      });
+    }
     try {
       const res = await fetch("/api/send-prebuilder-brief", {
         method: "POST",
@@ -340,6 +350,7 @@ export function PreBuildConfirmation({
 
   return (
     <>
+      <SystemMessageFox />
       {/* Main Card Container - MUST HAVE overflow-visible */}
       <div
         ref={cardRef}
@@ -663,6 +674,13 @@ function ProposalResendModal({
               <span className="font-medium text-white">{displayEmail}</span>. Do
               you want to send it again?
             </p>
+
+            {sending ? (
+              <p className="mt-4 text-center text-sm font-semibold tracking-wide text-[#1CA67F]">
+                {/* fox speaks via SystemMessageFox on confirm */}
+                Sending again…
+              </p>
+            ) : null}
 
             <div className="mt-6 grid grid-cols-1 gap-2 sm:grid-cols-2">
               <button

@@ -23,11 +23,17 @@ import { SingleDayBudgetModal } from "@/components/builder-s/SingleDayBudgetModa
 import {
   AppSidebar,
   APP_SIDEBAR_RAIL_PAD,
-  MobileAppNav,
 } from "@/components/navigation/AppSidebar";
+import { MobileTopChrome } from "@/components/navigation/MobileTopChrome";
 import { NewBookingResetButton } from "@/components/builder/NewBookingResetButton";
-import { GoldLight } from "@/components/branding/GoldLight";
 import { IdleHeroMascot } from "@/components/branding/IdleHeroMascot";
+import { SystemMessageFox } from "@/components/branding/SystemMessageFox";
+import { showSystemMessage } from "@/store/useSystemMessageStore";
+import { getSystemMessage } from "@/lib/systemMessages";
+import {
+  fetchPaymentConfigured,
+  isSingleDayBuilderComplete,
+} from "@/lib/itineraryGates";
 import { useItineraryStore } from "@/store/useItineraryStore";
 import { usePreBuilderStore } from "@/store/usePreBuilderStore";
 
@@ -57,6 +63,10 @@ export default function SingleDayItineraryPageClient() {
     (s) => s.selectedExperiences
   );
   const tourDate = useSingleDayBuilderStore((s) => s.tourDate);
+  const cityFocus = useSingleDayBuilderStore((s) => s.cityFocus);
+  const experiencesStepDone = useSingleDayBuilderStore(
+    (s) => s.experiencesStepDone
+  );
 
   const [activeView, setActiveView] = useState<ViewMode>("dossier");
   const [hydrated, setHydrated] = useState(false);
@@ -122,13 +132,61 @@ export default function SingleDayItineraryPageClient() {
     });
   };
 
-  const requestInvoiceView = () => {
+  const requestInvoiceView = async () => {
     if (activeView === "invoice") return;
+    const okPay = await fetchPaymentConfigured();
+    if (!okPay) {
+      showSystemMessage({
+        text: getSystemMessage("payment_not_ready"),
+        tone: "error",
+      });
+      return;
+    }
+    if (
+      !isSingleDayBuilderComplete({
+        tourDate,
+        tourHours,
+        adults,
+        cityFocus,
+        selectedExperienceCount: selectedExperiences.length,
+        experiencesStepDone,
+      })
+    ) {
+      showSystemMessage({
+        text: getSystemMessage("builder_incomplete"),
+        tone: "error",
+      });
+      return;
+    }
     setTermsIntent("invoice");
     setTermsOpen(true);
   };
 
-  const requestSendPdf = () => {
+  const requestSendPdf = async () => {
+    const okPay = await fetchPaymentConfigured();
+    if (!okPay) {
+      showSystemMessage({
+        text: getSystemMessage("payment_not_ready"),
+        tone: "error",
+      });
+      return;
+    }
+    if (
+      !isSingleDayBuilderComplete({
+        tourDate,
+        tourHours,
+        adults,
+        cityFocus,
+        selectedExperienceCount: selectedExperiences.length,
+        experiencesStepDone,
+      })
+    ) {
+      showSystemMessage({
+        text: getSystemMessage("builder_incomplete"),
+        tone: "error",
+      });
+      return;
+    }
     setTermsIntent("print");
     setTermsOpen(true);
   };
@@ -237,45 +295,45 @@ export default function SingleDayItineraryPageClient() {
 
   return (
     <div className="builder-theme relative z-10 min-h-screen overflow-x-hidden bg-transparent pb-44 text-white md:pb-36">
+      <SystemMessageFox />
       <AppSidebar
         brandEyebrow="TOKIOTOURS"
-        brandTitle="Single-Day Itinerary"
+        brandTitle="Itinerary"
         expandOnHover
       />
 
       <div className={APP_SIDEBAR_RAIL_PAD}>
+        <MobileTopChrome
+          brandTitle="Itinerary"
+          ctaHref="/builder-single"
+          ctaLabel="Builder"
+        />
         <div className="mx-auto mt-4 max-w-3xl px-4 sm:px-5">
-          <div className="mb-3 flex items-center gap-3 lg:hidden">
-            <MobileAppNav
-              brandEyebrow="TOKIOTOURS"
-              brandTitle="Single-Day Itinerary"
-            />
-          </div>
-
           <header className="group no-print relative overflow-visible rounded-2xl border border-white/10 bg-[#0A1017]/80 px-4 py-5 shadow-2xl backdrop-blur-md sm:px-5">
-            <GoldLight color="#F6A724" active />
             <div className="relative z-10">
-          <div className="relative flex items-start justify-between gap-3">
-            <div className="min-w-0 flex-1 pr-20 sm:pr-28">
+          <div className="relative grid grid-cols-3 items-end gap-2">
+            <div className="col-span-2 min-w-0">
               <p className="text-[0.65rem] font-semibold uppercase tracking-[0.35em] text-[#F6A724]">
                 Builder S · Itinerary
               </p>
-              <h1 className="mt-1 font-godiva text-3xl uppercase tracking-wider text-white">
+              <h1 className="mt-1 break-words font-godiva text-2xl uppercase leading-tight tracking-wide text-white sm:text-3xl">
                 {customerName}
               </h1>
-              <h1 className="mt-0.5 font-godiva text-[1.125rem] uppercase tracking-wider text-white/90">
+              <h2 className="mt-0.5 font-godiva text-[1.125rem] uppercase tracking-wider text-white/90">
                 Single Day Tour Dossier
-              </h1>
+              </h2>
               <p className="mt-1 text-sm text-white/55">
                 Hour-by-hour day plan and private single-day quotation.
               </p>
             </div>
-            <IdleHeroMascot
-              activeSrc="/brand/mascot-phone.webp"
-              idleSrc="/brand/mascot-time.webp"
-              idleMs={7_000}
-              className="pointer-events-none absolute -right-1 -bottom-4 z-[1] h-28 w-auto select-none object-contain sm:-right-2 sm:h-36 md:h-40"
-            />
+            <div className="col-span-1 flex justify-end self-end">
+              <IdleHeroMascot
+                activeSrc="/brand/mascot-phone.webp"
+                idleSrc="/brand/mascot-time.webp"
+                idleMs={7_000}
+                className="pointer-events-none z-[1] -mb-2 h-28 w-auto select-none object-contain sm:h-36 md:h-40"
+              />
+            </div>
           </div>
 
           <div

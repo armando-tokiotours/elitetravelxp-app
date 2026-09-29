@@ -18,6 +18,7 @@ import {
   dismissSystemMessage,
   showSystemMessage,
 } from "@/store/useSystemMessageStore";
+import { getSystemMessage } from "@/lib/systemMessages";
 
 type AccordionCtx = {
   openSection: number | null;
@@ -109,7 +110,7 @@ export function BuilderAccordionProvider({
   const tryOpenSection = useCallback(
     (n: number) => {
       if (!canOpenBuilderStep(n, effectiveUnlocked)) {
-        showToast("Complete the previous steps before unlocking this section.");
+        showToast(getSystemMessage("builder_lock"));
         return false;
       }
       setOpenSection(n);
@@ -121,7 +122,7 @@ export function BuilderAccordionProvider({
   const toggleSection = useCallback(
     (n: number) => {
       if (!canOpenBuilderStep(n, effectiveUnlocked)) {
-        showToast("Complete the previous steps before unlocking this section.");
+        showToast(getSystemMessage("builder_lock"));
         return;
       }
       setOpenSection((cur) => (cur === n ? null : n));

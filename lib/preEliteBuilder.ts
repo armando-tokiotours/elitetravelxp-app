@@ -345,16 +345,16 @@ export function emptyDraft(): PreEliteDraft {
 
 export function stepError(step: number, draft: PreEliteDraft): string | null {
   if (step === 1 && !draft.travelStyle) {
-    return "Choose the comfort tier that fits this trip.";
+    return "Pick a travel style.";
   }
   if (step === 2 && draft.interests.length === 0) {
-    return "Select at least one interest.";
+    return "Pick at least one interest.";
   }
   if (step === 3 && !draft.tripMotivation) {
-    return "Tell us what this trip is really for.";
+    return "Tell us what this trip is for.";
   }
   if (step === 4 && draft.painPoints.length === 0) {
-    return "Select at least one concern we should design around.";
+    return "Pick at least one concern.";
   }
   if (step === 5) return contactError(draft);
   return null;

@@ -76,7 +76,7 @@ export function NewBookingResetButton({
             aria-hidden
           />
         )}
-        {variant === "nav" ? <span>New +</span> : null}
+        {variant === "nav" ? <span aria-hidden>+</span> : null}
       </button>
       <ResetBookingModal
         open={open}
