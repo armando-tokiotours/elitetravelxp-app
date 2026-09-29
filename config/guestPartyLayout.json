@@ -2,7 +2,7 @@
   "version": 1,
   "adults": {
     "duck": {
-      "right": 24.4,
+      "right": 29,
       "bottom": 37,
       "height": 76,
       "z": 8
@@ -14,13 +14,13 @@
       "z": 6
     },
     "cat": {
-      "right": 60.5,
+      "right": 53.5,
       "bottom": 37,
       "height": 68,
       "z": 5
     },
     "red": {
-      "right": 54,
+      "right": 47.5,
       "bottom": 71.5,
       "height": 58,
       "z": 3
@@ -34,13 +34,13 @@
   },
   "chicks": [
     {
-      "right": 21.8,
+      "right": 27.5,
       "bottom": 36.4,
       "height": 69,
       "z": 14
     },
     {
-      "right": 51.3,
+      "right": 48.5,
       "bottom": 36.4,
       "height": 66,
       "z": 15
