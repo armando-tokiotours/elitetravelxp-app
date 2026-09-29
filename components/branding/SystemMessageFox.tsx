@@ -91,7 +91,7 @@ export function SystemMessageFox() {
             </div>
 
             <motion.img
-              src="/brand/fox-peek.png"
+              src="/brand/fox-peek.webp"
               alt=""
               aria-hidden
               draggable={false}

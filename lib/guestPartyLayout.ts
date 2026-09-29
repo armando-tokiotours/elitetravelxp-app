@@ -33,36 +33,36 @@ export const GUEST_PARTY_ADULTS: Array<{
   {
     id: "duck",
     label: "Duck peek",
-    src: "/brand/guest-duck-peek.png",
+    src: "/brand/guest-duck-peek.webp",
     minAdults: 2,
   },
   {
     id: "shiba",
     label: "Shiba",
-    src: "/brand/guest-shiba.png",
+    src: "/brand/guest-shiba.webp",
     minAdults: 3,
   },
   {
     id: "cat",
     label: "Cat",
-    src: "/brand/guest-cat.png",
+    src: "/brand/guest-cat.webp",
     minAdults: 4,
   },
   {
     id: "red",
     label: "Red panda",
-    src: "/brand/guest-red-panda.png",
+    src: "/brand/guest-red-panda.webp",
     minAdults: 5,
   },
   {
     id: "panda",
     label: "Panda",
-    src: "/brand/guest-panda.png",
+    src: "/brand/guest-panda.webp",
     minAdults: 6,
   },
 ];
 
-export const GUEST_PARTY_CHICK_SRC = "/brand/guest-chick.png";
+export const GUEST_PARTY_CHICK_SRC = "/brand/guest-chick.webp";
 
 /** Defaults match the current hard-coded layout in GuestPartyMascots. */
 export const GUEST_PARTY_LAYOUT_DEFAULTS: GuestPartyLayout = {

@@ -277,7 +277,7 @@ export function GuestPartyLayoutBuilder({
               {/* Locked kid reference (not editable) */}
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src="/brand/mascot-look.png"
+                src="/brand/mascot-look.webp"
                 alt=""
                 className="pointer-events-none absolute -right-2 -top-2 z-20 h-36 w-auto select-none object-contain opacity-90 sm:h-44"
               />

@@ -251,10 +251,10 @@ export const CLIMATE_SEASON_OPTIONS: {
 
 /** Bundled fallbacks when Team Access has no upload. */
 export const DEFAULT_CLIMATE_MASCOTS: Record<ClimateSeasonKey, string> = {
-  default: "/brand/mascot-season-default.png",
-  winter: "/brand/mascot-season-winter.png",
-  summer: "/brand/mascot-season-summer.png",
-  rain: "/brand/mascot-season-rain.png",
+  default: "/brand/mascot-season-default.webp",
+  winter: "/brand/mascot-season-winter.webp",
+  summer: "/brand/mascot-season-summer.webp",
+  rain: "/brand/mascot-season-rain.webp",
 };
 
 /** Hardcoded Japan climate windows when DB rows lack dates. */

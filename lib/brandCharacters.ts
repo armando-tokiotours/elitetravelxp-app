@@ -1,6 +1,7 @@
 /**
  * Brand character registry — Team Access Layout Builder catalog.
  * Paths under public/brand; optimal targets for live VPS speed.
+ * Characters ship as WebP (upload API converts PNG → WebP).
  */
 
 export type BrandCharacterCategory =
@@ -24,7 +25,7 @@ export type BrandCharacterOptimal = {
 export type BrandCharacterDef = {
   id: string;
   label: string;
-  /** Path relative to public, e.g. /brand/mascot-note.png */
+  /** Path relative to public, e.g. /brand/mascot-note.webp */
   path: string;
   category: BrandCharacterCategory;
   /** Human-readable where this shows up */
@@ -35,33 +36,33 @@ export type BrandCharacterDef = {
 /** Pre-Elite / builder mascots — large on screen but still &lt;512px is enough. */
 const MASCOT_OPTIMAL: BrandCharacterOptimal = {
   maxEdgePx: 512,
-  maxKb: 120,
-  formatHint: "PNG or WebP · ≤512px tall",
+  maxKb: 60,
+  formatHint: "WebP · ≤512px · PNG uploads auto-convert",
 };
 
 /** Tiny timeline mascot — even lighter. */
 const TIMELINE_OPTIMAL: BrandCharacterOptimal = {
   maxEdgePx: 256,
-  maxKb: 60,
-  formatHint: "PNG or WebP · ≤256px tall",
+  maxKb: 30,
+  formatHint: "WebP · ≤256px · PNG uploads auto-convert",
 };
 
 const GUEST_OPTIMAL: BrandCharacterOptimal = {
   maxEdgePx: 512,
-  maxKb: 100,
-  formatHint: "PNG or WebP · ≤512px tall",
+  maxKb: 50,
+  formatHint: "WebP · ≤512px · PNG uploads auto-convert",
 };
 
 const FOX_OPTIMAL: BrandCharacterOptimal = {
   maxEdgePx: 400,
-  maxKb: 80,
-  formatHint: "PNG or WebP · ≤400px tall",
+  maxKb: 40,
+  formatHint: "WebP · ≤400px · PNG uploads auto-convert",
 };
 
 const SEASON_OPTIMAL: BrandCharacterOptimal = {
   maxEdgePx: 512,
-  maxKb: 120,
-  formatHint: "PNG or WebP · ≤512px tall",
+  maxKb: 50,
+  formatHint: "WebP · ≤512px · PNG uploads auto-convert",
 };
 
 const HERO_OPTIMAL: BrandCharacterOptimal = {
@@ -74,7 +75,7 @@ export const BRAND_CHARACTERS: BrandCharacterDef[] = [
   {
     id: "mascot-look",
     label: "Look (default)",
-    path: "/brand/mascot-look.png",
+    path: "/brand/mascot-look.webp",
     category: "pre_elite",
     usedOn: ["Pre-Elite hero", "Builder timeline (active)"],
     optimal: MASCOT_OPTIMAL,
@@ -82,7 +83,7 @@ export const BRAND_CHARACTERS: BrandCharacterDef[] = [
   {
     id: "mascot-note",
     label: "Note (writing)",
-    path: "/brand/mascot-note.png",
+    path: "/brand/mascot-note.webp",
     category: "pre_elite",
     usedOn: ["Pre-Elite Step 5 (typing)", "Builder timeline (idle loop)"],
     optimal: MASCOT_OPTIMAL,
@@ -90,7 +91,7 @@ export const BRAND_CHARACTERS: BrandCharacterDef[] = [
   {
     id: "mascot-time",
     label: "Time (idle)",
-    path: "/brand/mascot-time.png",
+    path: "/brand/mascot-time.webp",
     category: "pre_elite",
     usedOn: ["Pre-Elite idle", "Builder timeline idle", "Itinerary idle"],
     optimal: MASCOT_OPTIMAL,
@@ -98,7 +99,7 @@ export const BRAND_CHARACTERS: BrandCharacterDef[] = [
   {
     id: "mascot-bow",
     label: "Bow",
-    path: "/brand/mascot-bow.png",
+    path: "/brand/mascot-bow.webp",
     category: "pre_elite",
     usedOn: ["Pre-Elite step transition"],
     optimal: MASCOT_OPTIMAL,
@@ -106,7 +107,7 @@ export const BRAND_CHARACTERS: BrandCharacterDef[] = [
   {
     id: "mascot-phone",
     label: "Phone",
-    path: "/brand/mascot-phone.png",
+    path: "/brand/mascot-phone.webp",
     category: "itinerary",
     usedOn: ["Itinerary hero (active)"],
     optimal: MASCOT_OPTIMAL,
@@ -114,7 +115,7 @@ export const BRAND_CHARACTERS: BrandCharacterDef[] = [
   {
     id: "mascot-multiday",
     label: "Multi-day pass",
-    path: "/brand/mascot-multiday.png",
+    path: "/brand/mascot-multiday.webp",
     category: "pre_elite",
     usedOn: ["Pre-Elite Step 5 · Multi-Day selected"],
     optimal: MASCOT_OPTIMAL,
@@ -122,7 +123,7 @@ export const BRAND_CHARACTERS: BrandCharacterDef[] = [
   {
     id: "mascot-1day-pass",
     label: "Single-day pass",
-    path: "/brand/mascot-1day-pass.png",
+    path: "/brand/mascot-1day-pass.webp",
     category: "pre_elite",
     usedOn: ["Pre-Elite Step 5 · Single-Day selected"],
     optimal: MASCOT_OPTIMAL,
@@ -130,23 +131,47 @@ export const BRAND_CHARACTERS: BrandCharacterDef[] = [
   {
     id: "mascot-right-hi",
     label: "Right hi",
-    path: "/brand/mascot-right-hi.png",
+    path: "/brand/mascot-right-hi.webp",
     category: "pre_elite",
     usedOn: ["Brand library (available)"],
     optimal: TIMELINE_OPTIMAL,
   },
   {
+    id: "mascot-question",
+    label: "Question (thinking)",
+    path: "/brand/mascot-question.webp",
+    category: "pre_elite",
+    usedOn: ["Brand library (available)"],
+    optimal: MASCOT_OPTIMAL,
+  },
+  {
+    id: "mascot-point",
+    label: "Point",
+    path: "/brand/mascot-point.webp",
+    category: "pre_elite",
+    usedOn: ["Brand library (available)"],
+    optimal: MASCOT_OPTIMAL,
+  },
+  {
     id: "fox-peek",
     label: "Fox (system messages)",
-    path: "/brand/fox-peek.png",
+    path: "/brand/fox-peek.webp",
     category: "system",
     usedOn: ["Builder system messages (bottom-left)"],
     optimal: FOX_OPTIMAL,
   },
   {
+    id: "fox1",
+    label: "Fox (standing)",
+    path: "/brand/fox1.webp",
+    category: "system",
+    usedOn: ["Brand library (available)"],
+    optimal: FOX_OPTIMAL,
+  },
+  {
     id: "guest-duck-peek",
     label: "Guest · Duck peek",
-    path: "/brand/guest-duck-peek.png",
+    path: "/brand/guest-duck-peek.webp",
     category: "guest_party",
     usedOn: ["Pre-Elite Step 5 guest party"],
     optimal: GUEST_OPTIMAL,
@@ -154,7 +179,7 @@ export const BRAND_CHARACTERS: BrandCharacterDef[] = [
   {
     id: "guest-shiba",
     label: "Guest · Shiba",
-    path: "/brand/guest-shiba.png",
+    path: "/brand/guest-shiba.webp",
     category: "guest_party",
     usedOn: ["Pre-Elite Step 5 guest party"],
     optimal: GUEST_OPTIMAL,
@@ -162,7 +187,7 @@ export const BRAND_CHARACTERS: BrandCharacterDef[] = [
   {
     id: "guest-cat",
     label: "Guest · Cat",
-    path: "/brand/guest-cat.png",
+    path: "/brand/guest-cat.webp",
     category: "guest_party",
     usedOn: ["Pre-Elite Step 5 guest party"],
     optimal: GUEST_OPTIMAL,
@@ -170,7 +195,7 @@ export const BRAND_CHARACTERS: BrandCharacterDef[] = [
   {
     id: "guest-red-panda",
     label: "Guest · Red panda",
-    path: "/brand/guest-red-panda.png",
+    path: "/brand/guest-red-panda.webp",
     category: "guest_party",
     usedOn: ["Pre-Elite Step 5 guest party"],
     optimal: GUEST_OPTIMAL,
@@ -178,7 +203,7 @@ export const BRAND_CHARACTERS: BrandCharacterDef[] = [
   {
     id: "guest-panda",
     label: "Guest · Panda",
-    path: "/brand/guest-panda.png",
+    path: "/brand/guest-panda.webp",
     category: "guest_party",
     usedOn: ["Pre-Elite Step 5 guest party"],
     optimal: GUEST_OPTIMAL,
@@ -186,7 +211,7 @@ export const BRAND_CHARACTERS: BrandCharacterDef[] = [
   {
     id: "guest-chick",
     label: "Guest · Chick",
-    path: "/brand/guest-chick.png",
+    path: "/brand/guest-chick.webp",
     category: "guest_party",
     usedOn: ["Pre-Elite Step 5 guest party (kids)"],
     optimal: GUEST_OPTIMAL,
@@ -194,7 +219,7 @@ export const BRAND_CHARACTERS: BrandCharacterDef[] = [
   {
     id: "guest-duck",
     label: "Guest · Duck (full)",
-    path: "/brand/guest-duck.png",
+    path: "/brand/guest-duck.webp",
     category: "guest_party",
     usedOn: ["Library (peek version is live)"],
     optimal: GUEST_OPTIMAL,
@@ -202,7 +227,7 @@ export const BRAND_CHARACTERS: BrandCharacterDef[] = [
   {
     id: "mascot-season-default",
     label: "Season · Default",
-    path: "/brand/mascot-season-default.png",
+    path: "/brand/mascot-season-default.webp",
     category: "season",
     usedOn: ["Seasonality climate cards"],
     optimal: SEASON_OPTIMAL,
@@ -210,7 +235,7 @@ export const BRAND_CHARACTERS: BrandCharacterDef[] = [
   {
     id: "mascot-season-summer",
     label: "Season · Summer",
-    path: "/brand/mascot-season-summer.png",
+    path: "/brand/mascot-season-summer.webp",
     category: "season",
     usedOn: ["Seasonality climate cards"],
     optimal: SEASON_OPTIMAL,
@@ -218,7 +243,7 @@ export const BRAND_CHARACTERS: BrandCharacterDef[] = [
   {
     id: "mascot-season-winter",
     label: "Season · Winter",
-    path: "/brand/mascot-season-winter.png",
+    path: "/brand/mascot-season-winter.webp",
     category: "season",
     usedOn: ["Seasonality climate cards"],
     optimal: SEASON_OPTIMAL,
@@ -226,7 +251,7 @@ export const BRAND_CHARACTERS: BrandCharacterDef[] = [
   {
     id: "mascot-season-rain",
     label: "Season · Rain",
-    path: "/brand/mascot-season-rain.png",
+    path: "/brand/mascot-season-rain.webp",
     category: "season",
     usedOn: ["Seasonality climate cards"],
     optimal: SEASON_OPTIMAL,

@@ -271,8 +271,8 @@ export default function SingleDayItineraryPageClient() {
               </p>
             </div>
             <IdleHeroMascot
-              activeSrc="/brand/mascot-phone.png"
-              idleSrc="/brand/mascot-time.png"
+              activeSrc="/brand/mascot-phone.webp"
+              idleSrc="/brand/mascot-time.webp"
               idleMs={7_000}
               className="pointer-events-none absolute -right-1 -bottom-4 z-[1] h-28 w-auto select-none object-contain sm:-right-2 sm:h-36 md:h-40"
             />

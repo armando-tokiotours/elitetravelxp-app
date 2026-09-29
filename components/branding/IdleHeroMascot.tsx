@@ -16,8 +16,8 @@ type IdleHeroMascotProps = {
  * then returns to the active pose on mouse / scroll / click / key.
  */
 export function IdleHeroMascot({
-  activeSrc = "/brand/mascot-phone.png",
-  idleSrc = "/brand/mascot-time.png",
+  activeSrc = "/brand/mascot-phone.webp",
+  idleSrc = "/brand/mascot-time.webp",
   idleMs = 7_000,
   className,
 }: IdleHeroMascotProps) {

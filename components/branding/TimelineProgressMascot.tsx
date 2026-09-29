@@ -4,9 +4,9 @@ import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useRef, useState } from "react";
 
 const POSES = {
-  look: "/brand/mascot-look.png",
-  time: "/brand/mascot-time.png",
-  note: "/brand/mascot-note.png",
+  look: "/brand/mascot-look.webp",
+  time: "/brand/mascot-time.webp",
+  note: "/brand/mascot-note.webp",
 } as const;
 
 type Pose = keyof typeof POSES;

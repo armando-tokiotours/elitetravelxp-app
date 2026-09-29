@@ -135,9 +135,9 @@ export function BrandCharactersCatalog({
             : "Characters"}
         </h2>
         <p className="mt-1 max-w-2xl text-sm text-zinc-400">
-          Current file weight vs optimal for live VPS. Heavy assets (~1s delay)
-          should be resized/compressed before replace. Paths stay the same so
-          live pages keep working.
+          Characters ship as <span className="text-emerald-400">WebP</span> for
+          fast VPS loads. Upload PNG/JPG — the server converts to WebP (q90 ·
+          max edge from Optimal). Current row shows format so you can verify.
         </p>
         {summary ? (
           <p className="mt-2 text-xs text-zinc-500">
@@ -196,6 +196,11 @@ export function BrandCharactersCatalog({
                   <p className="text-sm text-zinc-600">File missing</p>
                 )}
                 <StatusPill status={row.status} />
+                {row.format ? (
+                  <span className="absolute left-2 top-2 rounded-md bg-black/70 px-1.5 py-0.5 text-[0.6rem] font-bold uppercase tracking-wider text-emerald-300">
+                    {row.format}
+                  </span>
+                ) : null}
               </div>
               <div className="flex flex-1 flex-col gap-2 p-4">
                 <div>
@@ -258,7 +263,7 @@ export function BrandCharactersCatalog({
                     </p>
                   ) : (
                     <p className="mt-1 text-[0.65rem] text-zinc-500">
-                      Replace keeps filename {row.path.split("/").pop()}
+                      PNG/JPG → auto WebP · keeps {row.path.split("/").pop()}
                     </p>
                   )}
                 </label>

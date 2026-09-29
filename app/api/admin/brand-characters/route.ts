@@ -177,17 +177,16 @@ export async function POST(req: Request) {
 
     const disk = publicPathToDisk(def.path);
     // Keep the registered filename/extension so live code paths stay stable
-    const targetExt = path.extname(disk).toLowerCase() || ".png";
+    const targetExt = path.extname(disk).toLowerCase() || ".webp";
     const mime = (file.type || "").toLowerCase();
     let buffer = Buffer.from(await file.arrayBuffer());
 
-    // Normalize to the expected extension when possible (sharp)
+    // Normalize: characters → WebP (PNG/JPG uploads auto-convert); heroes stay JPG
     try {
       let pipeline = sharp(buffer).rotate();
       const meta = await pipeline.metadata();
       const maxEdge = Math.max(meta.width || 0, meta.height || 0);
-      // Soft downscale if wildly oversized for this slot
-      if (maxEdge > def.optimal.maxEdgePx * 2) {
+      if (maxEdge > def.optimal.maxEdgePx) {
         pipeline = pipeline.resize({
           width: def.optimal.maxEdgePx,
           height: def.optimal.maxEdgePx,
@@ -200,10 +199,13 @@ export async function POST(req: Request) {
           await pipeline.jpeg({ quality: 82, mozjpeg: true }).toBuffer()
         );
       } else if (targetExt === ".webp") {
-        buffer = Buffer.from(await pipeline.webp({ quality: 80 }).toBuffer());
-      } else {
         buffer = Buffer.from(
-          await pipeline.png({ compressionLevel: 8 }).toBuffer()
+          await pipeline.webp({ quality: 90, alphaQuality: 100 }).toBuffer()
+        );
+      } else {
+        // Legacy PNG slots — still convert to WebP if path was updated
+        buffer = Buffer.from(
+          await pipeline.webp({ quality: 90, alphaQuality: 100 }).toBuffer()
         );
       }
     } catch {
@@ -211,11 +213,12 @@ export async function POST(req: Request) {
       if (
         mime &&
         !mime.includes(targetExt.replace(".", "")) &&
-        !(targetExt === ".jpg" && mime.includes("jpeg"))
+        !(targetExt === ".jpg" && mime.includes("jpeg")) &&
+        !(targetExt === ".webp" && (mime.includes("png") || mime.includes("jpeg")))
       ) {
         return NextResponse.json(
           {
-            error: `This slot expects ${targetExt}. Upload a matching image type.`,
+            error: `This slot expects ${targetExt}. Upload PNG, JPG, or WebP.`,
           },
           { status: 400 }
         );
@@ -224,15 +227,16 @@ export async function POST(req: Request) {
 
     await writeFile(disk, buffer);
     const row = await buildRow(def);
+    const savedExt = path.extname(def.path).replace(".", "").toUpperCase();
     return NextResponse.json({
       ok: true,
       path: def.path,
       absolute: path.relative(process.cwd(), disk),
       item: row,
       note:
-        mime.includes("webp") && targetExt === ".png"
-          ? "Saved as PNG path (code still points at .png)."
-          : undefined,
+        targetExt === ".webp" && !mime.includes("webp")
+          ? `Converted upload → ${savedExt} (q90 · ≤${def.optimal.maxEdgePx}px).`
+          : `Saved as ${savedExt}.`,
     });
   } catch (err) {
     console.error("[brand-characters] POST", err);

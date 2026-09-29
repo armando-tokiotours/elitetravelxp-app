@@ -203,16 +203,16 @@ export function PreEliteBuilderClient() {
   }, [hydrated, submitted]);
 
   const heroMascot = (() => {
-    if (showBow) return { key: "bow", src: "/brand/mascot-bow.png" };
+    if (showBow) return { key: "bow", src: "/brand/mascot-bow.webp" };
     if (step === 5) {
-      if (contactWriting) return { key: "note", src: "/brand/mascot-note.png" };
+      if (contactWriting) return { key: "note", src: "/brand/mascot-note.webp" };
       if (draft.tripType === "multi_day")
-        return { key: "multi", src: "/brand/mascot-multiday.png" };
+        return { key: "multi", src: "/brand/mascot-multiday.webp" };
       if (draft.tripType === "single_day")
-        return { key: "single", src: "/brand/mascot-1day-pass.png" };
+        return { key: "single", src: "/brand/mascot-1day-pass.webp" };
     }
-    if (isIdle) return { key: "time", src: "/brand/mascot-time.png" };
-    return { key: "look", src: "/brand/mascot-look.png" };
+    if (isIdle) return { key: "time", src: "/brand/mascot-time.webp" };
+    return { key: "look", src: "/brand/mascot-look.webp" };
   })();
 
   const stepBlurb =
