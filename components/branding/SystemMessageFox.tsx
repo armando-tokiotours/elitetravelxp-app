@@ -111,8 +111,7 @@ export function SystemMessageFox() {
             />
           </motion.div>
         ) : (
-          /* Keep fox decoded off-screen so first tip paints from cache */
-          // eslint-disable-next-line @next/next/no-img-element
+          // eslint-disable-next-line @next/next/no-img-element -- keep fox decoded off-screen for first tip
           <img
             src={FOX_SRC}
             alt=""
