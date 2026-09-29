@@ -316,7 +316,7 @@ export function PreEliteBuilderClient() {
       <BrandCharacterPreloader />
       <SystemMessageFox />
       <header className="shrink-0 border-b border-white/10">
-        <div className="mx-auto flex max-w-3xl items-center justify-between px-5 py-5">
+        <div className="mx-auto flex max-w-3xl items-center justify-between px-5 py-3 sm:py-5">
           <Link href="/" className="inline-flex items-center gap-2">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
@@ -339,20 +339,20 @@ export function PreEliteBuilderClient() {
           <div className="h-80 rounded-3xl border border-zinc-800/80 bg-[#0D1117]/80 backdrop-blur-md" />
         </main>
       ) : (
-        <div className="flex min-h-0 flex-1 flex-col justify-center overflow-x-hidden overflow-y-visible">
-          {/* Hero through progress — vertically centered with options */}
+        <div className="flex min-h-0 flex-1 flex-col justify-start overflow-x-visible overflow-y-visible sm:justify-center">
+          {/* Hero through progress — pt-4 so mascot ears clear header on mobile */}
           <div
             className={
               step === 5
-                ? "relative z-40 mx-auto w-full max-w-3xl shrink-0 px-5 pt-3"
-                : "relative z-40 mx-auto w-full max-w-3xl shrink-0 px-5 pt-2"
+                ? "relative z-40 mx-auto w-full max-w-3xl shrink-0 px-5 pt-4 sm:pt-3"
+                : "relative z-40 mx-auto w-full max-w-3xl shrink-0 px-5 pt-4 sm:pt-2"
             }
           >
             <div
               className={
                 step === 5
-                  ? "relative min-h-[7rem] overflow-visible sm:min-h-[8rem]"
-                  : "relative min-h-[7.5rem] overflow-visible sm:min-h-[8.5rem]"
+                  ? "relative min-h-[6.25rem] overflow-visible sm:min-h-[8rem]"
+                  : "relative min-h-[6.5rem] overflow-visible sm:min-h-[8.5rem]"
               }
             >
               {/* Guest party behind the cat-hood kid — Step 5 only; kid unchanged */}
@@ -369,7 +369,7 @@ export function PreEliteBuilderClient() {
                 onKeyDown={(e) => {
                   if (e.key === "Enter" || e.key === " ") triggerHi(e);
                 }}
-                className="absolute -right-2 -top-4 z-30 cursor-pointer overflow-visible sm:-right-4 sm:-top-6"
+                className="absolute -right-2 top-0 z-30 cursor-pointer overflow-visible sm:-right-4 sm:-top-6"
               >
                 <HiBubble
                   show={showHi}
@@ -382,20 +382,20 @@ export function PreEliteBuilderClient() {
                     src={heroMascot.src}
                     alt=""
                     aria-hidden
-                    className="h-36 w-auto select-none object-contain opacity-95 sm:h-44 md:h-48"
+                    className="h-28 w-auto select-none object-contain opacity-95 sm:h-44 md:h-48"
                     draggable={false}
                   />
                 </MascotHiZoom>
               </span>
               <div className="relative z-10">
-                <p className="text-xs tracking-[0.22em] text-[#1CA67F] uppercase">
+                <p className="text-[10px] tracking-[0.22em] text-[#1CA67F] uppercase sm:text-xs">
                   Step {step} of 5
                 </p>
                 <h1
                   className={
                     step === 5
-                      ? "mt-1 max-w-[70%] font-display text-3xl leading-tight text-white sm:max-w-none sm:text-4xl"
-                      : "mt-3 max-w-[70%] font-display text-3xl leading-tight text-white sm:max-w-none sm:text-4xl"
+                      ? "mt-0.5 max-w-[70%] font-display text-2xl leading-tight text-white sm:mt-1 sm:max-w-none sm:text-4xl"
+                      : "mt-1 max-w-[70%] font-display text-2xl leading-tight text-white sm:mt-3 sm:max-w-none sm:text-4xl"
                   }
                 >
                   {step === 5 ? "Contact" : STEP_TITLES[step - 1]}
@@ -403,8 +403,8 @@ export function PreEliteBuilderClient() {
                 <p
                   className={
                     step === 5
-                      ? "mt-1 max-w-xl pr-24 text-sm leading-snug text-white/60 sm:pr-32"
-                      : "mt-2 max-w-xl pr-24 text-sm leading-relaxed text-white/60 sm:pr-32"
+                      ? "mt-1 max-w-xl pr-20 text-xs leading-snug text-white/60 sm:pr-32 sm:text-sm"
+                      : "mt-1 max-w-xl pr-20 text-xs leading-snug text-white/60 sm:mt-2 sm:pr-32 sm:text-sm sm:leading-relaxed"
                   }
                 >
                   {stepBlurb}
@@ -414,8 +414,8 @@ export function PreEliteBuilderClient() {
             <div
               className={
                 step === 5
-                  ? "relative z-10 mt-3 h-1 overflow-hidden rounded-full bg-white/10"
-                  : "relative z-10 mt-6 h-1 overflow-hidden rounded-full bg-white/10"
+                  ? "relative z-10 mt-2 h-1 overflow-hidden rounded-full bg-white/10 sm:mt-3"
+                  : "relative z-10 mt-3 h-1 overflow-hidden rounded-full bg-white/10 sm:mt-6"
               }
             >
               <div
@@ -425,13 +425,13 @@ export function PreEliteBuilderClient() {
             </div>
           </div>
 
-          {/* Scrollable options / form only */}
-          <div className="min-h-0 max-h-[min(58dvh,36rem)] flex-1 overflow-y-auto">
+          {/* Scrollable options / form — no flex-1 stretch (kills empty bottom void) */}
+          <div className="min-h-0 max-h-[min(62dvh,38rem)] shrink overflow-y-auto">
             <div
               className={
                 step === 5
-                  ? "mx-auto max-w-3xl px-5 pb-6 pt-3"
-                  : "mx-auto max-w-3xl px-5 pb-8 pt-4"
+                  ? "mx-auto max-w-3xl px-5 pb-4 pt-2 sm:pb-6 sm:pt-3"
+                  : "mx-auto max-w-3xl px-5 pb-4 pt-2 sm:pb-8 sm:pt-4"
               }
             >
               <div className="relative overflow-visible rounded-3xl border border-zinc-800/80 bg-[#0D1117]/80 p-5 backdrop-blur-md sm:p-7">
