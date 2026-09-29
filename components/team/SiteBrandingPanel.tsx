@@ -70,10 +70,13 @@ export function SiteBrandingPanel({ getClient }: { getClient: () => PbClient }) 
   );
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [heroFile, setHeroFile] = useState<File | null>(null);
+  const [faviconFile, setFaviconFile] = useState<File | null>(null);
   const [saveHeroToPublic, setSaveHeroToPublic] = useState(true);
   const [saveLogoToPublic, setSaveLogoToPublic] = useState(false);
+  const [saveFaviconToPublic, setSaveFaviconToPublic] = useState(true);
   const [logoPreview, setLogoPreview] = useState("");
   const [heroPreview, setHeroPreview] = useState("");
+  const [faviconPreview, setFaviconPreview] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
@@ -129,8 +132,10 @@ export function SiteBrandingPanel({ getClient }: { getClient: () => PbClient }) 
       setFontBody(coerceLocal("body", row.font_body));
       setLogoPreview(brandingLogoUrl(row, assets));
       setHeroPreview(brandingHeroUrl(row, assets));
+      setFaviconPreview(assets.favicon || "/brand/favicon.png");
       setLogoFile(null);
       setHeroFile(null);
+      setFaviconFile(null);
 
       // Single-day hero row
       let sdRows = await pb
@@ -197,7 +202,7 @@ export function SiteBrandingPanel({ getClient }: { getClient: () => PbClient }) 
   }, []);
 
   const savePublicAsset = async (
-    kind: "hero" | "logo" | "hero_single",
+    kind: "hero" | "logo" | "hero_single" | "favicon",
     file: File
   ) => {
     const fd = new FormData();
@@ -264,13 +269,22 @@ export function SiteBrandingPanel({ getClient }: { getClient: () => PbClient }) 
           notes.push(`Logo also saved to ${result.absolute || result.path}`);
         }
       }
+      if (faviconFile && saveFaviconToPublic) {
+        const result = await savePublicAsset("favicon", faviconFile);
+        if (result.path) {
+          nextAssets = { ...nextAssets, favicon: result.path };
+          notes.push(`Favicon saved to ${result.absolute || result.path}`);
+        }
+      }
 
       setPublicAssets(nextAssets);
       setRecord(saved);
       setLogoPreview(brandingLogoUrl(saved, nextAssets));
       setHeroPreview(brandingHeroUrl(saved, nextAssets));
+      setFaviconPreview(nextAssets.favicon || "/brand/favicon.png");
       setLogoFile(null);
       setHeroFile(null);
+      setFaviconFile(null);
       setMsg(
         [
           "Branding saved. Refresh the site to see typography updates.",
@@ -432,6 +446,25 @@ export function SiteBrandingPanel({ getClient }: { getClient: () => PbClient }) 
                 : "Saves a copy to public/brand/site-logo.*",
             }}
           />
+          <div className="mt-6">
+            <UploadField
+              label="Tab icon (favicon)"
+              hint="Browser tab icon · square PNG recommended (uses Tokio cat mark by default)"
+              preview={faviconPreview}
+              previewClass="h-12 w-12 object-contain"
+              onFile={(f) => {
+                setFaviconFile(f);
+                if (f) setFaviconPreview(URL.createObjectURL(f));
+              }}
+              publicOption={{
+                checked: saveFaviconToPublic,
+                onChange: setSaveFaviconToPublic,
+                pathHint: publicAssets.favicon
+                  ? `Current: ${publicAssets.favicon}`
+                  : "Saves to public/brand/favicon.png",
+              }}
+            />
+          </div>
         </div>
       </div>
 

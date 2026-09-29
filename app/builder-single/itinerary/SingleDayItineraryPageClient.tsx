@@ -27,6 +27,7 @@ import {
 import { MobileTopChrome } from "@/components/navigation/MobileTopChrome";
 import { NewBookingResetButton } from "@/components/builder/NewBookingResetButton";
 import { IdleHeroMascot } from "@/components/branding/IdleHeroMascot";
+import { GoldLight } from "@/components/branding/GoldLight";
 import { SystemMessageFox } from "@/components/branding/SystemMessageFox";
 import { showSystemMessage } from "@/store/useSystemMessageStore";
 import { getSystemMessage } from "@/lib/systemMessages";
@@ -310,6 +311,12 @@ export default function SingleDayItineraryPageClient() {
         />
         <div className="mx-auto mt-4 max-w-3xl px-4 sm:px-5">
           <header className="group no-print relative overflow-visible rounded-2xl border border-white/10 bg-[#0A1017]/80 px-4 py-5 shadow-2xl backdrop-blur-md sm:px-5">
+            <div
+              className="pointer-events-none absolute inset-0 z-0 overflow-hidden rounded-2xl"
+              aria-hidden
+            >
+              <GoldLight color="#F6A724" active />
+            </div>
             <div className="relative z-10">
           <div className="relative grid grid-cols-3 items-end gap-2">
             <div className="col-span-2 min-w-0">

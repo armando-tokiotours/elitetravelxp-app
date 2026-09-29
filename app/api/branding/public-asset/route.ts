@@ -13,7 +13,13 @@ const EXT_BY_MIME: Record<string, string> = {
   "image/gif": "gif",
 };
 
-type AssetKind = "hero" | "logo" | "hero_single" | "email_header" | "email_footer";
+type AssetKind =
+  | "hero"
+  | "logo"
+  | "hero_single"
+  | "email_header"
+  | "email_footer"
+  | "favicon";
 
 const BASENAME: Record<AssetKind, string> = {
   hero: "hero-background",
@@ -21,6 +27,7 @@ const BASENAME: Record<AssetKind, string> = {
   hero_single: "hero-single-day",
   email_header: "email-1",
   email_footer: "email-2",
+  favicon: "favicon",
 };
 
 function uploadsAllowed() {
@@ -42,6 +49,7 @@ async function readMeta(): Promise<Record<string, string>> {
 
 function parseKind(raw: string): AssetKind {
   if (raw === "logo") return "logo";
+  if (raw === "favicon" || raw === "icon" || raw === "tab_icon") return "favicon";
   if (raw === "hero_single" || raw === "hero-single" || raw === "hero_single_day") {
     return "hero_single";
   }
@@ -57,7 +65,7 @@ function parseKind(raw: string): AssetKind {
 /**
  * Saves a branding image into `public/brand/` so it ships with the project.
  * Body: multipart form with `file` + `kind`
- * (`hero` | `logo` | `hero_single` | `email_header` | `email_footer`).
+ * (`hero` | `logo` | `hero_single` | `email_header` | `email_footer` | `favicon`).
  */
 export async function POST(request: Request) {
   if (!uploadsAllowed()) {

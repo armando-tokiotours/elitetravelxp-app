@@ -1,5 +1,6 @@
 {
   "hero": "/brand/hero-background.jpg",
   "logo": "/brand/site-logo.png",
-  "hero_single": "/brand/hero-single-day.jpg"
+  "hero_single": "/brand/hero-single-day.jpg",
+  "favicon": "/brand/favicon.png"
 }

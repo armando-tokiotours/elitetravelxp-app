@@ -691,6 +691,8 @@ export type PublicBrandAssets = {
   logo?: string;
   /** Builder S single-day hero still (Site Branding → SINGLE-DAY HERO). */
   hero_single?: string;
+  /** Browser tab / favicon. */
+  favicon?: string;
 };
 
 export async function fetchPublicBrandAssets(): Promise<PublicBrandAssets> {

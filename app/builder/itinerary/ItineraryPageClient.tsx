@@ -34,6 +34,7 @@ import {
 import { MobileTopChrome } from "@/components/navigation/MobileTopChrome";
 import { NewBookingResetButton } from "@/components/builder/NewBookingResetButton";
 import { IdleHeroMascot } from "@/components/branding/IdleHeroMascot";
+import { GoldLight } from "@/components/branding/GoldLight";
 import { showSystemMessage } from "@/store/useSystemMessageStore";
 import { getSystemMessage } from "@/lib/systemMessages";
 import {
@@ -349,6 +350,13 @@ export default function ItineraryPageClient() {
             className="no-print my-4"
           >
             <header className="group relative overflow-visible rounded-2xl border border-white/10 bg-[#0A1017]/80 p-5 shadow-2xl backdrop-blur-md sm:p-6">
+              {/* Clip gold wash to card interior — mascot can still sit outside */}
+              <div
+                className="pointer-events-none absolute inset-0 z-0 overflow-hidden rounded-2xl"
+                aria-hidden
+              >
+                <GoldLight color="#F6A724" active />
+              </div>
               <div className="relative z-10 space-y-4 text-left">
               <div className="relative grid grid-cols-3 items-end gap-2">
                 <div className="col-span-2 min-w-0">

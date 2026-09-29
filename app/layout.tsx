@@ -57,6 +57,11 @@ export const metadata: Metadata = {
   },
   description: BRAND_DESCRIPTION,
   metadataBase: new URL(BRAND_URL),
+  icons: {
+    icon: [{ url: "/brand/favicon.png", type: "image/png" }],
+    apple: [{ url: "/brand/favicon.png", type: "image/png" }],
+    shortcut: "/brand/favicon.png",
+  },
   openGraph: {
     title: BRAND_TITLE,
     description: BRAND_DESCRIPTION,
