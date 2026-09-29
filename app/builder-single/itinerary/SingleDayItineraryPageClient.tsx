@@ -338,7 +338,7 @@ export default function SingleDayItineraryPageClient() {
                 activeSrc="/brand/mascot-phone.webp"
                 idleSrc="/brand/mascot-time.webp"
                 idleMs={7_000}
-                className="pointer-events-none z-[1] -mb-2 h-28 w-auto select-none object-contain sm:h-36 md:h-40"
+                className="z-[1] -mb-2 h-28 w-auto select-none object-contain sm:h-36 md:h-40"
               />
             </div>
           </div>

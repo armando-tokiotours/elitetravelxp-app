@@ -1,6 +1,11 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import {
+  HiBubble,
+  MascotHiZoom,
+  useMascotHiTap,
+} from "@/components/branding/MascotHiTap";
 
 type IdleHeroMascotProps = {
   /** Default pose (e.g. phone) */
@@ -15,6 +20,7 @@ type IdleHeroMascotProps = {
  * Hero mascot that swaps to an idle pose after inactivity,
  * then returns to the active pose on mouse / scroll / click / key.
  * Crossfade without remount/scale so the swap does not blink.
+ * Tap → HI bubble (1s) + zoom pulse.
  */
 export function IdleHeroMascot({
   activeSrc = "/brand/mascot-phone.webp",
@@ -24,6 +30,7 @@ export function IdleHeroMascot({
 }: IdleHeroMascotProps) {
   const [isIdle, setIsIdle] = useState(false);
   const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const { showHi, triggerHi } = useMascotHiTap();
 
   useEffect(() => {
     const bump = () => {
@@ -50,25 +57,37 @@ export function IdleHeroMascot({
   }, [idleMs]);
 
   return (
-    <span className={`relative inline-block ${className || ""}`} aria-hidden>
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src={activeSrc}
-        alt=""
-        draggable={false}
-        className={`h-full w-auto object-contain transition-opacity duration-300 ${
-          isIdle ? "opacity-0" : "opacity-100"
-        }`}
-      />
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src={idleSrc}
-        alt=""
-        draggable={false}
-        className={`pointer-events-none absolute inset-0 h-full w-auto object-contain transition-opacity duration-300 ${
-          isIdle ? "opacity-100" : "opacity-0"
-        }`}
-      />
+    <span
+      role="button"
+      tabIndex={0}
+      aria-label="Say hi"
+      onClick={triggerHi}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") triggerHi(e);
+      }}
+      className={`relative inline-block cursor-pointer ${className || ""}`}
+    >
+      <HiBubble show={showHi} className="-right-1 -top-1 sm:-top-2" />
+      <MascotHiZoom showHi={showHi} className="pointer-events-none">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={activeSrc}
+          alt=""
+          draggable={false}
+          className={`h-full w-auto object-contain transition-opacity duration-300 ${
+            isIdle ? "opacity-0" : "opacity-100"
+          }`}
+        />
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={idleSrc}
+          alt=""
+          draggable={false}
+          className={`absolute inset-0 h-full w-auto object-contain transition-opacity duration-300 ${
+            isIdle ? "opacity-100" : "opacity-0"
+          }`}
+        />
+      </MascotHiZoom>
     </span>
   );
 }

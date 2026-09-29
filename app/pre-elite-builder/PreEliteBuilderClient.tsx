@@ -38,6 +38,11 @@ import { PhoneCountryField } from "@/components/pre-elite/PhoneCountryField";
 import { TimingSelector } from "@/components/pre-elite/TimingSelector";
 import { SystemMessageFox } from "@/components/branding/SystemMessageFox";
 import { BrandCharacterPreloader } from "@/components/branding/BrandCharacterPreloader";
+import {
+  HiBubble,
+  MascotHiZoom,
+  useMascotHiTap,
+} from "@/components/branding/MascotHiTap";
 import { usePreBuilderStore } from "@/store/usePreBuilderStore";
 import { showSystemMessage } from "@/store/useSystemMessageStore";
 import {
@@ -100,6 +105,7 @@ export function PreEliteBuilderClient() {
   const bowTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const bowDelayRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const { showHi, triggerHi } = useMascotHiTap();
 
   const triggerBow = () => {
     if (bowTimerRef.current) clearTimeout(bowTimerRef.current);
@@ -354,14 +360,29 @@ export function PreEliteBuilderClient() {
                 children={draft.children}
                 visible={step === 5}
               />
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                key={heroMascot.key}
-                src={heroMascot.src}
-                alt=""
-                aria-hidden
-                className="pointer-events-none absolute -right-2 -top-4 z-20 h-36 w-auto select-none object-contain opacity-95 sm:-right-4 sm:-top-6 sm:h-44 md:h-48"
-              />
+              <span
+                role="button"
+                tabIndex={0}
+                aria-label="Say hi"
+                onClick={triggerHi}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") triggerHi(e);
+                }}
+                className="absolute -right-2 -top-4 z-20 cursor-pointer sm:-right-4 sm:-top-6"
+              >
+                <HiBubble show={showHi} className="-left-10 -top-2 sm:-left-12 sm:-top-3" />
+                <MascotHiZoom showHi={showHi} className="pointer-events-none">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    key={heroMascot.key}
+                    src={heroMascot.src}
+                    alt=""
+                    aria-hidden
+                    className="h-36 w-auto select-none object-contain opacity-95 sm:h-44 md:h-48"
+                    draggable={false}
+                  />
+                </MascotHiZoom>
+              </span>
               <div className="relative z-10">
                 <p className="text-xs tracking-[0.22em] text-[#1CA67F] uppercase">
                   Step {step} of 5

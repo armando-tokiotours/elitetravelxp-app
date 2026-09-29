@@ -137,6 +137,14 @@ export const BRAND_CHARACTERS: BrandCharacterDef[] = [
     optimal: TIMELINE_OPTIMAL,
   },
   {
+    id: "hi-bubble",
+    label: "HI speech bubble",
+    path: "/brand/hi-bubble.webp",
+    category: "pre_elite",
+    usedOn: ["Mascot tap (Pre-Elite, Builders, Itinerary)"],
+    optimal: TIMELINE_OPTIMAL,
+  },
+  {
     id: "mascot-question",
     label: "Question (thinking)",
     path: "/brand/mascot-question.webp",
