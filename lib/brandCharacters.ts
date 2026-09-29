@@ -282,6 +282,16 @@ export const BRAND_CHARACTERS: BrandCharacterDef[] = [
   },
 ];
 
+/**
+ * Lightweight WebP characters to warm-cache on app start (~0.7 MB total).
+ * Skips heavy hero JPGs — those load with their builders.
+ */
+export const BRAND_CHARACTER_PRELOAD_PATHS: readonly string[] = [
+  ...BRAND_CHARACTERS.filter((c) => c.category !== "hero").map((c) => c.path),
+  "/brand/trip-multi-thumb.webp",
+  "/brand/trip-single-thumb.webp",
+];
+
 export function getBrandCharacter(id: string): BrandCharacterDef | undefined {
   return BRAND_CHARACTERS.find((c) => c.id === id);
 }

@@ -37,6 +37,7 @@ import { GuestPartyMascots } from "@/components/pre-elite/GuestPartyMascots";
 import { PhoneCountryField } from "@/components/pre-elite/PhoneCountryField";
 import { TimingSelector } from "@/components/pre-elite/TimingSelector";
 import { SystemMessageFox } from "@/components/branding/SystemMessageFox";
+import { BrandCharacterPreloader } from "@/components/branding/BrandCharacterPreloader";
 import { usePreBuilderStore } from "@/store/usePreBuilderStore";
 import { showSystemMessage } from "@/store/useSystemMessageStore";
 import {
@@ -305,6 +306,7 @@ export function PreEliteBuilderClient() {
           : "min-h-dvh bg-transparent text-white"
       }
     >
+      <BrandCharacterPreloader />
       <SystemMessageFox />
       <header className="shrink-0 border-b border-white/10">
         <div className="mx-auto flex max-w-3xl items-center justify-between px-5 py-5">
