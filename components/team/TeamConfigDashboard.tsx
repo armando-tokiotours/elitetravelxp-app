@@ -14,13 +14,16 @@ import {
   previewProposalHtml,
   type StoredEmailConfig,
 } from "@/config/emailDefaults";
+import { EmailTemplateAssetsPanel } from "@/components/team/EmailTemplateAssetsPanel";
+import { PdfConfigPanel } from "@/components/team/PdfConfigPanel";
 
-type TabId = "smtp" | "routing" | "template";
+type TabId = "smtp" | "routing" | "template" | "pdf";
 
 const TABS: { id: TabId; label: string }[] = [
   { id: "smtp", label: "SMTP Configuration" },
   { id: "routing", label: "Team Routing" },
   { id: "template", label: "Email Template" },
+  { id: "pdf", label: "PDF" },
 ];
 
 function Field({
@@ -166,8 +169,9 @@ export function TeamConfigDashboard({
             Visual configuration
           </h2>
           <p className="mt-1 max-w-xl text-sm text-zinc-400">
-            Edit SMTP (mail.tokiotours.com), team BCC alerts, and proposal email copy. Saves
-            to <code className="text-[#075473]">config/emailConfig.json</code>{" "}
+            Edit SMTP (mail.tokiotours.com), team BCC alerts, email banners, and phone-view
+            PDF attach previews. Saves to{" "}
+            <code className="text-[#075473]">config/emailConfig.json</code>{" "}
             and feeds <code className="text-[#075473]">/api/send-itinerary</code>.
           </p>
         </div>
@@ -360,7 +364,8 @@ export function TeamConfigDashboard({
 
       {tab === "template" ? (
         <div className="grid gap-4 lg:grid-cols-2">
-          <div className="space-y-4 rounded-2xl border border-[#2C2C2E] bg-[#1C1C1E] p-5 sm:p-6">
+          <div className="space-y-4">
+            <div className="space-y-4 rounded-2xl border border-[#2C2C2E] bg-[#1C1C1E] p-5 sm:p-6">
             <Field
               label="Subject Line"
               hint="Use {{bookingRef}} or {{fullName}} placeholders."
@@ -425,6 +430,17 @@ export function TeamConfigDashboard({
                 }
               />
             </Field>
+            </div>
+
+            <EmailTemplateAssetsPanel
+              template={config.template}
+              onChange={(patch) =>
+                setConfig((c) => ({
+                  ...c,
+                  template: { ...c.template, ...patch },
+                }))
+              }
+            />
           </div>
           <div className="overflow-hidden rounded-2xl border border-[#2C2C2E] bg-[#1C1C1E]">
             <div className="border-b border-[#2C2C2E] px-4 py-2.5 text-[0.65rem] font-semibold uppercase tracking-[0.2em] text-[#075473]">
@@ -433,11 +449,23 @@ export function TeamConfigDashboard({
             <iframe
               title="Email template preview"
               srcDoc={previewHtml}
-              className="h-[520px] w-full bg-[#121212]"
+              className="h-[640px] w-full bg-[#121212]"
               sandbox=""
             />
           </div>
         </div>
+      ) : null}
+
+      {tab === "pdf" ? (
+        <PdfConfigPanel
+          template={config.template}
+          onChange={(patch) =>
+            setConfig((c) => ({
+              ...c,
+              template: { ...c.template, ...patch },
+            }))
+          }
+        />
       ) : null}
     </div>
   );

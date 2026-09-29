@@ -362,14 +362,28 @@ export function stepError(step: number, draft: PreEliteDraft): string | null {
 
 export function contactError(draft: PreEliteDraft): string | null {
   if (!draft.tripType) {
-    return "Choose Multi-Day Journey or Single-Day Tour.";
+    return "Choose Multi-Day or Single-Day.";
   }
   if (!draft.fullName.trim()) return "Enter your full name.";
   if (!EMAIL_RE.test(draft.email.trim())) {
-    return "Enter a valid email address.";
+    return "Enter a valid email.";
+  }
+  const phone = draft.whatsapp.trim();
+  if (!phone || phone === "+" || /^\+\d+\s*$/.test(phone)) {
+    return "Enter your phone number.";
+  }
+  // National part should have enough digits (country code alone is not enough)
+  {
+    const digits = phone.replace(/\D/g, "");
+    const dialMatch = phone.match(/^\+(\d{1,4})/);
+    const dialLen = dialMatch?.[1]?.length ?? 0;
+    const nationalLen = Math.max(0, digits.length - dialLen);
+    if (nationalLen < 6 || nationalLen > 15) {
+      return "Enter a valid phone number.";
+    }
   }
   if (!draft.timing.formattedString.trim()) {
-    return "Share your arrival date or a target month.";
+    return "Select your travel dates.";
   }
   const maxDays = draft.tripType === "single_day" ? 1 : 45;
   if (
@@ -390,10 +404,6 @@ export function contactError(draft: PreEliteDraft): string | null {
     draft.children > 20
   ) {
     return "Children must be between 0 and 20.";
-  }
-  const phone = draft.whatsapp.trim();
-  if (phone && !/\d/.test(phone)) {
-    return "WhatsApp number should include digits.";
   }
   return null;
 }

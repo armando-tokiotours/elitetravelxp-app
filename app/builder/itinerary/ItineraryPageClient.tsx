@@ -317,39 +317,51 @@ export default function ItineraryPageClient() {
               </div>
 
               <div
-                className="flex flex-wrap items-center gap-2 border-t border-white/10 pt-2"
+                className="flex flex-col gap-2 border-t border-white/10 pt-2"
                 role="tablist"
                 aria-label="Itinerary view"
               >
-                <ToggleBtn
-                  active={activeView === "dossier"}
-                  onClick={() => setMode("dossier")}
-                  icon={<Luggage className="h-3.5 w-3.5" />}
-                  label="Travel Dossier"
-                />
-                <ToggleBtn
-                  active={activeView === "invoice"}
-                  onClick={requestInvoiceView}
-                  icon={<Receipt className="h-3.5 w-3.5" />}
-                  label="Invoice"
-                />
-                <button
-                  type="button"
-                  onClick={requestSendPdf}
-                  aria-label="Send PDF"
-                  title="Send / PDF"
-                  className="inline-flex items-center gap-1.5 rounded-xl bg-[#075473] px-3 py-2 text-white transition-all hover:bg-[#064560]"
-                >
-                  <Send className="h-3.5 w-3.5" aria-hidden />
-                  <FileText className="h-3.5 w-3.5" aria-hidden />
-                </button>
-                <Link
-                  href="/builder"
-                  className="inline-flex items-center gap-1.5 rounded-xl border border-zinc-700 bg-black/30 px-3.5 py-2 text-[11px] font-bold tracking-wider text-zinc-300 uppercase transition-all hover:bg-black/60"
-                >
-                  ← Continue editing
-                </Link>
-                <NewBookingResetButton variant="nav" />
+                <div className="flex flex-wrap items-center gap-2">
+                  <ToggleBtn
+                    active={activeView === "dossier"}
+                    onClick={() => setMode("dossier")}
+                    icon={<Luggage className="h-3.5 w-3.5" />}
+                    label="Travel Dossier"
+                  />
+                  <ToggleBtn
+                    active={activeView === "invoice"}
+                    onClick={requestInvoiceView}
+                    icon={<Receipt className="h-3.5 w-3.5" />}
+                    label="Invoice"
+                  />
+                </div>
+                <div>
+                  <button
+                    type="button"
+                    onClick={requestSendPdf}
+                    aria-label="Send PDF"
+                    title="Send / PDF"
+                    className="inline-flex items-center gap-1.5 rounded-xl bg-[#075473] px-3 py-2 text-white transition-all hover:bg-[#064560]"
+                  >
+                    <Send className="h-3.5 w-3.5" aria-hidden />
+                    <FileText className="h-3.5 w-3.5" aria-hidden />
+                    <span className="text-[11px] font-bold tracking-wider uppercase">
+                      Send / PDF
+                    </span>
+                  </button>
+                </div>
+                <div className="grid grid-cols-6 items-center gap-2">
+                  <Link
+                    href="/builder"
+                    className="col-span-3 inline-flex items-center justify-center gap-1.5 rounded-xl border border-zinc-700 bg-black/30 px-3.5 py-2 text-[11px] font-bold tracking-wider text-zinc-300 uppercase transition-all hover:bg-black/60"
+                  >
+                    ← Continue editing
+                  </Link>
+                  <span className="col-span-2" aria-hidden />
+                  <div className="col-span-1 flex justify-end">
+                    <NewBookingResetButton variant="nav" />
+                  </div>
+                </div>
               </div>
               </div>
             </header>

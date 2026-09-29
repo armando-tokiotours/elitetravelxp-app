@@ -13,12 +13,14 @@ const EXT_BY_MIME: Record<string, string> = {
   "image/gif": "gif",
 };
 
-type AssetKind = "hero" | "logo" | "hero_single";
+type AssetKind = "hero" | "logo" | "hero_single" | "email_header" | "email_footer";
 
 const BASENAME: Record<AssetKind, string> = {
   hero: "hero-background",
   logo: "site-logo",
   hero_single: "hero-single-day",
+  email_header: "email-1",
+  email_footer: "email-2",
 };
 
 function uploadsAllowed() {
@@ -43,12 +45,19 @@ function parseKind(raw: string): AssetKind {
   if (raw === "hero_single" || raw === "hero-single" || raw === "hero_single_day") {
     return "hero_single";
   }
+  if (raw === "email_header" || raw === "email-header" || raw === "email_1") {
+    return "email_header";
+  }
+  if (raw === "email_footer" || raw === "email-footer" || raw === "email_2") {
+    return "email_footer";
+  }
   return "hero";
 }
 
 /**
  * Saves a branding image into `public/brand/` so it ships with the project.
- * Body: multipart form with `file` + `kind` (`hero` | `logo` | `hero_single`).
+ * Body: multipart form with `file` + `kind`
+ * (`hero` | `logo` | `hero_single` | `email_header` | `email_footer`).
  */
 export async function POST(request: Request) {
   if (!uploadsAllowed()) {
@@ -95,11 +104,17 @@ export async function POST(request: Request) {
     await mkdir(BRAND_DIR, { recursive: true });
 
     const base = BASENAME[kind];
-    // Remove previous hero/logo variants so only one active file remains
+    // Remove previous raster variants for this slot (keep .svg masters for email art)
     const existing = await readdir(BRAND_DIR);
+    const keepSvg =
+      kind === "email_header" || kind === "email_footer";
     await Promise.all(
       existing
-        .filter((name) => name.startsWith(`${base}.`))
+        .filter((name) => {
+          if (!name.startsWith(`${base}.`)) return false;
+          if (keepSvg && name.endsWith(".svg")) return false;
+          return true;
+        })
         .map((name) => unlink(path.join(BRAND_DIR, name)).catch(() => undefined))
     );
 

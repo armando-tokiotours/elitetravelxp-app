@@ -1,29 +1,53 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
-import { useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   useSystemMessageStore,
   type SystemMessageTone,
 } from "@/store/useSystemMessageStore";
 
+const CHAR_SPLIT = 48;
+
 /**
- * Fox-peek + Japanese-style speech bubble for system messages.
- * Anchored bottom-left (red zone) — stays above BottomNav, left strip only.
+ * Fox-peek + comic speech bubble(s) — sharp pointy tail toward the fox.
+ * Long copy splits into two bubbles; duration stays readable.
  */
 export function SystemMessageFox() {
   const message = useSystemMessageStore((s) => s.message);
   const dismiss = useSystemMessageStore((s) => s.dismiss);
 
+  const parts = useMemo(
+    () => (message ? splitSpeech(message.text) : []),
+    [message]
+  );
+
+  const [partIndex, setPartIndex] = useState(0);
+
   useEffect(() => {
-    if (!message) return;
-    const t = window.setTimeout(() => dismiss(), message.durationMs);
+    setPartIndex(0);
+  }, [message?.id]);
+
+  useEffect(() => {
+    if (!message || parts.length === 0) return;
+    const sliceMs = Math.max(
+      3000,
+      Math.floor(message.durationMs / parts.length)
+    );
+    if (partIndex < parts.length - 1) {
+      const t = window.setTimeout(() => setPartIndex((i) => i + 1), sliceMs);
+      return () => window.clearTimeout(t);
+    }
+    const t = window.setTimeout(() => dismiss(), sliceMs);
     return () => window.clearTimeout(t);
-  }, [message, dismiss]);
+  }, [message, parts.length, partIndex, dismiss]);
+
+  const visibleParts = parts.slice(0, partIndex + 1);
+  const tone = message?.tone ?? "info";
 
   return (
     <div
-      className="pointer-events-none fixed bottom-[5.75rem] left-0 z-[70] w-[min(46vw,13.5rem)] max-w-[13.5rem] sm:bottom-28 sm:w-[min(40vw,14rem)]"
+      className="pointer-events-none fixed bottom-[5.75rem] left-0 z-[70] w-[min(48vw,14.5rem)] max-w-[14.5rem] sm:bottom-28 sm:w-[min(42vw,15rem)]"
       aria-live="polite"
     >
       <AnimatePresence mode="wait">
@@ -36,38 +60,36 @@ export function SystemMessageFox() {
             transition={{ duration: 0.28, ease: "easeOut" }}
             className="relative flex flex-col items-start"
           >
-            {/* Bubble — Japanese comic style, zoom in */}
-            <motion.button
-              type="button"
-              initial={{ opacity: 0, scale: 0.72, y: 10 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.88, y: 6 }}
-              transition={{
-                type: "spring",
-                stiffness: 420,
-                damping: 22,
-                delay: 0.06,
-              }}
-              onClick={dismiss}
-              className={
-                "pointer-events-auto relative z-10 ml-9 mb-0 max-h-[8.5rem] w-[calc(100%-2rem)] cursor-pointer overflow-y-auto rounded-[1.35rem] border-[3.5px] px-3.5 py-3 text-left shadow-[0_10px_28px_rgba(0,0,0,0.5)] " +
-                bubbleTone(message.tone)
-              }
-            >
-              <p className="text-[0.8rem] font-bold leading-snug tracking-wide text-[#1a1510]">
-                {message.text}
-              </p>
-              {/* Comic tail toward fox (filled + outline) */}
-              <span
-                aria-hidden
-                className={
-                  "absolute -bottom-[9px] left-4 h-3.5 w-3.5 rotate-45 border-b-[3.5px] border-r-[3.5px] " +
-                  tailTone(message.tone)
-                }
-              />
-            </motion.button>
+            <div className="relative z-10 -mb-3 ml-8 flex w-[calc(100%-1.75rem)] flex-col items-start gap-1.5">
+              <AnimatePresence initial={false}>
+                {visibleParts.map((text, i) => {
+                  const isLast = i === visibleParts.length - 1;
+                  return (
+                    <motion.button
+                      key={`${message.id}-p${i}`}
+                      type="button"
+                      initial={{ opacity: 0, scale: 0.72, y: 10 }}
+                      animate={{ opacity: 1, scale: 1, y: 0 }}
+                      exit={{ opacity: 0, scale: 0.88, y: 6 }}
+                      transition={{
+                        type: "spring",
+                        stiffness: 420,
+                        damping: 22,
+                        delay: 0.04,
+                      }}
+                      onClick={dismiss}
+                      className="pointer-events-auto relative max-w-full cursor-pointer text-left"
+                      aria-label={text}
+                    >
+                      <ComicBubble tone={tone} showTail={isLast}>
+                        {text}
+                      </ComicBubble>
+                    </motion.button>
+                  );
+                })}
+              </AnimatePresence>
+            </div>
 
-            {/* Fox peek from left */}
             <motion.img
               src="/brand/fox-peek.png"
               alt=""
@@ -86,18 +108,99 @@ export function SystemMessageFox() {
   );
 }
 
-function bubbleTone(tone: SystemMessageTone): string {
-  if (tone === "error") {
-    return "border-[#E60F43] bg-[#FFF5F7]";
-  }
-  if (tone === "tip") {
-    return "border-[#F6A724] bg-[#FFFBF0]";
-  }
-  return "border-[#1a1510] bg-white";
+function ComicBubble({
+  children,
+  tone,
+  showTail,
+}: {
+  children: string;
+  tone: SystemMessageTone;
+  showTail: boolean;
+}) {
+  const { fill, stroke, ring } = toneColors(tone);
+  const lines = wrapWordsPerLine(children, 4);
+
+  return (
+    <div className="relative inline-block max-w-full drop-shadow-[0_8px_18px_rgba(0,0,0,0.45)]">
+      {/* Angular comic body — tight padding, hugs text */}
+      <div
+        className="relative px-2.5 py-1.5"
+        style={{
+          backgroundColor: fill,
+          border: `1.75px solid ${stroke}`,
+          borderRadius: "2px",
+          boxShadow: `inset 0 0 0 0.75px ${ring}`,
+        }}
+      >
+        <p className="whitespace-pre-line text-[0.78rem] font-bold leading-snug tracking-wide text-[#1a1510]">
+          {lines.join("\n")}
+        </p>
+      </div>
+
+      {/* Separate pointy tip — gap below the box, not attached to the border */}
+      {showTail ? (
+        <div className="mt-1.5 flex justify-start pl-4" aria-hidden>
+          <svg className="h-[11px] w-[16px]" viewBox="0 0 22 16">
+            <path
+              d="M3 0 L1 15 L18 2.5 Z"
+              fill={fill}
+              stroke={stroke}
+              strokeWidth="1.6"
+              strokeLinejoin="miter"
+              strokeMiterlimit={8}
+            />
+          </svg>
+        </div>
+      ) : null}
+    </div>
+  );
 }
 
-function tailTone(tone: SystemMessageTone): string {
-  if (tone === "error") return "border-[#E60F43] bg-[#FFF5F7]";
-  if (tone === "tip") return "border-[#F6A724] bg-[#FFFBF0]";
-  return "border-[#1a1510] bg-white";
+function toneColors(tone: SystemMessageTone): {
+  fill: string;
+  stroke: string;
+  ring: string;
+} {
+  if (tone === "error") {
+    return { fill: "#FFF5F7", stroke: "#E60F43", ring: "rgba(230,15,67,0.35)" };
+  }
+  if (tone === "tip") {
+    return { fill: "#FFFBF0", stroke: "#F6A724", ring: "rgba(246,167,36,0.4)" };
+  }
+  return { fill: "#FFFFFF", stroke: "#1a1510", ring: "rgba(26,21,16,0.28)" };
+}
+
+/** Max 3–4 words per visual line inside a bubble. */
+export function wrapWordsPerLine(text: string, maxWords = 4): string[] {
+  const words = text.trim().split(/\s+/).filter(Boolean);
+  if (words.length === 0) return [""];
+  const lines: string[] = [];
+  for (let i = 0; i < words.length; i += maxWords) {
+    lines.push(words.slice(i, i + maxWords).join(" "));
+  }
+  return lines;
+}
+
+/** Split long speech into ≤2 readable chunks at word boundaries. */
+export function splitSpeech(text: string): string[] {
+  const t = text.trim().replace(/\s+/g, " ");
+  if (t.length <= CHAR_SPLIT) return [t];
+
+  const soft = Math.min(CHAR_SPLIT + 12, t.length);
+  let cut = -1;
+  for (
+    let i = Math.min(soft, t.length - 1);
+    i >= Math.floor(CHAR_SPLIT * 0.55);
+    i--
+  ) {
+    if (t[i] === " " || t[i] === "." || t[i] === "," || t[i] === "!") {
+      cut = t[i] === " " ? i : i + 1;
+      break;
+    }
+  }
+  if (cut <= 0) cut = CHAR_SPLIT;
+  const a = t.slice(0, cut).trim();
+  const b = t.slice(cut).trim();
+  if (!b) return [a];
+  return [a, b];
 }

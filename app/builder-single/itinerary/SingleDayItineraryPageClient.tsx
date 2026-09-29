@@ -244,9 +244,7 @@ export default function SingleDayItineraryPageClient() {
       />
 
       <div className={APP_SIDEBAR_RAIL_PAD}>
-        <header className="group no-print relative mx-auto mt-4 max-w-3xl overflow-hidden rounded-2xl border border-white/10 bg-[#0A1017]/80 px-4 py-5 shadow-2xl backdrop-blur-md sm:px-5">
-          <GoldLight color="#F6A724" active />
-          <div className="relative z-10">
+        <div className="mx-auto mt-4 max-w-3xl px-4 sm:px-5">
           <div className="mb-3 flex items-center gap-3 lg:hidden">
             <MobileAppNav
               brandEyebrow="TOKIOTOURS"
@@ -254,6 +252,9 @@ export default function SingleDayItineraryPageClient() {
             />
           </div>
 
+          <header className="group no-print relative overflow-hidden rounded-2xl border border-white/10 bg-[#0A1017]/80 px-4 py-5 shadow-2xl backdrop-blur-md sm:px-5">
+            <GoldLight color="#F6A724" active />
+            <div className="relative z-10">
           <div className="relative flex items-start justify-between gap-3">
             <div className="min-w-0 flex-1 pr-20 sm:pr-28">
               <p className="text-[0.65rem] font-semibold uppercase tracking-[0.35em] text-[#F6A724]">
@@ -278,42 +279,55 @@ export default function SingleDayItineraryPageClient() {
           </div>
 
           <div
-            className="mt-4 flex flex-wrap items-center gap-2 border-t border-white/10 pt-2"
+            className="mt-4 flex flex-col gap-2 border-t border-white/10 pt-2"
             role="tablist"
             aria-label="Single-day itinerary view"
           >
-            <ToggleBtn
-              active={activeView === "dossier"}
-              onClick={() => setMode("dossier")}
-              icon={<Luggage className="h-3.5 w-3.5" />}
-              label="Travel Dossier"
-            />
-            <ToggleBtn
-              active={activeView === "invoice"}
-              onClick={requestInvoiceView}
-              icon={<Receipt className="h-3.5 w-3.5" />}
-              label="Invoice"
-            />
-            <button
-              type="button"
-              onClick={requestSendPdf}
-              aria-label="Send PDF"
-              title="Send / PDF"
-              className="inline-flex items-center gap-1.5 rounded-xl bg-[#075473] px-3 py-2 text-white transition-all hover:bg-[#064560]"
-            >
-              <Send className="h-3.5 w-3.5" aria-hidden />
-              <FileText className="h-3.5 w-3.5" aria-hidden />
-            </button>
-            <Link
-              href="/builder-single"
-              className="inline-flex items-center gap-1.5 rounded-xl border border-zinc-700 bg-black/30 px-3.5 py-2 text-[11px] font-bold tracking-wider text-zinc-300 uppercase transition-all hover:bg-black/60"
-            >
-              ← Continue editing
-            </Link>
-            <NewBookingResetButton variant="nav" />
+            <div className="flex flex-wrap items-center gap-2">
+              <ToggleBtn
+                active={activeView === "dossier"}
+                onClick={() => setMode("dossier")}
+                icon={<Luggage className="h-3.5 w-3.5" />}
+                label="Travel Dossier"
+              />
+              <ToggleBtn
+                active={activeView === "invoice"}
+                onClick={requestInvoiceView}
+                icon={<Receipt className="h-3.5 w-3.5" />}
+                label="Invoice"
+              />
+            </div>
+            <div>
+              <button
+                type="button"
+                onClick={requestSendPdf}
+                aria-label="Send PDF"
+                title="Send / PDF"
+                className="inline-flex items-center gap-1.5 rounded-xl bg-[#075473] px-3 py-2 text-white transition-all hover:bg-[#064560]"
+              >
+                <Send className="h-3.5 w-3.5" aria-hidden />
+                <FileText className="h-3.5 w-3.5" aria-hidden />
+                <span className="text-[11px] font-bold tracking-wider uppercase">
+                  Send / PDF
+                </span>
+              </button>
+            </div>
+            <div className="grid grid-cols-6 items-center gap-2">
+              <Link
+                href="/builder-single"
+                className="col-span-3 inline-flex items-center justify-center gap-1.5 rounded-xl border border-zinc-700 bg-black/30 px-3.5 py-2 text-[11px] font-bold tracking-wider text-zinc-300 uppercase transition-all hover:bg-black/60"
+              >
+                ← Continue editing
+              </Link>
+              <span className="col-span-2" aria-hidden />
+              <div className="col-span-1 flex justify-end">
+                <NewBookingResetButton variant="nav" />
+              </div>
+            </div>
           </div>
           </div>
         </header>
+        </div>
 
         <main className="mx-auto w-full max-w-3xl overflow-x-hidden px-4 py-6 pb-40 md:pb-28">
           <div

@@ -28,6 +28,16 @@ export type EmailTemplateConfig = {
   welcomeBody: string;
   ctaButtonText: string;
   ctaUrl: string;
+  /** Public path for hero banner (email top). */
+  headerImagePath: string;
+  /** Public path for footer banner. */
+  footerImagePath: string;
+  /** Show DOWNLOAD JAPAN PASS button in proposal emails. */
+  includeWalletCta: boolean;
+  /** PDF attachment filename pattern ({{bookingRef}}). */
+  pdfFileNamePattern: string;
+  /** Whether Save & Email / Send attaches a PDF. */
+  attachPdf: boolean;
 };
 
 export type StoredEmailConfig = {
@@ -69,6 +79,11 @@ export const EMAIL_CONFIG_DEFAULTS: StoredEmailConfig = {
       "Thank you for designing your bespoke itinerary. Our concierge team at TOKIOTOURS has received your trip selections and is preparing your confirmed 1-on-1 daily proposal.",
     ctaButtonText: "REVIEW YOUR BOOKING BRIEF →",
     ctaUrl: "https://tokiotours-app.com/manage?pnr={{bookingRef}}",
+    headerImagePath: "/brand/email-1.jpg",
+    footerImagePath: "/brand/email-2.png",
+    includeWalletCta: false,
+    pdfFileNamePattern: "TOKIOTOURS-brief-{{bookingRef}}.pdf",
+    attachPdf: true,
   },
 };
 
@@ -150,6 +165,23 @@ export function mergeStoredEmailConfig(
           base.template.ctaButtonText
       ),
       ctaUrl: String(template.ctaUrl ?? base.template.ctaUrl),
+      headerImagePath: String(
+        template.headerImagePath ?? base.template.headerImagePath
+      ),
+      footerImagePath: String(
+        template.footerImagePath ?? base.template.footerImagePath
+      ),
+      includeWalletCta:
+        typeof template.includeWalletCta === "boolean"
+          ? template.includeWalletCta
+          : base.template.includeWalletCta,
+      pdfFileNamePattern: String(
+        template.pdfFileNamePattern ?? base.template.pdfFileNamePattern
+      ),
+      attachPdf:
+        typeof template.attachPdf === "boolean"
+          ? template.attachPdf
+          : base.template.attachPdf,
     },
   };
 }
@@ -235,8 +267,19 @@ export function buildProposalHtml(
     tourDate: params.tourDate ?? null,
     adults: params.adults ?? 2,
     children: params.children ?? 0,
-    customerEmail: params.customerEmail ?? null,
+    customerEmail: params.customerEmail ?? "guest@example.com",
+    includeWalletCta: cfg.template.includeWalletCta === true,
+    heroImageUrl: absoluteBrandUrl(cfg.template.headerImagePath),
+    footerImageUrl: absoluteBrandUrl(cfg.template.footerImagePath),
   });
+}
+
+function absoluteBrandUrl(pathOrUrl: string): string {
+  const p = String(pathOrUrl || "").trim();
+  if (!p) return "";
+  if (p.startsWith("http")) return p;
+  const origin = "https://tokiotours-app.com";
+  return p.startsWith("/") ? `${origin}${p}` : `${origin}/${p}`;
 }
 
 export { formatEmailDisplayDate };

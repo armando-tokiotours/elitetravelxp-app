@@ -24,7 +24,10 @@ export type BookingPassEmailFields = {
   ctaButtonText?: string;
   /** Absolute or path CTA; {{bookingRef}} expanded when present. */
   ctaUrl?: string;
-  /** When false, omit Apple Wallet CTA. Default true. */
+  /** Absolute URL overrides for hero / footer banners (Team upload). */
+  heroImageUrl?: string;
+  footerImageUrl?: string;
+  /** When true, show Apple Wallet / Japan Pass download CTA. Default false. */
   includeWalletCta?: boolean;
   /**
    * Include “How Your Itinerary & Booking Works” disclosure
@@ -90,6 +93,7 @@ export function renderBookingPassCardHtml(
 ): string {
   const pnr = escapeHtml(fields.pnrCode);
   const guest = escapeHtml(fields.guestName || "GUEST");
+  const email = escapeHtml(String(fields.guestEmail || "").trim().toLowerCase());
   const party = escapeHtml(fields.partyText || "2 Adults");
   const style = escapeHtml(fields.travelStyle || "Premium Comfort");
   const start = escapeHtml(fields.startDateText || "Selected Itinerary Dates");
@@ -109,6 +113,14 @@ export function renderBookingPassCardHtml(
       <td style="padding:4px 0;font-weight:bold;width:35%;">GUEST:</td>
       <td style="padding:4px 0;color:#ffffff;">${guest}</td>
     </tr>
+    ${
+      email
+        ? `<tr>
+      <td style="padding:4px 0;font-weight:bold;">EMAIL:</td>
+      <td style="padding:4px 0;color:#ffffff;">${email}</td>
+    </tr>`
+        : ""
+    }
     <tr>
       <td style="padding:4px 0;font-weight:bold;">PARTY SIZE:</td>
       <td style="padding:4px 0;color:#ffffff;">${party}</td>
@@ -171,9 +183,13 @@ export function generateBookingEmailHtml(
   const walletUrl = escapeHtml(
     `${origin}/api/wallet/pass-file?pnr=${encodeURIComponent(pnrCode)}`
   );
-  const heroUrl = escapeHtml(`${origin}/brand/email-1.jpg`);
-  const footerUrl = escapeHtml(`${origin}/brand/email-2.png`);
-  const includeWallet = data.includeWalletCta !== false;
+  const heroUrl = escapeHtml(
+    data.heroImageUrl || `${origin}/brand/email-1.jpg`
+  );
+  const footerUrl = escapeHtml(
+    data.footerImageUrl || `${origin}/brand/email-2.png`
+  );
+  const includeWallet = data.includeWalletCta === true;
   const passCard = renderBookingPassCardHtml(data);
   const safeEmail = escapeHtml(guestEmail);
   const safePnr = escapeHtml(pnrCode);

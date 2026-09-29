@@ -373,10 +373,10 @@ export function TimingSelector({ value, onChange, tripType }: Props) {
 
   const summaryLabel = value.formattedString
     ? value.startDate && arrival
-      ? `Selected: ${formatDay(arrival)}`
+      ? formatDay(arrival)
       : value.targetMonth
-        ? `Selected: ${value.targetMonth}`
-        : `Selected: ${value.formattedString}`
+        ? value.targetMonth
+        : value.formattedString
     : null;
 
   const calendarPanel = (
@@ -565,29 +565,31 @@ export function TimingSelector({ value, onChange, tripType }: Props) {
   );
 
   return (
-    <div className="grid gap-2.5">
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        onTouchEnd={(e) => {
-          e.preventDefault();
-          setOpen(true);
-        }}
-        className="inline-flex min-h-[44px] w-full items-center justify-center gap-2 rounded-xl border border-[#075473]/50 bg-[#075473]/15 px-4 py-3.5 text-sm font-semibold tracking-[0.12em] text-white uppercase transition hover:bg-[#075473]/25"
-      >
-        <CalendarDays className="h-4 w-4 text-[#075473]" />
-        Select travel date(s) 📅
-      </button>
+    <div className="grid gap-1.5">
+      <div className="grid grid-cols-5 gap-2">
+        <div className="col-span-2 flex min-h-[40px] items-center justify-center rounded-xl border border-white/10 bg-[#121212] px-1.5">
+          {summaryLabel ? (
+            <span className="truncate text-center text-[0.7rem] font-semibold leading-tight tracking-wide text-[#F29727] sm:text-xs">
+              {summaryLabel}
+            </span>
+          ) : (
+            <span className="text-xs text-white/25">—</span>
+          )}
+        </div>
 
-      {summaryLabel ? (
-        <span className="inline-flex w-fit items-center rounded-full border border-[#075473]/40 bg-[#075473]/15 px-3 py-1.5 text-xs text-[#075473]">
-          {summaryLabel}
-        </span>
-      ) : (
-        <p className="text-[11px] text-white/40">
-          Tap above to open the calendar popup.
-        </p>
-      )}
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          onTouchEnd={(e) => {
+            e.preventDefault();
+            setOpen(true);
+          }}
+          className="col-span-3 inline-flex min-h-[40px] w-full items-center justify-center gap-2 rounded-xl border border-[#075473]/50 bg-[#075473]/15 px-2 py-2.5 text-[0.7rem] font-semibold tracking-[0.1em] text-white uppercase transition hover:bg-[#075473]/25 sm:px-4 sm:text-sm sm:tracking-[0.12em]"
+        >
+          <CalendarDays className="h-4 w-4 shrink-0 text-[#075473]" />
+          <span className="truncate">Select travel date(s)</span>
+        </button>
+      </div>
 
       {mounted &&
         createPortal(

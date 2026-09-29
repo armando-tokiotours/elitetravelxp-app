@@ -29,16 +29,18 @@ let seq = 0;
  */
 export const useSystemMessageStore = create<SystemMessageState>((set) => ({
   message: null,
-  show: ({ text, tone = "info", durationMs = 4200 }) => {
+  show: ({ text, tone = "info", durationMs }) => {
     const trimmed = String(text || "").trim();
     if (!trimmed) return;
     seq += 1;
+    // Longer copy stays up longer (default ~6.8–10s)
+    const auto = Math.min(10_000, Math.max(6800, 3200 + trimmed.length * 55));
     set({
       message: {
         id: `sys-${seq}-${Date.now()}`,
         text: trimmed,
         tone,
-        durationMs: Math.max(1200, durationMs),
+        durationMs: Math.max(2800, durationMs ?? auto),
       },
     });
   },

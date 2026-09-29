@@ -4,7 +4,7 @@ import { sendDraftBoardingPassEmails } from "@/lib/preEliteBoardingPassEmail";
 import { recordBookingLeadEmailSent } from "@/lib/bookingsAndLeads";
 
 /**
- * Sends Draft Boarding Pass emails to guest + concierge.
+ * Sends Draft Boarding Pass email to the guest only (no team BCC).
  * Only invoked from explicit "Save & Email" / resend on /pre-build.
  * Updates bookings_and_leads email audit counters.
  */

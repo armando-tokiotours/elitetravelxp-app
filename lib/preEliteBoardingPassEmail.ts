@@ -110,7 +110,7 @@ export function buildDraftBoardingPassHtml(
       ? `${arrival} · ${days} Day${days === 1 ? "" : "s"}`
       : arrival,
     siteOrigin: base,
-    includeWalletCta: true,
+    includeWalletCta: false,
   });
 
   // Guest mail uses the shared three-tier layout (hero + pass + footer).
@@ -126,7 +126,7 @@ export function buildDraftBoardingPassHtml(
         ? `${arrival} · ${days} Day${days === 1 ? "" : "s"}`
         : arrival,
       siteOrigin: base,
-      includeWalletCta: true,
+      includeWalletCta: false,
     });
   }
 

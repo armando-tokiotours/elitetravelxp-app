@@ -15,6 +15,7 @@ import {
 } from "@/lib/preEliteBuilder";
 import { hydrateStoresFromPreEliteBrief } from "@/lib/preEliteHydrate";
 import { useModalDismiss } from "@/hooks/useModalDismiss";
+import { TokioClockLoader } from "@/components/common/TokioClockLoader";
 import { useBuilderStore } from "@/store/useBuilderStore";
 import { useSingleDayBuilderStore } from "@/store/useSingleDayBuilderStore";
 import { usePreBuilderStore } from "@/store/usePreBuilderStore";
@@ -452,6 +453,16 @@ export function PreBuildConfirmation({
           </span>
         </div>
 
+        {sending ? (
+          <div className="mb-5 flex justify-center px-1">
+            <TokioClockLoader
+              message="SENDING YOUR BRIEF…"
+              subMessage="Almost there"
+              className="!max-w-sm"
+            />
+          </div>
+        ) : null}
+
         {/* 4. Details Table - Full-Width Edge-to-Edge */}
         {summaryItems.length > 0 ? (
           <div className="w-full space-y-3 border-t border-white/10 pt-4 text-left">
@@ -517,7 +528,7 @@ function SaveEmailGateModal({
       {open ? (
         <motion.div
           key="save-email-gate"
-          className="fixed inset-0 z-[130] flex items-end justify-center bg-[#05080C]/75 backdrop-blur-sm sm:items-center sm:p-4"
+          className="fixed inset-0 z-[130] flex items-center justify-center bg-[#05080C]/75 p-4 backdrop-blur-sm"
           role="alertdialog"
           aria-modal="true"
           aria-labelledby="save-email-gate-title"
@@ -532,7 +543,7 @@ function SaveEmailGateModal({
             onClick={onClose}
           />
           <motion.div
-            className="relative z-[1] w-full max-w-md rounded-t-3xl border border-white/10 bg-[#0D1117] p-5 shadow-2xl sm:rounded-2xl sm:p-6"
+            className="relative z-[1] w-full max-w-md rounded-2xl border border-white/10 bg-[#0D1117] p-5 shadow-2xl sm:p-6"
             initial={{ y: 24, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: 24, opacity: 0 }}
@@ -607,7 +618,7 @@ function ProposalResendModal({
       {open ? (
         <motion.div
           key="proposal-resend"
-          className="fixed inset-0 z-[130] flex items-end justify-center bg-[#05080C]/75 backdrop-blur-sm sm:items-center sm:p-4"
+          className="fixed inset-0 z-[130] flex items-center justify-center bg-[#05080C]/75 p-4 backdrop-blur-sm"
           role="dialog"
           aria-modal="true"
           aria-labelledby="proposal-resend-title"
@@ -623,7 +634,7 @@ function ProposalResendModal({
             disabled={sending}
           />
           <motion.div
-            className="relative z-[1] w-full max-w-md rounded-t-3xl border border-white/10 bg-[#0D1117] p-5 shadow-2xl sm:rounded-2xl sm:p-6"
+            className="relative z-[1] w-full max-w-md rounded-2xl border border-white/10 bg-[#0D1117] p-5 shadow-2xl sm:p-6"
             initial={{ y: 24, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: 24, opacity: 0 }}

@@ -2,19 +2,30 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { SystemMessageFox } from "@/components/branding/SystemMessageFox";
+import { TokioClockLoader } from "@/components/common/TokioClockLoader";
 import { BrandCharactersCatalog } from "@/components/team/BrandCharactersCatalog";
 import { GuestPartyLayoutBuilder } from "@/components/team/GuestPartyLayoutBuilder";
+import { showSystemMessage } from "@/store/useSystemMessageStore";
 
-type HubTab = "characters" | "guest_party" | "heroes";
+type HubTab =
+  | "characters"
+  | "guest_party"
+  | "heroes"
+  | "clock_loader"
+  | "fox_messages";
 
 const TABS: { id: HubTab; label: string }[] = [
   { id: "characters", label: "Characters" },
   { id: "guest_party", label: "Guest party" },
   { id: "heroes", label: "Heroes" },
+  { id: "clock_loader", label: "Bar loader" },
+  { id: "fox_messages", label: "Fox messages" },
 ];
 
 /**
- * Team Access layout hub — characters (weight + replace), guest party positions, heroes.
+ * Team Access layout hub — characters (weight + replace), guest party positions, heroes,
+ * plus live previews for TokioClockLoader and SystemMessageFox.
  */
 export function LayoutBuilderHub({
   initialTab = "characters",
@@ -41,7 +52,8 @@ export function LayoutBuilderHub({
         </h1>
         <p className="mt-1 max-w-2xl text-sm text-zinc-400">
           Manage brand characters and heroes: see current vs optimal file
-          weight, replace assets, and edit guest-party positions.
+          weight, replace assets, edit guest-party positions, and preview loaders
+          / fox messages.
         </p>
       </div>
 
@@ -67,6 +79,146 @@ export function LayoutBuilderHub({
       {tab === "guest_party" ? (
         <GuestPartyLayoutBuilder embedded />
       ) : null}
+      {tab === "clock_loader" ? <ClockLoaderPreview /> : null}
+      {tab === "fox_messages" ? <FoxMessagesPreview /> : null}
+    </div>
+  );
+}
+
+function ClockLoaderPreview() {
+  const [message, setMessage] = useState("PREPARING YOUR JOURNEY...");
+  const [subMessage, setSubMessage] = useState("Building your day tour…");
+  const [fullScreen, setFullScreen] = useState(false);
+  const [key, setKey] = useState(0);
+
+  return (
+    <div className="space-y-5">
+      <div className="rounded-2xl border border-zinc-800 bg-[#0D1117] p-4 sm:p-5">
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-500">
+          Controls
+        </p>
+        <div className="mt-3 grid gap-3 sm:grid-cols-2">
+          <label className="block text-xs text-zinc-400">
+            Message
+            <input
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              className="mt-1 w-full rounded-xl border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-white outline-none focus:border-[#075473]"
+            />
+          </label>
+          <label className="block text-xs text-zinc-400">
+            Sub-message
+            <input
+              value={subMessage}
+              onChange={(e) => setSubMessage(e.target.value)}
+              className="mt-1 w-full rounded-xl border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-white outline-none focus:border-[#075473]"
+            />
+          </label>
+        </div>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => setKey((k) => k + 1)}
+            className="rounded-xl border border-zinc-700 bg-zinc-950 px-3.5 py-2 text-xs font-semibold uppercase tracking-wider text-zinc-300 hover:border-zinc-500"
+          >
+            Restart animation
+          </button>
+          <button
+            type="button"
+            onClick={() => setFullScreen(true)}
+            className="rounded-xl border border-[#E60F43]/50 bg-[#E60F43]/15 px-3.5 py-2 text-xs font-semibold uppercase tracking-wider text-[#ff8aa8] hover:bg-[#E60F43]/25"
+          >
+            Preview full screen
+          </button>
+        </div>
+      </div>
+
+      <div className="flex min-h-[20rem] items-center justify-center rounded-2xl border border-zinc-800 bg-gradient-to-b from-[#0A1017] to-zinc-950 py-10">
+        <TokioClockLoader
+          key={key}
+          message={message}
+          subMessage={subMessage || undefined}
+        />
+      </div>
+
+      {fullScreen ? (
+        <div className="fixed inset-0 z-[100]">
+          <TokioClockLoader
+            key={`fs-${key}`}
+            message={message}
+            subMessage={subMessage || undefined}
+            fullScreen
+          />
+          <button
+            type="button"
+            onClick={() => setFullScreen(false)}
+            className="fixed right-4 top-4 z-[101] rounded-full border border-white/20 bg-black/60 px-4 py-2 text-xs font-semibold uppercase tracking-wider text-white backdrop-blur-md hover:bg-black/80"
+          >
+            Close
+          </button>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function FoxMessagesPreview() {
+  return (
+    <div className="relative min-h-[22rem] space-y-5">
+      <div className="rounded-2xl border border-zinc-800 bg-[#0D1117] p-4 sm:p-5">
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-500">
+          Fire a fox message
+        </p>
+        <p className="mt-1 text-sm text-zinc-400">
+          Speaks bottom-left (same zone as Builder). Click the bubble to
+          dismiss.
+        </p>
+        <div className="mt-4 flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() =>
+              showSystemMessage({
+                text: "Tip: drag cities to reorder your route.",
+                tone: "tip",
+              })
+            }
+            className="rounded-xl border border-[#1BA58A]/50 bg-[#1BA58A]/15 px-3.5 py-2 text-xs font-semibold uppercase tracking-wider text-[#7dd3c0]"
+          >
+            Tip
+          </button>
+          <button
+            type="button"
+            onClick={() =>
+              showSystemMessage({
+                text: "Something went wrong saving this step. Try again.",
+                tone: "error",
+              })
+            }
+            className="rounded-xl border border-[#E60F43]/50 bg-[#E60F43]/15 px-3.5 py-2 text-xs font-semibold uppercase tracking-wider text-[#ff8aa8]"
+          >
+            Error
+          </button>
+          <button
+            type="button"
+            onClick={() =>
+              showSystemMessage({
+                text: "Pick at least one experience before continuing.",
+                tone: "info",
+              })
+            }
+            className="rounded-xl border border-[#075473]/50 bg-[#075473]/20 px-3.5 py-2 text-xs font-semibold uppercase tracking-wider text-[#7dd3fc]"
+          >
+            Instruction
+          </button>
+        </div>
+      </div>
+
+      <div className="relative h-64 overflow-hidden rounded-2xl border border-dashed border-zinc-700 bg-zinc-950/80">
+        <p className="absolute left-4 top-4 text-[0.65rem] font-semibold uppercase tracking-[0.18em] text-zinc-600">
+          Preview stage
+        </p>
+        <SystemMessageFox />
+      </div>
     </div>
   );
 }

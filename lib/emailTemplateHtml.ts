@@ -28,6 +28,9 @@ export type ProposalEmailParams = {
   endDate?: string | null;
   /** Include deposit / how-booking-works disclosure (Send / Print). */
   includeBookingDisclosure?: boolean;
+  includeWalletCta?: boolean;
+  heroImageUrl?: string;
+  footerImageUrl?: string;
 } & ProposalTripMeta;
 
 /** Format ISO YYYY-MM-DD → `24 Sep 2026`. */
@@ -89,7 +92,9 @@ export function renderProposalEmailHtml(params: ProposalEmailParams): string {
     welcomeBody: params.welcomeBody,
     ctaButtonText: params.ctaButtonText,
     ctaUrl: params.ctaUrl,
-    includeWalletCta: true,
+    includeWalletCta: params.includeWalletCta === true,
     includeBookingDisclosure: params.includeBookingDisclosure !== false,
+    heroImageUrl: params.heroImageUrl,
+    footerImageUrl: params.footerImageUrl,
   });
 }

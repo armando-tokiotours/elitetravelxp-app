@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
-import { ArrowLeft, ArrowRight } from "lucide-react";
+import { ArrowLeft, ArrowRight, Minus, Plus } from "lucide-react";
 import {
   INTERESTS,
   MOTIVATIONS,
@@ -34,8 +34,11 @@ import {
 import { isVideoFilename } from "@/lib/brandingUi";
 import { StoryExplanationModal } from "@/components/pre-elite/StoryExplanationModal";
 import { GuestPartyMascots } from "@/components/pre-elite/GuestPartyMascots";
+import { PhoneCountryField } from "@/components/pre-elite/PhoneCountryField";
 import { TimingSelector } from "@/components/pre-elite/TimingSelector";
+import { SystemMessageFox } from "@/components/branding/SystemMessageFox";
 import { usePreBuilderStore } from "@/store/usePreBuilderStore";
+import { showSystemMessage } from "@/store/useSystemMessageStore";
 import {
   GoldLight,
   type GoldLightPlacement,
@@ -227,6 +230,7 @@ export function PreEliteBuilderClient() {
     const message = stepError(step, draft);
     if (message) {
       setError(message);
+      showSystemMessage({ text: message, tone: "error" });
       return;
     }
     setError(null);
@@ -247,6 +251,7 @@ export function PreEliteBuilderClient() {
     const message = stepError(5, draft);
     if (message) {
       setError(message);
+      showSystemMessage({ text: message, tone: "error" });
       return;
     }
     setError(null);
@@ -300,6 +305,7 @@ export function PreEliteBuilderClient() {
           : "min-h-dvh bg-transparent text-white"
       }
     >
+      <SystemMessageFox />
       <header className="shrink-0 border-b border-white/10">
         <div className="mx-auto flex max-w-3xl items-center justify-between px-5 py-5">
           <Link href="/" className="inline-flex items-center gap-2">
@@ -387,7 +393,7 @@ export function PreEliteBuilderClient() {
             <div
               className={
                 step === 5
-                  ? "mx-auto max-w-3xl px-5 pb-10 pt-3"
+                  ? "mx-auto max-w-3xl px-5 pb-6 pt-3"
                   : "mx-auto max-w-3xl px-5 pb-10 pt-6"
               }
             >
@@ -516,12 +522,12 @@ export function PreEliteBuilderClient() {
                 </AnimatePresence>
 
                 {error && (
-                  <p className="mt-5 text-sm text-[#075473]" role="alert">
+                  <p className="sr-only" role="alert">
                     {error}
                   </p>
                 )}
 
-                <div className="mt-7 flex items-center justify-between gap-3">
+                <div className="mt-4 flex items-center justify-between gap-3">
                   <button
                     type="button"
                     onClick={goBack}
@@ -799,18 +805,22 @@ function ContactFields({
 
   return (
     <div className="relative overflow-visible">
-      <div className="grid gap-4">
+      <div className="grid gap-3">
         <Field label="Trip type" as="div">
-          <div className="grid gap-2 sm:grid-cols-2">
+          <div className="grid grid-cols-2 gap-2">
             {TRIP_TYPES.map((option) => {
               const on = tripType === option.id;
+              const thumb =
+                option.id === "multi_day"
+                  ? "/brand/trip-multi-thumb.webp"
+                  : "/brand/trip-single-thumb.webp";
               return (
                 <button
                   key={option.id}
                   type="button"
                   aria-pressed={on}
                   onClick={() => onTripType(option.id)}
-                  className={`group relative overflow-hidden rounded-2xl px-4 py-3.5 text-left transition ${
+                  className={`group relative overflow-hidden rounded-2xl text-left transition ${
                     on
                       ? "border-2 bg-[#F6A724]/10"
                       : "border border-white/10 bg-black/20 hover:border-white/25"
@@ -830,12 +840,26 @@ function ContactFields({
                     active={on}
                     className="!z-[1]"
                   />
-                  <span className="relative z-10 block text-sm font-medium text-white">
-                    {option.title}
-                  </span>
-                  <span className="relative z-10 mt-1 block text-xs leading-relaxed text-white/55">
-                    {option.description}
-                  </span>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={thumb}
+                    alt=""
+                    aria-hidden
+                    draggable={false}
+                    className="relative z-10 h-14 w-full object-cover sm:h-16"
+                  />
+                  <div className="relative z-10 px-2.5 py-2 sm:px-3">
+                    <span className="block text-[0.8rem] font-medium leading-snug text-white sm:text-sm">
+                      {option.id === "multi_day"
+                        ? "Multi-Day Journey"
+                        : "Single-Day Tour"}
+                    </span>
+                    <span className="mt-0.5 block text-[0.65rem] leading-snug text-white/55 sm:text-xs">
+                      {option.id === "multi_day"
+                        ? "Hotels, cities & full itinerary."
+                        : "One focused 6–8 hour day trip."}
+                    </span>
+                  </div>
                 </button>
               );
             })}
@@ -862,14 +886,10 @@ function ContactFields({
             className={inputClass}
           />
         </Field>
-        <Field label="WhatsApp number" hint="Optional">
-          <input
+        <Field label="Phone">
+          <PhoneCountryField
             value={whatsapp}
-            onChange={(e) => onChange({ whatsapp: e.target.value })}
-            autoComplete="tel"
-            inputMode="tel"
-            placeholder="+81 …"
-            className={inputClass}
+            onChange={(full) => onChange({ whatsapp: full })}
           />
         </Field>
         <Field
@@ -886,39 +906,66 @@ function ContactFields({
           />
         </Field>
         <div className="grid grid-cols-2 gap-3">
-          <Field label="Adults">
-            <input
-              type="number"
+          <Field label="Adults" as="div">
+            <GuestStepper
+              value={adults}
               min={1}
               max={20}
-              value={adults}
-              onChange={(e) =>
-                onChange({
-                  adults: Math.max(1, Math.min(20, Number(e.target.value) || 1)),
-                })
-              }
-              className={inputClass}
+              label="Adults"
+              onChange={(n) => onChange({ adults: n })}
             />
           </Field>
-          <Field label="Children" labelClassName="text-[#DC6E8A]">
-            <input
-              type="number"
+          <Field label="Children" labelClassName="text-[#DC6E8A]" as="div">
+            <GuestStepper
+              value={children}
               min={0}
               max={20}
-              value={children}
-              onChange={(e) =>
-                onChange({
-                  children: Math.max(
-                    0,
-                    Math.min(20, Number(e.target.value) || 0)
-                  ),
-                })
-              }
-              className={inputClass}
+              label="Children"
+              onChange={(n) => onChange({ children: n })}
             />
           </Field>
         </div>
       </div>
+    </div>
+  );
+}
+
+function GuestStepper({
+  value,
+  min,
+  max,
+  label,
+  onChange,
+}: {
+  value: number;
+  min: number;
+  max: number;
+  label: string;
+  onChange: (n: number) => void;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-2 rounded-xl border border-white/10 bg-[#121212] px-2 py-1.5">
+      <button
+        type="button"
+        aria-label={`Decrease ${label}`}
+        disabled={value <= min}
+        onClick={() => onChange(Math.max(min, value - 1))}
+        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/15 text-white transition hover:bg-white/10 disabled:opacity-35"
+      >
+        <Minus className="h-3.5 w-3.5" aria-hidden />
+      </button>
+      <span className="min-w-[1.5rem] text-center text-sm font-semibold text-white">
+        {value}
+      </span>
+      <button
+        type="button"
+        aria-label={`Increase ${label}`}
+        disabled={value >= max}
+        onClick={() => onChange(Math.min(max, value + 1))}
+        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/15 text-white transition hover:bg-white/10 disabled:opacity-35"
+      >
+        <Plus className="h-3.5 w-3.5" aria-hidden />
+      </button>
     </div>
   );
 }
@@ -940,7 +987,7 @@ function Field({
   return (
     <Tag className="block">
       <span
-        className={`mb-1.5 flex items-baseline justify-between text-xs tracking-[0.14em] uppercase ${
+        className={`mb-1 flex items-baseline justify-between text-xs tracking-[0.14em] uppercase ${
           labelClassName ?? "text-[#1BA58A]"
         }`}
       >
@@ -953,4 +1000,4 @@ function Field({
 }
 
 const inputClass =
-  "w-full rounded-xl border border-white/10 bg-[#121212] px-3 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-[#075473]";
+  "w-full rounded-xl border border-white/10 bg-[#121212] px-3 py-2.5 text-sm text-white outline-none placeholder:text-white/30 focus:border-[#075473]";

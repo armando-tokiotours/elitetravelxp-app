@@ -53,32 +53,30 @@ export function NewBookingResetButton({
     "flex shrink-0 cursor-pointer items-center justify-center self-stretch rounded-lg border border-zinc-800 bg-[#1C1C1E] p-2 text-zinc-400 transition-all hover:border-red-500/50 hover:bg-red-950/20 hover:text-red-400 disabled:opacity-50";
 
   const navBtn =
-    "ml-auto flex items-center gap-1.5 rounded-xl border border-amber-500/40 bg-amber-500/20 px-3 py-2 text-[11px] font-bold tracking-wider text-amber-300 uppercase transition-all hover:bg-amber-500/30 active:scale-95 disabled:opacity-50";
+    "flex w-full items-center justify-center gap-1 rounded-xl border border-[#D91147]/55 bg-[#D91147]/20 px-2 py-2 text-[10px] font-bold tracking-wider text-[#D91147] uppercase transition-all hover:bg-[#D91147]/30 active:scale-95 disabled:opacity-50 sm:text-[11px]";
 
   return (
     <>
       <button
         type="button"
-        aria-label="Restart / Start New Booking"
-        title="Restart / Start New Booking"
+        aria-label="New booking"
+        title="New booking"
         disabled={busy}
         onClick={() => setOpen(true)}
         className={variant === "nav" ? navBtn : iconBtn}
       >
         {busy ? (
           <Loader2
-            className={`shrink-0 animate-spin ${variant === "nav" ? "h-3.5 w-3.5 text-amber-400" : "h-4 w-4"}`}
+            className={`shrink-0 animate-spin ${variant === "nav" ? "h-3.5 w-3.5 text-[#D91147]" : "h-4 w-4"}`}
             aria-hidden
           />
         ) : (
           <RotateCcw
-            className={`shrink-0 ${variant === "nav" ? "h-3.5 w-3.5 text-amber-400" : "h-4 w-4"}`}
+            className={`shrink-0 ${variant === "nav" ? "h-3.5 w-3.5 text-[#D91147]" : "h-4 w-4"}`}
             aria-hidden
           />
         )}
-        {variant === "nav" ? (
-          <span className="hidden sm:inline">New Booking</span>
-        ) : null}
+        {variant === "nav" ? <span>New +</span> : null}
       </button>
       <ResetBookingModal
         open={open}

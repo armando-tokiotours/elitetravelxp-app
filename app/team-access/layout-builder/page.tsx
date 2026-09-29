@@ -45,7 +45,11 @@ function HubFromQuery() {
   const searchParams = useSearchParams();
   const tab = searchParams.get("tab");
   const initial =
-    tab === "guest_party" || tab === "heroes" || tab === "characters"
+    tab === "guest_party" ||
+    tab === "heroes" ||
+    tab === "characters" ||
+    tab === "clock_loader" ||
+    tab === "fox_messages"
       ? tab
       : "characters";
   return <LayoutBuilderHub initialTab={initial} />;
