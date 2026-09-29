@@ -389,7 +389,7 @@ export function PreEliteBuilderClient() {
                   <HoldUntilReadyMascot
                     pose={heroPose}
                     poses={PRE_ELITE_HERO_POSES}
-                    imgClassName="h-28 w-auto select-none object-contain opacity-95 sm:h-44 md:h-48"
+                    imgClassName="h-28 w-auto select-none object-contain sm:h-44 md:h-48"
                   />
                 </MascotHiZoom>
               </span>
