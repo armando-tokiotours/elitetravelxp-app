@@ -332,11 +332,17 @@ export function PreEliteBuilderClient() {
       ) : (
         <>
           {/* Fixed hero through progress line — always visible on steps 1–5 */}
-          <div className="relative z-40 mx-auto w-full max-w-3xl shrink-0 px-5 pt-6">
+          <div
+            className={
+              step === 5
+                ? "relative z-40 mx-auto w-full max-w-3xl shrink-0 px-5 pt-3"
+                : "relative z-40 mx-auto w-full max-w-3xl shrink-0 px-5 pt-6"
+            }
+          >
             <div
               className={
                 step === 5
-                  ? "relative min-h-[9.5rem] overflow-visible sm:min-h-[10.5rem]"
+                  ? "relative min-h-[7rem] overflow-visible sm:min-h-[8rem]"
                   : "relative min-h-[7.5rem] overflow-visible sm:min-h-[8.5rem]"
               }
             >
@@ -358,18 +364,22 @@ export function PreEliteBuilderClient() {
                 <p className="text-xs tracking-[0.22em] text-[#1CA67F] uppercase">
                   Step {step} of 5
                 </p>
-                <h1 className="mt-3 max-w-[70%] font-display text-3xl leading-tight text-white sm:max-w-none sm:text-4xl">
-                  {step === 5 ? (
-                    <>
-                      Contact &
-                      <br />
-                      Timing
-                    </>
-                  ) : (
-                    STEP_TITLES[step - 1]
-                  )}
+                <h1
+                  className={
+                    step === 5
+                      ? "mt-1 max-w-[70%] font-display text-3xl leading-tight text-white sm:max-w-none sm:text-4xl"
+                      : "mt-3 max-w-[70%] font-display text-3xl leading-tight text-white sm:max-w-none sm:text-4xl"
+                  }
+                >
+                  {step === 5 ? "Contact & Timing" : STEP_TITLES[step - 1]}
                 </h1>
-                <p className="mt-2 max-w-xl pr-24 text-sm leading-relaxed text-white/60 sm:pr-32">
+                <p
+                  className={
+                    step === 5
+                      ? "mt-1 max-w-xl pr-24 text-sm leading-snug text-white/60 sm:pr-32"
+                      : "mt-2 max-w-xl pr-24 text-sm leading-relaxed text-white/60 sm:pr-32"
+                  }
+                >
                   {stepBlurb}
                 </p>
               </div>

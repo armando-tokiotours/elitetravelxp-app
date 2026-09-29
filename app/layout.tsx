@@ -121,6 +121,12 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           href="/brand/tokiotours-logo.png"
           as="image"
         />
+        <link
+          rel="preload"
+          href="/brand/fox-peek.webp"
+          as="image"
+          type="image/webp"
+        />
       </head>
       <body className="tokio-ambient-bg flex min-h-full flex-col font-futura text-tokio-ice">
         <DynamicTypography />

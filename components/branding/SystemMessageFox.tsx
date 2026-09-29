@@ -13,6 +13,8 @@ const CHAR_SPLIT = 48;
  * Fox-peek + comic speech bubble(s) — sharp pointy tail toward the fox.
  * Long copy splits into two bubbles; duration stays readable.
  */
+const FOX_SRC = "/brand/fox-peek.webp";
+
 export function SystemMessageFox() {
   const message = useSystemMessageStore((s) => s.message);
   const dismiss = useSystemMessageStore((s) => s.dismiss);
@@ -23,6 +25,12 @@ export function SystemMessageFox() {
   );
 
   const [partIndex, setPartIndex] = useState(0);
+
+  // Warm fox image as soon as the shell mounts (don't wait for first tip)
+  useEffect(() => {
+    const img = new window.Image();
+    img.src = FOX_SRC;
+  }, []);
 
   useEffect(() => {
     setPartIndex(0);
@@ -91,7 +99,7 @@ export function SystemMessageFox() {
             </div>
 
             <motion.img
-              src="/brand/fox-peek.webp"
+              src={FOX_SRC}
               alt=""
               aria-hidden
               draggable={false}
@@ -102,7 +110,16 @@ export function SystemMessageFox() {
               className="pointer-events-none -ml-1 h-[7.25rem] w-auto select-none object-contain object-left-bottom drop-shadow-[0_10px_18px_rgba(0,0,0,0.5)] sm:h-[8rem]"
             />
           </motion.div>
-        ) : null}
+        ) : (
+          /* Keep fox decoded off-screen so first tip paints from cache */
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={FOX_SRC}
+            alt=""
+            aria-hidden
+            className="pointer-events-none absolute h-0 w-0 opacity-0"
+          />
+        )}
       </AnimatePresence>
     </div>
   );
