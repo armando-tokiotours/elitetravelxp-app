@@ -440,7 +440,7 @@ export function PreEliteBuilderClient() {
                   : "mx-auto max-w-3xl px-5 pb-4 pt-2 sm:pb-8 sm:pt-4"
               }
             >
-              <div className="relative origin-top scale-[1.05] overflow-visible rounded-3xl border border-zinc-800/80 bg-[#0D1117]/80 p-5 backdrop-blur-md sm:p-7">
+              <div className="relative origin-top scale-[0.93] overflow-visible rounded-3xl border border-zinc-800/80 bg-[#0D1117]/80 p-5 backdrop-blur-md sm:p-7">
                 <AnimatePresence mode="wait">
                   <motion.div
                     key={step}
