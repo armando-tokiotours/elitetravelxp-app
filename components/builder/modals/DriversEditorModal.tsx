@@ -142,7 +142,7 @@ export function DriversEditorModal({
       {open ? (
         <motion.div
           key="drivers-editor"
-          className="fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-4"
+          className="fixed inset-0 z-50 flex flex-col bg-[#0A1017]"
           role="dialog"
           aria-modal="true"
           aria-label="Drivers and city transport"
@@ -151,34 +151,25 @@ export function DriversEditorModal({
           exit={{ opacity: 0 }}
           transition={{ duration: 0.2 }}
         >
-          <button
-            type="button"
-            aria-label="Close"
-            className="tokio-modal-backdrop absolute inset-0 cursor-default"
-            onClick={onClose}
-          />
           <motion.div
-            className="tokio-modal-content relative z-[1] flex h-[100dvh] max-h-[100dvh] w-full flex-col overflow-hidden border border-white/10 sm:h-[min(92dvh,44rem)] sm:max-h-[min(92dvh,44rem)] sm:max-w-lg sm:rounded-3xl"
-            initial={{ opacity: 0, y: 20 }}
+            className="relative z-[1] flex h-full w-full flex-col overflow-hidden bg-[#0A1017]"
+            initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 20 }}
+            exit={{ opacity: 0, y: -8 }}
             transition={{ duration: 0.25, ease: "easeOut" }}
           >
-            <div className="tokio-modal-chrome flex shrink-0 items-center gap-3 border-b px-4 pb-4 pt-[max(1rem,env(safe-area-inset-top))] sm:px-5 sm:pt-5">
+            <div className="sticky top-0 z-20 flex w-full shrink-0 items-center gap-3 border-b border-white/10 bg-[#0A1017]/95 px-4 py-3.5 pt-[max(0.875rem,env(safe-area-inset-top))] backdrop-blur-md">
               <button
                 type="button"
                 onClick={onClose}
                 aria-label="Back"
-                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-zinc-700 bg-zinc-900 text-white transition hover:border-zinc-500"
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white"
               >
                 <ArrowLeft className="h-5 w-5" />
               </button>
               <div className="min-w-0 flex-1">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#075473]">
-                  Configure
-                </p>
-                <h3 className="truncate font-display text-xl text-white sm:text-2xl">
-                  Drivers &amp; Transport
+                <h3 className="truncate font-godiva text-base uppercase tracking-wider text-white">
+                  Hotels &amp; Transport
                 </h3>
               </div>
             </div>

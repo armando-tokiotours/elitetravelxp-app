@@ -298,6 +298,12 @@ export async function syncSingleDayBookingLead(opts: {
         },
         dossierPdfUrl: opts.dossierPdfUrl ?? null,
         demand,
+        meetingPointName:
+          opts.state.meetingPointName || opts.state.meetingPoint || "",
+        meetingPointAddress: opts.state.meetingPoint || "",
+        meetingPointLat: opts.state.meetingPointLat ?? null,
+        meetingPointLng: opts.state.meetingPointLng ?? null,
+        meetingPointPlaceId: opts.state.meetingPointPlaceId || "",
       }),
     });
     if (!res.ok) {

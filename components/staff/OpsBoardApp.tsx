@@ -232,11 +232,9 @@ function OpsCard({
     dispatch?.driver_needed === true ||
     Boolean(driverId) ||
     Boolean(dispatch?.assigned_driver_id);
-  const guideNeeded =
-    row.guide_needed === true ||
-    dispatch?.guide_needed === true ||
-    Boolean(guideId) ||
-    Boolean(dispatch?.assigned_guide_id);
+  // 3h / 6h / 8h single-day and multi-day tours always expose Guide controls.
+  // Ops decides assign direct, post to board, or leave empty.
+  const guideNeeded = true;
 
   const ticketLines = Array.isArray(tickets?.ticket_lines)
     ? (tickets?.ticket_lines as { name?: string; qty?: number }[])

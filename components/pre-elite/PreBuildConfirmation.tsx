@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
-import { ArrowRight, Mail, RotateCcw, X } from "lucide-react";
+import { ArrowRight, HelpCircle, Save, X } from "lucide-react";
 import {
   INTERESTS,
   MOTIVATIONS,
@@ -116,6 +116,8 @@ export function PreBuildConfirmation({
   const [resendOpen, setResendOpen] = useState(false);
   const [saveGateOpen, setSaveGateOpen] = useState(false);
   const [saveModalOpen, setSaveModalOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
+  const [newBookingOpen, setNewBookingOpen] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [builderCharging, setBuilderCharging] = useState(false);
   const [builderWarmProgress, setBuilderWarmProgress] = useState<WarmProgress>({
@@ -183,6 +185,17 @@ export function PreBuildConfirmation({
   useModalDismiss(resendOpen, closeResendModal);
   useModalDismiss(saveGateOpen, closeSaveGateModal);
   useModalDismiss(saveModalOpen, () => setSaveModalOpen(false));
+  useModalDismiss(helpOpen, () => setHelpOpen(false));
+  useModalDismiss(newBookingOpen, () => setNewBookingOpen(false));
+
+  const confirmNewBooking = () => {
+    setNewBookingOpen(false);
+    setSending(false);
+    setIsEmailSent(false);
+    setIsBriefSaved(false);
+    cleanupHtml2PdfOverlay();
+    onReset?.();
+  };
 
   /** Persist brief locally (no email) + warm media assets. */
   const saveBriefLocal = () => {
@@ -460,38 +473,43 @@ export function PreBuildConfirmation({
             {/* Spacer under overlapping mascot — never capture clicks */}
             <div className="pointer-events-none h-16 w-full" aria-hidden />
 
-            {/* 2. Stacked Buttons directly beneath mascot (full labels, no truncation) */}
-            <div className="relative z-20 flex w-full flex-col space-y-2 pt-1">
-              <button
-                type="button"
-                onClick={() => {
-                  if (builderUnlocked) {
-                    setSaveModalOpen(true);
-                    return;
+            {/* 2. Grey Save + grey ? · gold Continue · New Booking */}
+            <div className="relative z-20 flex w-full flex-col items-center space-y-2 pt-1">
+              <div className="relative z-20 flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (builderUnlocked) {
+                      setSaveModalOpen(true);
+                      return;
+                    }
+                    saveBriefLocal();
+                  }}
+                  disabled={builderCharging}
+                  aria-label={
+                    builderCharging
+                      ? "Charging"
+                      : builderUnlocked
+                        ? "Saved"
+                        : "Save brief"
                   }
-                  saveBriefLocal();
-                }}
-                disabled={builderCharging}
-                className="relative z-20 flex w-full cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-xl bg-[#075473] px-2 py-2 text-[10px] font-bold tracking-wider text-white uppercase shadow-md transition-all pointer-events-auto hover:bg-[#096a91] disabled:opacity-60"
-              >
-                <span>
-                  {builderCharging
-                    ? "Charging…"
-                    : builderUnlocked
-                      ? "Saved ✓"
-                      : "Save"}
-                </span>
-              </button>
-
-              <button
-                type="button"
-                onClick={onSaveEmailClick}
-                disabled={sending}
-                className="relative z-20 flex w-full cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-xl border border-amber-500/40 bg-amber-500/10 px-2 py-2 text-[10px] font-bold tracking-wider text-amber-300 uppercase transition-all pointer-events-auto hover:bg-amber-500/20 disabled:opacity-60"
-              >
-                <Mail className="h-3 w-3 shrink-0" />
-                <span>{sending ? "Sending…" : "Email copy"}</span>
-              </button>
+                  className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-full border border-zinc-600/80 bg-zinc-900/80 text-zinc-400 transition-all pointer-events-auto hover:border-zinc-500 hover:text-zinc-300 disabled:opacity-50"
+                >
+                  {builderCharging ? (
+                    <span className="font-mono text-[9px] text-zinc-500">…</span>
+                  ) : (
+                    <Save className="h-4 w-4" strokeWidth={2} aria-hidden />
+                  )}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setHelpOpen(true)}
+                  aria-label="Help"
+                  className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-full border border-zinc-600/80 bg-zinc-900/80 text-zinc-400 transition-all pointer-events-auto hover:border-zinc-500 hover:text-zinc-300"
+                >
+                  <HelpCircle className="h-4 w-4" strokeWidth={2} />
+                </button>
+              </div>
 
               <button
                 type="button"
@@ -500,27 +518,27 @@ export function PreBuildConfirmation({
                   cleanupHtml2PdfOverlay();
                   openBuilder();
                 }}
-                className="relative z-20 flex w-full cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-xl border border-cyan-500/40 bg-cyan-500/20 px-2 py-2 text-[10px] font-bold tracking-wider text-cyan-300 uppercase transition-all pointer-events-auto hover:bg-cyan-500/30"
+                className="relative z-20 flex min-h-[5.25rem] w-full cursor-pointer flex-col items-center justify-center overflow-hidden rounded-xl border border-white/70 bg-white/10 px-2 py-3 text-center text-[#F6A724] shadow-md transition-all pointer-events-auto animate-locations-help-glow hover:bg-white/[0.14]"
               >
-                <span>Trip Builder</span>
-                <ArrowRight className="h-3 w-3 shrink-0" />
+                <span
+                  aria-hidden
+                  className="pointer-events-none absolute inset-0 animate-locations-help-ring rounded-xl border border-white/80"
+                />
+                <span className="relative z-10 inline-flex max-w-[9.5rem] flex-col items-center gap-1 px-1">
+                  <span className="text-[11px] font-bold leading-tight tracking-wider uppercase">
+                    Continue to Trip Builder!
+                  </span>
+                  <ArrowRight className="h-3.5 w-3.5" aria-hidden />
+                </span>
               </button>
 
               {onReset ? (
                 <button
                   type="button"
-                  onClick={() => {
-                    setSending(false);
-                    setIsEmailSent(false);
-                    setIsBriefSaved(false);
-                    cleanupHtml2PdfOverlay();
-                    onReset();
-                  }}
-                  title="Start Another Brief / Restart"
-                  aria-label="Restart Brief"
-                  className="relative z-20 flex w-full cursor-pointer items-center justify-center rounded-xl border border-zinc-700 bg-black/40 py-1.5 font-bold text-zinc-300 transition-all pointer-events-auto hover:bg-zinc-800"
+                  onClick={() => setNewBookingOpen(true)}
+                  className="relative z-20 flex min-h-[2.75rem] w-full cursor-pointer items-center justify-center rounded-xl border border-zinc-700 bg-black/40 px-2 text-[10px] font-bold uppercase tracking-wider text-zinc-200 transition-all pointer-events-auto hover:bg-zinc-800"
                 >
-                  <RotateCcw className="h-3.5 w-3.5 text-zinc-300" />
+                  New Booking
                 </button>
               ) : null}
             </div>
@@ -545,8 +563,8 @@ export function PreBuildConfirmation({
             </h3>
             <p className="pt-1 text-[11px] leading-relaxed text-zinc-400">
               {builderUnlocked
-                ? "We've got your ideas saved. Keep this reference handy — your concierge will use it to design your trip."
-                : "Review your selections below. Tap Save to unlock Trip Builder (email is optional)."}
+                ? "Thank you! Now let's build your trip."
+                : "Review your selections below. Tap Save to unlock Trip Builder."}
             </p>
             {(actionMsg || actionErr) && (
               <p
@@ -611,16 +629,21 @@ export function PreBuildConfirmation({
           closeSaveGateModal();
           saveBriefLocal();
         }}
-        onSaveEmail={() => {
-          closeSaveGateModal();
-          onSaveEmailClick();
-        }}
       />
 
       <SaveConfirmModal
         open={saveModalOpen}
         onClose={() => setSaveModalOpen(false)}
         onSaveAgain={saveBriefLocal}
+      />
+
+      <PreBuildHelpModal open={helpOpen} onClose={() => setHelpOpen(false)} />
+
+      <NewBookingWarningModal
+        open={newBookingOpen}
+        incomplete={!builderUnlocked}
+        onClose={() => setNewBookingOpen(false)}
+        onConfirm={confirmNewBooking}
       />
 
       {toast ? (
@@ -643,12 +666,10 @@ function SaveEmailGateModal({
   open,
   onClose,
   onSave,
-  onSaveEmail,
 }: {
   open: boolean;
   onClose: () => void;
   onSave: () => void;
-  onSaveEmail: () => void;
 }) {
   if (typeof document === "undefined") return null;
 
@@ -696,26 +717,10 @@ function SaveEmailGateModal({
               Save Your Request First
             </h3>
             <p className="mt-3 text-sm leading-relaxed text-white/70">
-              Tap Save to unlock Trip Builder. Email is optional if you also want
-              a copy in your inbox.
+              Tap Save to unlock Trip Builder before continuing.
             </p>
 
-            <div className="mt-6 grid grid-cols-1 gap-2">
-              <button
-                type="button"
-                onClick={onSave}
-                className="rounded-xl bg-[#075473] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[#096a91]"
-              >
-                Save
-              </button>
-              <button
-                type="button"
-                onClick={onSaveEmail}
-                className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm font-semibold text-amber-200 transition hover:bg-amber-500/20"
-              >
-                <Mail className="h-4 w-4 shrink-0" />
-                Save &amp; Email
-              </button>
+            <div className="mt-6 grid grid-cols-1 gap-2 sm:grid-cols-2">
               <button
                 type="button"
                 onClick={onClose}
@@ -723,7 +728,182 @@ function SaveEmailGateModal({
               >
                 Close
               </button>
+              <button
+                type="button"
+                onClick={onSave}
+                className="rounded-xl bg-[#075473] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[#096a91]"
+              >
+                Save
+              </button>
             </div>
+          </motion.div>
+        </motion.div>
+      ) : null}
+    </AnimatePresence>,
+    document.body
+  );
+}
+
+function NewBookingWarningModal({
+  open,
+  incomplete,
+  onClose,
+  onConfirm,
+}: {
+  open: boolean;
+  /** Brief not saved yet — booking is incomplete. */
+  incomplete: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+}) {
+  if (typeof document === "undefined") return null;
+
+  const body = incomplete
+    ? `${getSystemMessage("builder_incomplete")} Starting a new booking will erase this incomplete brief.`
+    : "If you start a new booking, you will lose this trip — tours, activities, and the other configurations you need to continue will no longer be available on this brief.";
+
+  return createPortal(
+    <AnimatePresence>
+      {open ? (
+        <motion.div
+          key="new-booking-warn"
+          className="fixed inset-0 z-[140] flex flex-col items-center justify-center bg-[#04080C]/95 px-5 py-8 backdrop-blur-md"
+          role="alertdialog"
+          aria-modal="true"
+          aria-labelledby="new-booking-warn-title"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+        >
+          {/* Fox peeks from bottom-left corner */}
+          <motion.img
+            src="/brand/fox-peek.webp"
+            alt=""
+            initial={{ x: -40, opacity: 0 }}
+            animate={{ x: 0, opacity: 1 }}
+            exit={{ x: -24, opacity: 0 }}
+            className="pointer-events-none absolute bottom-[5.5rem] left-0 z-[1] h-[7.5rem] w-auto object-contain object-left drop-shadow-[0_12px_28px_rgba(0,0,0,0.85)] sm:bottom-28 sm:h-36"
+          />
+
+          <motion.div
+            className="relative z-[2] flex w-full max-w-lg flex-col items-center text-center"
+            initial={{ y: 28, opacity: 0, scale: 0.96 }}
+            animate={{ y: 0, opacity: 1, scale: 1 }}
+            exit={{ y: 16, opacity: 0 }}
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={MASCOT_UPRIGHT}
+              alt=""
+              className="mb-5 h-24 w-24 object-contain sm:h-28 sm:w-28"
+            />
+            <p className="text-[10px] font-bold tracking-[0.22em] text-amber-400 uppercase">
+              Wait!
+            </p>
+            <h3
+              id="new-booking-warn-title"
+              className="mt-2 font-godiva text-2xl tracking-wider text-white uppercase sm:text-3xl"
+            >
+              {incomplete ? "Booking incomplete" : "Start a new booking?"}
+            </h3>
+            <p className="mt-4 max-w-md text-sm leading-relaxed text-white/70 sm:text-base">
+              {body}
+            </p>
+            <div className="mt-8 grid w-full max-w-sm grid-cols-1 gap-2 sm:grid-cols-2">
+              <button
+                type="button"
+                onClick={onClose}
+                className="rounded-xl border border-white/15 bg-black/50 px-4 py-3.5 text-sm font-semibold text-white/85"
+              >
+                Keep this trip
+              </button>
+              <button
+                type="button"
+                onClick={onConfirm}
+                className="rounded-xl border border-red-500/40 bg-red-950/50 px-4 py-3.5 text-sm font-semibold text-red-300"
+              >
+                Yes, new booking
+              </button>
+            </div>
+          </motion.div>
+        </motion.div>
+      ) : null}
+    </AnimatePresence>,
+    document.body
+  );
+}
+
+function PreBuildHelpModal({
+  open,
+  onClose,
+}: {
+  open: boolean;
+  onClose: () => void;
+}) {
+  if (typeof document === "undefined") return null;
+
+  return createPortal(
+    <AnimatePresence>
+      {open ? (
+        <motion.div
+          key="prebuild-help"
+          className="fixed inset-0 z-[130] flex items-center justify-center bg-[#05080C]/75 p-4 backdrop-blur-sm"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="prebuild-help-title"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+        >
+          <button
+            type="button"
+            aria-label="Close"
+            className="absolute inset-0"
+            onClick={onClose}
+          />
+          <motion.div
+            className="relative z-[1] w-full max-w-md overflow-hidden rounded-2xl border border-amber-500/30 bg-[#0D1117] p-5 shadow-[0_0_40px_rgba(246,167,36,0.2)] sm:p-6"
+            initial={{ y: 24, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: 24, opacity: 0 }}
+          >
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Close"
+              className="absolute top-3 right-3 flex h-10 w-10 items-center justify-center rounded-full border border-white/20 bg-black/50 text-white"
+            >
+              <X className="h-5 w-5" strokeWidth={2.5} />
+            </button>
+            <p className="text-[10px] font-bold tracking-[0.2em] text-amber-400 uppercase">
+              Quick help
+            </p>
+            <h3
+              id="prebuild-help-title"
+              className="mt-2 font-godiva text-2xl tracking-wider text-white uppercase"
+            >
+              What next?
+            </h3>
+            <ul className="mt-4 space-y-3 text-sm leading-relaxed text-white/70">
+              <li>
+                <span className="font-semibold text-white">1. Save</span>
+              </li>
+              <li>
+                <span className="font-semibold text-white">
+                  2. Continue to Trip Builder!
+                </span>
+              </li>
+              <li>
+                <span className="font-semibold text-white">3. New Booking</span>
+              </li>
+            </ul>
+            <button
+              type="button"
+              onClick={onClose}
+              className="mt-6 w-full rounded-xl bg-[#075473] px-4 py-3 text-sm font-semibold text-white"
+            >
+              Got it
+            </button>
           </motion.div>
         </motion.div>
       ) : null}

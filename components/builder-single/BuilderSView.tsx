@@ -6,7 +6,7 @@ import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import { ArrowLeft, Check, Clock, MapPin, TrainFront } from "lucide-react";
 import type { BuilderConfig, PbCity, PbTour } from "@/lib/pocketbase/client";
-import { cityPhoto, pbFileUrl } from "@/lib/pocketbase/client";
+import { cityPhoto, pbFileUrl, tourPhoto } from "@/lib/pocketbase/client";
 import { PB_THUMBS } from "@/lib/mediaStandards";
 import {
   formatMinutes,
@@ -18,12 +18,23 @@ import {
 import { useBuilderStore } from "@/store/useBuilderStore";
 import { useLazyModalMount } from "@/components/builder/modals/useLazyModalMount";
 import { CityLanguageSelect } from "@/components/builder/CityLanguageSelect";
-import { GoldLight } from "@/components/branding/GoldLight";
 import { resolveSingleDayCityThumbnail } from "@/config/mediaConfig";
 import { SingleDayProgressBar } from "@/components/builder-single/SingleDayProgressBar";
 import { MovementDetailModal } from "@/components/builder-s/MovementDetailModal";
+import { BuilderEditModalShell } from "@/components/builder/modals/BuilderEditModalShell";
+import { CityFocusModal } from "@/components/builder/modals/CityFocusModal";
+import { MeetingPointPlacesPicker } from "@/components/builder/MeetingPointPlacesPicker";
 import { LazyVideo } from "@/components/ui/LazyVideo";
 import { useSiteBrandingStore } from "@/store/useSiteBrandingStore";
+import type { GeoapifyPlace } from "@/lib/geoapify";
+import { languageFlag, languageToCode } from "@/lib/tourLanguages";
+import {
+  getWidgetPulsarClass,
+  WidgetCallingPulse,
+} from "@/components/branding/WidgetCallingPulse";
+import { syncSingleDayBookingLead } from "@/lib/syncBookingLead";
+import { useItineraryStore } from "@/store/useItineraryStore";
+import { usePreBuilderStore } from "@/store/usePreBuilderStore";
 
 const SingleDayTripDetailModal = dynamic(
   () =>
@@ -55,7 +66,6 @@ type SEditId =
   | "locations"
   | "tours"
   | "logistics"
-  | "language"
   | "meeting"
   | null;
 
@@ -66,46 +76,43 @@ type GlowStep =
   | "language"
   | "meeting"
   | "tours"
-  | "transport";
+  | "transport"
+  | "save";
 
+type PulsarStep =
+  | "city"
+  | "duration"
+  | "guests"
+  | "meeting"
+  | "tours"
+  | "transport"
+  | "save";
+
+/** Outer shell — no overflow-hidden (clips calling pulse). Clip media on an inner layer. */
 const WIDGET_SHELL =
-  "w-full bg-[#0A1017]/90 border border-white/10 rounded-[22px] p-4 text-left relative overflow-hidden shadow-xl hover:border-amber-500/40 transition-all active:scale-95 group";
+  "w-full bg-[#0A1017]/90 border rounded-[22px] p-4 text-left relative overflow-visible shadow-xl hover:border-amber-500/40 transition-all active:scale-95 group";
 
 const HALF = `${WIDGET_SHELL} h-36`;
-
-const START_TIMES = [
-  "08:00",
-  "08:30",
-  "09:00",
-  "09:30",
-  "10:00",
-  "10:30",
-  "11:00",
-] as const;
 
 const TRANSPORT_OPTIONS: {
   id: IntraCityTransport;
   label: string;
   brandingKey: string;
-  spotlight: string;
 }[] = [
   {
     id: "walk",
     label: "Walk",
     brandingKey: "transit_walk",
-    spotlight: "#DC6E8A",
   },
   {
     id: "subway",
     label: "Public / Suica",
     brandingKey: "transit_subway",
-    spotlight: "#054F70",
   },
   {
     id: "private_driver",
     label: "Private / taxi",
     brandingKey: "transit_private_driver",
-    spotlight: "#F6A724",
   },
 ];
 
@@ -135,22 +142,29 @@ export function BuilderSView({
   catalog,
   selectedCity,
   onSelectCity,
+  onActivePulsarStepChange,
 }: {
   config: BuilderConfig | null;
   catalog: PbTour[];
   selectedCity: PbCity | null;
   onSelectCity: (city: PbCity) => void;
+  /** Lets parent pulse Save & View when guided flow reaches the end. */
+  onActivePulsarStepChange?: (step: PulsarStep | null) => void;
 }) {
   const [activeEditModal, setActiveEditModal] = useState<SEditId>(null);
   const [movementModal, setMovementModal] =
     useState<IntraCityTransport | null>(null);
+  /** After city change confirm, force guided pulsar onto Hours & Date. */
+  const [pulsarOverride, setPulsarOverride] = useState<GlowStep | null>(null);
+  const [activePulsarStep, setActivePulsarStep] = useState<PulsarStep | null>(
+    "city"
+  );
 
   const durationMounted = useLazyModalMount(activeEditModal === "duration");
   const guestsMounted = useLazyModalMount(activeEditModal === "guests");
   const cityMounted = useLazyModalMount(activeEditModal === "locations");
   const toursMounted = useLazyModalMount(activeEditModal === "tours");
   const logisticsMounted = useLazyModalMount(activeEditModal === "logistics");
-  const languageMounted = useLazyModalMount(activeEditModal === "language");
   const meetingMounted = useLazyModalMount(activeEditModal === "meeting");
 
   const tourDate = useSingleDayBuilderStore((s) => s.tourDate);
@@ -164,6 +178,9 @@ export function BuilderSView({
   );
   const startTime = useSingleDayBuilderStore((s) => s.startTime);
   const meetingPoint = useSingleDayBuilderStore((s) => s.meetingPoint);
+  const meetingPointName = useSingleDayBuilderStore((s) => s.meetingPointName);
+  const meetingPointLat = useSingleDayBuilderStore((s) => s.meetingPointLat);
+  const meetingPointLng = useSingleDayBuilderStore((s) => s.meetingPointLng);
   const preferredMovement = useSingleDayBuilderStore(
     (s) => s.preferredMovement
   );
@@ -171,17 +188,21 @@ export function BuilderSView({
     (s) => s.preferredTourLanguage
   );
   const blocks = useSingleDayBuilderStore((s) => s.blocks);
-  const setStartTime = useSingleDayBuilderStore((s) => s.setStartTime);
-  const setMeetingPoint = useSingleDayBuilderStore((s) => s.setMeetingPoint);
-  const setPreferredTourLanguage = useSingleDayBuilderStore(
-    (s) => s.setPreferredTourLanguage
-  );
   const setPreferredMovement = useSingleDayBuilderStore(
     (s) => s.setPreferredMovement
   );
   const specialNeeds = useBuilderStore((s) => s.specialNeeds);
 
   const openEditModal = useCallback((id: Exclude<SEditId, null>) => {
+    if (
+      id === "duration" ||
+      id === "tours" ||
+      id === "meeting" ||
+      id === "logistics" ||
+      id === "guests"
+    ) {
+      setPulsarOverride(null);
+    }
     setActiveEditModal(id);
   }, []);
 
@@ -228,39 +249,113 @@ export function BuilderSView({
   }, [cityFocus, cities, selectedCity]);
 
   const nextGlow = useMemo((): GlowStep | null => {
+    if (pulsarOverride === "hours" && cityFocus.trim()) return "hours";
+    if (pulsarOverride === "guests" && cityFocus.trim() && tourDate) {
+      return "guests";
+    }
+    if (pulsarOverride === "meeting" && cityFocus.trim() && tourDate) {
+      if (!meetingPoint.trim()) return "meeting";
+    }
+    if (pulsarOverride === "tours" && meetingPoint.trim()) return "tours";
+    if (pulsarOverride === "transport" && selectedExperiences.length > 0) {
+      return "transport";
+    }
+    if (pulsarOverride === "save" && preferredMovement != null) return "save";
     if (!cityFocus.trim()) return "city";
     if (!tourDate) return "hours";
     if (travelPace === null || specialNeeds.length === 0) return "guests";
-    // EN default counts as set — skip language when preferredTourLanguage present
-    if (!String(preferredTourLanguage || "").trim()) return "language";
     if (!meetingPoint.trim()) return "meeting";
     if (selectedExperiences.length === 0) return "tours";
     if (preferredMovement == null) return "transport";
-    return null;
+    return "save";
   }, [
+    pulsarOverride,
     cityFocus,
     tourDate,
     travelPace,
     specialNeeds.length,
-    preferredTourLanguage,
     meetingPoint,
     selectedExperiences.length,
     preferredMovement,
   ]);
 
+  useEffect(() => {
+    const map: Record<string, PulsarStep> = {
+      city: "city",
+      hours: "duration",
+      guests: "guests",
+      meeting: "meeting",
+      tours: "tours",
+      transport: "transport",
+      save: "save",
+    };
+    if (!nextGlow) {
+      setActivePulsarStep(null);
+      return;
+    }
+    setActivePulsarStep(map[nextGlow] ?? "city");
+  }, [nextGlow]);
+
+  useEffect(() => {
+    onActivePulsarStepChange?.(activePulsarStep);
+  }, [activePulsarStep, onActivePulsarStepChange]);
+
+  const meetMapBg = useMemo(() => {
+    const hasMeeting =
+      Boolean((meetingPointName || "").trim() || meetingPoint.trim()) ||
+      (meetingPointLat != null &&
+        meetingPointLng != null &&
+        Number.isFinite(meetingPointLat) &&
+        Number.isFinite(meetingPointLng));
+    // After a meeting point is picked, use the Tokyo metro map canvas
+    return hasMeeting ? "/brand/tokyo-metro-map.png" : "";
+  }, [meetingPoint, meetingPointName, meetingPointLat, meetingPointLng]);
+
+  const experienceBands = useMemo(() => {
+    const byId = Object.fromEntries(catalog.map((t) => [t.id, t]));
+    return selectedExperiences.slice(0, 4).map((exp) => {
+      const tour = byId[exp.tourId];
+      const filename = tour ? tourPhoto(tour) : "";
+      const photoUrl =
+        tour && filename && tour.collectionId
+          ? pbFileUrl(tour.collectionId, tour.id, filename, {
+              thumb: PB_THUMBS.card,
+              format: "webp",
+            })
+          : "";
+      return {
+        key: exp.tourId,
+        title: tour?.title || exp.title,
+        photoUrl,
+      };
+    });
+  }, [catalog, selectedExperiences]);
+
+  const meetLabel =
+    (meetingPointName || "").trim() ||
+    meetingPoint.trim() ||
+    "Set meeting point";
+  const meetAddress =
+    meetingPoint.trim() &&
+    meetingPoint.trim() !== (meetingPointName || "").trim()
+      ? meetingPoint.trim()
+      : "Hotel / Hub Pick-Up";
+  const langCode = languageToCode(preferredTourLanguage || "EN") || "EN";
+  const langBadge = `lenguaje: ${languageFlag(preferredTourLanguage || "EN")} ${langCode}`;
+
   return (
     <>
       <SingleDayProgressBar />
-      <div className="mx-auto w-full max-w-2xl space-y-5 px-4 py-6">
-        <div>
+      <div className="mx-auto w-full max-w-2xl space-y-5 overflow-visible px-4 py-6">
+        <div className="overflow-visible">
           <button
             type="button"
             onClick={() => openEditModal("locations")}
-            className={`${WIDGET_SHELL} h-[14.5rem] p-0`}
+            className={`${WIDGET_SHELL} ${getWidgetPulsarClass(activePulsarStep, "city")} h-[14.5rem] p-0`}
           >
-            <GoldLight active={nextGlow === "city"} />
+            <WidgetCallingPulse active={activePulsarStep === "city"} />
             {cityFocus.trim() && cityThumb ? (
-              <div className="relative z-10 h-full w-full overflow-hidden">
+              <div className="absolute inset-0 z-0 overflow-hidden rounded-[22px]">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={cityThumb}
@@ -281,7 +376,7 @@ export function BuilderSView({
                 </div>
               </div>
             ) : cityFocus.trim() ? (
-              <div className="relative z-10 flex h-full flex-col justify-end bg-gradient-to-br from-[#1a3355] to-[#0B1F3A] p-4">
+              <div className="relative z-10 flex h-full flex-col justify-end overflow-hidden rounded-[22px] bg-gradient-to-br from-[#1a3355] to-[#0B1F3A] p-4">
                 <span className="block font-mono text-[10px] font-bold uppercase tracking-wider text-cyan-300">
                   CITY FOCUS
                 </span>
@@ -303,14 +398,14 @@ export function BuilderSView({
           <WidgetLabel>City</WidgetLabel>
         </div>
 
-        <div className="grid grid-cols-2 gap-3.5">
-          <div>
+        <div className="grid grid-cols-2 gap-3.5 overflow-visible">
+          <div className="overflow-visible">
             <button
               type="button"
               onClick={() => openEditModal("duration")}
-              className={HALF}
+              className={`${HALF} ${getWidgetPulsarClass(activePulsarStep, "duration")}`}
             >
-              <GoldLight active={nextGlow === "hours"} />
+            <WidgetCallingPulse active={activePulsarStep === "duration"} />
               <div className="relative z-10 flex items-center justify-between">
                 <span className="text-xl" aria-hidden>
                   📅
@@ -324,20 +419,22 @@ export function BuilderSView({
                   {tourHours}H TOUR
                 </h3>
                 <p className="mt-1 font-mono text-[11px] text-zinc-300">
-                  {dateText || "Set Tour Date"}
+                  {dateText
+                    ? `${dateText} · ${startTime || "09:00"}`
+                    : "Set Tour Date"}
                 </p>
               </div>
             </button>
             <WidgetLabel>Hours &amp; Date</WidgetLabel>
           </div>
 
-          <div>
+          <div className="overflow-visible">
             <button
               type="button"
               onClick={() => openEditModal("guests")}
-              className={HALF}
+              className={`${HALF} ${getWidgetPulsarClass(activePulsarStep, "guests")}`}
             >
-              <GoldLight active={nextGlow === "guests"} />
+            <WidgetCallingPulse active={activePulsarStep === "guests"} />
               <div className="relative z-10 flex items-center justify-between">
                 <span className="text-xl" aria-hidden>
                   👥
@@ -359,77 +456,73 @@ export function BuilderSView({
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-3.5">
-          <div>
-            <button
-              type="button"
-              onClick={() => openEditModal("language")}
-              className={HALF}
-            >
-              <GoldLight active={nextGlow === "language"} />
-              <div className="relative z-10 flex items-center justify-between">
-                <span className="text-xl" aria-hidden>
-                  🗣️
-                </span>
-                <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 font-mono text-[10px] font-bold uppercase tracking-widest text-emerald-400">
-                  LANG
-                </span>
-              </div>
-              <div className="relative z-10 mt-3">
-                <h3 className="font-godiva text-lg font-black leading-none text-white">
-                  {(preferredTourLanguage || "EN").toUpperCase()}
-                </h3>
-                <p className="mt-1 font-mono text-[11px] text-zinc-300">
-                  Tour language
-                </p>
-              </div>
-            </button>
-            <WidgetLabel>Language</WidgetLabel>
-          </div>
+        <div className="overflow-visible">
+          <button
+            type="button"
+            onClick={() => openEditModal("meeting")}
+            className={`${WIDGET_SHELL} ${getWidgetPulsarClass(activePulsarStep, "meeting")} h-40 p-0`}
+          >
+            <WidgetCallingPulse active={activePulsarStep === "meeting"} />
+            <div className="absolute inset-0 z-0 overflow-hidden rounded-[22px] bg-[#0A1017]">
+              {meetMapBg ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={meetMapBg}
+                  alt=""
+                  className="absolute inset-0 h-full w-full object-cover"
+                />
+              ) : (
+                <div
+                  className="absolute inset-0 bg-gradient-to-br from-[#1a2840] to-[#0A1017]"
+                  aria-hidden
+                />
+              )}
+              <div
+                className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/60 to-black/30 backdrop-blur-[1px]"
+                aria-hidden
+              />
+            </div>
 
-          <div>
-            <button
-              type="button"
-              onClick={() => openEditModal("meeting")}
-              className={HALF}
-            >
-              <GoldLight active={nextGlow === "meeting"} />
-              <div className="relative z-10 flex items-center justify-between">
-                <span className="flex h-9 w-9 items-center justify-center rounded-xl border border-amber-500/25 bg-amber-500/10 text-amber-400">
-                  <MapPin className="h-4 w-4" aria-hidden />
-                </span>
-                <span className="rounded-full bg-amber-500/10 px-2 py-0.5 font-mono text-[10px] font-bold uppercase tracking-widest text-amber-400">
-                  MEET
+            <div className="relative z-10 flex h-full flex-col justify-between p-4 text-left">
+              <div className="flex justify-end">
+                <span className="rounded-full border border-white/20 bg-black/70 px-3 py-1 text-xs font-bold text-amber-400">
+                  {langBadge}
                 </span>
               </div>
-              <div className="relative z-10 mt-3">
-                <h3 className="line-clamp-2 font-godiva text-base font-black leading-tight text-white uppercase">
-                  {meetingPoint.trim() || "Set meeting point"}
-                </h3>
-                <p className="mt-1 font-mono text-[11px] text-zinc-300">
-                  Hotel / hub pick-up
-                </p>
+
+              <div className="min-w-0">
+                <div className="flex items-start gap-2">
+                  <MapPin
+                    className="mt-0.5 h-4 w-4 shrink-0 text-amber-400"
+                    aria-hidden
+                  />
+                  <div className="min-w-0">
+                    <h3 className="line-clamp-2 font-godiva text-base font-black leading-tight text-white">
+                      {meetLabel}
+                    </h3>
+                    <p className="mt-1 line-clamp-2 font-mono text-[11px] text-zinc-300">
+                      {meetAddress}
+                    </p>
+                  </div>
+                </div>
               </div>
-            </button>
-            <WidgetLabel>Meeting Point</WidgetLabel>
-          </div>
+            </div>
+          </button>
+          <WidgetLabel>Language &amp; Meeting Point</WidgetLabel>
         </div>
 
-        <div>
+        <div className="overflow-visible">
           <button
             type="button"
             onClick={() => openEditModal("tours")}
-            className={`${WIDGET_SHELL} h-[13.5rem] p-0`}
+            className={`${WIDGET_SHELL} ${getWidgetPulsarClass(activePulsarStep, "tours")} h-[13.5rem] p-0`}
           >
-            <GoldLight active={nextGlow === "tours"} />
+            <WidgetCallingPulse active={activePulsarStep === "tours"} />
             {selectedExperiences.length === 0 ? (
-              <div className="relative z-10 flex h-full flex-col overflow-hidden bg-gradient-to-b from-[#1a2840] to-[#0A1017]">
-                <div className="relative z-10 flex flex-1 flex-col items-center justify-center px-4 pb-16 text-center">
+              <div className="absolute inset-0 z-0 overflow-hidden rounded-[22px] bg-gradient-to-b from-[#1a2840] to-[#0A1017]">
+                <div className="relative z-10 flex h-full flex-1 flex-col items-center justify-center px-4 pb-16 text-center">
                   <p className="font-godiva text-base font-bold uppercase leading-snug text-white">
-                    No experiences or tours chosen
-                  </p>
-                  <p className="mt-2 font-mono text-[11px] font-bold tracking-wider text-pink-400 uppercase">
-                    I&apos;m boring…
+                    Pick an experience or tour
                   </p>
                 </div>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -441,20 +534,29 @@ export function BuilderSView({
                 />
               </div>
             ) : (
-              <div className="relative z-10 flex h-full w-full flex-col">
-                {selectedExperiences.slice(0, 4).map((exp) => (
+              <div className="absolute inset-0 z-0 flex h-full w-full flex-col overflow-hidden rounded-[22px]">
+                {experienceBands.map((band) => (
                   <div
-                    key={exp.tourId}
+                    key={band.key}
                     className="relative min-h-0 flex-1 overflow-hidden border-b border-black/40 last:border-b-0"
                   >
-                    <div className="absolute inset-0 bg-gradient-to-br from-[#3a1a2e] to-[#0B1F3A]" />
+                    {band.photoUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={band.photoUrl}
+                        alt=""
+                        className="absolute inset-0 h-full w-full object-cover"
+                      />
+                    ) : (
+                      <div className="absolute inset-0 bg-gradient-to-br from-[#3a1a2e] to-[#0B1F3A]" />
+                    )}
                     <div
                       className="absolute inset-0 bg-gradient-to-r from-black/75 via-black/35 to-transparent"
                       aria-hidden
                     />
                     <div className="relative z-10 flex h-full items-end px-3 pb-2">
                       <p className="line-clamp-1 font-godiva text-xs font-bold uppercase tracking-wide text-white drop-shadow">
-                        {exp.title}
+                        {band.title}
                       </p>
                     </div>
                   </div>
@@ -465,14 +567,14 @@ export function BuilderSView({
           <WidgetLabel>Tours &amp; Experiences</WidgetLabel>
         </div>
 
-        <div className="grid grid-cols-2 gap-3.5">
-          <div>
+        <div className="grid grid-cols-2 gap-3.5 overflow-visible">
+          <div className="overflow-visible">
             <button
               type="button"
               onClick={() => openEditModal("logistics")}
-              className={`${WIDGET_SHELL} flex min-h-[12rem] flex-col justify-between p-4`}
+              className={`${WIDGET_SHELL} ${getWidgetPulsarClass(activePulsarStep, "transport")} flex min-h-[12rem] flex-col justify-between p-4`}
             >
-              <GoldLight active={nextGlow === "transport"} />
+              <WidgetCallingPulse active={activePulsarStep === "transport"} />
               <div className="relative z-10 flex items-center justify-between">
                 <span className="flex h-11 w-11 items-center justify-center rounded-xl border border-cyan-500/25 bg-cyan-500/10 text-cyan-400">
                   <TrainFront className="h-5 w-5" aria-hidden />
@@ -517,6 +619,9 @@ export function BuilderSView({
         <SingleDayTripDetailModal
           open={activeEditModal === "duration"}
           onClose={() => setActiveEditModal(null)}
+          onConfirmed={() => {
+            setPulsarOverride("guests");
+          }}
           seasonTiers={config?.seasonTiers ?? []}
         />
       ) : null}
@@ -525,6 +630,10 @@ export function BuilderSView({
         <SingleDayGuestsEditorModal
           open={activeEditModal === "guests"}
           onClose={() => setActiveEditModal(null)}
+          onConfirmed={() => {
+            // Advance guided pulsar to Row 3 (Language & Meeting) without clearing the ring
+            setPulsarOverride("meeting");
+          }}
           selectedCity={selectedCity}
         />
       ) : null}
@@ -535,8 +644,9 @@ export function BuilderSView({
           onClose={() => setActiveEditModal(null)}
           cities={cities}
           cityFocus={cityFocus}
-          onSelectCity={(city) => {
+          onConfirmCityChange={(city) => {
             onSelectCity(city);
+            setPulsarOverride("hours");
             setActiveEditModal(null);
           }}
         />
@@ -546,6 +656,9 @@ export function BuilderSView({
         <ExperiencesPlacesModal
           open={activeEditModal === "tours"}
           onClose={() => setActiveEditModal(null)}
+          onConfirmed={() => {
+            setPulsarOverride("transport");
+          }}
           catalog={catalog}
           selectedCity={selectedCity}
         />
@@ -556,7 +669,6 @@ export function BuilderSView({
           open={activeEditModal === "logistics"}
           onClose={() => setActiveEditModal(null)}
           startTime={startTime}
-          setStartTime={setStartTime}
           preferredMovement={preferredMovement}
           onOpenMovement={setMovementModal}
           scheduled={scheduled}
@@ -564,22 +676,15 @@ export function BuilderSView({
         />
       ) : null}
 
-      {languageMounted ? (
-        <LanguageModal
-          open={activeEditModal === "language"}
-          onClose={() => setActiveEditModal(null)}
-          selectedCity={selectedCity}
-          preferredTourLanguage={preferredTourLanguage}
-          setPreferredTourLanguage={setPreferredTourLanguage}
-        />
-      ) : null}
-
       {meetingMounted ? (
         <MeetingPointModal
           open={activeEditModal === "meeting"}
           onClose={() => setActiveEditModal(null)}
-          meetingPoint={meetingPoint}
-          setMeetingPoint={setMeetingPoint}
+          selectedCity={selectedCity}
+          onConfirmed={() => {
+            setPulsarOverride("tours");
+            setActiveEditModal(null);
+          }}
         />
       ) : null}
 
@@ -590,317 +695,166 @@ export function BuilderSView({
         onSelect={(id) => {
           setPreferredMovement(id);
           setMovementModal(null);
+          setActiveEditModal(null);
+          setPulsarOverride("save");
         }}
       />
     </>
   );
 }
 
-function CityFocusModal({
-  open,
-  onClose,
-  cities,
-  cityFocus,
-  onSelectCity,
-}: {
-  open: boolean;
-  onClose: () => void;
-  cities: PbCity[];
-  cityFocus: string;
-  onSelectCity: (city: PbCity) => void;
-}) {
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  if (!mounted) return null;
-
-  return createPortal(
-    <AnimatePresence>
-      {open ? (
-        <motion.div
-          key="city-focus"
-          className="fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-4"
-          role="dialog"
-          aria-modal="true"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-        >
-          <button
-            type="button"
-            aria-label="Close"
-            className="tokio-modal-backdrop absolute inset-0"
-            onClick={onClose}
-          />
-          <motion.div
-            className="tokio-modal-content relative z-[1] flex max-h-[min(90dvh,40rem)] w-full flex-col overflow-hidden border border-white/10 sm:max-w-lg sm:rounded-3xl"
-            initial={{ y: 20, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            exit={{ y: 20, opacity: 0 }}
-          >
-            <div className="tokio-modal-chrome flex shrink-0 items-center gap-3 border-b px-4 py-4">
-              <button
-                type="button"
-                onClick={onClose}
-                className="flex h-10 w-10 items-center justify-center rounded-full border border-zinc-700 bg-zinc-900"
-                aria-label="Back"
-              >
-                <ArrowLeft className="h-5 w-5" />
-              </button>
-              <h3 className="font-display text-xl text-white">City Focus</h3>
-            </div>
-            <div className="min-h-0 overflow-y-auto px-4 py-4">
-              <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
-                {cities.map((city) => {
-                  const on =
-                    cityFocus.trim().toLowerCase() ===
-                    city.name.trim().toLowerCase();
-                  const filename = cityPhoto(city);
-                  const pbImg =
-                    filename && city.collectionId
-                      ? pbFileUrl(city.collectionId, city.id, filename, {
-                          thumb: PB_THUMBS.card,
-                          format: "webp",
-                        })
-                      : "";
-                  const img = resolveSingleDayCityThumbnail(city.name, pbImg);
-                  return (
-                    <button
-                      key={city.id}
-                      type="button"
-                      onClick={() => onSelectCity(city)}
-                      className={`relative overflow-hidden rounded-xl border text-left ${
-                        on
-                          ? "border-[#075473] ring-2 ring-[#075473]"
-                          : "border-white/10"
-                      }`}
-                    >
-                      <div className="relative h-24 bg-zinc-900">
-                        {img ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img
-                            src={img}
-                            alt=""
-                            className="h-full w-full object-cover"
-                          />
-                        ) : null}
-                        {on ? (
-                          <span className="absolute right-2 top-2 flex h-5 w-5 items-center justify-center rounded-full bg-[#1BA58A]">
-                            <Check className="h-3 w-3" strokeWidth={3} />
-                          </span>
-                        ) : null}
-                      </div>
-                      <p className="truncate px-2 py-2 text-xs font-bold text-white">
-                        {city.name}
-                      </p>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          </motion.div>
-        </motion.div>
-      ) : null}
-    </AnimatePresence>,
-    document.body
-  );
-}
-
-function LanguageModal({
-  open,
-  onClose,
-  selectedCity,
-  preferredTourLanguage,
-  setPreferredTourLanguage,
-}: {
-  open: boolean;
-  onClose: () => void;
-  selectedCity: PbCity | null;
-  preferredTourLanguage: string;
-  setPreferredTourLanguage: (v: string) => void;
-}) {
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-  if (!mounted) return null;
-
-  return createPortal(
-    <AnimatePresence>
-      {open ? (
-        <motion.div
-          key="language-modal"
-          className="fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-4"
-          role="dialog"
-          aria-modal="true"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-        >
-          <button
-            type="button"
-            aria-label="Close"
-            className="tokio-modal-backdrop absolute inset-0"
-            onClick={onClose}
-          />
-          <motion.div
-            className="tokio-modal-content relative z-[1] flex max-h-[min(90dvh,28rem)] w-full flex-col overflow-hidden border border-white/10 sm:max-w-lg sm:rounded-3xl"
-            initial={{ y: 20, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            exit={{ y: 20, opacity: 0 }}
-          >
-            <div className="tokio-modal-chrome flex shrink-0 items-center gap-3 border-b px-4 py-4">
-              <button
-                type="button"
-                onClick={onClose}
-                className="flex h-10 w-10 items-center justify-center rounded-full border border-zinc-700 bg-zinc-900"
-                aria-label="Back"
-              >
-                <ArrowLeft className="h-5 w-5" />
-              </button>
-              <h3 className="font-display text-xl text-white">Tour language</h3>
-            </div>
-            <div className="overflow-y-auto px-4 py-5">
-              {selectedCity ? (
-                <CityLanguageSelect
-                  cityName={selectedCity.name}
-                  availableLanguages={selectedCity.available_languages}
-                  value={preferredTourLanguage}
-                  onChange={setPreferredTourLanguage}
-                />
-              ) : (
-                <p className="text-xs text-white/45">
-                  Choose a city focus to unlock tour languages.
-                </p>
-              )}
-            </div>
-            <div className="tokio-modal-chrome border-t px-4 py-4">
-              <button
-                type="button"
-                onClick={onClose}
-                className="w-full rounded-full bg-[#054F70] py-3 text-sm font-semibold text-white"
-              >
-                Done
-              </button>
-            </div>
-          </motion.div>
-        </motion.div>
-      ) : null}
-    </AnimatePresence>,
-    document.body
-  );
-}
-
 function MeetingPointModal({
   open,
   onClose,
-  meetingPoint,
-  setMeetingPoint,
+  onConfirmed,
+  selectedCity,
 }: {
   open: boolean;
   onClose: () => void;
-  meetingPoint: string;
-  setMeetingPoint: (v: string) => void;
+  onConfirmed: () => void;
+  selectedCity: PbCity | null;
 }) {
   const [mounted, setMounted] = useState(false);
-  const [draft, setDraft] = useState(meetingPoint);
+  const meetingPoint = useSingleDayBuilderStore((s) => s.meetingPoint);
+  const meetingPointName = useSingleDayBuilderStore((s) => s.meetingPointName);
+  const meetingPointLat = useSingleDayBuilderStore((s) => s.meetingPointLat);
+  const meetingPointLng = useSingleDayBuilderStore((s) => s.meetingPointLng);
+  const preferredTourLanguage = useSingleDayBuilderStore(
+    (s) => s.preferredTourLanguage
+  );
+  const setMeetingPointDetails = useSingleDayBuilderStore(
+    (s) => s.setMeetingPointDetails
+  );
+  const setPreferredTourLanguage = useSingleDayBuilderStore(
+    (s) => s.setPreferredTourLanguage
+  );
+  const [draft, setDraft] = useState<GeoapifyPlace | null>(null);
+  const [langDraft, setLangDraft] = useState(preferredTourLanguage || "EN");
+  const [saving, setSaving] = useState(false);
+
   useEffect(() => {
     setMounted(true);
   }, []);
+
   useEffect(() => {
-    if (open) setDraft(meetingPoint);
-  }, [open, meetingPoint]);
+    if (!open) return;
+    setLangDraft(preferredTourLanguage || "EN");
+    if (
+      meetingPointLat != null &&
+      meetingPointLng != null &&
+      Number.isFinite(meetingPointLat) &&
+      Number.isFinite(meetingPointLng)
+    ) {
+      setDraft({
+        name: meetingPointName || meetingPoint || "",
+        address: meetingPoint || meetingPointName || "",
+        city: "",
+        lat: meetingPointLat,
+        lng: meetingPointLng,
+        placeId: "",
+      });
+    } else {
+      setDraft(null);
+    }
+  }, [
+    open,
+    meetingPoint,
+    meetingPointName,
+    meetingPointLat,
+    meetingPointLng,
+    preferredTourLanguage,
+  ]);
 
-  if (!mounted) return null;
+  const canConfirm =
+    Boolean(draft?.name || draft?.address) &&
+    draft?.lat != null &&
+    draft?.lng != null &&
+    Number.isFinite(draft.lat) &&
+    Number.isFinite(draft.lng) &&
+    Boolean(String(langDraft || "").trim());
 
-  const query = draft.trim();
-  const mapSrc = query
-    ? `https://maps.google.com/maps?q=${encodeURIComponent(query)}&output=embed`
-    : "";
+  const persistAndClose = async () => {
+    if (!draft || !canConfirm) return;
+    setSaving(true);
+    setPreferredTourLanguage(langDraft || "EN");
+    setMeetingPointDetails({
+      name: draft.name,
+      address: draft.address || draft.name,
+      lat: draft.lat,
+      lng: draft.lng,
+      placeId: draft.placeId,
+    });
 
-  return createPortal(
-    <AnimatePresence>
-      {open ? (
-        <motion.div
-          key="meeting-modal"
-          className="fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-4"
-          role="dialog"
-          aria-modal="true"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
+    try {
+      const bookingRef =
+        useBuilderStore.getState().confirmedBookingRef ||
+        useBuilderStore.getState().tempBookingRef ||
+        "";
+      const email = (
+        useItineraryStore.getState().clientEmail ||
+        usePreBuilderStore.getState().email ||
+        usePreBuilderStore.getState().lastPayload?.email ||
+        ""
+      )
+        .trim()
+        .toLowerCase();
+      if (bookingRef && email) {
+        await syncSingleDayBookingLead({
+          bookingRef,
+          email,
+          state: useSingleDayBuilderStore.getState(),
+        });
+      }
+    } catch {
+      /* local store already updated */
+    } finally {
+      setSaving(false);
+      onConfirmed();
+    }
+  };
+
+  return (
+    <BuilderEditModalShell
+      open={open}
+      onClose={onClose}
+      title="Meeting Point & Language"
+      mounted={mounted}
+      footer={
+        <button
+          type="button"
+          disabled={!canConfirm || saving}
+          onClick={() => void persistAndClose()}
+          className="w-full rounded-full bg-[#054F70] py-3 text-sm font-semibold text-white transition hover:bg-[#043d57] disabled:cursor-not-allowed disabled:opacity-40"
         >
-          <button
-            type="button"
-            aria-label="Close"
-            className="tokio-modal-backdrop absolute inset-0"
-            onClick={onClose}
-          />
-          <motion.div
-            className="tokio-modal-content relative z-[1] flex max-h-[min(90dvh,40rem)] w-full flex-col overflow-hidden border border-white/10 sm:max-w-lg sm:rounded-3xl"
-            initial={{ y: 20, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            exit={{ y: 20, opacity: 0 }}
-          >
-            <div className="tokio-modal-chrome flex shrink-0 items-center gap-3 border-b px-4 py-4">
-              <button
-                type="button"
-                onClick={onClose}
-                className="flex h-10 w-10 items-center justify-center rounded-full border border-zinc-700 bg-zinc-900"
-                aria-label="Back"
-              >
-                <ArrowLeft className="h-5 w-5" />
-              </button>
-              <h3 className="font-display text-xl text-white">Meeting point</h3>
-            </div>
-            <div className="min-h-0 space-y-4 overflow-y-auto px-4 py-5">
-              <div>
-                <p className="mb-2 text-[10px] font-bold uppercase tracking-widest text-white">
-                  Hotel / station hub
-                </p>
-                <input
-                  type="text"
-                  value={draft}
-                  onChange={(e) => setDraft(e.target.value)}
-                  placeholder="e.g. Park Hyatt Tokyo lobby"
-                  className="w-full rounded-xl border border-white/15 bg-[#121212] px-3 py-3 text-base text-white placeholder:text-white/30"
-                />
-              </div>
-              {mapSrc ? (
-                <div className="overflow-hidden rounded-2xl border border-white/10">
-                  <iframe
-                    title="Meeting point map"
-                    src={mapSrc}
-                    className="h-48 w-full border-0"
-                    loading="lazy"
-                    referrerPolicy="no-referrer-when-downgrade"
-                  />
-                </div>
-              ) : (
-                <p className="text-xs text-white/40">
-                  Enter a place name to preview it on the map.
-                </p>
-              )}
-            </div>
-            <div className="tokio-modal-chrome border-t px-4 py-4">
-              <button
-                type="button"
-                onClick={() => {
-                  setMeetingPoint(draft.trim());
-                  onClose();
-                }}
-                className="w-full rounded-full bg-[#054F70] py-3 text-sm font-semibold text-white"
-              >
-                Save
-              </button>
-            </div>
-          </motion.div>
-        </motion.div>
-      ) : null}
-    </AnimatePresence>,
-    document.body
+          {saving ? "Saving…" : "Confirm Meeting Point & Language"}
+        </button>
+      }
+    >
+      <div className="space-y-6">
+        <MeetingPointPlacesPicker
+          initialName={meetingPointName || ""}
+          initialAddress={meetingPoint || ""}
+          lat={meetingPointLat ?? null}
+          lng={meetingPointLng ?? null}
+          onResolved={setDraft}
+        />
+
+        <div className="border-t border-white/10 pt-5">
+          {selectedCity ? (
+            <CityLanguageSelect
+              cityName={selectedCity.name}
+              availableLanguages={selectedCity.available_languages}
+              value={langDraft}
+              onChange={setLangDraft}
+            />
+          ) : (
+            <p className="text-xs text-white/45">
+              Choose a city focus to unlock tour languages.
+            </p>
+          )}
+        </div>
+      </div>
+    </BuilderEditModalShell>
   );
 }
 
@@ -908,7 +862,6 @@ function LogisticsModal({
   open,
   onClose,
   startTime,
-  setStartTime,
   preferredMovement,
   onOpenMovement,
   scheduled,
@@ -917,7 +870,6 @@ function LogisticsModal({
   open: boolean;
   onClose: () => void;
   startTime: string;
-  setStartTime: (v: string) => void;
   preferredMovement: IntraCityTransport | null;
   onOpenMovement: (m: IntraCityTransport) => void;
   scheduled: number;
@@ -940,46 +892,23 @@ function LogisticsModal({
 
   const overBudget = scheduled > tourHours * 60;
 
-  if (!mounted) return null;
-
-  return createPortal(
-    <AnimatePresence>
-      {open ? (
-        <motion.div
-          key="logistics"
-          className="fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-4"
-          role="dialog"
-          aria-modal="true"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
+  return (
+    <BuilderEditModalShell
+      open={open}
+      onClose={onClose}
+      title="Hotels & Transport"
+      mounted={mounted}
+      footer={
+        <button
+          type="button"
+          onClick={onClose}
+          className="w-full rounded-full bg-[#054F70] py-3 text-sm font-semibold text-white"
         >
-          <button
-            type="button"
-            aria-label="Close"
-            className="tokio-modal-backdrop absolute inset-0"
-            onClick={onClose}
-          />
-          <motion.div
-            className="tokio-modal-content relative z-[1] flex max-h-[min(92dvh,44rem)] w-full flex-col overflow-hidden border border-white/10 sm:max-w-lg sm:rounded-3xl"
-            initial={{ y: 20, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            exit={{ y: 20, opacity: 0 }}
-          >
-            <div className="tokio-modal-chrome flex shrink-0 items-center gap-3 border-b px-4 py-4">
-              <button
-                type="button"
-                onClick={onClose}
-                className="flex h-10 w-10 items-center justify-center rounded-full border border-zinc-700 bg-zinc-900"
-                aria-label="Back"
-              >
-                <ArrowLeft className="h-5 w-5" />
-              </button>
-              <h3 className="font-display text-xl text-white">
-                Drivers &amp; Transport
-              </h3>
-            </div>
-            <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-4 py-5">
+          Done
+        </button>
+      }
+    >
+      <div className="space-y-5">
               <div className="rounded-xl border border-white/10 bg-black/30 p-3 text-sm text-zinc-300">
                 <p className="font-godiva text-base uppercase tracking-wide text-white">
                   How you move today
@@ -988,22 +917,6 @@ function LogisticsModal({
                   Public rail may need tickets (Suica/PASMO). Private chauffeur /
                   taxi is assigned after Ops confirms.
                 </p>
-              </div>
-              <div>
-                <p className="mb-2 text-[10px] font-bold uppercase tracking-widest text-white">
-                  Start time
-                </p>
-                <select
-                  value={startTime}
-                  onChange={(e) => setStartTime(e.target.value)}
-                  className="w-full appearance-none rounded-xl border border-white/15 bg-[#121212] px-3 py-3 text-base text-white"
-                >
-                  {START_TIMES.map((t) => (
-                    <option key={t} value={t}>
-                      {t}
-                    </option>
-                  ))}
-                </select>
               </div>
               <div>
                 <p className="mb-2 text-[10px] font-bold uppercase tracking-widest text-white">
@@ -1025,11 +938,6 @@ function LogisticsModal({
                             : "border-white/10"
                         }`}
                       >
-                        <GoldLight
-                          color={opt.spotlight}
-                          placement="top-center"
-                          active={on}
-                        />
                         <span className="relative block aspect-[4/5] w-full bg-zinc-900">
                           {item.isVideo && item.mediaUrl ? (
                             <LazyVideo
@@ -1087,20 +995,7 @@ function LogisticsModal({
                   Capacity {tourHours}h · starts {startTime}
                 </span>
               </div>
-            </div>
-            <div className="tokio-modal-chrome border-t px-4 py-4">
-              <button
-                type="button"
-                onClick={onClose}
-                className="w-full rounded-full bg-[#054F70] py-3 text-sm font-semibold text-white"
-              >
-                Done
-              </button>
-            </div>
-          </motion.div>
-        </motion.div>
-      ) : null}
-    </AnimatePresence>,
-    document.body
+      </div>
+    </BuilderEditModalShell>
   );
 }

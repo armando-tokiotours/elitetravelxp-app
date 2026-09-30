@@ -64,6 +64,12 @@ export interface SingleDaySelections {
   selectedExperienceIds: string[];
   transitOption?: string;
   tourHours?: number;
+  meetingPointName?: string;
+  meetingPointAddress?: string;
+  meetingPointLat?: number | null;
+  meetingPointLng?: number | null;
+  meetingPointPlaceId?: string;
+  preferredTourLanguage?: string;
 }
 
 export type BookingLeadSelections =
@@ -88,6 +94,11 @@ export interface BookingsAndLeadsUpsertInput {
   dossierPdfUrl?: string | null;
   /** When true, also bumps email_sent_count + email timestamps. */
   recordEmailSent?: boolean;
+  meetingPointName?: string;
+  meetingPointAddress?: string;
+  meetingPointLat?: number | null;
+  meetingPointLng?: number | null;
+  meetingPointPlaceId?: string;
 }
 
 export interface BookingsAndLeadsRecord {
@@ -249,6 +260,10 @@ export function buildSingleDaySelections(
     transitOption?: string;
     preferredMovement?: string | null;
     meetingPoint?: string;
+    meetingPointName?: string;
+    meetingPointLat?: number | null;
+    meetingPointLng?: number | null;
+    meetingPointPlaceId?: string;
     preferredTourLanguage?: string;
   }
 ): SingleDaySelections {
@@ -266,6 +281,13 @@ export function buildSingleDaySelections(
       state.preferredMovement ||
       state.guidePreference,
     tourHours: state.tourHours,
+    meetingPointName:
+      state.meetingPointName || state.meetingPoint || undefined,
+    meetingPointAddress: state.meetingPoint || undefined,
+    meetingPointLat: state.meetingPointLat ?? null,
+    meetingPointLng: state.meetingPointLng ?? null,
+    meetingPointPlaceId: state.meetingPointPlaceId || undefined,
+    preferredTourLanguage: state.preferredTourLanguage || undefined,
   };
 }
 
@@ -340,6 +362,25 @@ export async function upsertBookingsAndLeads(
   };
   // Omit empty tour_date — PB date fields reject ""
   if (tourDateRaw) fields.tour_date = tourDateRaw;
+
+  const mpName = String(input.meetingPointName || "").trim();
+  const mpAddress = String(input.meetingPointAddress || "").trim();
+  const mpPlaceId = String(input.meetingPointPlaceId || "").trim();
+  if (mpName) fields.meeting_point_name = mpName;
+  if (mpAddress) fields.meeting_point_address = mpAddress;
+  if (mpPlaceId) fields.meeting_point_place_id = mpPlaceId;
+  if (
+    input.meetingPointLat != null &&
+    Number.isFinite(Number(input.meetingPointLat))
+  ) {
+    fields.meeting_point_lat = Number(input.meetingPointLat);
+  }
+  if (
+    input.meetingPointLng != null &&
+    Number.isFinite(Number(input.meetingPointLng))
+  ) {
+    fields.meeting_point_lng = Number(input.meetingPointLng);
+  }
 
   const STATUS_RANK: Record<string, number> = {
     draft: 1,

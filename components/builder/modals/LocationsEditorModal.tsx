@@ -127,7 +127,7 @@ export function LocationsEditorModal({
       {open ? (
         <motion.div
           key="locations-editor"
-          className="fixed inset-0 z-50 flex items-center justify-center tokio-modal-backdrop bg-[#05080C]/55 backdrop-blur-sm"
+          className="fixed inset-0 z-50 flex flex-col bg-[#0A1017]"
           role="dialog"
           aria-modal="true"
           aria-label="Edit route"
@@ -137,30 +137,25 @@ export function LocationsEditorModal({
           transition={{ duration: 0.2 }}
         >
           <motion.div
-            className="tokio-modal-content relative flex h-[100dvh] w-full flex-col overflow-hidden border border-white/10 md:h-[85vh] md:max-w-2xl md:rounded-2xl"
-            initial={{ opacity: 0, y: 20 }}
+            className="relative flex h-full w-full flex-col overflow-hidden bg-[#0A1017]"
+            initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 20 }}
+            exit={{ opacity: 0, y: -8 }}
             transition={{ duration: 0.25, ease: "easeOut" }}
           >
-            <div className="tokio-modal-chrome flex flex-shrink-0 items-start gap-3 border-b p-4 pt-[max(1rem,env(safe-area-inset-top))]">
+            <div className="sticky top-0 z-20 flex w-full shrink-0 items-center gap-3 border-b border-white/10 bg-[#0A1017]/95 px-4 py-3.5 pt-[max(0.875rem,env(safe-area-inset-top))] backdrop-blur-md">
               <button
                 type="button"
                 onClick={onClose}
                 aria-label="Back"
-                className="mt-1 flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-zinc-700 bg-zinc-900 text-white transition hover:border-zinc-500"
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white"
               >
                 <ArrowLeft className="h-5 w-5" />
               </button>
               <div className="min-w-0 flex-1">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#075473]">
-                  Configure
-                </p>
-                <div className="mt-0.5 flex items-start justify-between gap-3">
-                  <h3 className="font-display text-2xl font-extrabold leading-tight text-white">
-                    Locations &amp;
-                    <br />
-                    Nights
+                <div className="flex items-center justify-between gap-3">
+                  <h3 className="truncate font-godiva text-base uppercase tracking-wider text-white">
+                    Locations &amp; Nights
                   </h3>
                   {routeWarnings[0] || !matches ? (
                     <RouteNoticeBadge

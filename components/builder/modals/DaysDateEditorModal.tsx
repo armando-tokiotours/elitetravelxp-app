@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
-import { ArrowLeft, CalendarDays, Clock3, Minus, Plus } from "lucide-react";
+import { ArrowLeft, Clock3, Minus, Plus } from "lucide-react";
 import type { PbSeasonTier } from "@/lib/pocketbase/client";
 import { resolveSeasonInsight } from "@/lib/seasonality";
 import { useSeasonalFxStore } from "@/store/useSeasonalFxStore";
@@ -138,7 +138,7 @@ export function DaysDateEditorModal({
       {open ? (
         <motion.div
           key="days-date-editor"
-          className="fixed inset-0 z-50 flex items-center justify-center tokio-modal-backdrop bg-[#05080C]/55 backdrop-blur-sm"
+          className="fixed inset-0 z-50 flex flex-col bg-[#0A1017]"
           role="dialog"
           aria-modal="true"
           aria-label="Configure days and dates"
@@ -148,32 +148,26 @@ export function DaysDateEditorModal({
           transition={{ duration: 0.2 }}
         >
           <motion.div
-            className="tokio-modal-content relative flex h-[100dvh] max-h-[100dvh] w-full flex-col overflow-hidden border border-white/10 md:max-w-2xl md:rounded-2xl"
-            initial={{ opacity: 0, y: 20 }}
+            className="relative flex h-full w-full flex-col overflow-hidden bg-[#0A1017]"
+            initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 20 }}
+            exit={{ opacity: 0, y: -8 }}
             transition={{ duration: 0.25, ease: "easeOut" }}
           >
-            <div className="tokio-modal-chrome flex flex-shrink-0 items-center gap-4 border-b p-4 pt-[max(1rem,env(safe-area-inset-top))]">
+            <div className="sticky top-0 z-20 flex w-full shrink-0 items-center gap-3 border-b border-white/10 bg-[#0A1017]/95 px-4 py-3.5 pt-[max(0.875rem,env(safe-area-inset-top))] backdrop-blur-md">
               <button
                 type="button"
                 onClick={onClose}
                 aria-label="Back"
-                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-zinc-700 bg-zinc-900 text-white transition hover:border-zinc-500"
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white"
               >
                 <ArrowLeft className="h-5 w-5" />
               </button>
               <div className="min-w-0 flex-1">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#075473]">
-                  Timing
-                </p>
-                <h3 className="truncate font-display text-2xl text-white">
-                  Days &amp; Dates
+                <h3 className="truncate font-godiva text-base uppercase tracking-wider text-white">
+                  Trip Duration
                 </h3>
               </div>
-              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/10 bg-zinc-900 text-[#075473]">
-                <CalendarDays className="h-5 w-5" aria-hidden />
-              </span>
             </div>
 
             <div className="flex min-h-0 flex-1 flex-col gap-7 overflow-y-auto p-4 pb-12">

@@ -70,21 +70,27 @@ export function DayServiceIcons({
 
 /**
  * Staff identity card stubs for day timeline (guide / driver).
- * Shows name when Ops has assigned; otherwise quiet "Still pending".
+ * Shows name when Ops has assigned; otherwise quiet empty copy.
  */
 export function StaffIdentityCard({
   role,
   name,
   photoUrl,
   email,
+  emptyLabel,
 }: {
   role: "guide" | "driver";
   name?: string | null;
   photoUrl?: string | null;
   email?: string | null;
+  /** Override when unassigned (e.g. “No guide assigned yet”). */
+  emptyLabel?: string;
 }) {
   const label = role === "guide" ? "Guide" : "Driver";
   const assigned = Boolean(name && String(name).trim());
+  const pendingCopy =
+    emptyLabel ||
+    (role === "guide" ? "No guide assigned yet" : "No driver assigned yet");
   return (
     <div className="flex items-center gap-3 rounded-xl border border-white/10 bg-black/30 px-3 py-2">
       {photoUrl && assigned ? (
@@ -117,7 +123,7 @@ export function StaffIdentityCard({
             ) : null}
           </>
         ) : (
-          <p className="text-xs text-zinc-600">Still pending</p>
+          <p className="text-xs text-zinc-500">{pendingCopy}</p>
         )}
       </div>
     </div>
@@ -143,6 +149,57 @@ export function TicketStubCard({
       {subtitle ? (
         <p className="text-[11px] text-zinc-400">{subtitle}</p>
       ) : null}
+    </div>
+  );
+}
+
+/**
+ * Detect entry-ticket experiences (teamLab, direct ticket, timed entry, etc.).
+ */
+export function experienceNeedsEntryTicket(input: {
+  title?: string | null;
+  description?: string | null;
+  access_type?: string | null;
+  is_self_guided?: boolean | null;
+  category?: string | null;
+}): boolean {
+  const access = String(input.access_type || "").toLowerCase();
+  if (
+    access === "direct_ticket" ||
+    access === "time_sensitive" ||
+    access === "vip_event"
+  ) {
+    return true;
+  }
+  if (input.is_self_guided) return true;
+  const hay = `${input.title || ""} ${input.description || ""}`.toLowerCase();
+  if (
+    hay.includes("teamlab") ||
+    hay.includes("team lab") ||
+    hay.includes("ghibli") ||
+    hay.includes("disney") ||
+    hay.includes("timed entry") ||
+    hay.includes("admission")
+  ) {
+    return true;
+  }
+  return false;
+}
+
+/** Quiet “not applicable” row for day services. */
+export function DayServiceIdleRow({
+  label,
+  message,
+}: {
+  label: string;
+  message: string;
+}) {
+  return (
+    <div className="rounded-xl border border-dashed border-white/10 bg-zinc-950/40 px-3 py-2">
+      <p className="text-[9px] font-semibold tracking-wider text-zinc-500 uppercase">
+        {label}
+      </p>
+      <p className="mt-0.5 text-xs text-zinc-500">{message}</p>
     </div>
   );
 }

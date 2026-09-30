@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import {
   Ban,
   BedDouble,
@@ -8,11 +9,17 @@ import {
   Ship,
   TrainFront,
 } from "lucide-react";
-import { GoldLight } from "@/components/branding/GoldLight";
 import type { BuilderEditModalId } from "./BuilderEditModalContext";
+import {
+  getWidgetPulsarClass,
+  WidgetCallingPulse,
+} from "@/components/branding/WidgetCallingPulse";
 
+/** Outer shell — overflow-visible so white calling pulse is not clipped. */
 const WIDGET_SHELL =
-  "w-full bg-[#0A1017]/90 border border-white/10 rounded-[22px] text-left relative overflow-hidden shadow-xl hover:border-amber-500/40 transition-all active:scale-95 group";
+  "w-full bg-[#0A1017]/90 border rounded-[22px] text-left relative overflow-visible shadow-xl hover:border-amber-500/40 transition-all active:scale-95 group";
+
+type PulsarStep = "city" | "duration" | "guests" | "meeting" | "tours";
 
 function WidgetLabel({
   children,
@@ -44,15 +51,6 @@ export type ExperiencePhotoBand = {
   title: string;
   photoUrl: string | null;
 };
-
-type GlowStep =
-  | "duration"
-  | "guests"
-  | "transit"
-  | "locations"
-  | "hotels_transport"
-  | "drivers"
-  | "tours";
 
 export function BuilderMWidgetGrid({
   onOpen,
@@ -104,29 +102,51 @@ export function BuilderMWidgetGrid({
     (hotelCityChecks || []).length > 0 &&
     (hotelCityChecks || []).some((r) => !r.done);
 
-  const nextGlow = ((): GlowStep | null => {
-    if (!startDateText) return "duration";
-    if (!paceLabel) return "guests";
-    if (!arrivalAirport) return "transit";
-    if (cityBands.length === 0) return "locations";
-    if (hotelsIncomplete || hotelArrangeLabel === "Add cities first")
-      return "hotels_transport";
-    if (experienceBands.length === 0) return "tours";
-    return null;
-  })();
+  const [activePulsarStep, setActivePulsarStep] = useState<PulsarStep | null>(
+    "duration"
+  );
+
+  useEffect(() => {
+    // Builder M has no City Focus — start at Days & Dates (`duration`).
+    // Map transit/locations/hotels → `meeting` guided step until tours.
+    if (!startDateText) {
+      setActivePulsarStep("duration");
+      return;
+    }
+    if (!paceLabel) {
+      setActivePulsarStep("guests");
+      return;
+    }
+    if (!arrivalAirport || cityBands.length === 0 || hotelsIncomplete) {
+      setActivePulsarStep("meeting");
+      return;
+    }
+    if (experienceBands.length === 0) {
+      setActivePulsarStep("tours");
+      return;
+    }
+    setActivePulsarStep(null);
+  }, [
+    startDateText,
+    paceLabel,
+    arrivalAirport,
+    cityBands.length,
+    hotelsIncomplete,
+    experienceBands.length,
+  ]);
 
   return (
-    <div className="mx-auto w-full max-w-2xl space-y-5 px-4 py-6">
+    <div className="mx-auto w-full max-w-2xl space-y-5 overflow-visible px-4 py-6">
       {/* ROW 1 */}
-      <div className="grid grid-cols-2 gap-3.5">
-        <div>
+      <div className="grid grid-cols-2 gap-3.5 overflow-visible">
+        <div className="overflow-visible">
           <button
             type="button"
             onClick={() => open("duration")}
             disabled={locked?.duration}
-            className={`${WIDGET_SHELL} h-36 p-4 disabled:pointer-events-none disabled:opacity-40`}
+            className={`${WIDGET_SHELL} ${getWidgetPulsarClass(activePulsarStep, "duration")} h-36 p-4 disabled:pointer-events-none disabled:opacity-40`}
           >
-            <GoldLight active={nextGlow === "duration"} />
+            <WidgetCallingPulse active={activePulsarStep === "duration"} />
             <div className="relative z-10 flex items-center justify-between">
               <span className="text-xl" aria-hidden>
                 📅
@@ -147,14 +167,14 @@ export function BuilderMWidgetGrid({
           <WidgetLabel>Days &amp; Dates</WidgetLabel>
         </div>
 
-        <div>
+        <div className="overflow-visible">
           <button
             type="button"
             onClick={() => open("guests")}
             disabled={locked?.guests}
-            className={`${WIDGET_SHELL} h-36 p-4 disabled:pointer-events-none disabled:opacity-40`}
+            className={`${WIDGET_SHELL} ${getWidgetPulsarClass(activePulsarStep, "guests")} h-36 p-4 disabled:pointer-events-none disabled:opacity-40`}
           >
-            <GoldLight active={nextGlow === "guests"} />
+            <WidgetCallingPulse active={activePulsarStep === "guests"} />
             <div className="relative z-10 flex items-center justify-between">
               <span className="text-xl" aria-hidden>
                 👥
@@ -177,14 +197,14 @@ export function BuilderMWidgetGrid({
       </div>
 
       {/* ROW 2 — Arrival ~2× */}
-      <div>
+      <div className="overflow-visible">
         <button
           type="button"
           onClick={() => open("transit")}
           disabled={locked?.transit}
-          className={`${WIDGET_SHELL} min-h-[9.5rem] p-4 disabled:pointer-events-none disabled:opacity-40`}
+          className={`${WIDGET_SHELL} ${getWidgetPulsarClass(activePulsarStep, "meeting")} min-h-[9.5rem] p-4 disabled:pointer-events-none disabled:opacity-40`}
         >
-          <GoldLight active={nextGlow === "transit"} />
+            <WidgetCallingPulse active={activePulsarStep === "meeting"} />
           <span className="relative z-10 mb-3 block font-mono text-[10px] font-bold uppercase tracking-wider text-amber-400">
             ENTRY / EXIT
           </span>
@@ -207,14 +227,14 @@ export function BuilderMWidgetGrid({
       </div>
 
       {/* ROW 3 — Locations ~3× photo stack */}
-      <div>
+      <div className="overflow-visible">
         <button
           type="button"
           onClick={() => open("locations")}
           disabled={locked?.locations}
-          className={`${WIDGET_SHELL} h-[16.5rem] p-0 disabled:pointer-events-none disabled:opacity-40`}
+          className={`${WIDGET_SHELL} ${getWidgetPulsarClass(activePulsarStep, "meeting")} h-[16.5rem] p-0 disabled:pointer-events-none disabled:opacity-40`}
         >
-          <GoldLight active={nextGlow === "locations"} />
+            <WidgetCallingPulse active={activePulsarStep === "meeting"} />
           {cityBands.length === 0 ? (
             <div className="relative z-10 flex h-full flex-col items-center justify-center gap-1 px-4 text-center">
               <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-cyan-400">
@@ -225,7 +245,7 @@ export function BuilderMWidgetGrid({
               </span>
             </div>
           ) : (
-            <div className="relative z-10 flex h-full w-full flex-col">
+            <div className="absolute inset-0 z-0 flex h-full w-full flex-col overflow-hidden rounded-[22px]">
               {cityBands.map((band) => (
                 <div
                   key={band.key}
@@ -260,15 +280,15 @@ export function BuilderMWidgetGrid({
       </div>
 
       {/* ROW 4 — Hotel + Transport */}
-      <div className="grid grid-cols-2 gap-3.5">
-        <div>
+      <div className="grid grid-cols-2 gap-3.5 overflow-visible">
+        <div className="overflow-visible">
           <button
             type="button"
             onClick={() => open("hotels_transport")}
             disabled={locked?.hotels_transport}
-            className={`${WIDGET_SHELL} flex min-h-[19.5rem] flex-col justify-between p-4 disabled:pointer-events-none disabled:opacity-40`}
+            className={`${WIDGET_SHELL} ${getWidgetPulsarClass(activePulsarStep, "meeting")} flex min-h-[19.5rem] flex-col justify-between p-4 disabled:pointer-events-none disabled:opacity-40`}
           >
-            <GoldLight active={nextGlow === "hotels_transport"} />
+            <WidgetCallingPulse active={activePulsarStep === "meeting"} />
             <div className="relative z-10 flex items-center justify-between">
               <span className="flex h-11 w-11 items-center justify-center rounded-xl border border-amber-500/25 bg-amber-500/10 text-amber-400">
                 <BedDouble className="h-5 w-5" aria-hidden />
@@ -309,14 +329,14 @@ export function BuilderMWidgetGrid({
           <WidgetLabel>Hotels</WidgetLabel>
         </div>
 
-        <div>
+        <div className="overflow-visible">
           <button
             type="button"
             onClick={() => open("drivers")}
             disabled={locked?.drivers}
-            className={`${WIDGET_SHELL} flex min-h-[19.5rem] flex-col justify-between p-4 disabled:pointer-events-none disabled:opacity-40`}
+            className={`${WIDGET_SHELL} ${getWidgetPulsarClass(activePulsarStep, "meeting")} flex min-h-[19.5rem] flex-col justify-between p-4 disabled:pointer-events-none disabled:opacity-40`}
           >
-            <GoldLight active={nextGlow === "drivers"} />
+            <WidgetCallingPulse active={activePulsarStep === "meeting"} />
             <div className="relative z-10 flex items-center justify-between">
               <span className="flex h-11 w-11 items-center justify-center rounded-xl border border-cyan-500/25 bg-cyan-500/10 text-cyan-400">
                 <TrainFront className="h-5 w-5" aria-hidden />
@@ -355,22 +375,19 @@ export function BuilderMWidgetGrid({
       </div>
 
       {/* ROW 5 — Tours */}
-      <div>
+      <div className="overflow-visible">
         <button
           type="button"
           onClick={() => open("tours")}
           disabled={locked?.tours}
-          className={`${WIDGET_SHELL} h-[13.5rem] p-0 disabled:pointer-events-none disabled:opacity-40`}
+          className={`${WIDGET_SHELL} ${getWidgetPulsarClass(activePulsarStep, "tours")} h-[13.5rem] p-0 disabled:pointer-events-none disabled:opacity-40`}
         >
-          <GoldLight active={nextGlow === "tours"} />
+            <WidgetCallingPulse active={activePulsarStep === "tours"} />
           {experienceBands.length === 0 ? (
-            <div className="relative z-10 flex h-full flex-col overflow-hidden bg-gradient-to-b from-[#1a2840] to-[#0A1017]">
-              <div className="relative z-10 flex flex-1 flex-col items-center justify-center px-4 text-center">
+            <div className="absolute inset-0 z-0 overflow-hidden rounded-[22px] bg-gradient-to-b from-[#1a2840] to-[#0A1017]">
+              <div className="relative z-10 flex h-full flex-col items-center justify-center px-4 pb-14 text-center">
                 <p className="font-godiva text-base font-bold uppercase leading-snug text-white">
-                  No experiences or tours chosen
-                </p>
-                <p className="mt-2 font-mono text-[11px] font-bold tracking-wider text-pink-400 uppercase">
-                  I&apos;m boring…
+                  Pick an experience or tour
                 </p>
               </div>
               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -382,7 +399,7 @@ export function BuilderMWidgetGrid({
               />
             </div>
           ) : (
-            <div className="relative z-10 flex h-full w-full flex-col">
+            <div className="absolute inset-0 z-0 flex h-full w-full flex-col overflow-hidden rounded-[22px]">
               {experienceBands.slice(0, 4).map((band) => (
                 <div
                   key={band.key}

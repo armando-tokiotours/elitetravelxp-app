@@ -33,9 +33,8 @@ export function demandFromMultiDay(
   let ticketsNeeded =
     Boolean(state.arrivalNeedsTicket) || ticketLines.length > 0;
   let driverNeeded = false;
-  let guideNeeded = Object.values(state.selectedTours || {}).some(
-    (rows) => Array.isArray(rows) && rows.length > 0
-  );
+  // Multi-day tour days always need a guide desk decision (assign / board / none).
+  const guideNeeded = true;
 
   for (const loc of locations) {
     if (loc.transitType === "public" && loc.needsTicket) ticketsNeeded = true;
@@ -73,10 +72,10 @@ export function demandFromSingleDay(
     | "preferredMovement"
     | "guidePreference"
     | "selectedTransportProducts"
+    | "tourHours"
   >
 ): OpsDemandFlags {
   const transit = String(state.preferredMovement || "").toLowerCase();
-  const guide = String(state.guidePreference || "").toLowerCase();
   const ticketLines = [...(state.selectedTransportProducts || [])];
   const ticketsNeeded =
     ticketLines.length > 0 ||
@@ -86,15 +85,22 @@ export function demandFromSingleDay(
     transit.includes("public") ||
     transit.includes("rail") ||
     transit.includes("train") ||
-    transit.includes("subway");
+    transit.includes("subway") ||
+    (state.selectedExperiences || []).some((e) => {
+      const t = String(e.title || "").toLowerCase();
+      return (
+        t.includes("teamlab") ||
+        t.includes("team lab") ||
+        t.includes("ghibli") ||
+        t.includes("disney")
+      );
+    });
   const driverNeeded =
     transit.includes("private") ||
     transit.includes("chauffeur") ||
     transit.includes("driver");
-  const guideNeeded =
-    (state.selectedExperiences || []).length > 0 ||
-    guide.includes("guide") ||
-    guide.includes("private");
+  // 3h / 6h / 8h (and any single-day tour) always need guide desk — Ops decides assign or not.
+  const guideNeeded = true;
 
   return { ticketsNeeded, driverNeeded, guideNeeded, ticketLines };
 }
@@ -108,8 +114,9 @@ export async function applyOpsDemandForPnr(
   const pnr = String(pnrRaw || "")
     .trim()
     .toUpperCase();
-  if (!pnr || pnr.startsWith("TMP-")) return;
+  if (!pnr) return;
 
+  // TMP leads still get demand flags on ops_hub so Ops can assign before PNR finalizes.
   const dispatch = await ensureDispatchRow(pb, pnr);
   await pb.collection("ops_dispatch").update(
     dispatch.id,

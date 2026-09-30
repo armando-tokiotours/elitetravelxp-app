@@ -31,10 +31,13 @@ const SPECIAL_NEED_OPTIONS: { id: SpecialNeedId; label: string }[] = [
 export function SingleDayGuestsEditorModal({
   open,
   onClose,
+  onConfirmed,
   selectedCity,
 }: {
   open: boolean;
   onClose: () => void;
+  /** Fired when Done succeeds — advances guided pulsar to meeting. */
+  onConfirmed?: () => void;
   selectedCity?: PbCity | null;
 }) {
   const adults = useSingleDayBuilderStore((s) => s.adults);
@@ -110,7 +113,7 @@ export function SingleDayGuestsEditorModal({
       {open ? (
         <motion.div
           key="single-guests-editor"
-          className="fixed inset-0 z-50 flex items-center justify-center tokio-modal-backdrop bg-[#05080C]/55 backdrop-blur-sm"
+          className="fixed inset-0 z-50 flex flex-col bg-[#0A1017]"
           role="dialog"
           aria-modal="true"
           aria-label="Configure guests and pace"
@@ -120,27 +123,24 @@ export function SingleDayGuestsEditorModal({
           transition={{ duration: 0.2 }}
         >
           <motion.div
-            className="tokio-modal-content relative flex h-[100dvh] max-h-[100dvh] w-full flex-col overflow-hidden border border-white/10 md:max-w-4xl md:rounded-2xl lg:max-w-5xl"
+            className="relative flex h-full w-full flex-col overflow-hidden bg-[#0A1017]"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 20 }}
             transition={{ duration: 0.25, ease: "easeOut" }}
           >
-            <div className="tokio-modal-chrome flex flex-shrink-0 items-center gap-4 border-b p-4 pt-[max(1rem,env(safe-area-inset-top))]">
+            <div className="sticky top-0 z-20 flex w-full shrink-0 items-center gap-3 border-b border-white/10 bg-[#0A1017]/95 px-4 py-3.5 pt-[max(0.875rem,env(safe-area-inset-top))] backdrop-blur-md">
               <button
                 type="button"
                 onClick={onClose}
                 aria-label="Back"
-                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-zinc-700 bg-zinc-900 text-white transition hover:border-zinc-500"
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white"
               >
                 <ArrowLeft className="h-5 w-5" />
               </button>
               <div className="min-w-0 flex-1">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#075473]">
-                  Configure
-                </p>
-                <h3 className="truncate font-display text-2xl text-white">
-                  Configure Trip Details
+                <h3 className="truncate font-godiva text-base uppercase tracking-wider text-white">
+                  Party &amp; Pace
                 </h3>
               </div>
             </div>
@@ -232,7 +232,7 @@ export function SingleDayGuestsEditorModal({
                 <p className="mt-1.5 text-xs text-zinc-400">
                   Used for vehicles and private-driver sizing.
                 </p>
-                <SpecialNeedsAccordion />
+                <SpecialNeedsAccordion key={open ? "mobility-open" : "mobility-closed"} />
               </div>
 
               <div>
@@ -255,7 +255,11 @@ export function SingleDayGuestsEditorModal({
             <div className="tokio-modal-chrome flex flex-shrink-0 border-t p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
               <button
                 type="button"
-                onClick={onClose}
+                onClick={() => {
+                  if (!canDone) return;
+                  onConfirmed?.();
+                  onClose();
+                }}
                 disabled={!canDone}
                 className="w-full rounded-full bg-[#054F70] py-3 text-sm font-semibold text-white transition hover:bg-[#043d57] disabled:cursor-not-allowed disabled:opacity-40"
               >
@@ -324,101 +328,107 @@ function GuestStepper({
 
 function SpecialNeedsAccordion() {
   const [open, setOpen] = useState(false);
-  const [needsTap, setNeedsTap] = useState(true);
   const specialNeeds = useBuilderStore((s) => s.specialNeeds);
   const toggleSpecialNeed = useBuilderStore((s) => s.toggleSpecialNeed);
   const noNeed = specialNeeds.includes("none");
   const activeNeeds = specialNeeds.filter((id) => id !== "none");
   const answered = specialNeeds.length > 0;
 
+  const pickNeed = (id: SpecialNeedId) => {
+    toggleSpecialNeed(id);
+    if (id === "none") {
+      // Collapse after “No need” — mobility = none
+      window.setTimeout(() => setOpen(false), 180);
+    }
+  };
+
   return (
-    <div className="mt-3">
-      <div className="flex min-h-8 items-center gap-2">
-        <button
-          type="button"
-          onClick={() => {
-            setNeedsTap(false);
-            setOpen((v) => !v);
-          }}
-          aria-expanded={open}
-          aria-label={
-            open
-              ? "Hide special mobility options"
-              : "Show special mobility options"
-          }
-          className={`relative flex h-7 shrink-0 items-center gap-1.5 rounded-full border px-2.5 text-[10px] font-bold uppercase tracking-wider transition ${
-            open
-              ? "border-white/50 bg-white/15 text-white"
-              : needsTap && !answered
-                ? "animate-locations-help-glow border-white/70 bg-white/10 text-white"
-                : answered
-                  ? noNeed
-                    ? "border-emerald-500/50 bg-emerald-500/10 text-emerald-400"
-                    : "border-[#D91147]/50 bg-[#D91147]/10 text-[#D91147]"
-                  : "border-zinc-600 bg-zinc-900 text-zinc-300 hover:border-zinc-500"
-          }`}
-        >
-          {needsTap && !open && !answered ? (
-            <span
-              aria-hidden
-              className="pointer-events-none absolute inset-0 animate-locations-help-ring rounded-full border border-white/80"
-            />
-          ) : null}
-          <span className="relative z-[1]">Special mobility</span>
-          {answered && !open ? (
-            <span className="relative z-[1] rounded-full bg-white/15 px-1.5 py-0.5 text-[9px]">
-              {noNeed ? "OK" : activeNeeds.length}
-            </span>
-          ) : null}
-        </button>
-        {open ? (
-          <p className="min-w-0 flex-1 text-[11px] leading-snug text-zinc-400">
-            Tap any that apply, or select{" "}
-            <span className="font-semibold text-zinc-300">No need</span> to
-            continue. Bookings staff will see this.
-          </p>
+    <div className="mt-3 overflow-visible">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        aria-label={
+          open
+            ? "Hide special mobility options"
+            : "Show special mobility options"
+        }
+        className={`relative flex shrink-0 items-center gap-1.5 rounded-full bg-zinc-900/60 px-4 py-1.5 text-xs font-bold uppercase tracking-wider text-white transition ${
+          !answered
+            ? "z-[1] border border-white/70 animate-locations-help-glow"
+            : open
+              ? "border border-white/40 bg-white/10"
+              : noNeed
+                ? "border border-emerald-500/40 text-emerald-400"
+                : "border border-white/30"
+        }`}
+      >
+        {!answered ? (
+          <span
+            className="pointer-events-none absolute inset-0 animate-locations-help-ring rounded-full border border-white/80"
+            aria-hidden
+          />
         ) : null}
-      </div>
-      {open ? (
-        <div className="mt-2 space-y-2">
-          <div className="grid grid-cols-3 gap-2">
-            {SPECIAL_NEED_OPTIONS.map((opt) => {
-              const on = specialNeeds.includes(opt.id);
-              return (
+        <span className="relative z-[1]">Special mobility</span>
+        {answered && !open ? (
+          <span className="relative z-[1] rounded-full bg-white/15 px-1.5 py-0.5 text-[9px]">
+            {noNeed ? "OK" : activeNeeds.length}
+          </span>
+        ) : null}
+      </button>
+
+      <AnimatePresence initial={false}>
+        {open ? (
+          <motion.div
+            key="special-mobility-panel"
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.28, ease: "easeInOut" }}
+            className="overflow-hidden"
+          >
+            <div className="mt-2 space-y-2">
+              <p className="text-[11px] leading-snug text-zinc-400">
+                Tap any that apply, or select{" "}
+                <span className="font-semibold text-zinc-300">No need</span> to
+                continue.
+              </p>
+              <div className="grid grid-cols-2 gap-2">
+                {SPECIAL_NEED_OPTIONS.map((opt) => {
+                  const on = specialNeeds.includes(opt.id);
+                  return (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      aria-pressed={on}
+                      onClick={() => pickNeed(opt.id)}
+                      className={`rounded-full border px-2 py-2 text-center text-[11px] font-semibold leading-snug transition sm:text-xs ${
+                        on
+                          ? "border-amber-400/70 bg-amber-500/10 text-white"
+                          : "border-white/20 bg-zinc-900/50 text-zinc-300 hover:border-white/35"
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  );
+                })}
                 <button
-                  key={opt.id}
                   type="button"
-                  aria-pressed={on}
-                  onClick={() => toggleSpecialNeed(opt.id)}
-                  className={`rounded-full border px-2 py-1.5 text-center text-[11px] font-semibold leading-snug transition sm:text-xs ${
-                    on
-                      ? "border-[#D91147]/60 bg-[#D91147]/15 text-white"
-                      : "border-zinc-700 bg-zinc-900 text-zinc-400 hover:border-zinc-500"
+                  aria-pressed={noNeed}
+                  onClick={() => pickNeed("none")}
+                  className={`rounded-full border px-2 py-2 text-center text-[11px] font-semibold transition sm:text-xs ${
+                    noNeed
+                      ? "border-emerald-500/60 bg-emerald-500/15 text-emerald-300"
+                      : "border-white/20 bg-zinc-900/50 text-zinc-300 hover:border-white/35"
                   }`}
                 >
-                  {opt.label}
+                  No need
                 </button>
-              );
-            })}
-          </div>
-          <div className="grid grid-cols-3 gap-2">
-            <span aria-hidden />
-            <button
-              type="button"
-              aria-pressed={noNeed}
-              onClick={() => toggleSpecialNeed("none")}
-              className={`rounded-full border px-2 py-1.5 text-center text-[11px] font-semibold transition sm:text-xs ${
-                noNeed
-                  ? "border-emerald-500/60 bg-emerald-500/15 text-emerald-300"
-                  : "border-zinc-700 bg-zinc-900 text-zinc-400 hover:border-zinc-500"
-              }`}
-            >
-              No need
-            </button>
-            <span aria-hidden />
-          </div>
-        </div>
-      ) : null}
+              </div>
+            </div>
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
     </div>
   );
 }

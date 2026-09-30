@@ -82,6 +82,27 @@ export async function POST(request: Request) {
       selections,
       dossierPdfUrl: dossierPdfUrl ? String(dossierPdfUrl) : null,
       recordEmailSent,
+      meetingPointName: String(
+        body?.meetingPointName || body?.meeting_point_name || ""
+      ).trim(),
+      meetingPointAddress: String(
+        body?.meetingPointAddress || body?.meeting_point_address || ""
+      ).trim(),
+      meetingPointLat:
+        body?.meetingPointLat != null
+          ? Number(body.meetingPointLat)
+          : body?.meeting_point_lat != null
+            ? Number(body.meeting_point_lat)
+            : null,
+      meetingPointLng:
+        body?.meetingPointLng != null
+          ? Number(body.meetingPointLng)
+          : body?.meeting_point_lng != null
+            ? Number(body.meeting_point_lng)
+            : null,
+      meetingPointPlaceId: String(
+        body?.meetingPointPlaceId || body?.meeting_point_place_id || ""
+      ).trim(),
     });
 
     if (!result.ok) {
@@ -98,12 +119,13 @@ export async function POST(request: Request) {
           guideNeeded?: boolean;
         }
       | undefined;
-    if (demand && !isTempBookingRef(bookingRef)) {
+    if (demand) {
       void import("@/lib/opsDemand").then(({ applyOpsDemandForPnrAdmin }) =>
         applyOpsDemandForPnrAdmin(bookingRef, {
           ticketsNeeded: Boolean(demand.ticketsNeeded),
           driverNeeded: Boolean(demand.driverNeeded),
-          guideNeeded: Boolean(demand.guideNeeded),
+          // Single/multi tour days always need guide desk (Ops decides assign or not)
+          guideNeeded: demand.guideNeeded !== false,
         })
       );
     }

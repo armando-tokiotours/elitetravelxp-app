@@ -49,8 +49,11 @@ export interface SingleDayBuilderState {
   preferredTourLanguage: string;
   /** Hotel name or station hub for morning pick-up. */
   meetingPoint: string;
+  /** Display title (hotel/hub) from Geoapify. */
+  meetingPointName?: string;
   meetingPointLat?: number | null;
   meetingPointLng?: number | null;
+  meetingPointPlaceId?: string;
   /** Preferred intra-city movement for the day. */
   preferredMovement: IntraCityTransport | null;
   blocks: DayBlock[];
@@ -68,9 +71,21 @@ export interface SingleDayBuilderState {
   setStartTime: (time: string) => void;
   setGuidePreference: (pref: GuidePreference) => void;
   setCityFocus: (city: string) => void;
+  /**
+   * Switch tour city and clear city-bound meeting point + experiences.
+   * Used after City Change Confirmation.
+   */
+  changeCityFocus: (city: string) => void;
   setPreferredTourLanguage: (code: string) => void;
   setMeetingPoint: (value: string) => void;
   setMeetingPointCoords: (lat: number | null, lng: number | null) => void;
+  setMeetingPointDetails: (details: {
+    name: string;
+    address: string;
+    lat: number | null;
+    lng: number | null;
+    placeId?: string;
+  }) => void;
   setPreferredMovement: (value: IntraCityTransport | null) => void;
   addExperience: (row: SingleDaySelectedExperience) => void;
   removeExperience: (tourId: string) => void;
@@ -159,8 +174,10 @@ const initialState = {
   cityFocus: "Tokyo",
   preferredTourLanguage: "EN",
   meetingPoint: "",
+  meetingPointName: "",
   meetingPointLat: null as number | null,
   meetingPointLng: null as number | null,
+  meetingPointPlaceId: "",
   preferredMovement: null as IntraCityTransport | null,
   blocks: initialBlocks,
   selectedExperiences: [] as SingleDaySelectedExperience[],
@@ -191,16 +208,41 @@ export const useSingleDayBuilderStore = create<SingleDayBuilderState>()(
       setGuidePreference: (guidePreference) => set({ guidePreference }),
       setCityFocus: (cityFocus) =>
         set({ cityFocus, experiencesStepDone: false }),
+      changeCityFocus: (cityFocus) =>
+        set({
+          cityFocus: String(cityFocus || "").trim(),
+          meetingPoint: "",
+          meetingPointName: "",
+          meetingPointLat: null,
+          meetingPointLng: null,
+          meetingPointPlaceId: "",
+          selectedExperiences: [],
+          experiencesStepDone: false,
+          preferredTourLanguage: "EN",
+        }),
       setPreferredTourLanguage: (preferredTourLanguage) =>
         set({ preferredTourLanguage: preferredTourLanguage || "EN" }),
       setMeetingPoint: (meetingPoint) =>
-        set({ meetingPoint: String(meetingPoint ?? "") }),
+        set({
+          meetingPoint: String(meetingPoint ?? ""),
+          meetingPointName: String(meetingPoint ?? ""),
+        }),
       setMeetingPointCoords: (lat, lng) =>
         set({
           meetingPointLat:
             lat == null || !Number.isFinite(lat) ? null : lat,
           meetingPointLng:
             lng == null || !Number.isFinite(lng) ? null : lng,
+        }),
+      setMeetingPointDetails: ({ name, address, lat, lng, placeId }) =>
+        set({
+          meetingPointName: String(name || "").trim(),
+          meetingPoint: String(address || name || "").trim(),
+          meetingPointLat:
+            lat == null || !Number.isFinite(lat) ? null : lat,
+          meetingPointLng:
+            lng == null || !Number.isFinite(lng) ? null : lng,
+          meetingPointPlaceId: String(placeId || "").trim(),
         }),
       setPreferredMovement: (preferredMovement) => set({ preferredMovement }),
       setExperiencesStepDone: (experiencesStepDone) =>
@@ -299,7 +341,7 @@ export const useSingleDayBuilderStore = create<SingleDayBuilderState>()(
     }),
     {
       name: "single-day-builder",
-      version: 7,
+      version: 8,
       migrate: (persisted, version) => {
         const p = (persisted || {}) as Record<string, unknown>;
         if (version < 3) {
@@ -378,6 +420,21 @@ export const useSingleDayBuilderStore = create<SingleDayBuilderState>()(
               typeof p.meetingPointLat === "number" ? p.meetingPointLat : null,
             meetingPointLng:
               typeof p.meetingPointLng === "number" ? p.meetingPointLng : null,
+          };
+        }
+        if (version < 8) {
+          return {
+            ...(p as unknown as SingleDayBuilderState),
+            meetingPointName:
+              typeof p.meetingPointName === "string"
+                ? p.meetingPointName
+                : typeof p.meetingPoint === "string"
+                  ? p.meetingPoint
+                  : "",
+            meetingPointPlaceId:
+              typeof p.meetingPointPlaceId === "string"
+                ? p.meetingPointPlaceId
+                : "",
           };
         }
         return p as unknown as SingleDayBuilderState;

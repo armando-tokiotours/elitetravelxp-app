@@ -25,6 +25,10 @@ import { NewBookingResetButton } from "@/components/builder/NewBookingResetButto
 import { SingleDayBuilderHero } from "@/components/builder-single/SingleDayBuilderHero";
 import { BuilderSView } from "@/components/builder-single/BuilderSView";
 import {
+  getWidgetPulsarClass,
+  WidgetCallingPulse,
+} from "@/components/branding/WidgetCallingPulse";
+import {
   readBuilderSHeroLocalCache,
   SINGLE_DAY_BUILDER_HERO_KEY,
 } from "@/config/mediaConfig";
@@ -45,6 +49,7 @@ export function SingleDayBuilderView() {
     name: "Guest Brief",
     email: "",
   });
+  const [savePulsarActive, setSavePulsarActive] = useState(false);
 
   const setTripMode = useBuilderStore((s) => s.setTripMode);
   const tempBookingRef = useBuilderStore((s) => s.tempBookingRef);
@@ -53,7 +58,7 @@ export function SingleDayBuilderView() {
   const ensureTemp = useBuilderStore((s) => s.ensureTempBookingRef);
 
   const cityFocus = useSingleDayBuilderStore((s) => s.cityFocus);
-  const setCityFocus = useSingleDayBuilderStore((s) => s.setCityFocus);
+  const changeCityFocus = useSingleDayBuilderStore((s) => s.changeCityFocus);
 
   useEffect(() => {
     ensureTemp();
@@ -168,7 +173,7 @@ export function SingleDayBuilderView() {
   }, [config?.tours, extraPlaces]);
 
   const handleSelectCity = (city: PbCity) => {
-    setCityFocus(city.name);
+    changeCityFocus(city.name);
   };
 
   if (!hydrated) {
@@ -183,7 +188,7 @@ export function SingleDayBuilderView() {
     <>
       <AppSidebar
         brandEyebrow="TOKIOTOURS"
-        brandTitle="Builder S"
+        brandTitle="Builders"
         expandOnHover
       />
       <div
@@ -191,7 +196,7 @@ export function SingleDayBuilderView() {
       >
         <div className="builder-theme relative min-h-screen overflow-x-clip overflow-y-visible bg-[#04080C] text-white [color-scheme:dark]">
           <MobileTopChrome
-            brandTitle="Builder S"
+            brandTitle="Builders"
             ctaHref="/builder-single/itinerary"
             ctaLabel="Itinerary"
           />
@@ -244,6 +249,9 @@ export function SingleDayBuilderView() {
                       catalog={experiencesCatalog}
                       selectedCity={selectedCity}
                       onSelectCity={handleSelectCity}
+                      onActivePulsarStepChange={(step) => {
+                        setSavePulsarActive(step === "save");
+                      }}
                     />
 
                     <div className="mt-2 flex flex-col gap-3 px-4 sm:flex-row sm:px-6">
@@ -270,9 +278,19 @@ export function SingleDayBuilderView() {
                           }
                           window.location.href = "/builder-single/itinerary";
                         }}
-                        className="flex flex-1 items-center justify-center rounded-full bg-[#054F70] py-3.5 text-sm font-semibold text-white transition hover:bg-[#043d57]"
+                        className={`relative flex flex-1 items-center justify-center overflow-visible rounded-full bg-[#054F70] py-3.5 text-sm font-semibold text-white transition hover:bg-[#043d57] ${
+                          savePulsarActive
+                            ? getWidgetPulsarClass("save", "save")
+                            : ""
+                        }`}
                       >
-                        Save &amp; View Itinerary
+                        <WidgetCallingPulse
+                          active={savePulsarActive}
+                          roundedClass="rounded-full"
+                        />
+                        <span className="relative z-[1]">
+                          Save &amp; View Itinerary
+                        </span>
                       </button>
                     </div>
                   </div>

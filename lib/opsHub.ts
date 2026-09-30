@@ -80,6 +80,8 @@ export async function upsertOpsHubFromDirect(
     status: mapLeadStatusToOpsHub(input.status),
     primary_city: String(input.primaryCity || "").trim() || "Tokyo",
     guest_summary: String(input.guestSummary || "").trim(),
+    // Tour bookings (single 3/6/8h + multi) always need guide desk visibility.
+    guide_needed: true,
   };
   if (tourDateRaw) fields.tour_date = tourDateRaw;
 

@@ -28,9 +28,12 @@ import { usePreBuilderStore } from "@/store/usePreBuilderStore";
 import { JapanBookingPass } from "@/components/dossier/JapanBookingPass";
 import { CoordinationTeamSection } from "@/components/dossier/CoordinationTeamSection";
 import {
-  DayServiceIcons,
-  type ServiceIconState,
+  StaffIdentityCard,
+  TicketStubCard,
+  DayServiceIdleRow,
+  experienceNeedsEntryTicket,
 } from "@/components/dossier/DayStaffCards";
+import { useOpsStaffNames } from "@/lib/useOpsStaffNames";
 import { useConciergeAgentName } from "@/lib/useConciergeAgentName";
 import {
   buildDossierQrUrl,
@@ -160,12 +163,39 @@ export function SingleDayItineraryView() {
     bookingStatus,
   });
   const conciergeAgentName = useConciergeAgentName(pnrCode);
+  const { guideName, driverName } = useOpsStaffNames(pnrCode);
   const passDate = dateLabel === "Date TBD" ? "" : dateLabel.toUpperCase();
   const pickup = startTime || "09:00";
   const highlights = buildSingleDayHighlights({
     cityFocus: cityLabel,
     guidePreference,
   });
+
+  const needsCar = preferredMovement === "private_driver";
+  const needsGuide =
+    guidePreference === "private_guide" ||
+    guidePreference === "local_host" ||
+    selectedExperiences.length > 0;
+  const ticketStops = useMemo(() => {
+    return timedStops
+      .map((stop) => {
+        const tour = catalogById.get(stop.tourId);
+        const needs = experienceNeedsEntryTicket({
+          title: stop.title || tour?.title,
+          description: tour?.description,
+          access_type: tour?.access_type,
+          is_self_guided: tour?.is_self_guided,
+          category: tour?.category,
+        });
+        if (!needs) return null;
+        return {
+          key: stop.tourId,
+          title: tour?.title || stop.title,
+          timeLabel: stop.timeSlot || stop.startTime,
+        };
+      })
+      .filter((x): x is NonNullable<typeof x> => Boolean(x));
+  }, [timedStops, catalogById]);
 
   return (
     <div
@@ -206,29 +236,79 @@ export function SingleDayItineraryView() {
         tripPath="/builder-single/itinerary"
       />
 
-      {(() => {
-        const car: ServiceIconState =
-          preferredMovement === "private_driver" ? "pending" : "none";
-        const guide: ServiceIconState =
-          guidePreference === "private_guide" || guidePreference === "local_host"
-            ? "pending"
-            : "none";
-        const tickets: ServiceIconState =
-          preferredMovement === "subway" ? "pending" : "none";
-        return (
-          <div className="rounded-2xl border border-white/10 bg-black/30 p-3">
-            <p className="mb-2 text-[9px] font-semibold tracking-wider text-zinc-500 uppercase">
-              Day services
+      <div className="rounded-2xl border border-white/10 bg-black/30 p-3">
+        <div className="mb-3 flex items-center justify-between gap-2">
+          <p className="text-[9px] font-semibold tracking-wider text-zinc-500 uppercase">
+            Day services
+          </p>
+          <span className="font-mono text-[10px] font-bold tracking-wider text-zinc-500 uppercase">
+            Day 1
+          </span>
+        </div>
+
+        <div className="space-y-2.5">
+          {/* Line 1 — Car / driver */}
+          <div className="space-y-1.5">
+            <p className="text-[9px] font-bold uppercase tracking-widest text-white/45">
+              Car
             </p>
-            <DayServiceIcons
-              dayLabel="Day 1"
-              car={car}
-              guide={guide}
-              tickets={tickets}
-            />
+            {needsCar ? (
+              <StaffIdentityCard
+                role="driver"
+                name={driverName}
+                emptyLabel="No driver assigned yet"
+              />
+            ) : (
+              <DayServiceIdleRow
+                label="Car"
+                message="No private car for this day"
+              />
+            )}
           </div>
-        );
-      })()}
+
+          {/* Line 2 — Guide */}
+          <div className="space-y-1.5">
+            <p className="text-[9px] font-bold uppercase tracking-widest text-white/45">
+              Guide
+            </p>
+            {needsGuide ? (
+              <StaffIdentityCard
+                role="guide"
+                name={guideName}
+                emptyLabel="No guide assigned yet"
+              />
+            ) : (
+              <DayServiceIdleRow
+                label="Guide"
+                message="No guide assigned yet"
+              />
+            )}
+          </div>
+
+          {/* Line 3 — Tickets (teamLab / timed entry / direct ticket) */}
+          <div className="space-y-1.5">
+            <p className="text-[9px] font-bold uppercase tracking-widest text-white/45">
+              Tickets
+            </p>
+            {ticketStops.length > 0 ? (
+              <div className="space-y-2">
+                {ticketStops.map((t) => (
+                  <TicketStubCard
+                    key={t.key}
+                    title={t.title}
+                    subtitle={`Entry · ${t.timeLabel}`}
+                  />
+                ))}
+              </div>
+            ) : (
+              <DayServiceIdleRow
+                label="Tickets"
+                message="No entry tickets needed for this day"
+              />
+            )}
+          </div>
+        </div>
+      </div>
 
       <SingleDayTimelineInfographic
         stops={enrichedStops}

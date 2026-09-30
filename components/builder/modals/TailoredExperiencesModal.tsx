@@ -396,7 +396,7 @@ export function TailoredExperiencesModal({
       {open ? (
         <motion.div
           key="tailored-experiences"
-          className="fixed inset-0 z-50 flex items-center justify-center tokio-modal-backdrop bg-[#05080C]/55 backdrop-blur-sm"
+          className="fixed inset-0 z-50 flex flex-col bg-[#0A1017]"
           role="dialog"
           aria-modal="true"
           aria-label="Tailored Experiences"
@@ -406,27 +406,24 @@ export function TailoredExperiencesModal({
           transition={{ duration: 0.2 }}
         >
           <motion.div
-            className="tokio-modal-content relative flex h-[100dvh] max-h-[100dvh] w-full flex-col overflow-hidden border border-white/10 md:max-w-4xl md:rounded-2xl lg:max-w-5xl"
-            initial={{ opacity: 0, y: 20 }}
+            className="relative flex h-full w-full flex-col overflow-hidden bg-[#0A1017]"
+            initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 20 }}
+            exit={{ opacity: 0, y: -8 }}
             transition={{ duration: 0.25, ease: "easeOut" }}
           >
-            <div className="tokio-modal-chrome flex flex-shrink-0 items-center gap-4 border-b p-4 pt-[max(0.35rem,env(safe-area-inset-top))]">
+            <div className="sticky top-0 z-20 flex w-full shrink-0 items-center gap-3 border-b border-white/10 bg-[#0A1017]/95 px-4 py-3.5 pt-[max(0.875rem,env(safe-area-inset-top))] backdrop-blur-md">
               <button
                 type="button"
                 onClick={handleCancel}
-                aria-label="Cancel without saving"
-                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-zinc-700 bg-zinc-900 text-white transition hover:border-zinc-500"
+                aria-label="Back"
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white"
               >
                 <ArrowLeft className="h-5 w-5" />
               </button>
               <div className="min-w-0 flex-1">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#D9718C]">
-                  Configure
-                </p>
-                <h3 className="truncate font-display text-2xl text-white">
-                  Tailored Experiences
+                <h3 className="truncate font-godiva text-base uppercase tracking-wider text-white">
+                  Tours &amp; Experiences
                 </h3>
               </div>
             </div>

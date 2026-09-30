@@ -197,60 +197,26 @@ export function SingleDayTimelineInfographic({
 
         {stops.map((stop) => {
           const branchLeft = stop.stopNumber % 2 === 1;
-          const ring =
-            stop.ringTone === "red"
-              ? isPrint
-                ? "ring-[#E60F43]"
-                : "ring-[#E60F43] shadow-[0_0_18px_rgba(230,15,67,0.45)]"
-              : isPrint
-                ? "ring-[#075473]"
-                : "ring-[#075473] shadow-[0_0_18px_rgba(7,84,115,0.55)]";
 
           return (
             <li
               key={`${stop.tourId}-${stop.stopNumber}`}
-              className={`sd-timeline-item relative mb-10 last:mb-0 md:mb-14 pl-12 ${
+              className={`sd-timeline-item relative mb-10 last:mb-0 md:mb-14 ${
                 branchLeft
-                  ? "md:pl-0 md:pr-[calc(50%+1.75rem)]"
+                  ? "md:pr-[calc(50%+1.75rem)]"
                   : "md:pl-[calc(50%+1.75rem)]"
               }`}
             >
-              <div className="absolute top-0 left-0 z-[2] md:left-1/2 md:-translate-x-1/2">
-                <div
-                  className={`relative h-14 w-14 overflow-hidden rounded-full ring-2 sm:h-16 sm:w-16 ${ring} ${
-                    isPrint ? "bg-zinc-100" : "bg-[#121212]"
-                  }`}
-                >
-                  {stop.thumbUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={stop.thumbUrl}
-                      alt=""
-                      className="h-full w-full object-cover"
-                    />
-                  ) : (
-                    <span
-                      className={`flex h-full w-full items-center justify-center text-[10px] font-bold ${
-                        isPrint ? "text-zinc-500" : "text-white/40"
-                      }`}
-                    >
-                      {String(stop.stopNumber).padStart(2, "0")}
-                    </span>
-                  )}
-                  <span
-                    className={`absolute -bottom-1 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full px-1.5 py-0.5 text-[8px] font-bold tracking-wider ${
-                      isPrint
-                        ? "bg-[#0B1F3A] text-white"
-                        : "bg-[#E60F43] text-white shadow-md"
-                    }`}
-                  >
-                    STOP {String(stop.stopNumber).padStart(2, "0")}
-                  </span>
-                </div>
-              </div>
+              {/* Rail node — no circular stop photo */}
+              <div
+                aria-hidden
+                className={`absolute top-3 left-0 z-[2] h-2.5 w-2.5 rounded-full md:left-1/2 md:-translate-x-1/2 ${
+                  isPrint ? "bg-[#075473]" : "bg-cyan-400 shadow-[0_0_10px_rgba(34,211,238,0.55)]"
+                }`}
+              />
 
               <div
-                className={`sd-timeline-card ${
+                className={`sd-timeline-card pl-6 md:pl-0 ${
                   branchLeft ? "md:text-right" : "md:text-left"
                 }`}
               >

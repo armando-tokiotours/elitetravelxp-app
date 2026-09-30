@@ -421,7 +421,7 @@ export default function SingleDayItineraryPageClient() {
                 onClick={() => void requestSendPdf()}
                 aria-label="Send"
                 title="Send"
-                className="col-span-1 inline-flex items-center justify-center rounded-xl bg-[#075473] p-2.5 text-white hover:bg-[#064560]"
+                className="col-span-1 inline-flex items-center justify-center rounded-xl border border-white/15 bg-transparent p-2.5 text-white hover:border-white/30 hover:bg-white/5"
               >
                 <Send className="h-4 w-4" aria-hidden />
               </button>

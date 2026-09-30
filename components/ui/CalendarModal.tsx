@@ -83,7 +83,7 @@ type CalendarModalProps = {
   value: string | null;
   onClose: () => void;
   onSelect: (iso: string) => void;
-  /** Disallow dates before today (default true). */
+  /** Disallow dates before today (default true). When true, also blocks today + tomorrow (min = today+2). */
   disablePast?: boolean;
   title?: string;
   eyebrow?: string;
@@ -103,9 +103,18 @@ export function CalendarModal({
   eyebrow = "Calendar",
 }: CalendarModalProps) {
   const today = useMemo(() => startOfDay(new Date()), []);
+  /** Earliest selectable = day after tomorrow when past is disabled. */
+  const minDate = useMemo(() => {
+    if (!disablePast) return null;
+    return new Date(
+      today.getFullYear(),
+      today.getMonth(),
+      today.getDate() + 2
+    );
+  }, [disablePast, today]);
   const selected = useMemo(() => fromIso(value), [value]);
   const [view, setView] = useState(() => {
-    const base = selected ?? today;
+    const base = selected ?? minDate ?? today;
     return { year: base.getFullYear(), month: base.getMonth() };
   });
   const [mounted, setMounted] = useState(false);
@@ -114,9 +123,9 @@ export function CalendarModal({
 
   useEffect(() => {
     if (!open) return;
-    const base = selected ?? today;
+    const base = selected ?? minDate ?? today;
     setView({ year: base.getFullYear(), month: base.getMonth() });
-  }, [open, selected, today]);
+  }, [open, selected, today, minDate]);
 
   useEffect(() => {
     if (!open) return;
@@ -133,7 +142,7 @@ export function CalendarModal({
   );
 
   const pick = (day: Date) => {
-    if (disablePast && day.getTime() < today.getTime()) return;
+    if (minDate && day.getTime() < minDate.getTime()) return;
     onSelect(toIso(day));
     onClose();
   };
@@ -241,7 +250,7 @@ export function CalendarModal({
                     return <div key={`empty-${i}`} className="min-h-[44px]" />;
                   }
                   const disabled =
-                    disablePast && day.getTime() < today.getTime();
+                    minDate != null && day.getTime() < minDate.getTime();
                   const isSelected = selected ? sameDay(day, selected) : false;
                   return (
                     <button

@@ -61,8 +61,8 @@ export function SystemMessageFox() {
   const tone = message?.tone ?? "info";
   const shellClass =
     side === "right"
-      ? "pointer-events-none fixed bottom-[5.75rem] right-0 z-[70] w-[min(62vw,18.85rem)] max-w-[18.85rem] sm:bottom-28 sm:w-[min(55vw,19.5rem)]"
-      : "pointer-events-none fixed bottom-[5.75rem] left-0 z-[70] w-[min(62vw,18.85rem)] max-w-[18.85rem] sm:bottom-28 sm:w-[min(55vw,19.5rem)]";
+      ? "pointer-events-none fixed bottom-[5.75rem] right-0 z-[95] w-[min(62vw,18.85rem)] max-w-[18.85rem] sm:bottom-28 sm:w-[min(55vw,19.5rem)]"
+      : "pointer-events-none fixed bottom-[5.75rem] left-0 z-[95] w-[min(62vw,18.85rem)] max-w-[18.85rem] sm:bottom-28 sm:w-[min(55vw,19.5rem)]";
 
   return (
     <div className={shellClass} aria-live="polite">

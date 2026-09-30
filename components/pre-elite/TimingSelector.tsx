@@ -205,6 +205,8 @@ function DaysCounter({
 export function TimingSelector({ value, onChange, tripType }: Props) {
   const singleDay = tripType === "single_day";
   const today = useMemo(() => startOfDay(new Date()), []);
+  /** Block today + tomorrow — earliest arrival is day after tomorrow. */
+  const minArrival = useMemo(() => addDays(today, 2), [today]);
   const initialStart = value.startDate ? fromIso(value.startDate) : null;
 
   const [open, setOpen] = useState(false);
@@ -395,7 +397,7 @@ export function TimingSelector({ value, onChange, tripType }: Props) {
   };
 
   const pickDay = (day: Date) => {
-    if (day.getTime() < today.getTime()) return;
+    if (day.getTime() < minArrival.getTime()) return;
     setArrival(day);
     emit({
       mode: "dates",
@@ -533,7 +535,7 @@ export function TimingSelector({ value, onChange, tripType }: Props) {
               if (!day) {
                 return <div key={`empty-${i}`} className="min-h-[44px]" />;
               }
-              const disabled = day.getTime() < today.getTime();
+              const disabled = day.getTime() < minArrival.getTime();
               const selected = arrival ? sameDay(day, arrival) : false;
               return (
                 <button
@@ -558,7 +560,7 @@ export function TimingSelector({ value, onChange, tripType }: Props) {
           <p className="mt-2 text-[11px] text-white/45">
             {arrival
               ? `${singleDay ? "Tour date" : "Arrival"}: ${formatDay(arrival)}`
-              : `Select your ${singleDay ? "tour" : "arrival"} date`}
+              : `Select your ${singleDay ? "tour" : "arrival"} date (from ${formatDay(minArrival)} — not today or tomorrow)`}
           </p>
         </div>
       ) : (

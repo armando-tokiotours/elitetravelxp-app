@@ -419,9 +419,9 @@ function Field({
 
 const BOOKLET_PAGES = [
   "Identity",
-  "Region & availability",
-  "Comfort & expertise",
-  "Rates & banking",
+  "Region",
+  "Expertise",
+  "Rates",
 ] as const;
 
 /** 4-page passport booklet editor modal */
