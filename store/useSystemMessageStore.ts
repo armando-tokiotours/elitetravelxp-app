@@ -9,6 +9,10 @@ export type SystemMessage = {
   text: string;
   tone: SystemMessageTone;
   durationMs: number;
+  /** Optional fox image override (default /brand/fox-peek.webp). */
+  foxSrc?: string;
+  /** Peek side — right uses fox-peek-right assets. */
+  side?: "left" | "right";
 };
 
 type SystemMessageState = {
@@ -17,6 +21,8 @@ type SystemMessageState = {
     text: string;
     tone?: SystemMessageTone;
     durationMs?: number;
+    foxSrc?: string;
+    side?: "left" | "right";
   }) => void;
   dismiss: () => void;
 };
@@ -29,7 +35,7 @@ let seq = 0;
  */
 export const useSystemMessageStore = create<SystemMessageState>((set) => ({
   message: null,
-  show: ({ text, tone = "info", durationMs }) => {
+  show: ({ text, tone = "info", durationMs, foxSrc, side }) => {
     const trimmed = String(text || "").trim();
     if (!trimmed) return;
     seq += 1;
@@ -41,6 +47,8 @@ export const useSystemMessageStore = create<SystemMessageState>((set) => ({
         text: trimmed,
         tone,
         durationMs: Math.max(2800, durationMs ?? auto),
+        foxSrc,
+        side: side ?? (foxSrc ? "right" : "left"),
       },
     });
   },
@@ -52,6 +60,8 @@ export function showSystemMessage(input: {
   text: string;
   tone?: SystemMessageTone;
   durationMs?: number;
+  foxSrc?: string;
+  side?: "left" | "right";
 }): void {
   useSystemMessageStore.getState().show(input);
 }

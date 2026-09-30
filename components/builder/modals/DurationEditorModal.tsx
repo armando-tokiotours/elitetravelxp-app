@@ -4,43 +4,35 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import { ArrowLeft, Check } from "lucide-react";
-import type { PbSeasonTier } from "@/lib/pocketbase/client";
-import { resolveSeasonInsight } from "@/lib/seasonality";
-import { useSeasonalFxStore } from "@/store/useSeasonalFxStore";
-import { SeasonalityCard } from "@/components/builder/SeasonalityCard";
-import { DatePickerField } from "@/components/ui/CalendarModal";
 import { LazyVideo } from "@/components/ui/LazyVideo";
-import { useBuilderStore } from "@/store/useBuilderStore";
-import { ChoicePill, FieldLabel } from "../ui";
+import { useBuilderStore, type SpecialNeedId } from "@/store/useBuilderStore";
+import { FieldLabel } from "../ui";
 import { type PaceId } from "@/lib/travelPace";
 import { useSiteBrandingStore } from "@/store/useSiteBrandingStore";
 import { PaceDetailModal } from "@/components/builder/modals/PaceDetailModal";
-import { SeasonalityDetailModal } from "@/components/builder/modals/SeasonalityDetailModal";
 import { GuestCountStrip } from "@/components/branding/GuestCountStrip";
 
-const PRESETS = [10, 14, 21] as const;
+const SPECIAL_NEED_OPTIONS: { id: SpecialNeedId; label: string }[] = [
+  { id: "reduced_mobility", label: "Reduced mobility" },
+  { id: "baby_car_seat", label: "Kid / baby car seat" },
+  { id: "senior", label: "Senior" },
+];
 
+/**
+ * Pace + guest party configure modal (“Configure Trip Details”).
+ * Days + arrival date live in DaysDateEditorModal.
+ */
 export function DurationEditorModal({
   open,
   onClose,
-  seasonTiers = [],
 }: {
   open: boolean;
   onClose: () => void;
-  seasonTiers?: PbSeasonTier[];
 }) {
-  const durationDays = useBuilderStore((s) => s.durationDays);
-  const durationCustom = useBuilderStore((s) => s.durationCustom);
-  const arrivalDate = useBuilderStore((s) => s.arrivalDate);
-  const activeSeasonTier = useBuilderStore((s) => s.activeSeasonTier);
-  const activeSeasonNote = useBuilderStore((s) => s.activeSeasonNote);
   const adults = useBuilderStore((s) => s.adults);
   const children = useBuilderStore((s) => s.children);
   const travelPace = useBuilderStore((s) => s.travelPace);
-  const setDurationDays = useBuilderStore((s) => s.setDurationDays);
-  const setDurationCustom = useBuilderStore((s) => s.setDurationCustom);
-  const setArrivalDate = useBuilderStore((s) => s.setArrivalDate);
-  const setActiveSeason = useBuilderStore((s) => s.setActiveSeason);
+  const specialNeeds = useBuilderStore((s) => s.specialNeeds);
   const setAdults = useBuilderStore((s) => s.setAdults);
   const setChildren = useBuilderStore((s) => s.setChildren);
   const setTravelPace = useBuilderStore((s) => s.setTravelPace);
@@ -51,16 +43,12 @@ export function DurationEditorModal({
   void brandingItems; // subscribe so cards refresh after PB load
 
   const [mounted, setMounted] = useState(false);
-  const [customDraft, setCustomDraft] = useState(String(durationDays));
   const [paceModal, setPaceModal] = useState<PaceId | null>(null);
-  const [seasonModalOpen, setSeasonModalOpen] = useState(false);
 
   const totalGuests = adults + children;
+  const specialNeedsAnswered = specialNeeds.length > 0;
   const canDone =
-    durationDays > 0 &&
-    Boolean(arrivalDate) &&
-    travelPace !== null &&
-    totalGuests > 0;
+    travelPace !== null && totalGuests > 0 && specialNeedsAnswered;
 
   useEffect(() => {
     setMounted(true);
@@ -77,49 +65,6 @@ export function DurationEditorModal({
       document.body.style.overflow = "";
     };
   }, []);
-
-  useEffect(() => {
-    if (durationCustom) setCustomDraft(String(durationDays));
-  }, [durationCustom, durationDays]);
-
-  useEffect(() => {
-    const insight = resolveSeasonInsight(seasonTiers, arrivalDate);
-    if (!insight) {
-      setActiveSeason(null, null);
-      return;
-    }
-    setActiveSeason(insight.tier, {
-      crowds: insight.crowd_level,
-      note: insight.concierge_note,
-    });
-  }, [arrivalDate, seasonTiers, setActiveSeason]);
-
-  const selectPreset = (days: number) => {
-    setDurationCustom(false);
-    setDurationDays(days);
-  };
-
-  const selectCustom = () => {
-    setDurationCustom(true);
-    const n = Math.max(1, durationDays || 1);
-    setDurationDays(n);
-    setCustomDraft(String(n));
-  };
-
-  const applyCustom = (raw: string) => {
-    setCustomDraft(raw);
-    const parsed = Number.parseInt(raw, 10);
-    if (Number.isFinite(parsed) && parsed >= 1) {
-      setDurationDays(parsed);
-    }
-  };
-
-  const commitCustom = () => {
-    const parsed = Number.parseInt(customDraft, 10);
-    const next = Number.isFinite(parsed) && parsed >= 1 ? parsed : 1;
-    setDurationDays(next);
-    setCustomDraft(String(next));
-  };
 
   if (!mounted) return null;
 
@@ -168,85 +113,6 @@ export function DurationEditorModal({
             </div>
 
             <div className="flex min-h-0 flex-1 flex-col gap-8 overflow-y-auto p-4 pb-12">
-              <div>
-                <FieldLabel>How many total days will you spend in Japan?</FieldLabel>
-                <p className="mt-1 text-xs text-zinc-500">
-                  Set the full trip length first — then distribute nights across
-                  cities in Locations.
-                </p>
-                <div className="mt-2 flex flex-wrap gap-2">
-                  {PRESETS.map((days) => (
-                    <ChoicePill
-                      key={days}
-                      size="sm"
-                      active={!durationCustom && durationDays === days}
-                      onClick={() => selectPreset(days)}
-                    >
-                      {days}
-                    </ChoicePill>
-                  ))}
-                  <ChoicePill
-                    size="sm"
-                    active={durationCustom}
-                    onClick={selectCustom}
-                  >
-                    Custom
-                  </ChoicePill>
-                </div>
-
-                {durationCustom ? (
-                  <div className="mt-4 rounded-xl border border-zinc-800 bg-zinc-950 p-4">
-                    <FieldLabel>Enter days</FieldLabel>
-                    <div className="mt-1 flex items-center gap-3">
-                      <input
-                        type="number"
-                        min={1}
-                        step={1}
-                        inputMode="numeric"
-                        value={customDraft}
-                        onChange={(e) => applyCustom(e.target.value)}
-                        onBlur={commitCustom}
-                        placeholder="e.g. 1, 2, 3, 7"
-                        className="w-36 rounded-xl border border-zinc-700 bg-zinc-900 px-3 py-2.5 text-sm text-white outline-none focus:border-[#075473]"
-                      />
-                      <span className="text-sm text-zinc-400">
-                        Minimum 1 day · Step 3 nights must total{" "}
-                        <strong className="text-white">
-                          {Math.max(1, durationDays)}
-                        </strong>
-                      </span>
-                    </div>
-                  </div>
-                ) : null}
-              </div>
-
-              <div className="relative z-[1] overflow-visible md:grid md:grid-cols-2 md:gap-4">
-                <div className="flex flex-col gap-4 md:contents">
-                <DatePickerField
-                  value={arrivalDate}
-                  onChange={(next) => {
-                    setArrivalDate(next);
-                    if (next) {
-                      useSeasonalFxStore.getState().triggerFromDate(next);
-                    }
-                  }}
-                  label="Arrival date"
-                />
-
-                <SeasonalityCard
-                  arrivalDate={arrivalDate}
-                  tier={activeSeasonTier}
-                  crowds={activeSeasonNote?.crowds}
-                  note={activeSeasonNote?.note}
-                  onOpenExplain={() => {
-                    if (activeSeasonTier && activeSeasonNote) {
-                      setSeasonModalOpen(true);
-                    }
-                  }}
-                />
-                </div>
-              </div>
-
               <div>
                 <FieldLabel>Travel pace</FieldLabel>
                 <p className="mb-3 text-xs text-zinc-500">
@@ -333,6 +199,8 @@ export function DurationEditorModal({
                 <p className="mt-1.5 text-xs text-zinc-400">
                   Used for airport transfers, vehicles, and hotel room guidance.
                 </p>
+
+                <SpecialNeedsAccordion />
               </div>
             </div>
 
@@ -356,14 +224,6 @@ export function DurationEditorModal({
               setTravelPace(id);
               setPaceModal(null);
             }}
-          />
-
-          <SeasonalityDetailModal
-            open={seasonModalOpen}
-            onClose={() => setSeasonModalOpen(false)}
-            tier={activeSeasonTier}
-            crowds={activeSeasonNote?.crowds ?? ""}
-            note={activeSeasonNote?.note ?? ""}
           />
         </motion.div>
       ) : null}
@@ -410,6 +270,101 @@ function GuestStepper({
           +
         </button>
       </div>
+    </div>
+  );
+}
+
+function SpecialNeedsAccordion() {
+  const [open, setOpen] = useState(false);
+  const [needsTap, setNeedsTap] = useState(true);
+  const specialNeeds = useBuilderStore((s) => s.specialNeeds);
+  const toggleSpecialNeed = useBuilderStore((s) => s.toggleSpecialNeed);
+  const noNeed = specialNeeds.includes("none");
+  const activeNeeds = specialNeeds.filter((id) => id !== "none");
+  const answered = specialNeeds.length > 0;
+
+  return (
+    <div className="mt-3">
+      <div className="flex min-h-8 items-center gap-2">
+        <button
+          type="button"
+          onClick={() => {
+            setNeedsTap(false);
+            setOpen((v) => !v);
+          }}
+          aria-expanded={open}
+          aria-label={
+            open
+              ? "Hide special mobility options"
+              : "Show special mobility options"
+          }
+          className={`relative flex h-7 shrink-0 items-center gap-1.5 rounded-full border px-2.5 text-[10px] font-bold uppercase tracking-wider transition ${
+            open
+              ? "border-white/50 bg-white/15 text-white"
+              : needsTap && !answered
+                ? "animate-locations-help-glow border-white/70 bg-white/10 text-white"
+                : answered
+                  ? noNeed
+                    ? "border-emerald-500/50 bg-emerald-500/10 text-emerald-400"
+                    : "border-[#D91147]/50 bg-[#D91147]/10 text-[#D91147]"
+                  : "border-zinc-600 bg-zinc-900 text-zinc-300 hover:border-zinc-500"
+          }`}
+        >
+          {needsTap && !open && !answered ? (
+            <span
+              aria-hidden
+              className="pointer-events-none absolute inset-0 animate-locations-help-ring rounded-full border border-white/80"
+            />
+          ) : null}
+          <span className="relative z-[1]">Special mobility</span>
+          {answered && !open ? (
+            <span className="relative z-[1] rounded-full bg-white/15 px-1.5 py-0.5 text-[9px]">
+              {noNeed ? "OK" : activeNeeds.length}
+            </span>
+          ) : null}
+        </button>
+        {open ? (
+          <p className="min-w-0 flex-1 text-[11px] leading-snug text-zinc-400">
+            Tap any that apply, or select{" "}
+            <span className="font-semibold text-zinc-300">No need</span> to
+            continue. Bookings staff will see this.
+          </p>
+        ) : null}
+      </div>
+      {open ? (
+        <div className="mt-2 flex flex-wrap gap-2">
+          {SPECIAL_NEED_OPTIONS.map((opt) => {
+            const on = specialNeeds.includes(opt.id);
+            return (
+              <button
+                key={opt.id}
+                type="button"
+                aria-pressed={on}
+                onClick={() => toggleSpecialNeed(opt.id)}
+                className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
+                  on
+                    ? "border-[#D91147]/60 bg-[#D91147]/15 text-white"
+                    : "border-zinc-700 bg-zinc-900 text-zinc-400 hover:border-zinc-500"
+                }`}
+              >
+                {opt.label}
+              </button>
+            );
+          })}
+          <button
+            type="button"
+            aria-pressed={noNeed}
+            onClick={() => toggleSpecialNeed("none")}
+            className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
+              noNeed
+                ? "border-emerald-500/60 bg-emerald-500/15 text-emerald-300"
+                : "border-zinc-700 bg-zinc-900 text-zinc-400 hover:border-zinc-500"
+            }`}
+          >
+            No need
+          </button>
+        </div>
+      ) : null}
     </div>
   );
 }

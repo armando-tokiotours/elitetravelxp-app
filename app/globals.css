@@ -460,6 +460,40 @@ h1 .font-beauty,
   animation: fade-up 0.65s ease-out both;
 }
 
+/* Locations help ? — intermittent white glow until first tap */
+@keyframes locations-help-glow {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.15);
+    border-color: rgba(255, 255, 255, 0.45);
+  }
+  50% {
+    box-shadow:
+      0 0 0 4px rgba(255, 255, 255, 0.12),
+      0 0 18px 2px rgba(255, 255, 255, 0.55);
+    border-color: rgba(255, 255, 255, 0.95);
+  }
+}
+
+@keyframes locations-help-ring {
+  0% {
+    transform: scale(1);
+    opacity: 0.85;
+  }
+  100% {
+    transform: scale(1.85);
+    opacity: 0;
+  }
+}
+
+.animate-locations-help-glow {
+  animation: locations-help-glow 1.4s ease-in-out infinite;
+}
+
+.animate-locations-help-ring {
+  animation: locations-help-ring 1.4s ease-out infinite;
+}
+
 @keyframes mascotSwap {
   0% {
     opacity: 0;

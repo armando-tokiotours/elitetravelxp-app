@@ -91,6 +91,23 @@ export async function POST(request: Request) {
       );
     }
 
+    const demand = body?.demand as
+      | {
+          ticketsNeeded?: boolean;
+          driverNeeded?: boolean;
+          guideNeeded?: boolean;
+        }
+      | undefined;
+    if (demand && !isTempBookingRef(bookingRef)) {
+      void import("@/lib/opsDemand").then(({ applyOpsDemandForPnrAdmin }) =>
+        applyOpsDemandForPnrAdmin(bookingRef, {
+          ticketsNeeded: Boolean(demand.ticketsNeeded),
+          driverNeeded: Boolean(demand.driverNeeded),
+          guideNeeded: Boolean(demand.guideNeeded),
+        })
+      );
+    }
+
     return NextResponse.json({
       ok: true,
       id: result.id,

@@ -31,6 +31,8 @@ import { CityThumb } from "../CityThumb";
 import { coerceTransitType } from "@/store/useBuilderStore";
 import { showSystemMessage } from "@/store/useSystemMessageStore";
 import { getSystemMessage } from "@/lib/systemMessages";
+import { HorizontalHelpAccordion } from "../HorizontalHelpAccordion";
+import { GoldLight } from "@/components/branding/GoldLight";
 
 export function LocationsEditorModal({
   open,
@@ -68,7 +70,10 @@ export function LocationsEditorModal({
   locations: LocationStop[];
   cities: PbCity[];
   cityMap: Record<string, PbCity>;
-  dateByKey: Record<string, { label?: string }>;
+  dateByKey: Record<
+    string,
+    { label?: string; startDate?: string; endDate?: string }
+  >;
   arrivalHub: PbHub | null;
   departureHub?: PbHub | null;
   hubById?: Record<string, PbHub>;
@@ -174,12 +179,18 @@ export function LocationsEditorModal({
             </div>
 
             <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-4 py-4 pb-12 sm:px-5">
-              <div className="rounded-xl border border-zinc-800 bg-zinc-950 px-3.5 py-2.5 text-xs text-zinc-400">
-                Set how many nights you spend in each city and how you travel
-                between stops. Accommodation is optional and configured next
-                under{" "}
-                <span className="font-semibold text-[#F3D9C4]">Hotels</span>.
-              </div>
+              <HorizontalHelpAccordion
+                ariaLabelShow="Show how locations and nights work"
+                ariaLabelHide="Hide locations help"
+                text={
+                  <>
+                    Set nights per city and travel between stops. Hotels are
+                    optional next under{" "}
+                    <span className="font-semibold text-[#F3D9C4]">Hotels</span>
+                    .
+                  </>
+                }
+              />
 
               {routeToast ? (
                 <div
@@ -252,6 +263,8 @@ export function LocationsEditorModal({
                         city={cityMap[loc.cityId]}
                         displayName={hubName || undefined}
                         dateLabel={range?.label ?? ""}
+                        startDate={range?.startDate}
+                        endDate={range?.endDate}
                         fromLabel={fromLabel}
                         showFromLabel={showFromLabel}
                         index={index}
@@ -281,14 +294,17 @@ export function LocationsEditorModal({
                 </Reorder.Group>
               )}
 
-              <button
-                type="button"
-                onClick={() => setPickerOpen(true)}
-                disabled={cities.length === 0}
-                className="w-full rounded-full border border-dashed border-[#075473] bg-zinc-950 py-3 text-sm font-semibold text-white transition hover:bg-zinc-800 disabled:opacity-40"
-              >
-                + Add Location
-              </button>
+              <div className="flex w-full items-center gap-2">
+                <div className="min-h-[2.75rem] w-2/3" aria-hidden />
+                <button
+                  type="button"
+                  onClick={() => setPickerOpen(true)}
+                  disabled={cities.length === 0}
+                  className="w-1/3 rounded-full border border-dashed border-[#075473] bg-zinc-950 py-2.5 text-center text-xs font-semibold text-white transition hover:bg-zinc-800 disabled:opacity-40 sm:text-sm"
+                >
+                  + Add Location
+                </button>
+              </div>
             </div>
 
             <div className="tokio-modal-chrome flex flex-shrink-0 flex-col gap-3 border-t p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
@@ -400,6 +416,17 @@ function RouteNoticeBadge({ message }: { message: string }) {
     onToggleClick,
   } = useHybridTooltip();
 
+  const openNotice = () => {
+    onToggleClick();
+    showSystemMessage({
+      text: "what is the concern!",
+      tone: "error",
+      foxSrc: "/brand/fox-peek-right.png",
+      side: "right",
+      durationMs: 8000,
+    });
+  };
+
   return (
     <div
       ref={containerRef}
@@ -409,21 +436,25 @@ function RouteNoticeBadge({ message }: { message: string }) {
     >
       <button
         type="button"
-        onClick={onToggleClick}
+        onClick={openNotice}
         aria-expanded={isOpen}
         aria-describedby={isOpen ? "route-notice-tooltip" : undefined}
-        className="flex cursor-pointer items-center gap-1.5 rounded-lg border border-[#075473]/60 bg-[#075473]/15 px-3 py-1.5 text-xs font-bold text-[#075473] shadow-sm transition hover:bg-[#075473]/30 active:scale-95"
+        className="group relative flex cursor-pointer items-center gap-1.5 overflow-hidden rounded-lg border border-[#D91147]/50 bg-[#D91147]/10 px-3 py-1.5 text-xs font-bold text-[#D91147] shadow-sm transition hover:bg-[#D91147]/20 active:scale-95"
       >
-        <span>⚠️ Route Notice</span>
+        <GoldLight color="#D91147" placement="right-center" active />
+        <span className="relative z-10 inline-flex items-center gap-1.5">
+          <span aria-hidden>⚠️</span>
+          <span>Route Notice</span>
+        </span>
       </button>
       {isOpen ? (
         <div
           id="route-notice-tooltip"
           role="tooltip"
-          className="absolute right-0 top-full z-50 mt-2 w-64 max-w-[260px] rounded-xl border border-cyan-400/40 bg-[#075473] p-3 text-left text-[11px] font-semibold leading-tight text-white shadow-2xl animate-in fade-in duration-150"
+          className="absolute right-0 top-full z-50 mt-2 w-64 max-w-[260px] rounded-xl border border-[#D91147]/40 bg-[#1a0a10] p-3 text-left text-[11px] font-semibold leading-tight text-white shadow-2xl animate-in fade-in duration-150"
         >
           <div
-            className="absolute bottom-full right-4 border-[6px] border-transparent border-b-[#075473]"
+            className="absolute bottom-full right-4 border-[6px] border-transparent border-b-[#1a0a10]"
             aria-hidden
           />
           <p className="leading-snug text-white">{message}</p>

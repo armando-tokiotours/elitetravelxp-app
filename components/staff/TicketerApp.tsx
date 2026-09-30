@@ -47,9 +47,18 @@ function TicketerInner() {
       let filter =
         'ticket_status="needed" || ticket_status="ordered" || ticket_status="done"';
       if (role === "ticketer" && staffId) {
+        // Only jobs that need tickets (or already assigned to this ticketer)
         filter = `assigned_ticketer_id="${staffId}" || ticket_status="needed" || ticket_status="ordered"`;
       }
-      setRows(await loadTickets(pb, filter));
+      const list = await loadTickets(pb, filter);
+      // Hide pure "none" noise — never show bookings with no ticket demand
+      setRows(
+        list.filter((r) => {
+          const st = String(r.ticket_status || "none");
+          if (st === "none" || st === "") return false;
+          return true;
+        })
+      );
     } catch (e) {
       setError(formatPbError(e));
     } finally {

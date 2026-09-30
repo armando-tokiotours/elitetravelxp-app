@@ -118,6 +118,13 @@ export const COLLECTIONS: CollectionDef[] = [
         hint: "Tour = multi-stop guided day · Activity = single experience / ticket",
       },
       {
+        key: "audience",
+        label: "Audience",
+        type: "select",
+        options: ["agency", "individual", "both"],
+        hint: "Travel agencies only · Individuals only · Both",
+      },
+      {
         key: "vibe_tags",
         label: "Vibe tags",
         type: "multiselect",

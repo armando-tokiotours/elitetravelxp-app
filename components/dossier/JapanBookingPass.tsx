@@ -9,6 +9,7 @@ import {
   WalletPassFallbackError,
 } from "@/lib/wallet/downloadApplePass";
 import type { BookingPassProps } from "./JapanBookingPass.types";
+import { GoldLight } from "@/components/branding/GoldLight";
 
 export type { BookingPassProps, RouteBreakdownItem } from "./JapanBookingPass.types";
 
@@ -209,25 +210,85 @@ export function JapanBookingPass({
                 TOKIOTOURS
               </span>
             </div>
-            <span className="shrink-0 rounded-full border border-cyan-500/30 bg-cyan-500/10 px-3 py-1 text-[10px] font-bold tracking-widest text-cyan-400 uppercase">
-              {tripType === "multi"
-                ? "JAPAN MULTI-DAY PASS"
-                : "JAPAN DAY TOUR PASS"}
-            </span>
+            <div className="relative flex shrink-0 flex-wrap items-center justify-end gap-2">
+              {(() => {
+                const st = String(status || "DRAFT").toUpperCase();
+                const confirmed =
+                  st === "CONFIRMED" || st === "IN_OPS" || st === "DONE";
+                const cancelled = st === "CANCELLED" || st === "CANCELED";
+                const spot = confirmed
+                  ? "#1BA58A"
+                  : cancelled
+                    ? "#E60F43"
+                    : "#F6A724";
+                return (
+                  <span
+                    className={`group relative overflow-hidden rounded-full border px-[0.9rem] py-[0.4rem] text-[16px] font-bold tracking-widest uppercase shadow-lg ${
+                      confirmed
+                        ? "border-emerald-400/50 bg-emerald-500/20 text-emerald-200"
+                        : cancelled
+                          ? "border-red-500/50 bg-red-500/20 text-red-200"
+                          : "border-amber-400/50 bg-amber-500/20 text-amber-200"
+                    }`}
+                  >
+                    <GoldLight color={spot} placement="top-center" active />
+                    <span className="relative z-10">{st}</span>
+                  </span>
+                );
+              })()}
+              <span className="rounded-full border border-cyan-500/30 bg-cyan-500/10 px-3 py-1 text-[10px] font-bold tracking-widest text-cyan-400 uppercase">
+                {tripType === "multi"
+                  ? "JAPAN MULTI-DAY PASS"
+                  : "JAPAN DAY TOUR PASS"}
+              </span>
+            </div>
           </div>
 
           <div className="flex items-center justify-between pt-2">
-            <div>
-              <span
-                className={`font-black font-mono tracking-wider text-white ${
-                  isSingle ? "text-xl md:text-2xl" : "text-2xl md:text-3xl"
-                }`}
-              >
-                {leftCode}
-              </span>
-              <span className="block text-[10px] tracking-wider text-zinc-400 uppercase">
-                {leftLabel}
-              </span>
+            <div className="min-w-0 max-w-[38%]">
+              {(() => {
+                const code = String(leftCode || "");
+                const isAirportCode = /^[A-Z]{3}$/.test(code.trim());
+                const isTime = /^\d{1,2}:\d{2}/.test(code.trim());
+                if (isAirportCode || isTime || isSingle) {
+                  return (
+                    <>
+                      <span
+                        className={`font-black font-mono tracking-wider text-white ${
+                          isSingle ? "text-xl md:text-2xl" : "text-2xl md:text-3xl"
+                        }`}
+                      >
+                        {leftCode}
+                      </span>
+                      <span className="block text-[10px] tracking-wider text-zinc-400 uppercase">
+                        {leftLabel}
+                      </span>
+                    </>
+                  );
+                }
+                // Cruise / long hub name: city −20%, "Cruise Port" −50%
+                const parts = code.split(/\s+/).filter(Boolean);
+                const city = parts[0] || code;
+                const rest =
+                  parts.length > 1
+                    ? parts.slice(1).join(" ")
+                    : leftLabel && leftLabel !== "TOKYO ENTRY"
+                      ? leftLabel
+                      : "Cruise Port";
+                return (
+                  <>
+                    <span className="block font-black font-mono tracking-wider text-white text-[1.2rem] md:text-[1.5rem] leading-tight">
+                      {city}
+                    </span>
+                    <span className="block font-mono text-[0.75rem] md:text-[0.9375rem] font-semibold tracking-wider text-white/85 leading-tight">
+                      {rest}
+                    </span>
+                    <span className="mt-0.5 block text-[10px] tracking-wider text-zinc-400 uppercase">
+                      {leftLabel}
+                    </span>
+                  </>
+                );
+              })()}
             </div>
 
             <div className="flex flex-col items-center px-2 text-center">

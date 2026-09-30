@@ -181,6 +181,8 @@ export async function syncMultiDayBookingLead(opts: {
   const selections = buildMultiDaySelections(opts.state);
   const q = quoteFields(opts.quote);
   const status = opts.status || "lead";
+  const { demandFromMultiDay } = await import("@/lib/opsDemand");
+  const demand = demandFromMultiDay(opts.state);
 
   cacheBookingLeadLocally({
     booking_ref: bookingRef,
@@ -216,6 +218,7 @@ export async function syncMultiDayBookingLead(opts: {
           ...q,
         },
         dossierPdfUrl: opts.dossierPdfUrl ?? null,
+        demand,
       }),
     });
     if (!res.ok) {
@@ -257,6 +260,8 @@ export async function syncSingleDayBookingLead(opts: {
   });
   const q = quoteFields(opts.quote);
   const status = opts.status || "lead";
+  const { demandFromSingleDay } = await import("@/lib/opsDemand");
+  const demand = demandFromSingleDay(opts.state);
 
   cacheBookingLeadLocally({
     booking_ref: bookingRef,
@@ -292,6 +297,7 @@ export async function syncSingleDayBookingLead(opts: {
           ...q,
         },
         dossierPdfUrl: opts.dossierPdfUrl ?? null,
+        demand,
       }),
     });
     if (!res.ok) {

@@ -13,7 +13,8 @@ const CHAR_SPLIT = 48;
  * Fox-peek + comic speech bubble(s) — sharp pointy tail toward the fox.
  * Long copy splits into two bubbles; duration stays readable.
  */
-const FOX_SRC = "/brand/fox-peek.webp";
+const FOX_SRC_LEFT = "/brand/fox-peek.webp";
+const FOX_SRC_RIGHT = "/brand/fox-peek-right.png";
 
 export function SystemMessageFox() {
   const message = useSystemMessageStore((s) => s.message);
@@ -25,11 +26,17 @@ export function SystemMessageFox() {
   );
 
   const [partIndex, setPartIndex] = useState(0);
+  const foxSrc =
+    message?.foxSrc ||
+    (message?.side === "right" ? FOX_SRC_RIGHT : FOX_SRC_LEFT);
+  const side = message?.side ?? "left";
 
-  // Warm fox image as soon as the shell mounts (don't wait for first tip)
+  // Warm fox images as soon as the shell mounts (don't wait for first tip)
   useEffect(() => {
-    const img = new window.Image();
-    img.src = FOX_SRC;
+    const left = new window.Image();
+    left.src = FOX_SRC_LEFT;
+    const right = new window.Image();
+    right.src = FOX_SRC_RIGHT;
   }, []);
 
   useEffect(() => {
@@ -52,23 +59,32 @@ export function SystemMessageFox() {
 
   const visibleParts = parts.slice(0, partIndex + 1);
   const tone = message?.tone ?? "info";
+  const shellClass =
+    side === "right"
+      ? "pointer-events-none fixed bottom-[5.75rem] right-0 z-[70] w-[min(62vw,18.85rem)] max-w-[18.85rem] sm:bottom-28 sm:w-[min(55vw,19.5rem)]"
+      : "pointer-events-none fixed bottom-[5.75rem] left-0 z-[70] w-[min(62vw,18.85rem)] max-w-[18.85rem] sm:bottom-28 sm:w-[min(55vw,19.5rem)]";
 
   return (
-    <div
-      className="pointer-events-none fixed bottom-[5.75rem] left-0 z-[70] w-[min(62vw,18.85rem)] max-w-[18.85rem] sm:bottom-28 sm:w-[min(55vw,19.5rem)]"
-      aria-live="polite"
-    >
+    <div className={shellClass} aria-live="polite">
       <AnimatePresence mode="wait">
         {message ? (
           <motion.div
             key={message.id}
-            initial={{ opacity: 0, x: -18 }}
+            initial={{ opacity: 0, x: side === "right" ? 18 : -18 }}
             animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -12 }}
+            exit={{ opacity: 0, x: side === "right" ? 12 : -12 }}
             transition={{ duration: 0.28, ease: "easeOut" }}
-            className="relative flex flex-col items-start"
+            className={`relative flex flex-col ${
+              side === "right" ? "items-end" : "items-start"
+            }`}
           >
-            <div className="relative z-10 -mb-3 ml-10 flex w-[calc(100%-2.25rem)] flex-col items-start gap-2">
+            <div
+              className={`relative z-10 -mb-3 flex w-[calc(100%-2.25rem)] flex-col gap-2 ${
+                side === "right"
+                  ? "mr-10 items-end"
+                  : "ml-10 items-start"
+              }`}
+            >
               <AnimatePresence initial={false}>
                 {visibleParts.map((text, i) => {
                   const isLast = i === visibleParts.length - 1;
@@ -89,7 +105,7 @@ export function SystemMessageFox() {
                       className="pointer-events-auto relative max-w-full cursor-pointer text-left"
                       aria-label={text}
                     >
-                      <ComicBubble tone={tone} showTail={isLast}>
+                      <ComicBubble tone={tone} showTail={isLast} side={side}>
                         {text}
                       </ComicBubble>
                     </motion.button>
@@ -99,21 +115,25 @@ export function SystemMessageFox() {
             </div>
 
             <motion.img
-              src={FOX_SRC}
+              src={foxSrc}
               alt=""
               aria-hidden
               draggable={false}
-              initial={{ x: -28, opacity: 0 }}
+              initial={{ x: side === "right" ? 28 : -28, opacity: 0 }}
               animate={{ x: 0, opacity: 1 }}
-              exit={{ x: -20, opacity: 0 }}
+              exit={{ x: side === "right" ? 20 : -20, opacity: 0 }}
               transition={{ duration: 0.32, ease: "easeOut" }}
-              className="pointer-events-none -ml-1 h-[9.425rem] w-auto select-none object-contain object-left-bottom drop-shadow-[0_10px_18px_rgba(0,0,0,0.5)] sm:h-[10.4rem]"
+              className={`pointer-events-none h-[9.425rem] w-auto select-none object-contain drop-shadow-[0_10px_18px_rgba(0,0,0,0.5)] sm:h-[10.4rem] ${
+                side === "right"
+                  ? "-mr-1 object-right-bottom"
+                  : "-ml-1 object-left-bottom"
+              }`}
             />
           </motion.div>
         ) : (
           // eslint-disable-next-line @next/next/no-img-element -- keep fox decoded off-screen for first tip
           <img
-            src={FOX_SRC}
+            src={FOX_SRC_LEFT}
             alt=""
             aria-hidden
             className="pointer-events-none absolute h-0 w-0 opacity-0"
@@ -128,10 +148,12 @@ function ComicBubble({
   children,
   tone,
   showTail,
+  side = "left",
 }: {
   children: string;
   tone: SystemMessageTone;
   showTail: boolean;
+  side?: "left" | "right";
 }) {
   const { fill, stroke, ring } = toneColors(tone);
   const lines = wrapWordsPerLine(children, 4);
@@ -155,10 +177,19 @@ function ComicBubble({
 
       {/* Separate pointy tip — gap below the box, not attached to the border */}
       {showTail ? (
-        <div className="mt-2 flex justify-start pl-5" aria-hidden>
+        <div
+          className={`mt-2 flex ${
+            side === "right" ? "justify-end pr-5" : "justify-start pl-5"
+          }`}
+          aria-hidden
+        >
           <svg className="h-[14px] w-[21px]" viewBox="0 0 22 16">
             <path
-              d="M3 0 L1 15 L18 2.5 Z"
+              d={
+                side === "right"
+                  ? "M19 0 L21 15 L4 2.5 Z"
+                  : "M3 0 L1 15 L18 2.5 Z"
+              }
               fill={fill}
               stroke={stroke}
               strokeWidth="1.6"

@@ -92,9 +92,25 @@ function OpsBoardInner() {
     setSavingId(id);
     setMsg(null);
     try {
-      await getClient().collection("ops_hub").update(id, data, {
+      const pb = getClient();
+      const updated = await pb.collection("ops_hub").update(id, data, {
         requestKey: null,
       });
+      if (typeof data.status === "string") {
+        const { syncDetailStatusFromOpsHub } = await import(
+          "@/lib/syncOpsStatusToDetail"
+        );
+        await syncDetailStatusFromOpsHub(
+          pb,
+          updated as {
+            source?: string;
+            detail_collection?: string;
+            detail_id?: string;
+            pnr?: string;
+          },
+          data.status
+        );
+      }
       setMsg(okMsg);
       await reload();
     } catch (e) {
@@ -241,6 +257,19 @@ function OpsRow({
     tickets?.assigned_ticketer_id || row.assigned_ticketer_id || "";
   const ticketStatus =
     tickets?.ticket_status || row.ticket_status || "none";
+  const ticketsNeeded =
+    row.tickets_needed === true ||
+    ticketStatus === "needed" ||
+    ticketStatus === "ordered" ||
+    ticketStatus === "done";
+  const driverNeeded =
+    row.driver_needed === true ||
+    dispatch?.driver_needed === true ||
+    Boolean(driverId);
+  const guideNeeded =
+    row.guide_needed === true ||
+    dispatch?.guide_needed === true ||
+    Boolean(guideId);
 
   const guideLabel = useMemo(() => {
     if (guideBoard || guideMode === "open") return "Board open";
@@ -280,6 +309,7 @@ function OpsRow({
           }
         >
           {[
+            "draft",
             "incoming",
             "quoted",
             "confirmed",
@@ -326,12 +356,12 @@ function OpsRow({
           </select>
         )}
       </td>
-      <td className="px-3 py-3">
+      <td className={`px-3 py-3 ${guideNeeded ? "" : "opacity-40"}`}>
         <div className="space-y-1">
           <select
             className="max-w-[9rem] rounded border border-zinc-700 bg-zinc-950 px-2 py-1 text-xs"
             value={guideId}
-            disabled={saving}
+            disabled={saving || !guideNeeded}
             onChange={(e) => {
               const id = e.target.value;
               if (!id) return;
@@ -377,12 +407,12 @@ function OpsRow({
           <span className="text-[10px] text-zinc-600">{guideLabel}</span>
         </div>
       </td>
-      <td className="px-3 py-3">
+      <td className={`px-3 py-3 ${driverNeeded ? "" : "opacity-40"}`}>
         <div className="space-y-1">
           <select
             className="max-w-[9rem] rounded border border-zinc-700 bg-zinc-950 px-2 py-1 text-xs"
             value={driverId}
-            disabled={saving}
+            disabled={saving || !driverNeeded}
             onChange={(e) => {
               const id = e.target.value;
               if (!id) return;
@@ -440,7 +470,7 @@ function OpsRow({
         <select
           className="max-w-[9rem] rounded border border-zinc-700 bg-zinc-950 px-2 py-1 text-xs"
           value={ticketerId}
-          disabled={saving}
+          disabled={saving || !ticketsNeeded}
           onChange={(e) => {
             const id = e.target.value;
             void onSave(

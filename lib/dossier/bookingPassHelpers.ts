@@ -9,13 +9,12 @@ import { BRAND_DOMAIN } from "@/lib/brand";
 import { formatDisplayDate } from "@/store/useBuilderStore";
 import type { ExperienceService, LocationStop } from "@/store/useBuilderStore";
 import { isTransitHubStop } from "@/lib/transitHubs";
+import { toPassStatusLabel } from "@/lib/bookingStatus";
 
 export function mapBookingStatusToPass(
-  status: BookingStatus
+  status: BookingStatus | string
 ): BookingPassStatus {
-  if (status === "confirmed") return "CONFIRMED";
-  if (status === "in_progress") return "IN_PROGRESS";
-  return "DRAFT";
+  return toPassStatusLabel(status) as BookingPassStatus;
 }
 
 export function formatGuestCountText(adults: number, children: number): string {

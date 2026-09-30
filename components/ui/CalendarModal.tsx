@@ -163,11 +163,11 @@ export function CalendarModal({
             role="dialog"
             aria-modal="true"
             aria-label={title}
-            initial={{ opacity: 0, y: 28 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 20 }}
+            initial={{ opacity: 0, scale: 0.96, y: 8 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.98, y: 6 }}
             transition={{ type: "spring", damping: 26, stiffness: 320 }}
-            className="tokio-modal-content fixed inset-x-0 bottom-0 z-[9999] mx-auto flex max-h-[88dvh] w-full max-w-md flex-col overflow-hidden rounded-t-3xl border border-white/10 p-5 sm:inset-x-auto sm:bottom-auto sm:left-1/2 sm:top-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-3xl sm:p-6"
+            className="tokio-modal-content fixed left-1/2 top-1/2 z-[9999] mx-auto flex max-h-[min(88dvh,40rem)] w-[min(100%-1.5rem,28rem)] max-w-md -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-3xl border border-white/10 p-5 sm:p-6"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="mb-4 flex items-start justify-between gap-3">

@@ -4,7 +4,12 @@ export type BookingPassTripType = "single" | "multi";
 
 export type BookingPassStatus =
   | "IN_PROGRESS"
+  | "INCOMING"
+  | "QUOTED"
   | "CONFIRMED"
+  | "IN_OPS"
+  | "DONE"
+  | "CANCELLED"
   | "REVIEW"
   | "DRAFT";
 

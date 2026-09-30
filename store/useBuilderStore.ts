@@ -151,6 +151,12 @@ function normalizeLocation(
 
 export type HubTravelMode = "airport" | "cruise";
 export type TravelPace = "fast" | "moderate" | "relaxed" | null;
+/** Guest party special needs — synced to bookings for staff */
+export type SpecialNeedId =
+  | "reduced_mobility"
+  | "baby_car_seat"
+  | "senior"
+  | "none";
 /** Step 5 pathway: full concierge package vs self-selected experiences */
 export type ExperienceService = "concierge" | "tailored" | null;
 
@@ -203,6 +209,8 @@ export interface BuilderState {
   roomType: string;
   adults: number;
   children: number;
+  /** Guest special needs — shown to bookings staff */
+  specialNeeds: SpecialNeedId[];
   locations: LocationStop[];
   /** Per-city hotel preferences (keyed by cityId) */
   cityHotels: Record<string, CityHotelPref>;
@@ -296,6 +304,8 @@ export interface BuilderActions {
   setRoomType: (t: string) => void;
   setAdults: (n: number) => void;
   setChildren: (n: number) => void;
+  toggleSpecialNeed: (id: SpecialNeedId) => void;
+  setSpecialNeeds: (ids: SpecialNeedId[]) => void;
   setCityHotel: (cityId: string, patch: Partial<CityHotelPref>) => void;
   ensureCityHotels: (cityIds: string[]) => void;
   addLocation: (cityId: string) => boolean;
@@ -412,6 +422,7 @@ const initialState: BuilderState = {
   roomType: "King",
   adults: 2,
   children: 0,
+  specialNeeds: [],
   locations: [],
   cityHotels: {},
   transitModeId: null,
@@ -471,6 +482,7 @@ const BUILDER_PERSIST_KEYS = [
   "roomType",
   "adults",
   "children",
+  "specialNeeds",
   "locations",
   "cityHotels",
   "transitModeId",
@@ -628,6 +640,11 @@ export function mergePersistedBuilderState(
     )
       ? (p.travelPace as "fast" | "moderate" | "relaxed")
       : current.travelPace,
+    specialNeeds: Array.isArray(p.specialNeeds)
+      ? (p.specialNeeds as SpecialNeedId[]).filter((id) =>
+          ["reduced_mobility", "baby_car_seat", "senior", "none"].includes(id)
+        )
+      : current.specialNeeds,
     experienceProfile: (() => {
       const coerced = coerceExperienceProfile(p.experienceProfile);
       return coerced ?? current.experienceProfile;
@@ -886,6 +903,19 @@ export const useBuilderStore = create<BuilderState & BuilderActions>()(
       setRoomType: (t) => set({ roomType: t }),
       setAdults: (n) => set({ adults: Math.max(1, n) }),
       setChildren: (n) => set({ children: Math.max(0, n) }),
+      toggleSpecialNeed: (id) =>
+        set((s) => {
+          if (id === "none") {
+            return { specialNeeds: ["none"] };
+          }
+          const withoutNone = s.specialNeeds.filter((x) => x !== "none");
+          const has = withoutNone.includes(id);
+          const next = has
+            ? withoutNone.filter((x) => x !== id)
+            : [...withoutNone, id];
+          return { specialNeeds: next };
+        }),
+      setSpecialNeeds: (ids) => set({ specialNeeds: [...ids] }),
 
       setCityHotel: (cityId, patch) =>
         set((s) => {

@@ -1,8 +1,9 @@
 "use client";
 
 import { Reorder, useDragControls } from "framer-motion";
-import { Lock } from "lucide-react";
+import { ArrowDown, Lock } from "lucide-react";
 import type { PbCity } from "@/lib/pocketbase/client";
+import { formatCityDateSingle } from "@/lib/dateCascade";
 import type { SeasonalMatch } from "@/lib/seasonalMatcher";
 import type {
   CityTransitType,
@@ -23,6 +24,8 @@ export function CityAccordionItem({
   city,
   displayName,
   dateLabel,
+  startDate,
+  endDate,
   fromLabel,
   showFromLabel = true,
   index,
@@ -42,6 +45,8 @@ export function CityAccordionItem({
   /** Override label (airport / port hub name) */
   displayName?: string;
   dateLabel: string;
+  startDate?: string;
+  endDate?: string;
   fromLabel: string;
   /** Hide FROM origin on first overnight city (airport is Step 2). */
   showFromLabel?: boolean;
@@ -281,64 +286,70 @@ export function CityAccordionItem({
           <button
             type="button"
             onClick={onToggle}
-            className="flex min-w-0 flex-1 items-center gap-3 py-2.5 pr-2 text-left"
+            className="flex min-w-0 flex-1 items-stretch gap-2 py-2.5 pr-2 text-left"
           >
-            <span className="relative h-12 w-20 shrink-0 overflow-hidden rounded-lg">
-              <CityThumb
-                city={city}
-                name={name}
-                alt=""
-                thumb="200x200"
-                className="h-full w-full object-cover"
-              />
-            </span>
-            <span className="min-w-0 flex-1 overflow-hidden">
-              <span className="flex items-center gap-1.5">
-                <span className="block break-words text-sm font-semibold leading-tight text-white">
-                  {name}
+            {/* Photo + city/nights on top; transport spans under both */}
+            <span className="flex min-w-0 flex-1 flex-col gap-1">
+              <span className="flex min-w-0 items-center gap-2.5">
+                <span className="relative h-12 w-20 shrink-0 overflow-hidden rounded-lg">
+                  <CityThumb
+                    city={city}
+                    name={name}
+                    alt=""
+                    thumb="200x200"
+                    className="h-full w-full object-cover"
+                  />
                 </span>
-                {!isLast && transit === "unset" ? (
-                  <span
-                    className="inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-[#E60F43] text-[10px] font-black text-white"
-                    title="Transport not set"
-                    aria-label="Action required: pick transport"
-                  >
-                    !
+                <span className="min-w-0 flex-1 overflow-hidden">
+                  <span className="flex items-center gap-1.5">
+                    <span className="block break-words text-sm font-semibold leading-tight text-white">
+                      {name}
+                    </span>
+                    {!isLast && transit === "unset" ? (
+                      <span
+                        className="inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-[#E60F43] text-[10px] font-black text-white"
+                        title="Transport not set"
+                        aria-label="Action required: pick transport"
+                      >
+                        !
+                      </span>
+                    ) : null}
                   </span>
-                ) : null}
-              </span>
-              <span className={`text-xs font-medium ${nightsStatusClass}`}>
-                {isStay
-                  ? `${loc.nights} night${loc.nights === 1 ? "" : "s"}`
-                  : visitType === "arrival"
-                    ? "Arrival · 0 nights"
-                    : "Departure · 0 nights"}
+                  <span className={`text-xs font-medium ${nightsStatusClass}`}>
+                    {isStay
+                      ? `${loc.nights} night${loc.nights === 1 ? "" : "s"}`
+                      : visitType === "arrival"
+                        ? "Arrival · 0 nights"
+                        : "Departure · 0 nights"}
+                  </span>
+                </span>
               </span>
               {!isLast ? (
                 <span
-                  className={`mt-0.5 block text-[10px] font-semibold uppercase tracking-wider ${
+                  className={`truncate pl-0.5 text-[9px] font-semibold uppercase leading-tight tracking-wide ${
                     transit === "unset"
                       ? "text-[#E60F43]"
                       : transit === "self"
-                        ? "text-white/45"
+                        ? "text-white/40"
                         : "text-[#F6A724]"
                   }`}
                 >
                   {transit === "unset"
-                    ? "! Transport · action required"
+                    ? "Transport: ! action required"
                     : transit === "self"
-                      ? "Transport · self-arranged"
+                      ? "Transport: self-arranged"
                       : transit === "public"
-                        ? "Transport · public / rail"
-                        : "Transport · private"}
+                        ? "Transport: public / rail"
+                        : "Transport: private"}
                 </span>
               ) : null}
             </span>
-            {dateLabel ? (
-              <span className="shrink-0 text-xs text-zinc-400">
-                <span className="mr-0.5 text-[#075473]">›</span>
-                {dateLabel.toLowerCase()}
-              </span>
+            {dateLabel || startDate ? (
+              <CityDateStack
+                label={dateLabel}
+                startDate={startDate}
+                endDate={endDate}
+              />
             ) : null}
           </button>
           <div className="flex items-center pr-1">
@@ -348,6 +359,59 @@ export function CityAccordionItem({
       )}
     </Reorder.Item>
   );
+}
+
+function CityDateStack({
+  label,
+  startDate,
+  endDate,
+}: {
+  label: string;
+  startDate?: string;
+  endDate?: string;
+}) {
+  const start =
+    (startDate && formatCityDateSingle(startDate).toLowerCase()) || "";
+  const end =
+    endDate && endDate !== startDate
+      ? formatCityDateSingle(endDate).toLowerCase()
+      : "";
+
+  if (start && end) {
+    return (
+      <span className="flex shrink-0 flex-col items-end gap-0.5 text-right text-[10px] leading-tight text-zinc-400">
+        <span>{start}</span>
+        <ArrowDown className="h-3 w-3 text-[#075473]" aria-hidden />
+        <span>{end}</span>
+      </span>
+    );
+  }
+
+  if (start) {
+    return (
+      <span className="shrink-0 text-[10px] text-zinc-400">{start}</span>
+    );
+  }
+
+  // Fallback: split "a–b" style labels
+  const parts = label
+    .toLowerCase()
+    .split(/[–—-]/)
+    .map((p) => p.trim())
+    .filter(Boolean);
+  if (parts.length >= 2) {
+    return (
+      <span className="flex shrink-0 flex-col items-end gap-0.5 text-right text-[10px] leading-tight text-zinc-400">
+        <span>{parts[0]}</span>
+        <ArrowDown className="h-3 w-3 text-[#075473]" aria-hidden />
+        <span>{parts.slice(1).join(" ")}</span>
+      </span>
+    );
+  }
+
+  return label ? (
+    <span className="shrink-0 text-[10px] text-zinc-400">{label.toLowerCase()}</span>
+  ) : null;
 }
 
 function VisitPill({

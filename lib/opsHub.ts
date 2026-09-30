@@ -5,6 +5,10 @@
 
 import { getAdminPocketBase } from "@/lib/pocketbase/admin";
 import type { BookingLeadStatus } from "@/lib/bookingsAndLeads";
+import {
+  mapLeadStatusToOpsHub,
+  type OpsHubStatus,
+} from "@/lib/bookingStatus";
 
 export type OpsHubSource = "direct" | "agency";
 
@@ -12,13 +16,8 @@ export type OpsHubDetailCollection =
   | "bookings_and_leads"
   | "agency_orders";
 
-export type OpsHubStatus =
-  | "incoming"
-  | "quoted"
-  | "confirmed"
-  | "in_ops"
-  | "done"
-  | "cancelled";
+export type { OpsHubStatus };
+export { mapLeadStatusToOpsHub };
 
 export interface UpsertOpsHubFromDirectInput {
   pnr: string;
@@ -34,20 +33,6 @@ function safePnr(pnr: string): string {
     .trim()
     .toUpperCase()
     .replace(/"/g, "");
-}
-
-/** Map bookings_and_leads lifecycle → ops_hub board status. */
-export function mapLeadStatusToOpsHub(
-  status?: string | null
-): OpsHubStatus {
-  const s = String(status || "").toLowerCase();
-  if (s === "quoted") return "quoted";
-  if (s === "confirmed") return "confirmed";
-  if (s === "cancelled") return "cancelled";
-  if (s === "in_ops" || s === "done") return s as OpsHubStatus;
-  if (s === "incoming") return "incoming";
-  // lead | in_progress | unknown → incoming
-  return "incoming";
 }
 
 export function formatGuestSummary(guests?: {

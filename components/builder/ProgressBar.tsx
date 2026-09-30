@@ -3,57 +3,68 @@
 import { useEffect, useState } from "react";
 import { useBuilderStore } from "@/store/useBuilderStore";
 import {
-  BUILDER_SECTION_IDS,
   canOpenBuilderStep,
   isBuilderStepComplete,
 } from "@/lib/builderSteps";
 import { useBuilderAccordionOptional } from "./BuilderAccordion";
+import {
+  useBuilderEditModalOptional,
+  type BuilderEditModalId,
+} from "./BuilderEditModalContext";
 import { TimelineMascotRow } from "@/components/branding/TimelineMascotRow";
+import { getSystemMessage } from "@/lib/systemMessages";
+import { showSystemMessage } from "@/store/useSystemMessageStore";
 
 const SECTIONS = [
   {
     id: "duration",
     label: "Duration",
     shortLabel: "Duration",
-    href: "#section-duration",
     number: 1,
+    modal: "duration" as const,
   },
   {
     id: "arrival",
     label: "Arrival / Departure",
     shortLabel: "Arrival",
-    href: "#section-arrival",
     number: 2,
+    modal: "transit" as const,
   },
   {
     id: "locations",
     label: "Locations & Nights",
     shortLabel: "Places",
-    href: "#section-locations",
     number: 3,
+    modal: "locations" as const,
   },
   {
     id: "hotels",
     label: "Hotels",
     shortLabel: "Hotels",
-    href: "#section-hotels",
     number: 4,
+    modal: "hotels_transport" as const,
   },
   {
     id: "tours",
     label: "Tours & Experiences",
     shortLabel: "Tours",
-    href: "#section-tours",
     number: 5,
+    modal: "tours" as const,
   },
   {
     id: "drivers",
     label: "Drivers & Transport",
     shortLabel: "Drivers",
-    href: "#section-drivers",
     number: 6,
+    modal: "drivers" as const,
   },
 ] as const;
+
+function activeModalToStep(id: BuilderEditModalId): number | null {
+  if (!id) return null;
+  const hit = SECTIONS.find((s) => s.modal === id);
+  return hit?.number ?? null;
+}
 
 /** Sticky step tracker — pinned at top of the builder while scrolling. */
 export function ProgressBar() {
@@ -62,6 +73,7 @@ export function ProgressBar() {
 
 export function StickyProgressBar() {
   const accordion = useBuilderAccordionOptional();
+  const editModal = useBuilderEditModalOptional();
   const highestUnlockedStep = useBuilderStore((s) => s.highestUnlockedStep);
   const durationDays = useBuilderStore((s) => s.durationDays);
   const arrivalDate = useBuilderStore((s) => s.arrivalDate);
@@ -74,7 +86,10 @@ export function StickyProgressBar() {
 
   const [visitedTours, setVisitedTours] = useState(false);
   const [visitedDrivers, setVisitedDrivers] = useState(false);
-  const open = accordion?.openSection ?? null;
+
+  const openFromAccordion = accordion?.openSection ?? null;
+  const openFromModal = activeModalToStep(editModal?.activeEditModal ?? null);
+  const open = openFromModal ?? openFromAccordion;
 
   useEffect(() => {
     if (open === 5) setVisitedTours(true);
@@ -131,12 +146,10 @@ export function StickyProgressBar() {
     <div className="sticky top-[3.75rem] z-40 overflow-visible border-b border-[#2C2C2E] bg-[#000000] px-2 py-2.5 shadow-xl backdrop-blur-md lg:top-0 sm:px-4 sm:py-3">
       <TimelineMascotRow variant="multi">
         <ol className="relative flex items-start justify-between gap-0.5">
-          {/* Track */}
           <span
             aria-hidden
             className="absolute left-[8%] right-[8%] top-[12px] h-[2px] bg-[#2C2C2E]"
           />
-          {/* Completed path */}
           <span
             aria-hidden
             className="absolute left-[8%] top-[12px] h-[2px] bg-[#182536] transition-[width] duration-300"
@@ -152,19 +165,18 @@ export function StickyProgressBar() {
                 disabled={sec.locked}
                 onClick={() => {
                   if (sec.locked) {
-                    accordion?.showToast(
-                      "Complete the previous steps before unlocking this section."
-                    );
+                    const msg = getSystemMessage("builder_lock");
+                    if (accordion) accordion.showToast(msg);
+                    else
+                      showSystemMessage({ text: msg, tone: "error" });
+                    return;
+                  }
+                  if (editModal) {
+                    editModal.openEditModal(sec.modal);
                     return;
                   }
                   const opened = accordion?.tryOpenSection(sec.number);
                   if (opened === false) return;
-                  const id = BUILDER_SECTION_IDS[sec.number];
-                  if (id) {
-                    document
-                      .getElementById(id)
-                      ?.scrollIntoView({ behavior: "smooth", block: "start" });
-                  }
                 }}
                 className={`flex w-full flex-col items-center gap-0.5 text-center ${
                   sec.locked

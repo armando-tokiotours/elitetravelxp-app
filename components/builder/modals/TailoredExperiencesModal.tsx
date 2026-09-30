@@ -53,6 +53,7 @@ import { buildTripMatchReelSlides } from "@/lib/matchReel";
 import { ConciergeSuggestionCard } from "../ConciergeSuggestionCard";
 import { ExperiencesDrawer } from "../ExperiencesDrawer";
 import { ActivityMatcherBanner } from "../ActivityMatcherBanner";
+import { HorizontalHelpAccordion } from "../HorizontalHelpAccordion";
 import { FieldLabel } from "../ui";
 import { CityTransportModal } from "./CityTransportModal";
 import { GoldLight } from "@/components/branding/GoldLight";
@@ -440,17 +441,24 @@ export function TailoredExperiencesModal({
               ) : null}
 
               {/* 2. Your Cities */}
-              <div className="rounded-xl bg-zinc-950 px-4 py-3 text-sm text-zinc-400">
-                Maximum {MAX_TOUR_HOURS_PER_DAY} hours of activities allowed per
-                day.{" "}
-                {allowToursOnTravelDays
-                  ? `~${tourableDays} day${tourableDays === 1 ? "" : "s"} available.`
-                  : `~${tourableDays} available day${
-                      tourableDays === 1 ? "" : "s"
-                    } after ${travelDays} travel day${
-                      travelDays === 1 ? "" : "s"
-                    }.`}
-              </div>
+              <HorizontalHelpAccordion
+                variant="alert"
+                ariaLabelShow="Show tour day limits"
+                ariaLabelHide="Hide tour day limits"
+                text={
+                  <>
+                    Maximum {MAX_TOUR_HOURS_PER_DAY} hours of activities allowed
+                    per day.{" "}
+                    {allowToursOnTravelDays
+                      ? `~${tourableDays} day${tourableDays === 1 ? "" : "s"} available.`
+                      : `~${tourableDays} available day${
+                          tourableDays === 1 ? "" : "s"
+                        } after ${travelDays} travel day${
+                          travelDays === 1 ? "" : "s"
+                        }.`}
+                  </>
+                }
+              />
 
               {seasonalMatches.length > 0 ? (
                 <div className="space-y-2">

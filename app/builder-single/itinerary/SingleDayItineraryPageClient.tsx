@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowRight, FileText, Luggage, Receipt, Send, Wallet } from "lucide-react";
+import { ArrowRight, FileText, Luggage, Printer, Receipt, Save, Send, Wallet } from "lucide-react";
 import { submitBookingRequest } from "@/lib/bookingRequest";
 import { calculateSingleDayQuote, formatEur } from "@/lib/singleDayPricing";
 import { useBuilderStore } from "@/store/useBuilderStore";
@@ -37,6 +37,7 @@ import {
 } from "@/lib/itineraryGates";
 import { useItineraryStore } from "@/store/useItineraryStore";
 import { usePreBuilderStore } from "@/store/usePreBuilderStore";
+import { activeBookingRef } from "@/utils/pnr";
 
 type ViewMode = "dossier" | "invoice";
 
@@ -51,10 +52,18 @@ export default function SingleDayItineraryPageClient() {
   const experienceService = useBuilderStore((s) => s.experienceService);
 
   const clientName = useItineraryStore((s) => s.clientName);
+  const clientEmail = useItineraryStore((s) => s.clientEmail);
   const preName = usePreBuilderStore(
     (s) => s.fullName || s.lastPayload?.fullName || ""
   );
+  const preEmail = usePreBuilderStore(
+    (s) => s.email || s.lastPayload?.email || ""
+  );
   const customerName = (clientName || preName || "").trim() || "Guest";
+  const guestEmail = (clientEmail || preEmail || "").trim().toLowerCase();
+  const tempBookingRef = useBuilderStore((s) => s.tempBookingRef);
+  const confirmedBookingRef = useBuilderStore((s) => s.confirmedBookingRef);
+  const bookingStatus = useBuilderStore((s) => s.bookingStatus);
 
   const adults = useSingleDayBuilderStore((s) => s.adults);
   const children = useSingleDayBuilderStore((s) => s.children);
@@ -190,6 +199,38 @@ export default function SingleDayItineraryPageClient() {
     }
     setTermsIntent("print");
     setTermsOpen(true);
+  };
+
+  const requestSaveOnly = async () => {
+    const ref = activeBookingRef({
+      tempBookingRef,
+      confirmedBookingRef,
+      bookingStatus,
+    });
+    if (!guestEmail) {
+      showSystemMessage({
+        text: "Add your email in Pre-Elite / booking details before saving.",
+        tone: "error",
+      });
+      return;
+    }
+    const sd = useSingleDayBuilderStore.getState();
+    const { syncSingleDayBookingLead } = await import("@/lib/syncBookingLead");
+    const ok = await syncSingleDayBookingLead({
+      bookingRef: ref,
+      email: guestEmail,
+      state: sd,
+      status: "in_progress",
+      quote: quote ? { min: quote.min, max: quote.max } : undefined,
+    });
+    showSystemMessage({
+      text: ok ? "Itinerary saved." : "Could not save itinerary.",
+      tone: ok ? "info" : "error",
+    });
+  };
+
+  const requestPrintOnly = () => {
+    window.print();
   };
 
   const handleTermsConfirm = () => {
@@ -348,43 +389,61 @@ export default function SingleDayItineraryPageClient() {
             role="tablist"
             aria-label="Single-day itinerary view"
           >
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="grid grid-cols-2 gap-2">
               <ToggleBtn
                 active={activeView === "dossier"}
                 onClick={() => setMode("dossier")}
                 icon={<Luggage className="h-3.5 w-3.5" />}
                 label="Travel Dossier"
+                className="w-full justify-center"
               />
               <ToggleBtn
                 active={activeView === "invoice"}
                 onClick={requestInvoiceView}
                 icon={<Receipt className="h-3.5 w-3.5" />}
                 label="Invoice"
+                className="w-full justify-center"
               />
             </div>
-            <div>
+            <div className="grid grid-cols-5 items-center gap-2">
               <button
                 type="button"
-                onClick={requestSendPdf}
-                aria-label="Send PDF"
-                title="Send / PDF"
-                className="inline-flex items-center gap-1.5 rounded-xl bg-[#075473] px-3 py-2 text-white transition-all hover:bg-[#064560]"
+                onClick={() => void requestSaveOnly()}
+                aria-label="Save"
+                title="Save"
+                className="col-span-1 inline-flex items-center justify-center rounded-xl border border-white/10 bg-black/40 p-2.5 text-zinc-200 hover:text-white"
               >
-                <Send className="h-3.5 w-3.5" aria-hidden />
-                <FileText className="h-3.5 w-3.5" aria-hidden />
-                <span className="text-[11px] font-bold tracking-wider uppercase">
-                  Send / PDF
-                </span>
+                <Save className="h-4 w-4" aria-hidden />
+              </button>
+              <span className="col-span-1" aria-hidden />
+              <button
+                type="button"
+                onClick={() => void requestSendPdf()}
+                aria-label="Send"
+                title="Send"
+                className="col-span-1 inline-flex items-center justify-center rounded-xl bg-[#075473] p-2.5 text-white hover:bg-[#064560]"
+              >
+                <Send className="h-4 w-4" aria-hidden />
+              </button>
+              <span className="col-span-1" aria-hidden />
+              <button
+                type="button"
+                onClick={requestPrintOnly}
+                aria-label="Print"
+                title="Print"
+                className="col-span-1 inline-flex items-center justify-center rounded-xl border border-white/10 bg-black/40 p-2.5 text-zinc-200 hover:text-white"
+              >
+                <Printer className="h-4 w-4" aria-hidden />
               </button>
             </div>
-            <div className="grid grid-cols-6 items-center gap-2">
+            <div className="grid grid-cols-5 items-center gap-2">
               <Link
                 href="/builder-single"
                 className="col-span-3 inline-flex items-center justify-center gap-1.5 rounded-xl border border-zinc-700 bg-black/30 px-3.5 py-2 text-[11px] font-bold tracking-wider text-zinc-300 uppercase transition-all hover:bg-black/60"
               >
                 ← Continue editing
               </Link>
-              <span className="col-span-2" aria-hidden />
+              <span className="col-span-1" aria-hidden />
               <div className="col-span-1 flex justify-end">
                 <NewBookingResetButton variant="nav" />
               </div>
@@ -571,11 +630,13 @@ function ToggleBtn({
   onClick,
   icon,
   label,
+  className = "",
 }: {
   active: boolean;
   onClick: () => void;
   icon: React.ReactNode;
   label: string;
+  className?: string;
 }) {
   return (
     <button
@@ -587,7 +648,7 @@ function ToggleBtn({
         active
           ? "border border-cyan-400/30 bg-[#075473] text-white shadow-md"
           : "border border-white/10 bg-black/40 text-zinc-400 hover:text-white"
-      }`}
+      } ${className}`}
     >
       {icon}
       {label}

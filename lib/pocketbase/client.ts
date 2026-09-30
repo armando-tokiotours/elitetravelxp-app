@@ -543,6 +543,8 @@ export interface PbTour {
   description?: string;
   /** `tour` = Tours tab · `activity` = Experiences tab */
   category?: "tour" | "activity" | string;
+  /** Who can book: agency | individual | both (default both) */
+  audience?: "agency" | "individual" | "both" | string;
   /**
    * Matcher vibes: tours may have several; activities usually 1 primary.
    * culture | foodie | modern | nature | multi_vibe

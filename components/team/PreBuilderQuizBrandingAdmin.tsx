@@ -350,12 +350,20 @@ export function PreBuilderQuizBrandingAdmin({
             <code className="text-zinc-300">/pre-elite-builder</code> live.
           </p>
         </div>
-        <Link
-          href="/team-access/layout-builder"
-          className="shrink-0 rounded-xl border border-[#075473] bg-[#075473]/20 px-4 py-2 text-xs font-bold uppercase tracking-[0.14em] text-[#7dd3fc] transition hover:bg-[#075473]/35"
-        >
-          Layout &amp; characters →
-        </Link>
+        <div className="flex shrink-0 flex-wrap gap-2">
+          <Link
+            href="/team-access/layout-builder"
+            className="rounded-xl border border-[#075473] bg-[#075473]/20 px-4 py-2 text-xs font-bold uppercase tracking-[0.14em] text-[#7dd3fc] transition hover:bg-[#075473]/35"
+          >
+            Layout &amp; characters →
+          </Link>
+          <Link
+            href="/team-access/source-wizard"
+            className="rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-2 text-xs font-bold uppercase tracking-[0.14em] text-amber-300 transition hover:bg-amber-500/20"
+          >
+            Source wizard →
+          </Link>
+        </div>
       </div>
 
       {error ? (

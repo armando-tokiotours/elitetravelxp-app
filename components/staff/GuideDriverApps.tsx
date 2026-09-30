@@ -115,7 +115,17 @@ function DispatchPortal({ kind }: { kind: "guide" | "driver" }) {
           sort: "-updated",
           requestKey: null,
         });
-      setDispatchRows(list);
+      // Demand filter: only show jobs that need this role (or already assigned)
+      setDispatchRows(
+        list.filter((d) => {
+          if (kind === "guide") {
+            if (d.assigned_guide_id) return true;
+            return d.guide_needed !== false;
+          }
+          if (d.assigned_driver_id) return true;
+          return d.driver_needed !== false;
+        })
+      );
       setPayouts([]);
     } catch (e) {
       setError(formatPbError(e));

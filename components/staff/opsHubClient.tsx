@@ -26,6 +26,9 @@ export type OpsHubRow = {
   driver_pay_jpy?: number;
   ticket_cost_jpy?: number;
   tour_count?: number;
+  tickets_needed?: boolean;
+  driver_needed?: boolean;
+  guide_needed?: boolean;
 };
 
 export type StaffOption = {

@@ -2,31 +2,31 @@
   "version": 1,
   "adults": {
     "duck": {
-      "right": 29,
+      "right": 23,
       "bottom": 37,
       "height": 76,
       "z": 8
     },
     "shiba": {
-      "right": 36.5,
+      "right": 28.5,
       "bottom": 37,
       "height": 76,
       "z": 6
     },
     "cat": {
-      "right": 53.5,
+      "right": 42.5,
       "bottom": 37,
       "height": 68,
       "z": 5
     },
     "red": {
-      "right": 47.5,
+      "right": 35.5,
       "bottom": 71.5,
       "height": 58,
       "z": 3
     },
     "panda": {
-      "right": 34.5,
+      "right": 17,
       "bottom": 72,
       "height": 58,
       "z": 2

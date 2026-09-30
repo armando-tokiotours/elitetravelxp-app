@@ -14,10 +14,14 @@ import type { SingleDayBuilderState } from "@/store/useSingleDayBuilderStore";
 export type BookingLeadType = "multi_day" | "single_day";
 
 export type BookingLeadStatus =
+  | "draft"
   | "lead"
   | "in_progress"
+  | "incoming"
   | "quoted"
   | "confirmed"
+  | "in_ops"
+  | "done"
   | "cancelled";
 
 export interface BookingLeadGuests {
@@ -46,6 +50,8 @@ export interface MultiDaySelections {
   departureTransferId?: string | null;
   durationDays?: number;
   experienceService?: string | null;
+  /** Special mobility / party needs for ops staff */
+  specialNeeds?: string[];
 }
 
 /** Single-day: IDs + hour-by-hour prefs */
@@ -162,6 +168,7 @@ export function buildMultiDaySelections(
     | "departureTransferId"
     | "durationDays"
     | "experienceService"
+    | "specialNeeds"
   >
 ): MultiDaySelections {
   const locationCityIds = (state.locations || [])
@@ -221,6 +228,9 @@ export function buildMultiDaySelections(
     departureTransferId: state.departureTransferId ?? null,
     durationDays: state.durationDays || undefined,
     experienceService: state.experienceService ?? null,
+    specialNeeds: Array.isArray(state.specialNeeds)
+      ? [...state.specialNeeds]
+      : [],
   };
 }
 
@@ -332,10 +342,14 @@ export async function upsertBookingsAndLeads(
   if (tourDateRaw) fields.tour_date = tourDateRaw;
 
   const STATUS_RANK: Record<string, number> = {
+    draft: 1,
     lead: 1,
     in_progress: 2,
+    incoming: 2,
     quoted: 3,
     confirmed: 4,
+    in_ops: 5,
+    done: 6,
     cancelled: 0,
   };
 

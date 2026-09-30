@@ -68,6 +68,22 @@ function formatGuests(g?: { adults?: number; kids?: number }) {
   return parts.length ? parts.join(", ") : "—";
 }
 
+function formatSpecialNeeds(selections?: Record<string, unknown> | null) {
+  const raw = selections?.specialNeeds;
+  if (!Array.isArray(raw) || raw.length === 0) return null;
+  const labels: Record<string, string> = {
+    reduced_mobility: "Reduced mobility",
+    baby_car_seat: "Baby / car seat",
+    senior: "Senior",
+    none: "No special needs",
+  };
+  const text = raw
+    .map((id) => labels[String(id)] || String(id))
+    .filter(Boolean)
+    .join(" · ");
+  return text || null;
+}
+
 function sourceBadge(type?: string) {
   if (type === "single_day") {
     return (
@@ -736,6 +752,15 @@ export function BookingsManagementTable({
                       <p className="text-xs text-zinc-500">
                         {formatGuests(row.guests)}
                       </p>
+                      {formatSpecialNeeds(
+                        row.selections as Record<string, unknown> | undefined
+                      ) ? (
+                        <p className="mt-0.5 text-[10px] font-semibold uppercase tracking-wide text-[#D91147]">
+                          {formatSpecialNeeds(
+                            row.selections as Record<string, unknown> | undefined
+                          )}
+                        </p>
+                      ) : null}
                     </td>
                     <td className="px-4 py-3">{sourceBadge(row.type)}</td>
                     <td className="px-4 py-3 text-xs text-zinc-400">

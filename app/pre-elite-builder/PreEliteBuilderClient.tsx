@@ -862,7 +862,7 @@ function ContactFields({
   return (
     <div className="relative overflow-visible">
       <div className="grid gap-3">
-        <Field label="Trip type" as="div">
+        <Field label="Trip type" as="div" labelClassName="text-white">
           <div className="grid grid-cols-2 gap-2">
             {TRIP_TYPES.map((option) => {
               const on = tripType === option.id;
@@ -921,7 +921,7 @@ function ContactFields({
             })}
           </div>
         </Field>
-        <Field label="Full name">
+        <Field label="Full name" labelClassName="text-white">
           <input
             value={fullName}
             onChange={(e) => onChange({ fullName: e.target.value })}
@@ -931,7 +931,7 @@ function ContactFields({
             className={inputClass}
           />
         </Field>
-        <Field label="Email">
+        <Field label="Email" labelClassName="text-white">
           <input
             type="email"
             value={email}
@@ -942,7 +942,7 @@ function ContactFields({
             className={inputClass}
           />
         </Field>
-        <Field label="Phone">
+        <Field label="Phone" labelClassName="text-white">
           <PhoneCountryField
             value={whatsapp}
             onChange={(full) => onChange({ whatsapp: full })}
@@ -962,7 +962,7 @@ function ContactFields({
           />
         </Field>
         <div className="grid grid-cols-2 gap-3">
-          <Field label="Adults" as="div">
+          <Field label="Adults" as="div" labelClassName="text-white">
             <GuestStepper
               value={adults}
               min={1}

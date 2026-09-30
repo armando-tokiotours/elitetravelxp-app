@@ -15,6 +15,7 @@ const CSV_HEADERS = [
   "city_id",
   "city",
   "category", // tour | activity
+  "audience", // agency | individual | both
   "title",
   "description",
   "route",
@@ -243,6 +244,7 @@ export function ToursCsvSync({
           city_id: String(r.city_id ?? ""),
           city: cityName(String(r.city_id ?? "")),
           category,
+          audience: String(r.audience ?? "both"),
           title: String(r.title ?? ""),
           description: String(r.description ?? ""),
           route: String(r.route ?? ""),
@@ -349,6 +351,15 @@ export function ToursCsvSync({
             ),
             is_active: boolish(cell(row, "is_active", "active"), true),
           };
+
+          const audienceRaw = cell(row, "audience").toLowerCase();
+          if (
+            audienceRaw === "agency" ||
+            audienceRaw === "individual" ||
+            audienceRaw === "both"
+          ) {
+            payload.audience = audienceRaw;
+          }
 
           if (paceTag) payload.pace_tag = paceTag;
           if (crowdTag) payload.crowd_tag = crowdTag;

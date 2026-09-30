@@ -1,10 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import {
   fetchBuilderConfig,
-  ruleBool,
   type BuilderConfig,
   type PbAccommodation,
 } from "@/lib/pocketbase/client";
@@ -18,16 +17,9 @@ import {
 } from "@/components/navigation/AppSidebar";
 import { MobileTopChrome } from "@/components/navigation/MobileTopChrome";
 import { ManageBookingModal } from "@/components/modals/ManageBookingModal";
-import { ArrivalDepartureSection } from "./ArrivalDepartureSection";
-import { BuilderAccordionProvider } from "./BuilderAccordion";
 import { BuilderHero } from "./BuilderHero";
+import { BuilderMView } from "./BuilderMView";
 import { BottomNav } from "./BottomNav";
-import { HotelsGuestsSection } from "./HotelsGuestsSection";
-import { LocationsNightsSection } from "./LocationsNightsSection";
-import { ProgressBar } from "./ProgressBar";
-import { ToursDriverSection } from "./ToursDriverSection";
-import { DriversTransportSection } from "./DriversTransportSection";
-import { TripDurationSection } from "./TripDurationSection";
 import { BookingRefBadge } from "./BookingRefBadge";
 import { NewBookingResetButton } from "./NewBookingResetButton";
 
@@ -233,11 +225,6 @@ export function BuilderApp() {
     };
   }, [addLocation, setArrival, setDeparture, setTransit]);
 
-  const cityNames = useMemo(() => {
-    if (!config) return {};
-    return Object.fromEntries(config.cities.map((c) => [c.id, c.name]));
-  }, [config]);
-
   const [manageOpen, setManageOpen] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
 
@@ -320,53 +307,11 @@ export function BuilderApp() {
                         <p className="mt-2 text-zinc-400">{error}</p>
                       </div>
                     ) : config ? (
-                      <BuilderAccordionProvider
+                      <BuilderMView
                         key={state.tempBookingRef || "draft"}
-                        defaultOpen={null}
-                      >
-                        <ProgressBar />
-                        <div className="space-y-4 px-4 pt-4 sm:px-6">
-                          <TripDurationSection
-                            seasonTiers={config.seasonTiers}
-                          />
-                          <ArrivalDepartureSection
-                            hubs={config.hubs}
-                            vehicles={config.vehicles}
-                            airportTransfers={config.airportTransfers}
-                          />
-                          <LocationsNightsSection
-                            cities={config.cities}
-                            hubs={config.hubs}
-                            cityMovements={config.cityMovements}
-                            transitModes={config.transitModes}
-                            seasonalHighlights={config.seasonalHighlights}
-                          />
-                          <HotelsGuestsSection
-                            cities={config.cities}
-                            maxAdultsPerRoom={Number(
-                              config.rules.max_adults_per_room || 3
-                            )}
-                            onAccommodationsLoaded={handleAccommodationsLoaded}
-                          />
-                          <ToursDriverSection
-                            tours={config.tours}
-                            cities={config.cities}
-                            cityNames={cityNames}
-                            allowToursOnTravelDays={ruleBool(
-                              config.rules,
-                              "allow_tours_on_travel_days",
-                              false
-                            )}
-                            seasonalHighlights={config.seasonalHighlights}
-                          />
-                          <DriversTransportSection
-                            cities={config.cities}
-                            cityNames={cityNames}
-                            vehicles={config.vehicles}
-                            chauffeurRates={config.chauffeurRates}
-                          />
-                        </div>
-                      </BuilderAccordionProvider>
+                        config={config}
+                        onAccommodationsLoaded={handleAccommodationsLoaded}
+                      />
                     ) : null}
                   </div>
                 </div>

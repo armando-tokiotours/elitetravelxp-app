@@ -16,7 +16,12 @@ export async function GET(request: Request) {
     const agent = await findConciergeAgentByPnr(pnr);
     return NextResponse.json({
       agent: agent
-        ? { name: agent.name, id: agent.id || undefined }
+        ? {
+            name: agent.name,
+            id: agent.id || undefined,
+            email: agent.email || undefined,
+            photoUrl: agent.photoUrl || undefined,
+          }
         : null,
     });
   } catch (err) {

@@ -11,18 +11,27 @@ import { BRAND_LOGO_ICON } from "@/lib/brand";
 const HOME_SESSION_KEY = "tokio-assets-warmed-v2";
 const BUILDER_SESSION_KEY = "tokio-builder-entry-warmed-v1";
 
-function ChargingScreen({
+export function ChargingScreen({
   progress,
   label,
+  logoSrc = BRAND_LOGO_ICON,
+  embedded = false,
 }: {
   progress: WarmProgress;
   label: string;
+  logoSrc?: string;
+  /** Inline preview (Layout Builder) instead of fixed overlay */
+  embedded?: boolean;
 }) {
+  const shell = embedded
+    ? "relative flex min-h-[20rem] w-full flex-col items-center justify-center rounded-2xl bg-[#04080C] px-6 py-10 text-white"
+    : "fixed inset-0 z-[10000] flex flex-col items-center justify-center bg-[#04080C] px-6 text-white";
+
   return (
-    <div className="fixed inset-0 z-[10000] flex flex-col items-center justify-center bg-[#04080C] px-6 text-white">
+    <div className={shell}>
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
-        src={BRAND_LOGO_ICON}
+        src={logoSrc}
         alt=""
         className="mb-6 h-14 w-14 rounded-full object-cover"
       />
@@ -50,10 +59,6 @@ function ChargingScreen({
   );
 }
 
-/**
- * Home gate: center progress bar until characters + key videos are cached.
- * Skip on return visits in the same tab session.
- */
 export function HomeAssetWarmGate({ children }: { children: ReactNode }) {
   const [progress, setProgress] = useState<WarmProgress>({
     loaded: 0,
@@ -100,10 +105,6 @@ export function HomeAssetWarmGate({ children }: { children: ReactNode }) {
   );
 }
 
-/**
- * Full-screen charge before entering Builder M / Builder S from Pre-Build.
- * Returns a promise that resolves when warm is done (or already cached).
- */
 export function runBuilderEntryWarm(
   onProgress?: (p: WarmProgress) => void
 ): Promise<void> {
@@ -134,9 +135,6 @@ export function BuilderEntryChargingOverlay({
   progress: WarmProgress;
 }) {
   return (
-    <ChargingScreen
-      progress={progress}
-      label="Charging your builder…"
-    />
+    <ChargingScreen progress={progress} label="Charging your builder…" />
   );
 }

@@ -21,6 +21,9 @@ export type OpsDispatchRow = {
   driver_board_visible?: boolean;
   claimed_at?: string;
   assigned_by_staff_id?: string;
+  tickets_needed?: boolean;
+  driver_needed?: boolean;
+  guide_needed?: boolean;
 };
 
 function safePnr(pnr: string): string {

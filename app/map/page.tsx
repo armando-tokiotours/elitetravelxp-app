@@ -38,11 +38,13 @@ const SILO1_LIVE: MapLink[] = [
   },
 ];
 
-const SILO2_PLANNED: StubCard[] = [
-  { label: "Agency login", note: "Portal auth — not built" },
-  { label: "Agency orders", note: "List/detail over agency_orders" },
-  { label: "Inquire / Reserve", note: "Agency intake → agency_orders" },
+const SILO2_LIVE: MapLink[] = [
+  { href: "/agency", label: "Agency login / portal", note: "Staff role agency + agency_id" },
+  { href: "/agency", label: "Agency orders", note: "List/detail over agency_orders" },
+  { href: "/agency", label: "Inquire / Reserve", note: "Agency intake → agency_orders + ops_hub" },
 ];
+
+const SILO2_PLANNED: StubCard[] = [];
 
 const SILO3_LIVE: MapLink[] = [
   { href: "/admin", label: "Admin / leads" },
@@ -59,8 +61,15 @@ const SILO3_LIVE: MapLink[] = [
 ];
 
 const SILO3_PLANNED: StubCard[] = [
-  { label: "Comm hub", note: "Guest/staff messaging — not built" },
   { label: "Google Workspace SSO", note: "Button stubbed — add OAuth client next" },
+];
+
+const SILO3_COMM: MapLink[] = [
+  {
+    href: "/agent",
+    label: "Comm hub",
+    note: "Guest ↔ agent messaging on dossier + agent inbox",
+  },
 ];
 
 function LiveLink({ item }: { item: MapLink }) {
@@ -203,13 +212,13 @@ export default function MapPage() {
         <section className="mb-10">
           <div className="mb-3 flex items-baseline justify-between gap-3">
             <h2 className="font-display text-xl text-white">Silo 2 · Agency</h2>
-            <span className="text-[0.65rem] font-semibold uppercase tracking-wider text-zinc-500">
-              Planned
+            <span className="text-[0.65rem] font-semibold uppercase tracking-wider text-emerald-500/90">
+              Live
             </span>
           </div>
           <ul className="grid gap-2 sm:grid-cols-2">
-            {SILO2_PLANNED.map((item) => (
-              <StubItem key={item.label} item={item} />
+            {SILO2_LIVE.map((item) => (
+              <LiveLink key={`${item.href}-${item.label}`} item={item} />
             ))}
           </ul>
         </section>
@@ -226,6 +235,9 @@ export default function MapPage() {
           <ul className="mb-4 grid gap-2 sm:grid-cols-2">
             {SILO3_LIVE.map((item) => (
               <LiveLink key={item.href} item={item} />
+            ))}
+            {SILO3_COMM.map((item) => (
+              <LiveLink key={`comm-${item.href}`} item={item} />
             ))}
           </ul>
           <p className="mb-2 text-[0.65rem] font-semibold uppercase tracking-wider text-zinc-500">

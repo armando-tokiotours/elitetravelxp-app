@@ -26,6 +26,11 @@ import { useBuilderStore } from "@/store/useBuilderStore";
 import { useItineraryStore } from "@/store/useItineraryStore";
 import { usePreBuilderStore } from "@/store/usePreBuilderStore";
 import { JapanBookingPass } from "@/components/dossier/JapanBookingPass";
+import { CoordinationTeamSection } from "@/components/dossier/CoordinationTeamSection";
+import {
+  DayServiceIcons,
+  type ServiceIconState,
+} from "@/components/dossier/DayStaffCards";
 import { useConciergeAgentName } from "@/lib/useConciergeAgentName";
 import {
   buildDossierQrUrl,
@@ -54,6 +59,7 @@ export function SingleDayItineraryView() {
   const startTime = useSingleDayBuilderStore((s) => s.startTime);
   const cityFocus = useSingleDayBuilderStore((s) => s.cityFocus);
   const guidePreference = useSingleDayBuilderStore((s) => s.guidePreference);
+  const preferredMovement = useSingleDayBuilderStore((s) => s.preferredMovement);
   const selectedExperiences = useSingleDayBuilderStore(
     (s) => s.selectedExperiences
   );
@@ -191,6 +197,38 @@ export function SingleDayItineraryView() {
         qrValue={buildDossierQrUrl(pnrCode, "/builder-single/itinerary")}
         conciergeAgentName={conciergeAgentName}
       />
+
+      <CoordinationTeamSection
+        pnr={pnrCode}
+        agentName={conciergeAgentName}
+        guestEmail={passengerEmail || undefined}
+        guestName={passengerName || undefined}
+        tripPath="/builder-single/itinerary"
+      />
+
+      {(() => {
+        const car: ServiceIconState =
+          preferredMovement === "private_driver" ? "pending" : "none";
+        const guide: ServiceIconState =
+          guidePreference === "private_guide" || guidePreference === "local_host"
+            ? "pending"
+            : "none";
+        const tickets: ServiceIconState =
+          preferredMovement === "subway" ? "pending" : "none";
+        return (
+          <div className="rounded-2xl border border-white/10 bg-black/30 p-3">
+            <p className="mb-2 text-[9px] font-semibold tracking-wider text-zinc-500 uppercase">
+              Day services
+            </p>
+            <DayServiceIcons
+              dayLabel="Day 1"
+              car={car}
+              guide={guide}
+              tickets={tickets}
+            />
+          </div>
+        );
+      })()}
 
       <SingleDayTimelineInfographic
         stops={enrichedStops}

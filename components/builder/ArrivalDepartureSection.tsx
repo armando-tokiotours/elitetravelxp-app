@@ -45,11 +45,8 @@ export function ArrivalDepartureSection({
   vehicles?: PbVehicle[];
   airportTransfers?: PbAirportTransfer[];
 }) {
-  const [activeModal, setActiveModal] = useState<
-    "arrival" | "departure" | null
-  >(null);
-  const arrivalModalMounted = useLazyModalMount(activeModal === "arrival");
-  const departureModalMounted = useLazyModalMount(activeModal === "departure");
+  const [modalOpen, setModalOpen] = useState(false);
+  const modalMounted = useLazyModalMount(modalOpen);
 
   const arrivalTransferId = useBuilderStore((s) => s.arrivalTransferId);
   const departureTransferId = useBuilderStore((s) => s.departureTransferId);
@@ -95,6 +92,8 @@ export function ArrivalDepartureSection({
 
   const arriveName = hubDisplayName(hubs, arrivalTransferId);
   const departName = hubDisplayName(hubs, departureTransferId);
+  const openEditor = () => setModalOpen(true);
+
   const summary = (
     <div className="flex max-w-[180px] flex-col gap-0.5 sm:max-w-none">
       <span className="block truncate text-[10px] font-medium text-zinc-300 sm:text-xs">
@@ -124,7 +123,7 @@ export function ArrivalDepartureSection({
           configured={Boolean(arrivalTransferId)}
           mode={arrivalMode}
           vipEnabled={airportPickup}
-          onClick={() => setActiveModal("arrival")}
+          onClick={openEditor}
         />
         <HubSummaryCard
           kind="departure"
@@ -133,48 +132,36 @@ export function ArrivalDepartureSection({
           configured={Boolean(departureTransferId)}
           mode={departureMode}
           vipEnabled={airportDropoff}
-          onClick={() => setActiveModal("departure")}
+          onClick={openEditor}
         />
       </div>
 
-      {arrivalModalMounted ? (
-      <HubConfigModal
-        open={activeModal === "arrival"}
-        kind="arrival"
-        onClose={() => setActiveModal(null)}
-        mode={arrivalMode}
-        onModeChange={setArrivalMode}
-        hubId={arrivalTransferId}
-        onHubChange={setArrivalTransferId}
-        hubs={arrivalHubs}
-        vipEnabled={airportPickup}
-        onVipChange={setAirportPickup}
-        allHubs={hubs}
-        vehicles={vehicles}
-        airportTransfers={airportTransfers}
-        arrivalHubId={arrivalTransferId}
-        departureHubId={departureTransferId}
-      />
-      ) : null}
-
-      {departureModalMounted ? (
-      <HubConfigModal
-        open={activeModal === "departure"}
-        kind="departure"
-        onClose={() => setActiveModal(null)}
-        mode={departureMode}
-        onModeChange={setDepartureMode}
-        hubId={departureTransferId}
-        onHubChange={setDepartureTransferId}
-        hubs={departureHubs}
-        vipEnabled={airportDropoff}
-        onVipChange={setAirportDropoff}
-        allHubs={hubs}
-        vehicles={vehicles}
-        airportTransfers={airportTransfers}
-        arrivalHubId={arrivalTransferId}
-        departureHubId={departureTransferId}
-      />
+      {modalMounted ? (
+        <HubConfigModal
+          open={modalOpen}
+          onClose={() => setModalOpen(false)}
+          arrival={{
+            mode: arrivalMode,
+            onModeChange: setArrivalMode,
+            hubId: arrivalTransferId,
+            onHubChange: setArrivalTransferId,
+            hubs: arrivalHubs,
+            vipEnabled: airportPickup,
+            onVipChange: setAirportPickup,
+          }}
+          departure={{
+            mode: departureMode,
+            onModeChange: setDepartureMode,
+            hubId: departureTransferId,
+            onHubChange: setDepartureTransferId,
+            hubs: departureHubs,
+            vipEnabled: airportDropoff,
+            onVipChange: setAirportDropoff,
+          }}
+          allHubs={hubs}
+          vehicles={vehicles}
+          airportTransfers={airportTransfers}
+        />
       ) : null}
 
       <SectionContinue next={3} />
@@ -213,7 +200,6 @@ function HubSummaryCard({
     ? "border border-emerald-500/50 bg-emerald-950/40 text-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.25)]"
     : "border border-zinc-700 bg-[#1C1C1E] text-zinc-500";
 
-  /** No pickup/drop-off → teal; VIP chosen → amber */
   const spotlight = vipEnabled ? "#F6A724" : "#1BA58A";
 
   return (

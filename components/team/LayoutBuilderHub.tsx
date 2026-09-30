@@ -6,6 +6,8 @@ import { FoxMessagesEditor } from "@/components/team/FoxMessagesEditor";
 import { HiBubbleEditor } from "@/components/team/HiBubbleEditor";
 import { TimelineMascotLayoutEditor } from "@/components/team/TimelineMascotLayoutEditor";
 import { TokioClockLoader } from "@/components/common/TokioClockLoader";
+import { ChargingScreen } from "@/components/branding/HomeAssetWarmGate";
+import { BRAND_LOGO_ICON } from "@/lib/brand";
 import { useState } from "react";
 import Link from "next/link";
 
@@ -92,39 +94,101 @@ export function LayoutBuilderHub({
 }
 
 function ClockLoaderPreview() {
+  const [subTab, setSubTab] = useState<"bike" | "home" | "builder">("bike");
   const [message, setMessage] = useState("PREPARING YOUR JOURNEY...");
   const [subMessage, setSubMessage] = useState("Building your day tour…");
+  const [chargeLabel, setChargeLabel] = useState("Charging your trip assets…");
+  const [logoSrc, setLogoSrc] = useState(BRAND_LOGO_ICON);
+  const [percent, setPercent] = useState(42);
   const [fullScreen, setFullScreen] = useState(false);
   const [key, setKey] = useState(0);
 
+  const subTabs: { id: typeof subTab; label: string }[] = [
+    { id: "bike", label: "Bike bar" },
+    { id: "home", label: "Home charge" },
+    { id: "builder", label: "Builder charge" },
+  ];
+
   return (
     <div className="space-y-5">
+      <div className="flex flex-wrap gap-2">
+        {subTabs.map((t) => (
+          <button
+            key={t.id}
+            type="button"
+            onClick={() => setSubTab(t.id)}
+            className={
+              subTab === t.id
+                ? "rounded-full border border-[#075473] bg-[#075473]/25 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-[#7dd3fc]"
+                : "rounded-full border border-zinc-700 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-zinc-500"
+            }
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
       <div className="rounded-2xl border border-zinc-800 bg-[#0D1117] p-4 sm:p-5">
         <p className="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-500">
           Controls
         </p>
-        <div className="mt-3 grid gap-3 sm:grid-cols-2">
-          <label className="block text-xs text-zinc-400">
-            Message
-            <input
-              value={message}
-              onChange={(e) => setMessage(e.target.value)}
-              className="mt-1 w-full rounded-xl border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-white outline-none focus:border-[#075473]"
-            />
-          </label>
-          <label className="block text-xs text-zinc-400">
-            Sub-message
-            <input
-              value={subMessage}
-              onChange={(e) => setSubMessage(e.target.value)}
-              className="mt-1 w-full rounded-xl border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-white outline-none focus:border-[#075473]"
-            />
-          </label>
-        </div>
+        {subTab === "bike" ? (
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            <label className="block text-xs text-zinc-400">
+              Message
+              <input
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+                className="mt-1 w-full rounded-xl border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-white outline-none focus:border-[#075473]"
+              />
+            </label>
+            <label className="block text-xs text-zinc-400">
+              Sub-message
+              <input
+                value={subMessage}
+                onChange={(e) => setSubMessage(e.target.value)}
+                className="mt-1 w-full rounded-xl border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-white outline-none focus:border-[#075473]"
+              />
+            </label>
+          </div>
+        ) : (
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            <label className="block text-xs text-zinc-400">
+              Label
+              <input
+                value={chargeLabel}
+                onChange={(e) => setChargeLabel(e.target.value)}
+                className="mt-1 w-full rounded-xl border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-white outline-none focus:border-[#075473]"
+              />
+            </label>
+            <label className="block text-xs text-zinc-400">
+              Logo URL (optimal ~112×112 · under 40KB · webp/png)
+              <input
+                value={logoSrc}
+                onChange={(e) => setLogoSrc(e.target.value)}
+                className="mt-1 w-full rounded-xl border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-white outline-none focus:border-[#075473]"
+              />
+            </label>
+            <label className="block text-xs text-zinc-400 sm:col-span-2">
+              Fake progress %
+              <input
+                type="range"
+                min={0}
+                max={100}
+                value={percent}
+                onChange={(e) => setPercent(Number(e.target.value))}
+                className="mt-2 w-full"
+              />
+            </label>
+          </div>
+        )}
         <div className="mt-3 flex flex-wrap gap-2">
           <button
             type="button"
-            onClick={() => setKey((k) => k + 1)}
+            onClick={() => {
+              setKey((k) => k + 1);
+              if (subTab !== "bike") setPercent(8);
+            }}
             className="rounded-xl border border-zinc-700 bg-zinc-950 px-3.5 py-2 text-xs font-semibold uppercase tracking-wider text-zinc-300 hover:border-zinc-500"
           >
             Restart animation
@@ -139,22 +203,56 @@ function ClockLoaderPreview() {
         </div>
       </div>
 
-      <div className="flex min-h-[20rem] items-center justify-center rounded-2xl border border-zinc-800 bg-gradient-to-b from-[#0A1017] to-zinc-950 py-10">
-        <TokioClockLoader
-          key={key}
-          message={message}
-          subMessage={subMessage || undefined}
+      {subTab === "bike" ? (
+        <div className="flex min-h-[20rem] items-center justify-center rounded-2xl border border-zinc-800 bg-gradient-to-b from-[#0A1017] to-zinc-950 py-10">
+          <TokioClockLoader
+            key={key}
+            message={message}
+            subMessage={subMessage || undefined}
+          />
+        </div>
+      ) : (
+        <ChargingScreen
+          key={`${subTab}-${key}`}
+          embedded
+          logoSrc={logoSrc}
+          label={
+            chargeLabel ||
+            (subTab === "builder"
+              ? "Charging your builder…"
+              : "Charging your trip assets…")
+          }
+          progress={{
+            loaded: percent,
+            total: 100,
+            percent,
+            done: percent >= 100,
+          }}
         />
-      </div>
+      )}
 
       {fullScreen ? (
         <div className="fixed inset-0 z-[100]">
-          <TokioClockLoader
-            key={`fs-${key}`}
-            message={message}
-            subMessage={subMessage || undefined}
-            fullScreen
-          />
+          {subTab === "bike" ? (
+            <TokioClockLoader
+              key={`fs-${key}`}
+              message={message}
+              subMessage={subMessage || undefined}
+              fullScreen
+            />
+          ) : (
+            <ChargingScreen
+              key={`fs-charge-${key}`}
+              logoSrc={logoSrc}
+              label={chargeLabel}
+              progress={{
+                loaded: percent,
+                total: 100,
+                percent,
+                done: percent >= 100,
+              }}
+            />
+          )}
           <button
             type="button"
             onClick={() => setFullScreen(false)}

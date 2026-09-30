@@ -25,6 +25,7 @@ import { FieldLabel } from "../ui";
 import { ExplainerTriggerButton } from "../ExplainerTriggerButton";
 import { CityThumb } from "../CityThumb";
 import { GoldLight } from "@/components/branding/GoldLight";
+import { HorizontalHelpAccordion } from "../HorizontalHelpAccordion";
 import { CITY_PLACEHOLDER, cityPbImageUrl } from "@/lib/cityMedia";
 
 const ROOM_KEYS: {
@@ -224,10 +225,15 @@ export function HotelsEditorModal({
   onChange: (cityId: string, patch: Partial<CityHotelPref>) => void;
 }) {
   const [mounted, setMounted] = useState(false);
+  const [showFoxIntro, setShowFoxIntro] = useState(true);
 
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  useEffect(() => {
+    if (open) setShowFoxIntro(true);
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
@@ -287,43 +293,107 @@ export function HotelsEditorModal({
             </div>
 
             <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4 pb-12">
+              {showFoxIntro ? (
+                <div className="flex flex-1 flex-col items-center justify-center gap-4 px-2 text-center">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src="/brand/fox-peek-right.png"
+                    alt=""
+                    className="h-28 w-auto object-contain"
+                  />
+                  <p className="font-godiva text-xl uppercase tracking-wide text-white">
+                    Hotels — who books?
+                  </p>
+                  <p className="max-w-sm text-sm text-zinc-400">
+                    Choose how you want stays handled. You can still edit each
+                    city after this.
+                  </p>
+                  <div className="mt-2 grid w-full max-w-sm gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowFoxIntro(false)}
+                      className="rounded-xl bg-[#075473] px-4 py-3 text-xs font-bold tracking-wider text-white uppercase"
+                    >
+                      I do — self-arrange per city
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowFoxIntro(false)}
+                      className="rounded-xl border border-[#F6A724]/40 bg-[#F6A724]/10 px-4 py-3 text-xs font-bold tracking-wider text-[#F6A724] uppercase"
+                    >
+                      You do — TokioTours books
+                    </button>
+                    <a
+                      href="https://www.japan-guide.com/e/e2025.html"
+                      target="_blank"
+                      rel="noreferrer"
+                      className="rounded-xl border border-white/10 px-4 py-2 text-[11px] text-zinc-400 hover:text-white"
+                    >
+                      Read: Japanese hotels guide
+                    </a>
+                    <a
+                      href="https://www.booking.com/"
+                      target="_blank"
+                      rel="noreferrer"
+                      className="rounded-xl border border-white/10 px-4 py-2 text-[11px] text-zinc-400 hover:text-white"
+                    >
+                      Browse Booking.com
+                    </a>
+                    <a
+                      href="https://www.tokiotours.nl/"
+                      target="_blank"
+                      rel="noreferrer"
+                      className="rounded-xl border border-white/10 px-4 py-2 text-[11px] text-zinc-400 hover:text-white"
+                    >
+                      Ask TokioTours concierge
+                    </a>
+                  </div>
+                </div>
+              ) : (
+                <>
               <ExplainerTriggerButton
                 featureKey="hotel_rooms"
                 title="Japanese Hotel Rooms Explained"
               />
 
-              <p className="text-xs text-zinc-500">
-                Party size from Step 1:{" "}
-                <span className="font-medium text-white">
-                  {totalGuests} guest{totalGuests === 1 ? "" : "s"}
-                </span>{" "}
-                ({adults} adults, {children} children).
-                {roomReq ? (
+              <HorizontalHelpAccordion
+                ariaLabelShow="Show party size and room guidance"
+                ariaLabelHide="Hide party size help"
+                text={
                   <>
-                    {" "}
-                    Suggested:{" "}
-                    <span className="font-medium text-[#075473]">
-                      {roomReq.breakdownText}
-                    </span>
-                  </>
-                ) : null}
-                {monthName ? (
-                  <>
-                    {" "}
-                    · Rates use{" "}
-                    <span className="font-medium text-white">{monthName}</span>
-                    {seasonTier ? (
+                    Party size from Step 1:{" "}
+                    <span className="font-medium text-white">
+                      {totalGuests} guest{totalGuests === 1 ? "" : "s"}
+                    </span>{" "}
+                    ({adults} adults, {children} children).
+                    {roomReq ? (
                       <>
                         {" "}
-                        ·{" "}
-                        <span className="font-medium text-white">
-                          {seasonTier} season
+                        Suggested:{" "}
+                        <span className="font-medium text-[#075473]">
+                          {roomReq.breakdownText}
                         </span>
                       </>
                     ) : null}
+                    {monthName ? (
+                      <>
+                        {" "}
+                        · Rates use{" "}
+                        <span className="font-medium text-white">{monthName}</span>
+                        {seasonTier ? (
+                          <>
+                            {" "}
+                            ·{" "}
+                            <span className="font-medium text-white">
+                              {seasonTier} season
+                            </span>
+                          </>
+                        ) : null}
+                      </>
+                    ) : null}
                   </>
-                ) : null}
-              </p>
+                }
+              />
 
               {orderedCityIds.length === 0 ? (
                 <p className="rounded-xl border border-dashed border-zinc-700 bg-zinc-950 p-4 text-sm text-zinc-400">
@@ -349,9 +419,21 @@ export function HotelsEditorModal({
                   ))}
                 </div>
               )}
+                </>
+              )}
             </div>
 
             <div className="tokio-modal-chrome flex flex-shrink-0 flex-col gap-3 border-t p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+              {showFoxIntro ? (
+                <button
+                  type="button"
+                  onClick={() => setShowFoxIntro(false)}
+                  className="w-full rounded-full border border-zinc-700 py-3 text-sm font-semibold text-zinc-300"
+                >
+                  Skip intro
+                </button>
+              ) : (
+                <>
               <div
                 className={`rounded-xl px-4 py-3 text-sm font-medium ${
                   overallAllocation.covered
@@ -373,6 +455,8 @@ export function HotelsEditorModal({
               >
                 Done
               </button>
+                </>
+              )}
             </div>
           </motion.div>
         </motion.div>

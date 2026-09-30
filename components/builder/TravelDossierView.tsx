@@ -40,7 +40,16 @@ import { travelStyleTierRules } from "@/lib/preEliteHydrate";
 import { DossierSectionOutline } from "@/components/builder/DossierSectionOutline";
 import { BoardingPassCard } from "@/components/builder/BoardingPassCard";
 import { JapanBookingPass } from "@/components/dossier/JapanBookingPass";
+import { CoordinationTeamSection } from "@/components/dossier/CoordinationTeamSection";
+import {
+  DayServiceIcons,
+  StaffIdentityCard,
+  SuicaPassCard,
+  TicketStubCard,
+  type ServiceIconState,
+} from "@/components/dossier/DayStaffCards";
 import { useConciergeAgentName } from "@/lib/useConciergeAgentName";
+import { useOpsStaffNames } from "@/lib/useOpsStaffNames";
 import {
   buildDossierQrUrl,
   buildRouteBreakdown,
@@ -137,7 +146,20 @@ export function TravelDossierView({
     bookingStatus: state.bookingStatus,
   });
   const conciergeAgentName = useConciergeAgentName(pnrCode);
+  const { guideName, driverName } = useOpsStaffNames(pnrCode);
   const routeBreakdown = buildRouteBreakdown(state.locations, cityName);
+  const hasSuica = (state.locations || []).some((l) => {
+    const t = String(l.ticketType || "").toLowerCase();
+    return t.includes("suica") || t.includes("pasmo") || t === "ic_card";
+  });
+  const hasPrivateDriver =
+    Object.values(state.chauffeurSelections || {}).some((byDate) =>
+      Object.values(byDate || {}).some((sel) => sel && sel.mode !== "none")
+    ) ||
+    (state.locations || []).some((l) => l.transitType === "private");
+  const hasGuidedTours = Object.values(state.selectedTours || {}).some(
+    (rows) => (rows || []).length > 0
+  );
   const experienceType = experienceTierLabel(
     state.experienceService,
     state.isEliteConcierge
@@ -182,6 +204,14 @@ export function TravelDossierView({
         status={mapBookingStatusToPass(state.bookingStatus)}
         qrValue={buildDossierQrUrl(pnrCode, "/builder/itinerary")}
         conciergeAgentName={conciergeAgentName}
+      />
+
+      <CoordinationTeamSection
+        pnr={pnrCode}
+        agentName={conciergeAgentName}
+        guestEmail={passengerEmail || undefined}
+        guestName={passengerName || undefined}
+        tripPath="/builder/itinerary"
       />
 
       {afterSummary}
@@ -239,10 +269,16 @@ export function TravelDossierView({
                   state={state}
                   onOpenTransit={(leg) => openLeg(leg)}
                   totalGuests={totalGuests}
+                  guideName={hasGuidedTours ? guideName : null}
+                  driverName={hasPrivateDriver ? driverName : null}
+                  showGuideCard={hasGuidedTours}
+                  showDriverCard={hasPrivateDriver}
                 />
               );
             })
           )}
+
+          <SuicaPassCard active={hasSuica} />
 
           <BoardingPassCard
             kind="departure"
@@ -277,6 +313,10 @@ function LocationSegment({
   state,
   onOpenTransit,
   totalGuests,
+  guideName,
+  driverName,
+  showGuideCard,
+  showDriverCard,
 }: {
   loc: LocationStop;
   index: number;
@@ -288,6 +328,10 @@ function LocationSegment({
   state: BuilderState;
   onOpenTransit: (leg: InterCityTransitLeg) => void;
   totalGuests: number;
+  guideName?: string | null;
+  driverName?: string | null;
+  showGuideCard?: boolean;
+  showDriverCard?: boolean;
 }) {
   const city = config?.cities.find((c) => c.id === loc.cityId);
   const hotelPref = state.cityHotels[loc.cityId];
@@ -446,6 +490,113 @@ function LocationSegment({
               ) : null}
             </div>
           )}
+
+          {(showGuideCard || showDriverCard) && (
+            <div className="mt-3 grid gap-2 border-t border-dashed border-white/10 pt-3 sm:grid-cols-2">
+              {showGuideCard ? (
+                <StaffIdentityCard role="guide" name={guideName} />
+              ) : null}
+              {showDriverCard ? (
+                <StaffIdentityCard role="driver" name={driverName} />
+              ) : null}
+            </div>
+          )}
+
+          {/* Day-by-day service icons so guests see car / guide / tickets clearly */}
+          <div className="mt-3 space-y-2 border-t border-dashed border-white/10 pt-3">
+            <p className="text-[9px] font-semibold tracking-wider text-zinc-500 uppercase">
+              Day services
+            </p>
+            {(() => {
+              const dayMap = new Map<
+                string,
+                { car: boolean; guide: boolean; tickets: boolean }
+              >();
+              for (const [date, sel] of Object.entries(chauffeurByDate)) {
+                if (!sel || sel.mode === "none") continue;
+                const cur = dayMap.get(date) || {
+                  car: false,
+                  guide: false,
+                  tickets: false,
+                };
+                cur.car = true;
+                dayMap.set(date, cur);
+              }
+              for (const row of tours) {
+                const date = row.scheduledDate || state.arrivalDate || "undated";
+                const cur = dayMap.get(date) || {
+                  car: false,
+                  guide: false,
+                  tickets: false,
+                };
+                cur.guide = true;
+                dayMap.set(date, cur);
+              }
+              if (loc.transitType === "public" && loc.needsTicket) {
+                const date = state.arrivalDate || "undated";
+                const cur = dayMap.get(date) || {
+                  car: false,
+                  guide: false,
+                  tickets: false,
+                };
+                cur.tickets = true;
+                dayMap.set(date, cur);
+              }
+              const entries = [...dayMap.entries()].sort(([a], [b]) =>
+                a.localeCompare(b)
+              );
+              if (entries.length === 0) {
+                return (
+                  <DayServiceIcons
+                    dayLabel="Stay"
+                    car="none"
+                    guide="none"
+                    tickets="none"
+                  />
+                );
+              }
+              return entries.map(([date, flags]) => {
+                const dayNum = tripDayIndex(state.arrivalDate, date);
+                const carState: ServiceIconState = !flags.car
+                  ? "none"
+                  : driverName
+                    ? "confirmed"
+                    : "pending";
+                const guideState: ServiceIconState = !flags.guide
+                  ? "none"
+                  : guideName
+                    ? "confirmed"
+                    : "pending";
+                const ticketState: ServiceIconState = !flags.tickets
+                  ? "none"
+                  : "pending";
+                return (
+                  <DayServiceIcons
+                    key={date}
+                    dayLabel={
+                      date === "undated" ? "Day" : `Day ${dayNum}`
+                    }
+                    car={carState}
+                    guide={guideState}
+                    tickets={ticketState}
+                  />
+                );
+              });
+            })()}
+          </div>
+
+          {loc.transitType === "public" && loc.needsTicket ? (
+            <div className="mt-3 space-y-2">
+              <TicketStubCard
+                title={`${cityLabel} rail / transit`}
+                subtitle={
+                  loc.ticketType
+                    ? String(loc.ticketType)
+                    : "Public transport ticket"
+                }
+              />
+            </div>
+          ) : null}
 
           {tours.length > 0 ? (
             <ul className="relative mt-3 space-y-3 border-t border-dashed border-white/10 pt-3">

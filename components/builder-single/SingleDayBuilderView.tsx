@@ -1,9 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { Check, Clock, Footprints, Train, Car } from "lucide-react";
 import {
   APP_SIDEBAR_RAIL_PAD,
   AppSidebar,
@@ -15,41 +13,21 @@ import {
   fetchBuilderConfig,
   fetchExperiencesAndPlaces,
   mapEapToTour,
-  pbFileUrl,
-  cityPhoto,
   type BuilderConfig,
   type PbCity,
   type PbTour,
 } from "@/lib/pocketbase/client";
-import { PB_THUMBS } from "@/lib/mediaStandards";
 import { hydrateStoresFromPreEliteBrief } from "@/lib/preEliteHydrate";
 import { useBuilderStore } from "@/store/useBuilderStore";
 import { usePreBuilderStore } from "@/store/usePreBuilderStore";
-import {
-  formatMinutes,
-  totalScheduledMinutes,
-  useSingleDayBuilderStore,
-  type IntraCityTransport,
-} from "@/store/useSingleDayBuilderStore";
-import { BuilderAccordionProvider, useBuilderAccordionOptional } from "@/components/builder/BuilderAccordion";
-import { SectionBlock } from "@/components/builder/ui";
+import { useSingleDayBuilderStore } from "@/store/useSingleDayBuilderStore";
 import { NewBookingResetButton } from "@/components/builder/NewBookingResetButton";
-import { SingleDayTripDurationSection } from "@/components/builder-s/SingleDayTripDurationSection";
-import { SingleDayExperiencesSection } from "@/components/builder-s/SingleDayExperiencesSection";
-import { MovementDetailModal } from "@/components/builder-s/MovementDetailModal";
-import { CityLanguageSelect } from "@/components/builder/CityLanguageSelect";
-import { GoldLight } from "@/components/branding/GoldLight";
 import { SingleDayBuilderHero } from "@/components/builder-single/SingleDayBuilderHero";
-import { SingleDayProgressBar } from "@/components/builder-single/SingleDayProgressBar";
+import { BuilderSView } from "@/components/builder-single/BuilderSView";
 import {
-  resolveSingleDayCityThumbnail,
   readBuilderSHeroLocalCache,
   SINGLE_DAY_BUILDER_HERO_KEY,
 } from "@/config/mediaConfig";
-import {
-  isSingleDayStep2Complete,
-  singleDayStepIncompleteMessage,
-} from "@/lib/singleDaySteps";
 import {
   builderSDisplayCity,
   builderSTagline,
@@ -57,35 +35,6 @@ import {
 } from "@/config/teamConfig";
 import { useItineraryStore } from "@/store/useItineraryStore";
 import { useSiteBrandingStore } from "@/store/useSiteBrandingStore";
-
-const TRANSPORT_OPTIONS: {
-  id: IntraCityTransport;
-  label: string;
-  icon: typeof Footprints;
-  spotlight: string;
-}[] = [
-  { id: "walk", label: "Walking", icon: Footprints, spotlight: "#DC6E8A" },
-  { id: "subway", label: "Subway", icon: Train, spotlight: "#054F70" },
-  {
-    id: "private_driver",
-    label: "Private driver",
-    icon: Car,
-    spotlight: "#F6A724",
-  },
-];
-
-const START_TIMES = [
-  "08:00",
-  "08:30",
-  "09:00",
-  "09:30",
-  "10:00",
-  "10:30",
-  "11:00",
-] as const;
-
-const GLASS_CARD =
-  "rounded-2xl border border-white/10 bg-[#0D1117]/70 backdrop-blur-md";
 
 export function SingleDayBuilderView() {
   const searchParams = useSearchParams();
@@ -96,8 +45,6 @@ export function SingleDayBuilderView() {
     name: "Guest Brief",
     email: "",
   });
-  const [movementModal, setMovementModal] =
-    useState<IntraCityTransport | null>(null);
 
   const setTripMode = useBuilderStore((s) => s.setTripMode);
   const tempBookingRef = useBuilderStore((s) => s.tempBookingRef);
@@ -105,26 +52,8 @@ export function SingleDayBuilderView() {
   const bookingStatus = useBuilderStore((s) => s.bookingStatus);
   const ensureTemp = useBuilderStore((s) => s.ensureTempBookingRef);
 
-  const startTime = useSingleDayBuilderStore((s) => s.startTime);
-  const tourHours = useSingleDayBuilderStore((s) => s.tourHours);
   const cityFocus = useSingleDayBuilderStore((s) => s.cityFocus);
-  const blocks = useSingleDayBuilderStore((s) => s.blocks);
-  const meetingPoint = useSingleDayBuilderStore((s) => s.meetingPoint);
-  const preferredMovement = useSingleDayBuilderStore(
-    (s) => s.preferredMovement
-  );
-  const preferredTourLanguage = useSingleDayBuilderStore(
-    (s) => s.preferredTourLanguage
-  );
-  const setStartTime = useSingleDayBuilderStore((s) => s.setStartTime);
   const setCityFocus = useSingleDayBuilderStore((s) => s.setCityFocus);
-  const setMeetingPoint = useSingleDayBuilderStore((s) => s.setMeetingPoint);
-  const setPreferredMovement = useSingleDayBuilderStore(
-    (s) => s.setPreferredMovement
-  );
-  const setPreferredTourLanguage = useSingleDayBuilderStore(
-    (s) => s.setPreferredTourLanguage
-  );
 
   useEffect(() => {
     ensureTemp();
@@ -238,10 +167,6 @@ export function SingleDayBuilderView() {
     return [...tours, ...extraPlaces.filter((p) => !ids.has(p.id))];
   }, [config?.tours, extraPlaces]);
 
-  const scheduled = totalScheduledMinutes(blocks);
-  const capacity = tourHours * 60;
-  const overBudget = scheduled > capacity;
-
   const handleSelectCity = (city: PbCity) => {
     setCityFocus(city.name);
   };
@@ -261,7 +186,9 @@ export function SingleDayBuilderView() {
         brandTitle="Builder S"
         expandOnHover
       />
-      <div className={`${APP_SIDEBAR_RAIL_PAD} min-h-screen overflow-x-clip overflow-y-visible bg-[#04080C]`}>
+      <div
+        className={`${APP_SIDEBAR_RAIL_PAD} min-h-screen overflow-x-clip overflow-y-visible bg-[#04080C]`}
+      >
         <div className="builder-theme relative min-h-screen overflow-x-clip overflow-y-visible bg-[#04080C] text-white [color-scheme:dark]">
           <MobileTopChrome
             brandTitle="Builder S"
@@ -272,11 +199,10 @@ export function SingleDayBuilderView() {
           <div className="relative bg-[#04080C]">
             <SingleDayBuilderHero />
 
-            {/* Glass sheet overlaps hero fade — same as multi-day BuilderApp */}
             <div className="relative z-20 -mt-20 w-full bg-transparent sm:-mt-28">
               <div className="mx-auto w-full max-w-2xl px-4 pb-8 sm:max-w-3xl">
                 <div className="tokio-glass-sheet w-full overflow-visible rounded-t-3xl border border-white/10 bg-[#0A1017]/95 text-left shadow-2xl backdrop-blur-md">
-                  <div className="rounded-t-3xl px-5 pt-6 pb-5 sm:px-6">
+                  <div className="rounded-t-3xl px-5 pb-5 pt-6 sm:px-6">
                     <div className="flex items-start justify-between gap-4 pt-1">
                       <div className="min-w-0">
                         <p className="text-[10px] font-bold uppercase tracking-wider text-amber-400">
@@ -313,217 +239,14 @@ export function SingleDayBuilderView() {
                   </div>
 
                   <div className="px-0 pb-40 pt-0">
-                    <BuilderAccordionProvider
-                      key={tempBookingRef || "single-day"}
-                      defaultOpen={null}
-                      unlockAll
-                    >
-                      <SingleDayProgressBar />
-                      <div className="space-y-4 px-4 pt-4 sm:px-6">
-{/* §1 Trip Duration */}
-            <SingleDayTripDurationSection seasonTiers={config?.seasonTiers ?? []} />
+                    <BuilderSView
+                      config={config}
+                      catalog={experiencesCatalog}
+                      selectedCity={selectedCity}
+                      onSelectCity={handleSelectCity}
+                    />
 
-            {/* §2 City Focus */}
-            <SectionBlock
-              number={2}
-              title="City Focus"
-              id="section-city-focus"
-              icon="map"
-              summary={cityFocus || "Choose a city"}
-            >
-              <div className="grid grid-cols-2 gap-2.5 p-0.5 sm:grid-cols-3 sm:gap-3">
-                {cities.map((city) => {
-                  const on =
-                    cityFocus.trim().toLowerCase() ===
-                    city.name.trim().toLowerCase();
-                  const hasSelection = Boolean(cityFocus.trim());
-                  const filename = cityPhoto(city);
-                  const pbImg =
-                    filename && city.collectionId
-                      ? pbFileUrl(city.collectionId, city.id, filename, {
-                          thumb: PB_THUMBS.card,
-                          format: "webp",
-                        })
-                      : "";
-                  const img = resolveSingleDayCityThumbnail(city.name, pbImg);
-                  const cardClass = on
-                    ? "border-[#075473] bg-[#075473]/15 opacity-100 shadow-[0_0_12px_rgba(7,84,115,0.35)] ring-2 ring-[#075473] scale-[1.02] z-10"
-                    : hasSelection
-                      ? "border-white/5 bg-black/40 opacity-40 grayscale hover:opacity-70 hover:grayscale-0"
-                      : "border-white/10 bg-[#05080C]/80 opacity-90 hover:border-white/30";
-                  return (
-                    <button
-                      key={city.id}
-                      type="button"
-                      aria-pressed={on}
-                      onClick={() => handleSelectCity(city)}
-                      className={`relative flex flex-col overflow-hidden rounded-xl border text-left transition-all duration-300 ${cardClass}`}
-                    >
-                      <div className="relative h-24 w-full overflow-hidden bg-zinc-900 sm:h-28">
-                        {img ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img
-                            src={img}
-                            alt=""
-                            className="h-full w-full object-cover [image-rendering:auto] transition-transform duration-500 hover:scale-105"
-                          />
-                        ) : (
-                          <div className="flex h-full items-end bg-gradient-to-br from-[#1a3355] to-[#0B1F3A] p-2.5">
-                            <span className="text-xs font-semibold uppercase tracking-wide text-white/80">
-                              {city.name}
-                            </span>
-                          </div>
-                        )}
-                        {on ? (
-                          <span className="absolute right-2 top-2 flex h-5 w-5 items-center justify-center rounded-full bg-[#1BA58A] text-white shadow-md">
-                            <Check className="h-3 w-3" strokeWidth={3} />
-                          </span>
-                        ) : null}
-                      </div>
-                      <div className="bg-[#080C10]/90 px-2.5 py-2 text-left">
-                        <p className="truncate text-xs font-bold tracking-wide text-white">
-                          {city.name}
-                        </p>
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-              <SingleDayContinue next={3} />
-            </SectionBlock>
-
-            {/* §3 Experiences & Places */}
-            <SingleDayExperiencesSection
-              catalog={experiencesCatalog}
-              selectedCity={selectedCity}
-            />
-
-            {/* §4 Start time, meeting point & language */}
-            <SectionBlock
-              number={4}
-              title="Start Time, Meeting Point & Language"
-              id="section-transit"
-              icon="car"
-              summary={`${startTime} · ${
-                preferredTourLanguage || "EN"
-              }${meetingPoint ? ` · ${meetingPoint}` : ""}`}
-            >
-              <div className="grid gap-5">
-                <div>
-                  <p className="mb-2 text-[10px] font-bold uppercase tracking-widest text-white">
-                    Start time
-                  </p>
-                  <div className="relative">
-                    <select
-                      value={startTime}
-                      onChange={(e) => setStartTime(e.target.value)}
-                      className="w-full cursor-pointer appearance-none rounded-xl border border-white/15 bg-[#121212] px-3 py-3 pr-10 text-base text-white outline-none focus:border-[#075473]"
-                      aria-label="Start time"
-                    >
-                      {START_TIMES.map((t) => (
-                        <option key={t} value={t} className="bg-[#121212] text-white">
-                          {t}
-                        </option>
-                      ))}
-                    </select>
-                    <span
-                      aria-hidden
-                      className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-white/45"
-                    >
-                      <Clock className="h-4 w-4" />
-                    </span>
-                  </div>
-                </div>
-
-                <div>
-                  <p className="mb-2 text-[10px] font-bold uppercase tracking-widest text-white">
-                    Meeting point
-                  </p>
-                  <p className="mb-2 text-xs text-white/45">
-                    Hotel lobby or station hub for morning pick-up.
-                  </p>
-                  <input
-                    type="text"
-                    value={meetingPoint}
-                    onChange={(e) => setMeetingPoint(e.target.value)}
-                    onBlur={() =>
-                      setMeetingPoint(meetingPoint.replace(/\s+/g, " ").trim())
-                    }
-                    placeholder="e.g. Park Hyatt Tokyo lobby · Tokyo Station Yaesu"
-                    className="w-full rounded-xl border border-white/15 bg-[#121212] px-3 py-3 text-base text-white outline-none placeholder:text-white/30 focus:border-[#075473]"
-                  />
-                </div>
-
-                {selectedCity ? (
-                  <CityLanguageSelect
-                    cityName={selectedCity.name}
-                    availableLanguages={selectedCity.available_languages}
-                    value={preferredTourLanguage}
-                    onChange={setPreferredTourLanguage}
-                  />
-                ) : (
-                  <p className="text-xs text-white/45">
-                    Choose a city focus to unlock tour languages.
-                  </p>
-                )}
-
-                <div>
-                  <p className="mb-2 text-[10px] font-bold uppercase tracking-widest text-white">
-                    Preferred movement
-                  </p>
-                  <p className="mb-2 text-xs text-white/45">
-                    Tap an option for how transfers work during your day.
-                  </p>
-                  <div className="grid grid-cols-3 gap-2">
-                    {TRANSPORT_OPTIONS.map((opt) => {
-                      const Icon = opt.icon;
-                      const on = preferredMovement === opt.id;
-                      return (
-                        <button
-                          key={opt.id}
-                          type="button"
-                          onClick={() => setMovementModal(opt.id)}
-                          className={`group relative overflow-hidden ${GLASS_CARD} flex flex-col items-center gap-1.5 px-2 py-3 text-[10px] transition ${
-                            on
-                              ? "ring-2 ring-[#075473] text-white"
-                              : "text-white/70 hover:border-white/30"
-                          }`}
-                        >
-                          <GoldLight
-                            color={opt.spotlight}
-                            placement="top-center"
-                            active={on}
-                          />
-                          <span className="relative z-10 flex flex-col items-center gap-1.5">
-                            <Icon className="h-4 w-4 text-cyan-400" />
-                            {opt.label}
-                          </span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                <div
-                  className={`flex items-center justify-between px-3 py-2.5 text-xs ${GLASS_CARD} ${
-                    overBudget ? "ring-1 ring-[#DC6E8A]/50 text-[#DC6E8A]" : "text-white/60"
-                  }`}
-                >
-                  <span className="inline-flex items-center gap-1.5">
-                    <Clock className="h-3.5 w-3.5" />
-                    Scheduled {formatMinutes(scheduled)}
-                  </span>
-                  <span>
-                    Capacity {tourHours}h · starts {startTime}
-                  </span>
-                </div>
-              </div>
-            </SectionBlock>
-
-                      </div>
-                    </BuilderAccordionProvider>
-
-                    <div className="mt-8 flex flex-col gap-3 px-4 sm:flex-row sm:px-6">
+                    <div className="mt-2 flex flex-col gap-3 px-4 sm:flex-row sm:px-6">
                       <button
                         type="button"
                         onClick={() => {
@@ -547,16 +270,10 @@ export function SingleDayBuilderView() {
                           }
                           window.location.href = "/builder-single/itinerary";
                         }}
-                        className="inline-flex flex-1 items-center justify-center rounded-full bg-[#075473] px-5 py-3.5 text-sm font-semibold text-white"
+                        className="flex flex-1 items-center justify-center rounded-full bg-[#054F70] py-3.5 text-sm font-semibold text-white transition hover:bg-[#043d57]"
                       >
-                        Save day timeline
+                        Save &amp; View Itinerary
                       </button>
-                      <Link
-                        href="/pre-elite-builder"
-                        className="inline-flex items-center justify-center rounded-full border border-white/15 px-5 py-3.5 text-sm text-white/70"
-                      >
-                        Back to Pre-Build
-                      </Link>
                     </div>
                   </div>
                 </div>
@@ -567,68 +284,6 @@ export function SingleDayBuilderView() {
           <BottomNav />
         </div>
       </div>
-
-      <MovementDetailModal
-        movementId={movementModal}
-        selected={preferredMovement}
-        onClose={() => setMovementModal(null)}
-        onSelect={(id) => {
-          setPreferredMovement(id);
-          setMovementModal(null);
-        }}
-      />
     </>
   );
 }
-
-function SingleDayContinue({ next }: { next: number }) {
-  const accordion = useBuilderAccordionOptional();
-  const setExperiencesStepDone = useSingleDayBuilderStore(
-    (s) => s.setExperiencesStepDone
-  );
-  if (!accordion) return null;
-  return (
-    <button
-      type="button"
-      onClick={() => {
-        const snap = useSingleDayBuilderStore.getState();
-        if (next === 3) {
-          if (
-            !isSingleDayStep2Complete({
-              tourDate: snap.tourDate,
-              tourHours: snap.tourHours,
-              adults: snap.adults,
-              cityFocus: snap.cityFocus,
-              selectedExperienceCount: snap.selectedExperiences.length,
-              experiencesStepDone: snap.experiencesStepDone,
-            })
-          ) {
-            accordion.showToast(singleDayStepIncompleteMessage(2));
-            return;
-          }
-        }
-        if (next === 4) {
-          // Skip or confirm experiences → unlock Transit
-          setExperiencesStepDone(true);
-        }
-        // Force-open next (avoids stale unlock race after setExperiencesStepDone)
-        accordion.advanceTo(next);
-        requestAnimationFrame(() => {
-          document
-            .getElementById(
-              next === 3
-                ? "section-experiences"
-                : next === 4
-                  ? "section-transit"
-                  : "section-city-focus"
-            )
-            ?.scrollIntoView({ behavior: "smooth", block: "start" });
-        });
-      }}
-      className="mt-4 flex w-full items-center justify-center rounded-full border border-[#075473]/50 bg-[#05080C]/60 py-2.5 text-sm font-semibold text-white backdrop-blur-md transition hover:border-[#075473] hover:bg-[#075473]/20"
-    >
-      Save & Continue →
-    </button>
-  );
-}
-
