@@ -18,6 +18,13 @@ import type { OpsDispatchRow } from "@/lib/opsDispatch";
 import { canAccessMoney } from "@/lib/staffRoles";
 import { useTeamAuth } from "@/store/useTeamAuth";
 import { StaffPortalShell } from "@/components/staff/StaffPortalShell";
+import {
+  generateAgencyMonthlyInvoice,
+  generateGuideMonthlySettlement,
+  markSettlementPaid,
+  type AgencyMonthlyInvoice,
+  type GuideMonthlySettlement,
+} from "@/lib/pricing/settlements";
 
 const GUEST_STATUSES: GuestPayStatus[] = [
   "unpaid",
@@ -45,6 +52,20 @@ function MoneyInner() {
   const [msg, setMsg] = useState<string | null>(null);
   const [savingId, setSavingId] = useState<string | null>(null);
 
+  const [settlements, setSettlements] = useState<GuideMonthlySettlement[]>([]);
+  const [invoices, setInvoices] = useState<AgencyMonthlyInvoice[]>([]);
+  const [period, setPeriod] = useState(() =>
+    new Date().toISOString().slice(0, 7)
+  );
+  const [guideIdForSettle, setGuideIdForSettle] = useState("");
+  const [agencyIdForInvoice, setAgencyIdForInvoice] = useState("");
+  const [guidesList, setGuidesList] = useState<
+    { id: string; full_name?: string }[]
+  >([]);
+  const [agenciesList, setAgenciesList] = useState<
+    { id: string; name?: string }[]
+  >([]);
+
   const reload = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -52,6 +73,46 @@ function MoneyInner() {
       const pb = getClient();
       setRows(await loadAllMoney(pb));
       setPayouts(await loadAllPayouts(pb));
+      try {
+        setSettlements(
+          await pb.collection("guide_monthly_settlements").getFullList({
+            sort: "-billing_period",
+            requestKey: null,
+          })
+        );
+      } catch {
+        setSettlements([]);
+      }
+      try {
+        setInvoices(
+          await pb.collection("agency_monthly_invoices").getFullList({
+            sort: "-billing_period",
+            requestKey: null,
+          })
+        );
+      } catch {
+        setInvoices([]);
+      }
+      try {
+        setGuidesList(
+          await pb.collection("guides").getFullList({
+            sort: "full_name",
+            requestKey: null,
+          })
+        );
+      } catch {
+        setGuidesList([]);
+      }
+      try {
+        setAgenciesList(
+          await pb.collection("agencies").getFullList({
+            sort: "name",
+            requestKey: null,
+          })
+        );
+      } catch {
+        setAgenciesList([]);
+      }
     } catch (e) {
       setError(formatPbError(e));
     } finally {
@@ -238,6 +299,168 @@ function MoneyInner() {
             </tbody>
           </table>
         </div>
+      </div>
+
+      <div className="rounded-xl border border-zinc-800 bg-zinc-950/40 p-4">
+        <h3 className="font-medium text-zinc-100">Monthly guide payroll</h3>
+        <p className="mt-1 text-xs text-zinc-500">
+          Aggregates verified completion reports for a billing period.
+        </p>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <input
+            type="month"
+            className="rounded border border-zinc-700 bg-zinc-900 px-2 py-1.5 text-xs"
+            value={period}
+            onChange={(e) => setPeriod(e.target.value)}
+          />
+          <select
+            className="rounded border border-zinc-700 bg-zinc-900 px-2 py-1.5 text-xs"
+            value={guideIdForSettle}
+            onChange={(e) => setGuideIdForSettle(e.target.value)}
+          >
+            <option value="">Guide…</option>
+            {guidesList.map((g) => (
+              <option key={g.id} value={g.id}>
+                {g.full_name || g.id}
+              </option>
+            ))}
+          </select>
+          <button
+            type="button"
+            className="rounded-lg bg-[#075473] px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-40"
+            disabled={!guideIdForSettle || !period}
+            onClick={async () => {
+              try {
+                await generateGuideMonthlySettlement(getClient(), {
+                  guideId: guideIdForSettle,
+                  billingPeriod: period,
+                });
+                setMsg(`Settlement draft · ${period}`);
+                await reload();
+              } catch (e) {
+                setMsg(formatPbError(e));
+              }
+            }}
+          >
+            Generate settlement
+          </button>
+        </div>
+        <ul className="mt-3 space-y-2">
+          {settlements.length === 0 ? (
+            <li className="text-xs text-zinc-500">No settlements yet.</li>
+          ) : (
+            settlements.map((s) => (
+              <li
+                key={s.id}
+                className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-zinc-800 px-3 py-2 text-xs"
+              >
+                <span className="text-zinc-300">
+                  {s.billing_period} · {s.total_tours_completed || 0} tours ·{" "}
+                  {s.status}
+                </span>
+                <span className="font-mono text-white">
+                  {Number(s.final_net_payout || 0).toLocaleString()}{" "}
+                  {s.currency || "JPY"}
+                </span>
+                {s.status !== "paid" ? (
+                  <button
+                    type="button"
+                    className="rounded border border-emerald-700/50 px-2 py-0.5 text-emerald-400"
+                    onClick={async () => {
+                      try {
+                        await markSettlementPaid(getClient(), s.id);
+                        setMsg(`Paid settlement ${s.billing_period}`);
+                        await reload();
+                      } catch (e) {
+                        setMsg(formatPbError(e));
+                      }
+                    }}
+                  >
+                    Mark paid
+                  </button>
+                ) : null}
+              </li>
+            ))
+          )}
+        </ul>
+      </div>
+
+      <div className="rounded-xl border border-zinc-800 bg-zinc-950/40 p-4">
+        <h3 className="font-medium text-zinc-100">Agency monthly invoices</h3>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <select
+            className="rounded border border-zinc-700 bg-zinc-900 px-2 py-1.5 text-xs"
+            value={agencyIdForInvoice}
+            onChange={(e) => setAgencyIdForInvoice(e.target.value)}
+          >
+            <option value="">Agency…</option>
+            {agenciesList.map((a) => (
+              <option key={a.id} value={a.id}>
+                {a.name || a.id}
+              </option>
+            ))}
+          </select>
+          <button
+            type="button"
+            className="rounded-lg bg-[#075473] px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-40"
+            disabled={!agencyIdForInvoice || !period}
+            onClick={async () => {
+              try {
+                const pb = getClient();
+                const orders = await pb
+                  .collection("agency_orders")
+                  .getFullList<{
+                    booking_ref?: string;
+                    agency_id?: string;
+                    status?: string;
+                  }>({
+                    filter: `agency_id="${agencyIdForInvoice}"`,
+                    requestKey: null,
+                  });
+                const lineItems = orders
+                  .filter((o) => o.booking_ref)
+                  .map((o) => ({
+                    pnr: String(o.booking_ref).toUpperCase(),
+                    amount: 0,
+                    title: o.status || "order",
+                  }));
+                await generateAgencyMonthlyInvoice(pb, {
+                  agencyId: agencyIdForInvoice,
+                  billingPeriod: period,
+                  lineItems,
+                });
+                setMsg(
+                  `Invoice draft · ${period} (${lineItems.length} PNRs — set amounts in PB)`
+                );
+                await reload();
+              } catch (e) {
+                setMsg(formatPbError(e));
+              }
+            }}
+          >
+            Generate invoice
+          </button>
+        </div>
+        <ul className="mt-3 space-y-2">
+          {invoices.length === 0 ? (
+            <li className="text-xs text-zinc-500">No invoices yet.</li>
+          ) : (
+            invoices.map((inv) => (
+              <li
+                key={inv.id}
+                className="flex flex-wrap justify-between gap-2 rounded-lg border border-zinc-800 px-3 py-2 text-xs"
+              >
+                <span className="text-zinc-300">
+                  {inv.invoice_number} · {inv.invoice_status}
+                </span>
+                <span className="font-mono text-white">
+                  {Number(inv.total_amount_due || 0).toLocaleString()}{" "}
+                  {inv.currency || "EUR"}
+                </span>
+              </li>
+            ))
+          )}
+        </ul>
       </div>
     </div>
   );

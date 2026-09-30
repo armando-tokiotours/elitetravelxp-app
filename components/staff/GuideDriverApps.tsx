@@ -20,6 +20,9 @@ import {
 } from "@/components/staff/opsHubClient";
 import { formatPbError } from "@/lib/pocketbase/admin-schema";
 import Link from "next/link";
+import { GuideRateCardEditor } from "@/components/staff/GuideRateCardEditor";
+import { DriverRateSheetEditor } from "@/components/staff/DriverRateSheetEditor";
+import { TourCompletionReportForm } from "@/components/staff/TourCompletionReportForm";
 
 export function GuideApp() {
   return (
@@ -37,17 +40,21 @@ export function DriverApp() {
   );
 }
 
-type Tab = "mine" | "board" | "payouts";
+type Tab = "mine" | "board" | "payouts" | "rates";
 
 function DispatchPortal({ kind }: { kind: "guide" | "driver" }) {
   const getClient = useTeamAuth((s) => s.getClient);
   const role = useTeamAuth((s) => s.role);
   const staffId = useTeamAuth((s) => s.staffId);
+  const email = useTeamAuth((s) => s.email);
   const record = useTeamAuth((s) => s.record);
   const [tab, setTab] = useState<Tab>("mine");
   const [hubByPnr, setHubByPnr] = useState<Record<string, OpsHubRow>>({});
   const [dispatchRows, setDispatchRows] = useState<OpsDispatchRow[]>([]);
   const [payouts, setPayouts] = useState<OpsPayoutRow[]>([]);
+  const [assignmentByPnr, setAssignmentByPnr] = useState<
+    Record<string, string>
+  >({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
@@ -67,6 +74,12 @@ function DispatchPortal({ kind }: { kind: "guide" | "driver" }) {
       const map: Record<string, OpsHubRow> = {};
       for (const h of hubs) map[String(h.pnr).toUpperCase()] = h;
       setHubByPnr(map);
+
+      if (tab === "rates") {
+        setDispatchRows([]);
+        setPayouts([]);
+        return;
+      }
 
       if (tab === "payouts") {
         if (staffId) {
@@ -115,7 +128,6 @@ function DispatchPortal({ kind }: { kind: "guide" | "driver" }) {
           sort: "-updated",
           requestKey: null,
         });
-      // Demand filter: only show jobs that need this role (or already assigned)
       setDispatchRows(
         list.filter((d) => {
           if (kind === "guide") {
@@ -127,6 +139,22 @@ function DispatchPortal({ kind }: { kind: "guide" | "driver" }) {
         })
       );
       setPayouts([]);
+
+      if (kind === "guide" && tab === "mine" && staffId) {
+        try {
+          const asgs = await pb
+            .collection("itinerary_guide_assignments")
+            .getFullList<{ id: string; pnr: string; staff_id?: string }>({
+              filter: `staff_id="${staffId}"`,
+              requestKey: null,
+            });
+          const amap: Record<string, string> = {};
+          for (const a of asgs) amap[String(a.pnr).toUpperCase()] = a.id;
+          setAssignmentByPnr(amap);
+        } catch {
+          setAssignmentByPnr({});
+        }
+      }
     } catch (e) {
       setError(formatPbError(e));
     } finally {
@@ -166,8 +194,7 @@ function DispatchPortal({ kind }: { kind: "guide" | "driver" }) {
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-zinc-400">
-          Jobs from dispatch · payouts from ops_payouts (your earnings only —
-          not guest deposits).{" "}
+          Jobs from dispatch · payouts from ops_payouts · rate cards for payroll.{" "}
           <Link href="/profile" className="text-[#075473] hover:underline">
             Edit profile
           </Link>
@@ -187,6 +214,7 @@ function DispatchPortal({ kind }: { kind: "guide" | "driver" }) {
             ["mine", "My jobs"],
             ["board", "Open board"],
             ["payouts", "My payouts"],
+            ["rates", kind === "guide" ? "Rate card" : "Rate sheet"],
           ] as const
         ).map(([id, label]) => (
           <button
@@ -209,6 +237,27 @@ function DispatchPortal({ kind }: { kind: "guide" | "driver" }) {
         <p className="text-sm text-zinc-400">Loading…</p>
       ) : error ? (
         <p className="text-sm text-red-400">{error}</p>
+      ) : tab === "rates" ? (
+        staffId ? (
+          kind === "guide" ? (
+            <GuideRateCardEditor
+              getClient={getClient}
+              staffId={staffId}
+              seedName={staffName}
+              seedEmail={email || undefined}
+            />
+          ) : (
+            <DriverRateSheetEditor
+              getClient={getClient}
+              staffId={staffId}
+              seedName={staffName}
+            />
+          )
+        ) : (
+          <p className="text-sm text-zinc-500">
+            Sign in as staff to edit your rate card.
+          </p>
+        )
       ) : tab === "payouts" ? (
         <ul className="space-y-3">
           {payouts.length === 0 ? (
@@ -249,6 +298,7 @@ function DispatchPortal({ kind }: { kind: "guide" | "driver" }) {
           ) : (
             dispatchRows.map((d) => {
               const hub = hubByPnr[String(d.pnr).toUpperCase()];
+              const asgId = assignmentByPnr[String(d.pnr).toUpperCase()];
               return (
                 <li
                   key={d.id}
@@ -284,6 +334,13 @@ function DispatchPortal({ kind }: { kind: "guide" | "driver" }) {
                     >
                       {claiming === d.pnr ? "Claiming…" : "Claim job"}
                     </button>
+                  ) : null}
+                  {kind === "guide" && tab === "mine" && asgId ? (
+                    <TourCompletionReportForm
+                      pb={getClient()}
+                      pnr={d.pnr}
+                      assignmentId={asgId}
+                    />
                   ) : null}
                 </li>
               );

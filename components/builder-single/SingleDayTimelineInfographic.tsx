@@ -255,73 +255,89 @@ export function SingleDayTimelineInfographic({
                 }`}
               >
                 <p
-                  className={`font-mono text-xs font-bold tracking-wide sm:text-sm ${
+                  className={`mb-2 font-mono text-xs font-bold tracking-wide sm:text-sm ${
                     isPrint ? "text-[#B45309]" : "text-[#F6A724]"
                   }`}
                 >
                   {formatTimeSlotRange(stop.startTime, stop.endTime)}
                 </p>
 
-                <div
-                  className={`mt-2 rounded-2xl border p-3.5 sm:p-4 ${
+                <section
+                  className={`w-full overflow-hidden rounded-2xl border border-white/10 text-white shadow-2xl border-l-[3px] ${
                     isPrint
-                      ? "border-zinc-300 bg-white"
-                      : "border-white/10 bg-white/5 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-md"
+                      ? "border-zinc-300 border-l-[#075473] bg-white text-[#0B1F3A]"
+                      : "bg-[#0A1017]/80 border-l-[#F6A724] backdrop-blur-md"
                   } ${branchLeft ? "md:ml-auto" : ""}`}
                 >
-                  <h4
-                    className={`font-godiva text-base uppercase tracking-wider sm:text-lg ${
-                      isPrint ? "text-[#0B1F3A]" : "text-white"
-                    }`}
-                  >
-                    {stop.title}
-                  </h4>
-                  {stop.description ? (
-                    <p
-                      className={`mt-1.5 text-xs leading-relaxed sm:text-sm ${
-                        isPrint ? "text-zinc-600" : "text-white/60"
+                  {stop.thumbUrl ? (
+                    <div className="relative h-28 w-full overflow-hidden sm:h-32">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={stop.thumbUrl}
+                        alt=""
+                        className="h-full w-full object-cover"
+                      />
+                      <div
+                        className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent"
+                        aria-hidden
+                      />
+                      <span
+                        className={`absolute bottom-2 left-3 rounded-full px-2 py-0.5 text-[9px] font-bold tracking-wider ${
+                          isPrint
+                            ? "bg-[#0B1F3A] text-white"
+                            : "bg-[#E60F43] text-white"
+                        }`}
+                      >
+                        STOP {String(stop.stopNumber).padStart(2, "0")}
+                      </span>
+                    </div>
+                  ) : null}
+                  <div className="px-4 py-3 sm:px-5">
+                    <h4
+                      className={`font-godiva text-base uppercase tracking-wider sm:text-lg ${
+                        isPrint ? "text-[#0B1F3A]" : "text-white"
                       }`}
                     >
-                      {stop.description}
-                    </p>
-                  ) : null}
-                  {stop.address ? (
-                    <p
-                      className={`mt-2 inline-flex items-start gap-1 text-[11px] ${
-                        isPrint ? "text-zinc-500" : "text-white/40"
-                      } ${branchLeft ? "md:flex-row-reverse" : ""}`}
-                    >
-                      <MapPin className="mt-0.5 h-3 w-3 shrink-0" />
-                      <span>{stop.address}</span>
-                    </p>
-                  ) : null}
-                  <div
-                    className={`mt-3 flex flex-wrap gap-1.5 ${
-                      branchLeft ? "md:justify-end" : ""
-                    }`}
-                  >
-                    <span
-                      className={`rounded-full px-2.5 py-0.5 text-[10px] font-semibold ${
-                        isPrint
-                          ? "bg-zinc-100 text-[#075473]"
-                          : "bg-cyan-500/15 text-cyan-300"
+                      {stop.title}
+                    </h4>
+                    {stop.address ? (
+                      <p
+                        className={`mt-1.5 inline-flex items-start gap-1 text-[11px] ${
+                          isPrint ? "text-zinc-500" : "text-white/40"
+                        } ${branchLeft ? "md:flex-row-reverse" : ""}`}
+                      >
+                        <MapPin className="mt-0.5 h-3 w-3 shrink-0" />
+                        <span>{stop.address}</span>
+                      </p>
+                    ) : null}
+                    <div
+                      className={`mt-3 flex flex-wrap gap-1.5 ${
+                        branchLeft ? "md:justify-end" : ""
                       }`}
                     >
-                      {durationPillLabel(Number(stop.duration_hours) || 0)}
-                    </span>
-                    {stop.vibeLabel ? (
                       <span
                         className={`rounded-full px-2.5 py-0.5 text-[10px] font-semibold ${
                           isPrint
-                            ? "bg-[#E60F43]/10 text-[#E60F43]"
-                            : "bg-[#E60F43]/15 text-[#F29727]"
+                            ? "bg-zinc-100 text-[#075473]"
+                            : "bg-cyan-500/15 text-cyan-300"
                         }`}
                       >
-                        {stop.vibeLabel}
+                        {durationPillLabel(Number(stop.duration_hours) || 0)}
                       </span>
-                    ) : null}
+                      {stop.vibeLabel ? (
+                        <span
+                          className={`rounded-full px-2.5 py-0.5 text-[10px] font-semibold ${
+                            isPrint
+                              ? "bg-[#E60F43]/10 text-[#E60F43]"
+                              : "bg-[#E60F43]/15 text-[#F29727]"
+                          }`}
+                        >
+                          {stop.vibeLabel}
+                        </span>
+                      ) : null}
+                    </div>
                   </div>
-                </div>
+                </section>
               </div>
             </li>
           );

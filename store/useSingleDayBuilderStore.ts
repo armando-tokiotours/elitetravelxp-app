@@ -49,6 +49,8 @@ export interface SingleDayBuilderState {
   preferredTourLanguage: string;
   /** Hotel name or station hub for morning pick-up. */
   meetingPoint: string;
+  meetingPointLat?: number | null;
+  meetingPointLng?: number | null;
   /** Preferred intra-city movement for the day. */
   preferredMovement: IntraCityTransport | null;
   blocks: DayBlock[];
@@ -68,6 +70,7 @@ export interface SingleDayBuilderState {
   setCityFocus: (city: string) => void;
   setPreferredTourLanguage: (code: string) => void;
   setMeetingPoint: (value: string) => void;
+  setMeetingPointCoords: (lat: number | null, lng: number | null) => void;
   setPreferredMovement: (value: IntraCityTransport | null) => void;
   addExperience: (row: SingleDaySelectedExperience) => void;
   removeExperience: (tourId: string) => void;
@@ -156,6 +159,8 @@ const initialState = {
   cityFocus: "Tokyo",
   preferredTourLanguage: "EN",
   meetingPoint: "",
+  meetingPointLat: null as number | null,
+  meetingPointLng: null as number | null,
   preferredMovement: null as IntraCityTransport | null,
   blocks: initialBlocks,
   selectedExperiences: [] as SingleDaySelectedExperience[],
@@ -190,6 +195,13 @@ export const useSingleDayBuilderStore = create<SingleDayBuilderState>()(
         set({ preferredTourLanguage: preferredTourLanguage || "EN" }),
       setMeetingPoint: (meetingPoint) =>
         set({ meetingPoint: String(meetingPoint ?? "") }),
+      setMeetingPointCoords: (lat, lng) =>
+        set({
+          meetingPointLat:
+            lat == null || !Number.isFinite(lat) ? null : lat,
+          meetingPointLng:
+            lng == null || !Number.isFinite(lng) ? null : lng,
+        }),
       setPreferredMovement: (preferredMovement) => set({ preferredMovement }),
       setExperiencesStepDone: (experiencesStepDone) =>
         set({ experiencesStepDone }),
@@ -287,7 +299,7 @@ export const useSingleDayBuilderStore = create<SingleDayBuilderState>()(
     }),
     {
       name: "single-day-builder",
-      version: 6,
+      version: 7,
       migrate: (persisted, version) => {
         const p = (persisted || {}) as Record<string, unknown>;
         if (version < 3) {
@@ -357,6 +369,15 @@ export const useSingleDayBuilderStore = create<SingleDayBuilderState>()(
             )
               ? (p.selectedTransportProducts as import("@/lib/transportProducts").TransportTicketLine[])
               : [],
+          };
+        }
+        if (version < 7) {
+          return {
+            ...(p as unknown as SingleDayBuilderState),
+            meetingPointLat:
+              typeof p.meetingPointLat === "number" ? p.meetingPointLat : null,
+            meetingPointLng:
+              typeof p.meetingPointLng === "number" ? p.meetingPointLng : null,
           };
         }
         return p as unknown as SingleDayBuilderState;

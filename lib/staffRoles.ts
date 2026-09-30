@@ -87,6 +87,40 @@ export const ROLE_LABELS: Record<StaffRole, string> = {
   agent: "Concierge agent",
   ticketer: "Ticketer",
   guide: "Guide",
-  driver: "Driver",
+  driver: "Driver Coordinator",
   agency: "Agency",
 };
+
+/** Credential registry filter tabs (Drivers = Driver Coordinator role). */
+export const CREDENTIAL_TABS = [
+  { id: "agencies", label: "Agencies" },
+  { id: "guides", label: "Guides" },
+  { id: "staff", label: "Staff" },
+  { id: "drivers", label: "Drivers" },
+] as const;
+
+export type CredentialTab = (typeof CREDENTIAL_TABS)[number]["id"];
+
+export function roleMatchesCredentialTab(
+  role: StaffRole | null | undefined,
+  tab: CredentialTab
+): boolean {
+  switch (tab) {
+    case "agencies":
+      return role === "agency";
+    case "guides":
+      return role === "guide";
+    case "drivers":
+      return role === "driver";
+    case "staff":
+      return (
+        role === "owner" ||
+        role === "ops" ||
+        role === "agent" ||
+        role === "ticketer" ||
+        !role
+      );
+    default:
+      return true;
+  }
+}

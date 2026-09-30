@@ -29,11 +29,13 @@ import { tourDurationHours } from "@/lib/tourValidator";
 import {
   EXPERIENCES_PLACES_TABS,
   filterCatalogByCity,
+  filterCatalogBySegment,
   filterCatalogByTab,
   formatDurationBadge,
   isPlaceItem,
   selectedHoursTotal,
   type CatalogItem,
+  type ExperiencesPlacesSegment,
   type ExperiencesPlacesTab,
 } from "@/lib/experiencesPlaces";
 import { calculateTimeSlots } from "@/lib/singleDayTimeSlots";
@@ -79,6 +81,7 @@ export function ExperiencesPlacesModal({
   const experienceProfile = useActiveMatchProfile();
 
   const [mounted, setMounted] = useState(false);
+  const [segment, setSegment] = useState<ExperiencesPlacesSegment>("tour");
   const [tab, setTab] = useState<ExperiencesPlacesTab>("all");
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [toast, setToast] = useState<string | null>(null);
@@ -94,6 +97,7 @@ export function ExperiencesPlacesModal({
 
   useEffect(() => {
     if (!open) return;
+    setSegment("tour");
     setTab("all");
     document.body.style.overflow = "hidden";
     return () => {
@@ -116,10 +120,10 @@ export function ExperiencesPlacesModal({
     );
   }, [catalog, selectedCity]);
 
-  const filtered = useMemo(
-    () => filterCatalogByTab(cityItems, tab, experienceProfile),
-    [cityItems, tab, experienceProfile]
-  );
+  const filtered = useMemo(() => {
+    const bySegment = filterCatalogBySegment(cityItems, segment);
+    return filterCatalogByTab(bySegment, tab, experienceProfile);
+  }, [cityItems, segment, tab, experienceProfile]);
 
   const usedHours = selectedHoursTotal(selectedRows);
   const timedStops = useMemo(
@@ -317,7 +321,41 @@ export function ExperiencesPlacesModal({
               </div>
             ) : null}
 
-            {/* Category tabs */}
+            {/* Tour | Activity segment */}
+            <div className="shrink-0 border-b border-white/10 px-3 pt-3">
+              <div
+                role="tablist"
+                aria-label="Tour or activity"
+                className="grid grid-cols-2 gap-1 rounded-full border border-white/15 bg-white/5 p-1"
+              >
+                {(
+                  [
+                    ["tour", "Tour"],
+                    ["activity", "Activity"],
+                  ] as const
+                ).map(([id, label]) => {
+                  const selected = segment === id;
+                  return (
+                    <button
+                      key={id}
+                      type="button"
+                      role="tab"
+                      aria-selected={selected}
+                      onClick={() => setSegment(id)}
+                      className={`rounded-full py-2 text-sm font-semibold transition ${
+                        selected
+                          ? "bg-[#075473] text-white shadow-sm"
+                          : "text-white/55 hover:text-white"
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Category / vibe tabs */}
             <div
               className="flex shrink-0 gap-1 overflow-x-auto border-b border-white/10 px-3 py-2 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
               role="tablist"

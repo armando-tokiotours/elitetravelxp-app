@@ -1,10 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import { JapanKeyword } from "@/components/branding/JapanKeyword";
 import { HomeAssetWarmGate } from "@/components/branding/HomeAssetWarmGate";
 import { ManageBookingModal } from "@/components/modals/ManageBookingModal";
+import { StartTripGate } from "@/components/home/StartTripGate";
 import { BRAND_LOGO_ICON } from "@/lib/brand";
 
 export default function HomePage() {
@@ -47,12 +47,7 @@ export default function HomePage() {
             className="mt-10 flex w-full max-w-sm items-stretch gap-2 pt-4 animate-fade-up"
             style={{ animationDelay: "0.2s" }}
           >
-            <Link
-              href="/pre-elite-builder"
-              className="flex w-2/3 items-center justify-center rounded-2xl border border-amber-500/60 px-4 py-3 text-center font-godiva text-xs font-bold uppercase tracking-widest text-amber-300 shadow-md transition-all hover:bg-amber-500/10"
-            >
-              START TRIP →
-            </Link>
+            <StartTripGate className="flex w-2/3 items-center justify-center rounded-2xl border border-amber-500/60 px-4 py-3 text-center font-godiva text-xs font-bold uppercase tracking-widest text-amber-300 shadow-md transition-all hover:bg-amber-500/10" />
             <div className="flex w-1/3 flex-col gap-2">
               <div className="min-h-0 flex-1" aria-hidden />
               <button

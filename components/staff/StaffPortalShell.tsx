@@ -82,7 +82,7 @@ function linksForRole(role: StaffRole | null): StaffNavLink[] {
   if (canAccessDriver(role))
     links.push({
       href: "/driver",
-      label: "Driver",
+      label: "Driver Coordinator",
       icon: <Car className="h-5 w-5" strokeWidth={2} />,
     });
   if (canAccessAgency(role))

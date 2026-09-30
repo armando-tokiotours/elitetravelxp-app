@@ -11,10 +11,12 @@ import { type PaceId } from "@/lib/travelPace";
 import { useSiteBrandingStore } from "@/store/useSiteBrandingStore";
 import { PaceDetailModal } from "@/components/builder/modals/PaceDetailModal";
 import { GuestCountStrip } from "@/components/branding/GuestCountStrip";
+import { CityLanguageSelect } from "@/components/builder/CityLanguageSelect";
 import {
   useSingleDayBuilderStore,
   type SingleDayTravelPace,
 } from "@/store/useSingleDayBuilderStore";
+import type { PbCity } from "@/lib/pocketbase/client";
 
 const SPECIAL_NEED_OPTIONS: { id: SpecialNeedId; label: string }[] = [
   { id: "reduced_mobility", label: "Reduced mobility" },
@@ -29,13 +31,22 @@ const SPECIAL_NEED_OPTIONS: { id: SpecialNeedId; label: string }[] = [
 export function SingleDayGuestsEditorModal({
   open,
   onClose,
+  selectedCity,
 }: {
   open: boolean;
   onClose: () => void;
+  selectedCity?: PbCity | null;
 }) {
   const adults = useSingleDayBuilderStore((s) => s.adults);
   const children = useSingleDayBuilderStore((s) => s.children);
   const travelPace = useSingleDayBuilderStore((s) => s.travelPace);
+  const cityFocus = useSingleDayBuilderStore((s) => s.cityFocus);
+  const preferredTourLanguage = useSingleDayBuilderStore(
+    (s) => s.preferredTourLanguage
+  );
+  const setPreferredTourLanguage = useSingleDayBuilderStore(
+    (s) => s.setPreferredTourLanguage
+  );
   const setAdultsSd = useSingleDayBuilderStore((s) => s.setAdults);
   const setChildrenSd = useSingleDayBuilderStore((s) => s.setChildren);
   const setTravelPaceSd = useSingleDayBuilderStore((s) => s.setTravelPace);
@@ -223,6 +234,22 @@ export function SingleDayGuestsEditorModal({
                 </p>
                 <SpecialNeedsAccordion />
               </div>
+
+              <div>
+                <FieldLabel>Preferred tour language</FieldLabel>
+                {selectedCity || cityFocus ? (
+                  <CityLanguageSelect
+                    cityName={selectedCity?.name || cityFocus || "city"}
+                    availableLanguages={selectedCity?.available_languages}
+                    value={preferredTourLanguage}
+                    onChange={setPreferredTourLanguage}
+                  />
+                ) : (
+                  <p className="mt-2 text-xs text-zinc-400">
+                    Choose a city focus to unlock tour languages.
+                  </p>
+                )}
+              </div>
             </div>
 
             <div className="tokio-modal-chrome flex flex-shrink-0 border-t p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
@@ -353,37 +380,43 @@ function SpecialNeedsAccordion() {
         ) : null}
       </div>
       {open ? (
-        <div className="mt-2 flex flex-wrap gap-2">
-          {SPECIAL_NEED_OPTIONS.map((opt) => {
-            const on = specialNeeds.includes(opt.id);
-            return (
-              <button
-                key={opt.id}
-                type="button"
-                aria-pressed={on}
-                onClick={() => toggleSpecialNeed(opt.id)}
-                className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
-                  on
-                    ? "border-[#D91147]/60 bg-[#D91147]/15 text-white"
-                    : "border-zinc-700 bg-zinc-900 text-zinc-400 hover:border-zinc-500"
-                }`}
-              >
-                {opt.label}
-              </button>
-            );
-          })}
-          <button
-            type="button"
-            aria-pressed={noNeed}
-            onClick={() => toggleSpecialNeed("none")}
-            className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
-              noNeed
-                ? "border-emerald-500/60 bg-emerald-500/15 text-emerald-300"
-                : "border-zinc-700 bg-zinc-900 text-zinc-400 hover:border-zinc-500"
-            }`}
-          >
-            No need
-          </button>
+        <div className="mt-2 space-y-2">
+          <div className="grid grid-cols-3 gap-2">
+            {SPECIAL_NEED_OPTIONS.map((opt) => {
+              const on = specialNeeds.includes(opt.id);
+              return (
+                <button
+                  key={opt.id}
+                  type="button"
+                  aria-pressed={on}
+                  onClick={() => toggleSpecialNeed(opt.id)}
+                  className={`rounded-full border px-2 py-1.5 text-center text-[11px] font-semibold leading-snug transition sm:text-xs ${
+                    on
+                      ? "border-[#D91147]/60 bg-[#D91147]/15 text-white"
+                      : "border-zinc-700 bg-zinc-900 text-zinc-400 hover:border-zinc-500"
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              );
+            })}
+          </div>
+          <div className="grid grid-cols-3 gap-2">
+            <span aria-hidden />
+            <button
+              type="button"
+              aria-pressed={noNeed}
+              onClick={() => toggleSpecialNeed("none")}
+              className={`rounded-full border px-2 py-1.5 text-center text-[11px] font-semibold transition sm:text-xs ${
+                noNeed
+                  ? "border-emerald-500/60 bg-emerald-500/15 text-emerald-300"
+                  : "border-zinc-700 bg-zinc-900 text-zinc-400 hover:border-zinc-500"
+              }`}
+            >
+              No need
+            </button>
+            <span aria-hidden />
+          </div>
         </div>
       ) : null}
     </div>

@@ -25,6 +25,7 @@ import {
   type OpsHubRow,
   type StaffOption,
 } from "@/components/staff/opsHubClient";
+import { GuideAssignPayoutPanel } from "@/components/staff/GuideAssignPayoutPanel";
 
 export function OpsBoardApp() {
   return (
@@ -436,6 +437,14 @@ function OpsCard({
               </button>
             </div>
           </div>
+        ) : null}
+
+        {guideNeeded && guideId ? (
+          <GuideAssignPayoutPanel
+            pb={pb}
+            pnr={row.pnr}
+            staffGuideId={guideId}
+          />
         ) : null}
 
         {driverNeeded ? (

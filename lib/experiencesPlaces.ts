@@ -5,6 +5,8 @@
 import type { PbTour } from "@/lib/pocketbase/client";
 import { isBestMatchTour, type ExperienceProfile } from "@/lib/experienceProfiler";
 
+export type ExperiencesPlacesSegment = "tour" | "activity";
+
 export type ExperiencesPlacesTab =
   | "all"
   | "culture"
@@ -44,6 +46,27 @@ export function isPlaceItem(item: CatalogItem): boolean {
   if (et === "place") return true;
   const cat = String(item.category || "").toLowerCase();
   return cat === "place";
+}
+
+export function isActivityItem(item: CatalogItem): boolean {
+  if (isPlaceItem(item)) return true;
+  return String(item.category || "").toLowerCase() === "activity";
+}
+
+export function isTourItem(item: CatalogItem): boolean {
+  return (
+    !isPlaceItem(item) &&
+    String(item.category || "").toLowerCase() !== "activity"
+  );
+}
+
+export function filterCatalogBySegment(
+  items: CatalogItem[],
+  segment: ExperiencesPlacesSegment
+): CatalogItem[] {
+  return segment === "activity"
+    ? items.filter(isActivityItem)
+    : items.filter(isTourItem);
 }
 
 export function formatDurationBadge(hours: number): string {

@@ -42,6 +42,10 @@ function proposalSentStorageKey(ref: string) {
   return `tokiotours:proposal-sent:${ref.trim().toUpperCase()}`;
 }
 
+function briefSavedStorageKey(ref: string) {
+  return `tokiotours:brief-saved:${ref.trim().toUpperCase()}`;
+}
+
 function readProposalSent(ref: string): { email: string; sentAt: string } | null {
   if (typeof window === "undefined" || !ref) return null;
   try {
@@ -49,33 +53,44 @@ function readProposalSent(ref: string): { email: string; sentAt: string } | null
     if (!raw) return null;
     const parsed = JSON.parse(raw) as { email?: string; sentAt?: string };
     if (!parsed?.sentAt) return null;
-    return {
-      email: String(parsed.email || "").trim().toLowerCase(),
-      sentAt: String(parsed.sentAt),
-    };
+    return { email: parsed.email || "", sentAt: parsed.sentAt };
   } catch {
     return null;
   }
 }
 
 function markProposalSent(ref: string, email: string) {
-  if (typeof window === "undefined" || !ref) return;
   try {
     window.localStorage.setItem(
       proposalSentStorageKey(ref),
-      JSON.stringify({
-        email: email.trim().toLowerCase(),
-        sentAt: new Date().toISOString(),
-      })
+      JSON.stringify({ email, sentAt: new Date().toISOString() })
     );
   } catch {
-    /* ignore quota / private mode */
+    /* private mode */
+  }
+  markBriefSaved(ref);
+}
+
+function readBriefSaved(ref: string): boolean {
+  if (typeof window === "undefined" || !ref) return false;
+  try {
+    return window.localStorage.getItem(briefSavedStorageKey(ref)) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function markBriefSaved(ref: string) {
+  try {
+    window.localStorage.setItem(briefSavedStorageKey(ref), "1");
+  } catch {
+    /* private mode */
   }
 }
 
 /**
  * Pre-Build summary after qualification submit or Manage Booking retrieve.
- * Upright mascot = draft unsent; bow = email successfully dispatched.
+ * Upright mascot = draft unsaved; bow = brief saved (or email sent).
  */
 export function PreBuildConfirmation({
   bookingRef,
@@ -95,10 +110,12 @@ export function PreBuildConfirmation({
   const [sending, setSending] = useState(false);
   const [actionMsg, setActionMsg] = useState<string | null>(null);
   const [actionErr, setActionErr] = useState<string | null>(null);
-  /** True only after SAVE & EMAIL succeeds (or prior send for this ref). */
+  /** True after SAVE (local) or SAVE & EMAIL / prior send for this ref. */
+  const [isBriefSaved, setIsBriefSaved] = useState(false);
   const [isEmailSent, setIsEmailSent] = useState(false);
   const [resendOpen, setResendOpen] = useState(false);
   const [saveGateOpen, setSaveGateOpen] = useState(false);
+  const [saveModalOpen, setSaveModalOpen] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [builderCharging, setBuilderCharging] = useState(false);
   const [builderWarmProgress, setBuilderWarmProgress] = useState<WarmProgress>({
@@ -116,15 +133,20 @@ export function PreBuildConfirmation({
   const firstName = (fullName || "").trim().split(/\s+/)[0] || "";
   const emailOnFile = (email || "").trim().toLowerCase();
 
-  /** Unlock Trip Builder when email already went out (Save & Email or Manage link). */
+  /** Unlock Trip Builder when brief saved locally and/or email sent. */
   const builderUnlocked =
+    isBriefSaved ||
     isEmailSent ||
     emailSentCount >= 1 ||
+    readBriefSaved(bookingRef) ||
     Boolean(readProposalSent(bookingRef));
 
   useEffect(() => {
-    const prior = Boolean(readProposalSent(bookingRef)) || emailSentCount >= 1;
-    setIsEmailSent(prior);
+    const priorEmail =
+      Boolean(readProposalSent(bookingRef)) || emailSentCount >= 1;
+    const priorSave = readBriefSaved(bookingRef) || priorEmail;
+    setIsEmailSent(priorEmail);
+    setIsBriefSaved(priorSave);
   }, [bookingRef, emailSentCount]);
 
   useEffect(() => {
@@ -160,13 +182,34 @@ export function PreBuildConfirmation({
 
   useModalDismiss(resendOpen, closeResendModal);
   useModalDismiss(saveGateOpen, closeSaveGateModal);
+  useModalDismiss(saveModalOpen, () => setSaveModalOpen(false));
+
+  /** Persist brief locally (no email) + warm media assets. */
+  const saveBriefLocal = () => {
+    markBriefSaved(bookingRef);
+    setIsBriefSaved(true);
+    setSaveModalOpen(false);
+    setSaveGateOpen(false);
+    setActionMsg("Request saved. Media charged for Trip Builder.");
+    setToast("Brief saved — Trip Builder unlocked.");
+    setBuilderCharging(true);
+    setBuilderWarmProgress({
+      loaded: 0,
+      total: 1,
+      percent: 0,
+      done: false,
+    });
+    void runBuilderEntryWarm((p) => setBuilderWarmProgress(p)).then(() => {
+      setBuilderCharging(false);
+    });
+  };
 
   const openBuilder = () => {
     if (!builderUnlocked) {
       setSaveGateOpen(true);
       return;
     }
-    setIsEmailSent(true);
+    setIsBriefSaved(true);
 
     const builder = useBuilderStore.getState();
     const single = useSingleDayBuilderStore.getState();
@@ -421,12 +464,33 @@ export function PreBuildConfirmation({
             <div className="relative z-20 flex w-full flex-col space-y-2 pt-1">
               <button
                 type="button"
-                onClick={onSaveEmailClick}
-                disabled={sending}
+                onClick={() => {
+                  if (builderUnlocked) {
+                    setSaveModalOpen(true);
+                    return;
+                  }
+                  saveBriefLocal();
+                }}
+                disabled={builderCharging}
                 className="relative z-20 flex w-full cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-xl bg-[#075473] px-2 py-2 text-[10px] font-bold tracking-wider text-white uppercase shadow-md transition-all pointer-events-auto hover:bg-[#096a91] disabled:opacity-60"
               >
+                <span>
+                  {builderCharging
+                    ? "Charging…"
+                    : builderUnlocked
+                      ? "Saved ✓"
+                      : "Save"}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={onSaveEmailClick}
+                disabled={sending}
+                className="relative z-20 flex w-full cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-xl border border-amber-500/40 bg-amber-500/10 px-2 py-2 text-[10px] font-bold tracking-wider text-amber-300 uppercase transition-all pointer-events-auto hover:bg-amber-500/20 disabled:opacity-60"
+              >
                 <Mail className="h-3 w-3 shrink-0" />
-                <span>{sending ? "Sending…" : "Save & Email"}</span>
+                <span>{sending ? "Sending…" : "Email copy"}</span>
               </button>
 
               <button
@@ -448,6 +512,7 @@ export function PreBuildConfirmation({
                   onClick={() => {
                     setSending(false);
                     setIsEmailSent(false);
+                    setIsBriefSaved(false);
                     cleanupHtml2PdfOverlay();
                     onReset();
                   }}
@@ -481,7 +546,7 @@ export function PreBuildConfirmation({
             <p className="pt-1 text-[11px] leading-relaxed text-zinc-400">
               {builderUnlocked
                 ? "We've got your ideas saved. Keep this reference handy — your concierge will use it to design your trip."
-                : "Review your selections below. Click Save & Email to send a copy directly to your inbox."}
+                : "Review your selections below. Tap Save to unlock Trip Builder (email is optional)."}
             </p>
             {(actionMsg || actionErr) && (
               <p
@@ -542,10 +607,20 @@ export function PreBuildConfirmation({
       <SaveEmailGateModal
         open={saveGateOpen}
         onClose={closeSaveGateModal}
+        onSave={() => {
+          closeSaveGateModal();
+          saveBriefLocal();
+        }}
         onSaveEmail={() => {
           closeSaveGateModal();
           onSaveEmailClick();
         }}
+      />
+
+      <SaveConfirmModal
+        open={saveModalOpen}
+        onClose={() => setSaveModalOpen(false)}
+        onSaveAgain={saveBriefLocal}
       />
 
       {toast ? (
@@ -567,10 +642,12 @@ export function PreBuildConfirmation({
 function SaveEmailGateModal({
   open,
   onClose,
+  onSave,
   onSaveEmail,
 }: {
   open: boolean;
   onClose: () => void;
+  onSave: () => void;
   onSaveEmail: () => void;
 }) {
   if (typeof document === "undefined") return null;
@@ -619,11 +696,26 @@ function SaveEmailGateModal({
               Save Your Request First
             </h3>
             <p className="mt-3 text-sm leading-relaxed text-white/70">
-              Please click &apos;Save &amp; Email&apos; to save your request
-              before continuing to the Trip Builder.
+              Tap Save to unlock Trip Builder. Email is optional if you also want
+              a copy in your inbox.
             </p>
 
-            <div className="mt-6 grid grid-cols-1 gap-2 sm:grid-cols-2">
+            <div className="mt-6 grid grid-cols-1 gap-2">
+              <button
+                type="button"
+                onClick={onSave}
+                className="rounded-xl bg-[#075473] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[#096a91]"
+              >
+                Save
+              </button>
+              <button
+                type="button"
+                onClick={onSaveEmail}
+                className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm font-semibold text-amber-200 transition hover:bg-amber-500/20"
+              >
+                <Mail className="h-4 w-4 shrink-0" />
+                Save &amp; Email
+              </button>
               <button
                 type="button"
                 onClick={onClose}
@@ -631,13 +723,81 @@ function SaveEmailGateModal({
               >
                 Close
               </button>
+            </div>
+          </motion.div>
+        </motion.div>
+      ) : null}
+    </AnimatePresence>,
+    document.body
+  );
+}
+
+function SaveConfirmModal({
+  open,
+  onClose,
+  onSaveAgain,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onSaveAgain: () => void;
+}) {
+  if (typeof document === "undefined") return null;
+
+  return createPortal(
+    <AnimatePresence>
+      {open ? (
+        <motion.div
+          key="save-confirm"
+          className="fixed inset-0 z-[130] flex items-center justify-center bg-[#05080C]/75 p-4 backdrop-blur-sm"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="save-confirm-title"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+        >
+          <button
+            type="button"
+            aria-label="Close"
+            className="absolute inset-0"
+            onClick={onClose}
+          />
+          <motion.div
+            className="relative z-[1] w-full max-w-md overflow-hidden rounded-2xl border border-white/10 bg-[#0D1117] p-5 shadow-2xl sm:p-6"
+            initial={{ y: 24, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: 24, opacity: 0 }}
+          >
+            <div className="group relative overflow-hidden rounded-xl border border-white/10 bg-[#0A1017]/80 p-4">
+              <GoldLightLocal />
+              <p className="relative z-10 text-[10px] font-bold tracking-[0.2em] text-amber-400 uppercase">
+                Already saved
+              </p>
+              <h3
+                id="save-confirm-title"
+                className="relative z-10 mt-2 font-godiva text-xl tracking-wider text-white uppercase"
+              >
+                Brief is on file
+              </h3>
+              <p className="relative z-10 mt-2 text-sm text-white/65">
+                Trip Builder is unlocked. Save again to re-charge media, or
+                continue building.
+              </p>
+            </div>
+            <div className="mt-4 grid grid-cols-2 gap-2">
               <button
                 type="button"
-                onClick={onSaveEmail}
-                className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-[#075473] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[#096a91]"
+                onClick={onClose}
+                className="rounded-xl border border-white/15 px-4 py-3 text-sm font-semibold text-white/80"
               >
-                <Mail className="h-4 w-4 shrink-0" />
-                Save &amp; Email
+                Close
+              </button>
+              <button
+                type="button"
+                onClick={onSaveAgain}
+                className="rounded-xl bg-[#075473] px-4 py-3 text-sm font-semibold text-white"
+              >
+                Save again
               </button>
             </div>
           </motion.div>
@@ -645,6 +805,15 @@ function SaveEmailGateModal({
       ) : null}
     </AnimatePresence>,
     document.body
+  );
+}
+
+function GoldLightLocal() {
+  return (
+    <span
+      aria-hidden
+      className="pointer-events-none absolute -top-8 left-1/2 h-24 w-40 -translate-x-1/2 rounded-full bg-[#F6A724]/35 blur-2xl"
+    />
   );
 }
 

@@ -8,6 +8,7 @@ import {
   Ship,
   TrainFront,
 } from "lucide-react";
+import { GoldLight } from "@/components/branding/GoldLight";
 import type { BuilderEditModalId } from "./BuilderEditModalContext";
 
 const WIDGET_SHELL =
@@ -43,6 +44,15 @@ export type ExperiencePhotoBand = {
   title: string;
   photoUrl: string | null;
 };
+
+type GlowStep =
+  | "duration"
+  | "guests"
+  | "transit"
+  | "locations"
+  | "hotels_transport"
+  | "drivers"
+  | "tours";
 
 export function BuilderMWidgetGrid({
   onOpen,
@@ -89,6 +99,22 @@ export function BuilderMWidgetGrid({
   const ArrivalIcon = arrivalMode === "cruise" ? Ship : Plane;
   const DepartureIcon = departureMode === "cruise" ? Ship : Plane;
 
+  const hotelsIncomplete =
+    cityBands.length > 0 &&
+    (hotelCityChecks || []).length > 0 &&
+    (hotelCityChecks || []).some((r) => !r.done);
+
+  const nextGlow = ((): GlowStep | null => {
+    if (!startDateText) return "duration";
+    if (!paceLabel) return "guests";
+    if (!arrivalAirport) return "transit";
+    if (cityBands.length === 0) return "locations";
+    if (hotelsIncomplete || hotelArrangeLabel === "Add cities first")
+      return "hotels_transport";
+    if (experienceBands.length === 0) return "tours";
+    return null;
+  })();
+
   return (
     <div className="mx-auto w-full max-w-2xl space-y-5 px-4 py-6">
       {/* ROW 1 */}
@@ -100,7 +126,8 @@ export function BuilderMWidgetGrid({
             disabled={locked?.duration}
             className={`${WIDGET_SHELL} h-36 p-4 disabled:pointer-events-none disabled:opacity-40`}
           >
-            <div className="flex items-center justify-between">
+            <GoldLight active={nextGlow === "duration"} />
+            <div className="relative z-10 flex items-center justify-between">
               <span className="text-xl" aria-hidden>
                 📅
               </span>
@@ -108,7 +135,7 @@ export function BuilderMWidgetGrid({
                 SET
               </span>
             </div>
-            <div className="mt-3">
+            <div className="relative z-10 mt-3">
               <h3 className="font-godiva text-lg font-black leading-none text-white">
                 {tripDays || 10} DAYS
               </h3>
@@ -127,7 +154,8 @@ export function BuilderMWidgetGrid({
             disabled={locked?.guests}
             className={`${WIDGET_SHELL} h-36 p-4 disabled:pointer-events-none disabled:opacity-40`}
           >
-            <div className="flex items-center justify-between">
+            <GoldLight active={nextGlow === "guests"} />
+            <div className="relative z-10 flex items-center justify-between">
               <span className="text-xl" aria-hidden>
                 👥
               </span>
@@ -135,7 +163,7 @@ export function BuilderMWidgetGrid({
                 PARTY
               </span>
             </div>
-            <div className="mt-3">
+            <div className="relative z-10 mt-3">
               <h3 className="font-godiva text-lg font-black leading-none text-white">
                 {guestCount || 2} GUESTS
               </h3>
@@ -156,10 +184,11 @@ export function BuilderMWidgetGrid({
           disabled={locked?.transit}
           className={`${WIDGET_SHELL} min-h-[9.5rem] p-4 disabled:pointer-events-none disabled:opacity-40`}
         >
-          <span className="mb-3 block font-mono text-[10px] font-bold uppercase tracking-wider text-amber-400">
+          <GoldLight active={nextGlow === "transit"} />
+          <span className="relative z-10 mb-3 block font-mono text-[10px] font-bold uppercase tracking-wider text-amber-400">
             ENTRY / EXIT
           </span>
-          <div className="space-y-3">
+          <div className="relative z-10 space-y-3">
             <HubLine
               Icon={ArrivalIcon}
               label={arrivalAirport || "Set arrival hub"}
@@ -185,8 +214,9 @@ export function BuilderMWidgetGrid({
           disabled={locked?.locations}
           className={`${WIDGET_SHELL} h-[16.5rem] p-0 disabled:pointer-events-none disabled:opacity-40`}
         >
+          <GoldLight active={nextGlow === "locations"} />
           {cityBands.length === 0 ? (
-            <div className="flex h-full flex-col items-center justify-center gap-1 px-4 text-center">
+            <div className="relative z-10 flex h-full flex-col items-center justify-center gap-1 px-4 text-center">
               <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-cyan-400">
                 Selected cities
               </span>
@@ -195,7 +225,7 @@ export function BuilderMWidgetGrid({
               </span>
             </div>
           ) : (
-            <div className="flex h-full w-full flex-col">
+            <div className="relative z-10 flex h-full w-full flex-col">
               {cityBands.map((band) => (
                 <div
                   key={band.key}
@@ -229,7 +259,7 @@ export function BuilderMWidgetGrid({
         <WidgetLabel>Locations &amp; Nights</WidgetLabel>
       </div>
 
-      {/* ROW 4 — Hotel + Transport (each ~1.7× prior combined card) */}
+      {/* ROW 4 — Hotel + Transport */}
       <div className="grid grid-cols-2 gap-3.5">
         <div>
           <button
@@ -238,7 +268,8 @@ export function BuilderMWidgetGrid({
             disabled={locked?.hotels_transport}
             className={`${WIDGET_SHELL} flex min-h-[19.5rem] flex-col justify-between p-4 disabled:pointer-events-none disabled:opacity-40`}
           >
-            <div className="flex items-center justify-between">
+            <GoldLight active={nextGlow === "hotels_transport"} />
+            <div className="relative z-10 flex items-center justify-between">
               <span className="flex h-11 w-11 items-center justify-center rounded-xl border border-amber-500/25 bg-amber-500/10 text-amber-400">
                 <BedDouble className="h-5 w-5" aria-hidden />
               </span>
@@ -246,7 +277,7 @@ export function BuilderMWidgetGrid({
                 STAY
               </span>
             </div>
-            <div className="mt-auto">
+            <div className="relative z-10 mt-auto">
               <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">
                 Hotels
               </p>
@@ -254,23 +285,24 @@ export function BuilderMWidgetGrid({
                 {hotelArrangeLabel}
               </h3>
               <ul className="mt-2 max-h-16 space-y-0.5 overflow-y-auto">
-                {(hotelCityChecks || cityBands.map((b) => ({ name: b.name, done: false }))).map(
-                  (row) => (
-                    <li
-                      key={row.name}
-                      className="flex items-center justify-between gap-2 font-mono text-[10px] text-zinc-400"
+                {(
+                  hotelCityChecks ||
+                  cityBands.map((b) => ({ name: b.name, done: false }))
+                ).map((row) => (
+                  <li
+                    key={row.name}
+                    className="flex items-center justify-between gap-2 font-mono text-[10px] text-zinc-400"
+                  >
+                    <span className="truncate">{row.name}</span>
+                    <span
+                      className={
+                        row.done ? "text-emerald-400" : "text-zinc-600"
+                      }
                     >
-                      <span className="truncate">{row.name}</span>
-                      <span
-                        className={
-                          row.done ? "text-emerald-400" : "text-zinc-600"
-                        }
-                      >
-                        {row.done ? "✓" : "—"}
-                      </span>
-                    </li>
-                  )
-                )}
+                      {row.done ? "✓" : "—"}
+                    </span>
+                  </li>
+                ))}
               </ul>
             </div>
           </button>
@@ -284,7 +316,8 @@ export function BuilderMWidgetGrid({
             disabled={locked?.drivers}
             className={`${WIDGET_SHELL} flex min-h-[19.5rem] flex-col justify-between p-4 disabled:pointer-events-none disabled:opacity-40`}
           >
-            <div className="flex items-center justify-between">
+            <GoldLight active={nextGlow === "drivers"} />
+            <div className="relative z-10 flex items-center justify-between">
               <span className="flex h-11 w-11 items-center justify-center rounded-xl border border-cyan-500/25 bg-cyan-500/10 text-cyan-400">
                 <TrainFront className="h-5 w-5" aria-hidden />
               </span>
@@ -292,7 +325,7 @@ export function BuilderMWidgetGrid({
                 MOVE
               </span>
             </div>
-            <div className="mt-auto">
+            <div className="relative z-10 mt-auto">
               <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">
                 Transport
               </p>
@@ -321,7 +354,7 @@ export function BuilderMWidgetGrid({
         <WidgetLabel muted>Status Overview</WidgetLabel>
       </div>
 
-      {/* ROW 5 — Tours empty 2.5× / selected photo stack */}
+      {/* ROW 5 — Tours */}
       <div>
         <button
           type="button"
@@ -329,8 +362,9 @@ export function BuilderMWidgetGrid({
           disabled={locked?.tours}
           className={`${WIDGET_SHELL} h-[13.5rem] p-0 disabled:pointer-events-none disabled:opacity-40`}
         >
+          <GoldLight active={nextGlow === "tours"} />
           {experienceBands.length === 0 ? (
-            <div className="relative flex h-full flex-col overflow-hidden bg-gradient-to-b from-[#1a2840] to-[#0A1017]">
+            <div className="relative z-10 flex h-full flex-col overflow-hidden bg-gradient-to-b from-[#1a2840] to-[#0A1017]">
               <div className="relative z-10 flex flex-1 flex-col items-center justify-center px-4 text-center">
                 <p className="font-godiva text-base font-bold uppercase leading-snug text-white">
                   No experiences or tours chosen
@@ -348,7 +382,7 @@ export function BuilderMWidgetGrid({
               />
             </div>
           ) : (
-            <div className="flex h-full w-full flex-col">
+            <div className="relative z-10 flex h-full w-full flex-col">
               {experienceBands.slice(0, 4).map((band) => (
                 <div
                   key={band.key}
@@ -420,4 +454,3 @@ function HubLine({
     </div>
   );
 }
-

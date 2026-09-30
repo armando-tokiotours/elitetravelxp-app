@@ -30,6 +30,16 @@ type AgencyRow = {
   bank_info?: string;
   payment_terms?: string;
   contact_email?: string;
+  ops_contact_name?: string;
+  ops_contact_email?: string;
+  ops_contact_phone?: string;
+  billing_contact_name?: string;
+  billing_contact_email?: string;
+  billing_contact_phone?: string;
+  preferred_currency?: string;
+  payment_method?: string;
+  commission_rate_percentage?: number;
+  account_status?: string;
 };
 
 export function AgencyApp() {
@@ -366,6 +376,16 @@ function AgencyCompanyCard({
   const [bank, setBank] = useState("");
   const [terms, setTerms] = useState("");
   const [contactEmail, setContactEmail] = useState("");
+  const [opsName, setOpsName] = useState("");
+  const [opsEmail, setOpsEmail] = useState("");
+  const [opsPhone, setOpsPhone] = useState("");
+  const [billName, setBillName] = useState("");
+  const [billEmail, setBillEmail] = useState("");
+  const [billPhone, setBillPhone] = useState("");
+  const [prefCurrency, setPrefCurrency] = useState("EUR");
+  const [payMethod, setPayMethod] = useState("");
+  const [commission, setCommission] = useState("");
+  const [accountStatus, setAccountStatus] = useState("Active");
   const [msg, setMsg] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -383,6 +403,20 @@ function AgencyCompanyCard({
     setBank(a.bank_info || "");
     setTerms(a.payment_terms || "");
     setContactEmail(a.contact_email || "");
+    setOpsName(a.ops_contact_name || "");
+    setOpsEmail(a.ops_contact_email || "");
+    setOpsPhone(a.ops_contact_phone || "");
+    setBillName(a.billing_contact_name || "");
+    setBillEmail(a.billing_contact_email || "");
+    setBillPhone(a.billing_contact_phone || "");
+    setPrefCurrency(a.preferred_currency || "EUR");
+    setPayMethod(a.payment_method || "");
+    setCommission(
+      a.commission_rate_percentage != null
+        ? String(a.commission_rate_percentage)
+        : ""
+    );
+    setAccountStatus(a.account_status || "Active");
   }, [agencies, agencyId, id]);
 
   if (!id && agencies.length === 0) return null;
@@ -483,6 +517,96 @@ function AgencyCompanyCard({
               onChange={(e) => setTerms(e.target.value)}
             />
           </label>
+          <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 sm:col-span-2">
+            Operations contact
+          </p>
+          {(
+            [
+              ["Name", opsName, setOpsName],
+              ["Email", opsEmail, setOpsEmail],
+              ["Phone", opsPhone, setOpsPhone],
+            ] as const
+          ).map(([label, value, set]) => (
+            <label
+              key={`ops-${label}`}
+              className="block text-xs uppercase tracking-wider text-zinc-500"
+            >
+              Ops {label}
+              <input
+                className="mt-1 w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm"
+                value={value}
+                onChange={(e) => set(e.target.value)}
+              />
+            </label>
+          ))}
+          <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 sm:col-span-2">
+            Billing contact
+          </p>
+          {(
+            [
+              ["Name", billName, setBillName],
+              ["Email", billEmail, setBillEmail],
+              ["Phone", billPhone, setBillPhone],
+            ] as const
+          ).map(([label, value, set]) => (
+            <label
+              key={`bill-${label}`}
+              className="block text-xs uppercase tracking-wider text-zinc-500"
+            >
+              Billing {label}
+              <input
+                className="mt-1 w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm"
+                value={value}
+                onChange={(e) => set(e.target.value)}
+              />
+            </label>
+          ))}
+          <label className="block text-xs uppercase tracking-wider text-zinc-500">
+            Preferred currency
+            <select
+              className="mt-1 w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm"
+              value={prefCurrency}
+              onChange={(e) => setPrefCurrency(e.target.value)}
+            >
+              <option value="EUR">EUR</option>
+              <option value="JPY">JPY</option>
+            </select>
+          </label>
+          <label className="block text-xs uppercase tracking-wider text-zinc-500">
+            Payment method
+            <select
+              className="mt-1 w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm"
+              value={payMethod}
+              onChange={(e) => setPayMethod(e.target.value)}
+            >
+              <option value="">—</option>
+              <option value="Bank Transfer / SEPA">Bank Transfer / SEPA</option>
+              <option value="Credit Card">Credit Card</option>
+              <option value="WISE">WISE</option>
+              <option value="Invoice Net 30">Invoice Net 30</option>
+            </select>
+          </label>
+          <label className="block text-xs uppercase tracking-wider text-zinc-500">
+            Commission %
+            <input
+              type="number"
+              className="mt-1 w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm"
+              value={commission}
+              onChange={(e) => setCommission(e.target.value)}
+            />
+          </label>
+          <label className="block text-xs uppercase tracking-wider text-zinc-500">
+            Account status
+            <select
+              className="mt-1 w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm"
+              value={accountStatus}
+              onChange={(e) => setAccountStatus(e.target.value)}
+            >
+              <option value="Active">Active</option>
+              <option value="Pending Review">Pending Review</option>
+              <option value="Suspended">Suspended</option>
+            </select>
+          </label>
           {error ? <p className="text-sm text-red-400 sm:col-span-2">{error}</p> : null}
           {msg ? <p className="text-sm text-[#075473] sm:col-span-2">{msg}</p> : null}
           <button
@@ -506,6 +630,16 @@ function AgencyCompanyCard({
                     bank_info: bank.trim(),
                     payment_terms: terms.trim(),
                     contact_email: contactEmail.trim(),
+                    ops_contact_name: opsName.trim(),
+                    ops_contact_email: opsEmail.trim(),
+                    ops_contact_phone: opsPhone.trim(),
+                    billing_contact_name: billName.trim(),
+                    billing_contact_email: billEmail.trim(),
+                    billing_contact_phone: billPhone.trim(),
+                    preferred_currency: prefCurrency,
+                    payment_method: payMethod,
+                    commission_rate_percentage: Number(commission) || 0,
+                    account_status: accountStatus,
                   },
                   { requestKey: null }
                 );

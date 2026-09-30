@@ -332,37 +332,43 @@ function SpecialNeedsAccordion() {
         ) : null}
       </div>
       {open ? (
-        <div className="mt-2 flex flex-wrap gap-2">
-          {SPECIAL_NEED_OPTIONS.map((opt) => {
-            const on = specialNeeds.includes(opt.id);
-            return (
-              <button
-                key={opt.id}
-                type="button"
-                aria-pressed={on}
-                onClick={() => toggleSpecialNeed(opt.id)}
-                className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
-                  on
-                    ? "border-[#D91147]/60 bg-[#D91147]/15 text-white"
-                    : "border-zinc-700 bg-zinc-900 text-zinc-400 hover:border-zinc-500"
-                }`}
-              >
-                {opt.label}
-              </button>
-            );
-          })}
-          <button
-            type="button"
-            aria-pressed={noNeed}
-            onClick={() => toggleSpecialNeed("none")}
-            className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
-              noNeed
-                ? "border-emerald-500/60 bg-emerald-500/15 text-emerald-300"
-                : "border-zinc-700 bg-zinc-900 text-zinc-400 hover:border-zinc-500"
-            }`}
-          >
-            No need
-          </button>
+        <div className="mt-2 space-y-2">
+          <div className="grid grid-cols-3 gap-2">
+            {SPECIAL_NEED_OPTIONS.map((opt) => {
+              const on = specialNeeds.includes(opt.id);
+              return (
+                <button
+                  key={opt.id}
+                  type="button"
+                  aria-pressed={on}
+                  onClick={() => toggleSpecialNeed(opt.id)}
+                  className={`rounded-full border px-2 py-1.5 text-center text-[11px] font-semibold leading-snug transition sm:text-xs ${
+                    on
+                      ? "border-[#D91147]/60 bg-[#D91147]/15 text-white"
+                      : "border-zinc-700 bg-zinc-900 text-zinc-400 hover:border-zinc-500"
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              );
+            })}
+          </div>
+          <div className="grid grid-cols-3 gap-2">
+            <span aria-hidden />
+            <button
+              type="button"
+              aria-pressed={noNeed}
+              onClick={() => toggleSpecialNeed("none")}
+              className={`rounded-full border px-2 py-1.5 text-center text-[11px] font-semibold transition sm:text-xs ${
+                noNeed
+                  ? "border-emerald-500/60 bg-emerald-500/15 text-emerald-300"
+                  : "border-zinc-700 bg-zinc-900 text-zinc-400 hover:border-zinc-500"
+              }`}
+            >
+              No need
+            </button>
+            <span aria-hidden />
+          </div>
         </div>
       ) : null}
     </div>

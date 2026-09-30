@@ -132,7 +132,7 @@ export function SingleDayTripDetailModal({
           exit={{ opacity: 0 }}
         >
           <motion.div
-            className="tokio-modal-content relative z-[1] flex h-[min(90dvh,40rem)] w-full flex-col overflow-hidden border border-white/10 bg-[#0D1117] sm:max-w-lg sm:rounded-3xl"
+            className="tokio-modal-content relative z-[1] flex max-h-[min(90dvh,40rem)] w-full flex-col overflow-hidden border border-white/10 bg-[#0D1117] sm:max-w-lg sm:rounded-3xl"
             initial={{ y: 24, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: 24, opacity: 0 }}
@@ -164,7 +164,7 @@ export function SingleDayTripDetailModal({
               </button>
             </div>
 
-            <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-4 py-4 pb-6">
+            <div className="min-h-0 space-y-5 overflow-y-auto px-4 py-4 pb-6">
               <div>
                 <p className="text-[10px] font-bold uppercase tracking-widest text-[#1BA58A]">
                   Tour Duration (Hours)
