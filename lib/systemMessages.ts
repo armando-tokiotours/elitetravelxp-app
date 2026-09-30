@@ -26,6 +26,7 @@ export type SystemMessageKey =
   | "builder_s_lock"
   | "payment_not_ready"
   | "builder_incomplete"
+  | "builder_m_transit_required"
   | "sending_again"
   | "sending_pdf";
 
@@ -168,6 +169,13 @@ export const SYSTEM_MESSAGE_CATALOG: readonly SystemMessageDef[] = [
     label: "Itinerary · incomplete builder",
     group: "itinerary",
     defaultText: "Save all builder sections first.",
+  },
+  {
+    key: "builder_m_transit_required",
+    label: "Builder M · transit required",
+    group: "builder_m",
+    defaultText:
+      "Pick how you will travel between cities (Self, Public, or Private) before saving.",
   },
   {
     key: "sending_again",

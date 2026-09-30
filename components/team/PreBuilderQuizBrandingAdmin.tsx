@@ -12,6 +12,9 @@ import {
   brandingUiSlide3Url,
   brandingUiCardUrl,
   brandingUiCardPosterUrl,
+  brandingUiMediaPosterUrl,
+  brandingUiSlide2PosterUrl,
+  brandingUiSlide3PosterUrl,
   type PbBrandingUiItem,
 } from "@/lib/pocketbase/client";
 import { videoPosterUrlForSrc } from "@/lib/videoPosterUrl";
@@ -41,10 +44,16 @@ type OptionDraft = {
   posterFile: File | null;
   slide3File: File | null;
   cardFile: File | null;
+  mediaPosterFile: File | null;
+  slide2PosterFile: File | null;
+  slide3PosterFile: File | null;
   mediaPreview: string;
   posterPreview: string;
   slide3Preview: string;
   cardPreview: string;
+  mediaPosterPreview: string;
+  slide2PosterPreview: string;
+  slide3PosterPreview: string;
 };
 
 function emptyDraft(
@@ -72,10 +81,16 @@ function emptyDraft(
     posterFile: null,
     slide3File: null,
     cardFile: null,
+    mediaPosterFile: null,
+    slide2PosterFile: null,
+    slide3PosterFile: null,
     mediaPreview: s1?.videoUrl || s1?.imageUrl || "",
     posterPreview: s2?.videoUrl || s2?.imageUrl || "",
     slide3Preview: s3?.videoUrl || s3?.imageUrl || "",
     cardPreview: "",
+    mediaPosterPreview: s1?.imageUrl && !s1?.videoUrl ? "" : s1?.imageUrl || "",
+    slide2PosterPreview: "",
+    slide3PosterPreview: "",
   };
 }
 
@@ -105,10 +120,16 @@ function draftFromRow(
     posterFile: null,
     slide3File: null,
     cardFile: null,
+    mediaPosterFile: null,
+    slide2PosterFile: null,
+    slide3PosterFile: null,
     mediaPreview: media,
     posterPreview: poster,
     slide3Preview: slide3,
     cardPreview: card,
+    mediaPosterPreview: brandingUiMediaPosterUrl(row) || "",
+    slide2PosterPreview: brandingUiSlide2PosterUrl(row) || "",
+    slide3PosterPreview: brandingUiSlide3PosterUrl(row) || "",
   };
 }
 
@@ -192,14 +213,35 @@ export function PreBuilderQuizBrandingAdmin({
       if (draft.mediaFile) {
         const opt = await optimizeFileForUpload(draft.mediaFile);
         fd.append("media", opt.file);
+        if (!draft.mediaPosterFile && opt.posterFile) {
+          fd.append("media_poster", opt.posterFile);
+        }
+      }
+      if (draft.mediaPosterFile) {
+        const opt = await optimizeFileForUpload(draft.mediaPosterFile);
+        fd.append("media_poster", opt.file);
       }
       if (draft.posterFile) {
         const opt = await optimizeFileForUpload(draft.posterFile);
         fd.append("poster", opt.file);
+        if (!draft.slide2PosterFile && opt.posterFile) {
+          fd.append("slide2_poster", opt.posterFile);
+        }
+      }
+      if (draft.slide2PosterFile) {
+        const opt = await optimizeFileForUpload(draft.slide2PosterFile);
+        fd.append("slide2_poster", opt.file);
       }
       if (draft.slide3File) {
         const opt = await optimizeFileForUpload(draft.slide3File);
         fd.append("slide3", opt.file);
+        if (!draft.slide3PosterFile && opt.posterFile) {
+          fd.append("slide3_poster", opt.posterFile);
+        }
+      }
+      if (draft.slide3PosterFile) {
+        const opt = await optimizeFileForUpload(draft.slide3PosterFile);
+        fd.append("slide3_poster", opt.file);
       }
       if (draft.cardFile) {
         const opt = await optimizeFileForUpload(draft.cardFile);
@@ -228,6 +270,12 @@ export function PreBuilderQuizBrandingAdmin({
         (cardUrl && isVideoFilename(cardUrl)
           ? videoPosterUrlForSrc(cardUrl)
           : "");
+      const mediaPosterUrl =
+        brandingUiMediaPosterUrl(saved) || draft.mediaPosterPreview || "";
+      const slide2PosterUrl =
+        brandingUiSlide2PosterUrl(saved) || draft.slide2PosterPreview || "";
+      const slide3PosterUrl =
+        brandingUiSlide3PosterUrl(saved) || draft.slide3PosterPreview || "";
       writePreEliteQuizLocalEntry(optionId, {
         title: draft.title,
         subtitle: draft.subtitle,
@@ -236,6 +284,9 @@ export function PreBuilderQuizBrandingAdmin({
         slide3Url,
         cardUrl,
         cardPosterUrl: cardPosterUrl || undefined,
+        mediaPosterUrl: mediaPosterUrl || undefined,
+        slide2PosterUrl: slide2PosterUrl || undefined,
+        slide3PosterUrl: slide3PosterUrl || undefined,
         slide1Title: draft.slide1Title,
         slide1Caption: draft.slide1Caption,
         slide2Title: draft.slide2Title,
@@ -251,13 +302,19 @@ export function PreBuilderQuizBrandingAdmin({
         posterFile: null,
         slide3File: null,
         cardFile: null,
+        mediaPosterFile: null,
+        slide2PosterFile: null,
+        slide3PosterFile: null,
         mediaPreview: mediaUrl,
         posterPreview: posterUrl,
         slide3Preview: slide3Url,
         cardPreview: cardUrl,
+        mediaPosterPreview: mediaPosterUrl,
+        slide2PosterPreview: slide2PosterUrl,
+        slide3PosterPreview: slide3PosterUrl,
       });
       setMsg(
-        `Saved “${draft.title}”. Card photo + 3 story slides update on Pre-Builder.`
+        `Saved “${draft.title}”. Card + slides + fast preload posters update on Pre-Builder.`
       );
     } catch (e) {
       setError(formatPbError(e));
@@ -367,48 +424,96 @@ export function PreBuilderQuizBrandingAdmin({
                 </div>
 
                 <div className="mt-4 grid gap-4 lg:grid-cols-3">
-                  <MediaSlot
-                    label="Slide 1 / 3"
-                    variant="story"
-                    preview={d.mediaPreview}
-                    pendingFile={d.mediaFile}
-                    onFile={(f) => {
-                      patchDraft(opt.id, {
-                        mediaFile: f,
-                        mediaPreview: f
-                          ? URL.createObjectURL(f)
-                          : d.mediaPreview,
-                      });
-                    }}
-                  />
-                  <MediaSlot
-                    label="Slide 2 / 3"
-                    variant="story"
-                    preview={d.posterPreview}
-                    pendingFile={d.posterFile}
-                    onFile={(f) => {
-                      patchDraft(opt.id, {
-                        posterFile: f,
-                        posterPreview: f
-                          ? URL.createObjectURL(f)
-                          : d.posterPreview,
-                      });
-                    }}
-                  />
-                  <MediaSlot
-                    label="Slide 3 / 3"
-                    variant="story"
-                    preview={d.slide3Preview}
-                    pendingFile={d.slide3File}
-                    onFile={(f) => {
-                      patchDraft(opt.id, {
-                        slide3File: f,
-                        slide3Preview: f
-                          ? URL.createObjectURL(f)
-                          : d.slide3Preview,
-                      });
-                    }}
-                  />
+                  <div className="space-y-3">
+                    <MediaSlot
+                      label="Slide 1 / 3"
+                      variant="story"
+                      preview={d.mediaPreview}
+                      pendingFile={d.mediaFile}
+                      onFile={(f) => {
+                        patchDraft(opt.id, {
+                          mediaFile: f,
+                          mediaPreview: f
+                            ? URL.createObjectURL(f)
+                            : d.mediaPreview,
+                        });
+                      }}
+                    />
+                    <MediaSlot
+                      label="Fast preload poster · slide 1"
+                      variant="still"
+                      preview={d.mediaPosterPreview}
+                      pendingFile={d.mediaPosterFile}
+                      onFile={(f) => {
+                        patchDraft(opt.id, {
+                          mediaPosterFile: f,
+                          mediaPosterPreview: f
+                            ? URL.createObjectURL(f)
+                            : d.mediaPosterPreview,
+                        });
+                      }}
+                    />
+                  </div>
+                  <div className="space-y-3">
+                    <MediaSlot
+                      label="Slide 2 / 3"
+                      variant="story"
+                      preview={d.posterPreview}
+                      pendingFile={d.posterFile}
+                      onFile={(f) => {
+                        patchDraft(opt.id, {
+                          posterFile: f,
+                          posterPreview: f
+                            ? URL.createObjectURL(f)
+                            : d.posterPreview,
+                        });
+                      }}
+                    />
+                    <MediaSlot
+                      label="Fast preload poster · slide 2"
+                      variant="still"
+                      preview={d.slide2PosterPreview}
+                      pendingFile={d.slide2PosterFile}
+                      onFile={(f) => {
+                        patchDraft(opt.id, {
+                          slide2PosterFile: f,
+                          slide2PosterPreview: f
+                            ? URL.createObjectURL(f)
+                            : d.slide2PosterPreview,
+                        });
+                      }}
+                    />
+                  </div>
+                  <div className="space-y-3">
+                    <MediaSlot
+                      label="Slide 3 / 3"
+                      variant="story"
+                      preview={d.slide3Preview}
+                      pendingFile={d.slide3File}
+                      onFile={(f) => {
+                        patchDraft(opt.id, {
+                          slide3File: f,
+                          slide3Preview: f
+                            ? URL.createObjectURL(f)
+                            : d.slide3Preview,
+                        });
+                      }}
+                    />
+                    <MediaSlot
+                      label="Fast preload poster · slide 3"
+                      variant="still"
+                      preview={d.slide3PosterPreview}
+                      pendingFile={d.slide3PosterFile}
+                      onFile={(f) => {
+                        patchDraft(opt.id, {
+                          slide3PosterFile: f,
+                          slide3PosterPreview: f
+                            ? URL.createObjectURL(f)
+                            : d.slide3PosterPreview,
+                        });
+                      }}
+                    />
+                  </div>
                 </div>
 
                 <div className="mt-4 grid gap-3">
@@ -512,16 +617,23 @@ function MediaSlot({
   preview: string;
   pendingFile?: File | null;
   onFile: (f: File | null) => void;
-  /** card = wide Pre-Builder row · story = tall 9:16 overlay */
-  variant?: "card" | "story";
+  /** card = wide Pre-Builder row · story = tall 9:16 · still = image-only poster */
+  variant?: "card" | "story" | "still";
 }) {
   const isVideo =
-    (pendingFile ? pendingFile.type.startsWith("video/") : false) ||
-    isVideoFilename(preview);
+    variant !== "still" &&
+    ((pendingFile ? pendingFile.type.startsWith("video/") : false) ||
+      isVideoFilename(preview));
   const isCard = variant === "card";
-  const hint = isCard
-    ? "Image or video · landscape 16:9 (≈1600×900) · under 50MB — matches selected card strip"
-    : "Image or video · portrait 9:16 (1080×1920) · under 50MB — matches story window";
+  const isStill = variant === "still";
+  const hint = isStill
+    ? "Still image only · shown until the slide video is ready (leave empty to auto-grab a frame)"
+    : isCard
+      ? "Image or video · landscape 16:9 (≈1600×900) · under 50MB — matches selected card strip"
+      : "Image or video · portrait 9:16 (1080×1920) · under 50MB — matches story window";
+  const accept = isStill
+    ? "image/jpeg,image/png,image/webp,image/*"
+    : "image/*,video/mp4,video/webm,video/quicktime,.m4v";
 
   return (
     <div>
@@ -551,6 +663,21 @@ function MediaSlot({
             ) : (
               <div className="flex aspect-[16/7] max-h-36 w-full items-center justify-center text-xs text-zinc-500">
                 No media yet
+              </div>
+            )}
+          </div>
+        ) : isStill ? (
+          <div className="overflow-hidden rounded-lg border border-white/10 bg-black">
+            {preview ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={preview}
+                alt=""
+                className="aspect-[9/16] max-h-40 w-full object-cover"
+              />
+            ) : (
+              <div className="flex aspect-[9/16] max-h-40 w-full items-center justify-center px-2 text-center text-[10px] text-zinc-500">
+                Optional still · auto frame if empty
               </div>
             )}
           </div>
@@ -595,7 +722,7 @@ function MediaSlot({
         )}
         <input
           type="file"
-          accept="image/jpeg,image/webp,image/png,video/mp4,video/webm,video/quicktime,.mov,.m4v,.jpg,.webp,.mp4,.webm"
+          accept={accept}
           className="mt-3 block w-full text-xs text-zinc-300"
           onChange={(e) => onFile(e.target.files?.[0] ?? null)}
         />

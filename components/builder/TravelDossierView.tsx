@@ -192,22 +192,11 @@ export function TravelDossierView({
           {(state.experienceService === "concierge" ||
             state.isEliteConcierge) && (
             <TicketCard accent="gold">
-              <div className="flex items-start gap-2">
-                <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-[#F6A724]" />
-                <div>
-                  <h2 className="text-[0.7rem] font-semibold uppercase tracking-[0.28em] text-white">
-                    Elite Concierge
-                  </h2>
-                  <p className="mt-2 text-sm font-semibold text-[#F6A724]">
-                    €50 Design Deposit
-                  </p>
-                  <p className="mt-2 text-sm text-white/60">
-                    Day-by-day itinerary design included — dining, access, and
-                    private drivers coordinated by your specialist. 100% of the
-                    €50 fee is credited toward your final trip balance when you
-                    book.
-                  </p>
-                </div>
+              <div className="flex items-center gap-2">
+                <Sparkles className="h-4 w-4 shrink-0 text-[#F6A724]" />
+                <h2 className="text-[0.75rem] font-semibold uppercase tracking-[0.28em] text-[#F6A724]">
+                  Elite Concierge
+                </h2>
               </div>
             </TicketCard>
           )}
@@ -409,12 +398,52 @@ function LocationSegment({
                     </span>
                   ) : null}
                 </p>
+                {next ? (
+                  <p
+                    className={`text-[11px] font-semibold uppercase tracking-wider ${
+                      loc.transitType === "unset"
+                        ? "text-[#E60F43]"
+                        : loc.transitType === "self"
+                          ? "text-white/45"
+                          : "text-[#F6A724]"
+                    }`}
+                  >
+                    {loc.transitType === "unset"
+                      ? "! Transport · action required"
+                      : loc.transitType === "self"
+                        ? "Transport · self-arranged"
+                        : loc.transitType === "public"
+                          ? "Transport · public / rail"
+                          : "Transport · private"}
+                  </p>
+                ) : null}
               </div>
             </div>
           ) : (
-            <div className="mt-4 flex w-full items-center gap-2 overflow-hidden border-t border-dashed border-white/10 pt-3 text-xs italic text-white/45">
-              <BedDouble className="h-4 w-4 shrink-0 text-white/30" />
-              <span>Accommodation Self-Arranged (No Hotel Required)</span>
+            <div className="mt-4 flex w-full flex-col gap-1 overflow-hidden border-t border-dashed border-white/10 pt-3 text-xs italic text-white/45">
+              <div className="flex items-center gap-2">
+                <BedDouble className="h-4 w-4 shrink-0 text-white/30" />
+                <span>Accommodation Self-Arranged (No Hotel Required)</span>
+              </div>
+              {next ? (
+                <p
+                  className={`pl-6 text-[11px] font-semibold not-italic uppercase tracking-wider ${
+                    loc.transitType === "unset"
+                      ? "text-[#E60F43]"
+                      : loc.transitType === "self"
+                        ? "text-white/45"
+                        : "text-[#F6A724]"
+                  }`}
+                >
+                  {loc.transitType === "unset"
+                    ? "! Transport · action required"
+                    : loc.transitType === "self"
+                      ? "Transport · self-arranged"
+                      : loc.transitType === "public"
+                        ? "Transport · public / rail"
+                        : "Transport · private"}
+                </p>
+              ) : null}
             </div>
           )}
 

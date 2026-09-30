@@ -6,8 +6,12 @@
  *   title / subtitle → option + story header
  *   card → selected choice-card background (image or video)
  *   media → story slide 1 background (image or video)
+ *   media_poster → fast preload still for slide 1 video
  *   poster → story slide 2 background
+ *   slide2_poster → fast preload still for slide 2 video
  *   slide3 → story slide 3 background
+ *   slide3_poster → fast preload still for slide 3 video
+ *   card / card_poster → choice-card background + video still
  *   cta_primary / inclusion_body → slide 1 title / caption (optional)
  *   cta_secondary / credit_body → slide 2 title / caption (optional)
  *   inclusion_title / credit_title → slide 3 title / caption (optional)
@@ -42,6 +46,10 @@ export type PreEliteBrandingOverlay = {
   cardUrl?: string;
   /** Still for card video */
   cardPosterUrl?: string;
+  /** Fast preload stills for story videos */
+  mediaPosterUrl?: string;
+  slide2PosterUrl?: string;
+  slide3PosterUrl?: string;
   ctaPrimary?: string;
   ctaSecondary?: string;
   inclusionBody?: string;
@@ -99,6 +107,9 @@ export type PreEliteQuizLocalEntry = {
   slide3Url?: string;
   cardUrl?: string;
   cardPosterUrl?: string;
+  mediaPosterUrl?: string;
+  slide2PosterUrl?: string;
+  slide3PosterUrl?: string;
   slide1Title?: string;
   slide1Caption?: string;
   slide2Title?: string;
@@ -143,15 +154,17 @@ export function writePreEliteQuizLocalEntry(
 
 function applySlideMedia(
   slide: StorySlide,
-  url: string | undefined
+  url: string | undefined,
+  stillUrl?: string
 ): StorySlide {
   const media = (url || "").trim();
   if (!media) return slide;
   if (isVideoFilename(media)) {
     const still =
-      slide.imageUrl && !isVideoFilename(slide.imageUrl)
+      (stillUrl || "").trim() ||
+      (slide.imageUrl && !isVideoFilename(slide.imageUrl)
         ? slide.imageUrl
-        : videoPosterUrlForSrc(media);
+        : videoPosterUrlForSrc(media));
     return { ...slide, videoUrl: media, imageUrl: still };
   }
   return { ...slide, imageUrl: media, videoUrl: undefined };
@@ -198,11 +211,17 @@ export function resolvePreEliteStory(
   const slide1Url = local?.mediaUrl || branding?.mediaUrl || "";
   const slide2Url = local?.posterUrl || branding?.posterUrl || "";
   const slide3Url = local?.slide3Url || branding?.slide3Url || "";
+  const slide1Still =
+    local?.mediaPosterUrl || branding?.mediaPosterUrl || "";
+  const slide2Still =
+    local?.slide2PosterUrl || branding?.slide2PosterUrl || "";
+  const slide3Still =
+    local?.slide3PosterUrl || branding?.slide3PosterUrl || "";
 
   const slides = ensureThreeSlides(optionId, base.slides).map((slide, i) => {
     let next = slide;
     if (i === 0) {
-      next = applySlideMedia(next, slide1Url);
+      next = applySlideMedia(next, slide1Url, slide1Still);
       const t = local?.slide1Title?.trim() || branding?.ctaPrimary?.trim();
       const c =
         local?.slide1Caption?.trim() ||
@@ -211,7 +230,7 @@ export function resolvePreEliteStory(
       if (t) next = { ...next, title: t };
       if (c) next = { ...next, caption: c };
     } else if (i === 1) {
-      next = applySlideMedia(next, slide2Url);
+      next = applySlideMedia(next, slide2Url, slide2Still);
       const t = local?.slide2Title?.trim() || branding?.ctaSecondary?.trim();
       const c =
         local?.slide2Caption?.trim() ||
@@ -220,7 +239,7 @@ export function resolvePreEliteStory(
       if (t) next = { ...next, title: t };
       if (c) next = { ...next, caption: c };
     } else if (i === 2) {
-      next = applySlideMedia(next, slide3Url);
+      next = applySlideMedia(next, slide3Url, slide3Still);
       const t = local?.slide3Title?.trim() || branding?.inclusionTitle?.trim();
       const c =
         local?.slide3Caption?.trim() || branding?.creditTitle?.trim() || "";

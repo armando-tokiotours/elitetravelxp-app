@@ -387,6 +387,12 @@ export interface PbBrandingUiItem {
   card?: string;
   /** Still frame for card video (no-blink) */
   card_poster?: string;
+  /** Fast preload still for slide 1 video (`media`) */
+  media_poster?: string;
+  /** Fast preload still for slide 2 video (`poster`) */
+  slide2_poster?: string;
+  /** Fast preload still for slide 3 video (`slide3`) */
+  slide3_poster?: string;
   cta_primary?: string;
   cta_secondary?: string;
   inclusion_title?: string;
@@ -467,6 +473,44 @@ export function brandingUiCardPosterUrl(
     row.card_poster,
     thumb ? { thumb, format: "webp" } : undefined
   );
+}
+
+function brandingUiStillFileUrl(
+  row: PbBrandingUiItem | null | undefined,
+  fileName: string | undefined,
+  thumb?: string
+): string {
+  if (!fileName || !row?.id) return "";
+  return pbFileUrl(
+    String(row.collectionId ?? "branding_ui_items"),
+    row.id,
+    fileName,
+    thumb ? { thumb, format: "webp" } : undefined
+  );
+}
+
+/** Fast preload still for Pre-Builder story slide 1 video. */
+export function brandingUiMediaPosterUrl(
+  row: PbBrandingUiItem | null | undefined,
+  thumb?: string
+): string {
+  return brandingUiStillFileUrl(row, row?.media_poster, thumb);
+}
+
+/** Fast preload still for Pre-Builder story slide 2 video. */
+export function brandingUiSlide2PosterUrl(
+  row: PbBrandingUiItem | null | undefined,
+  thumb?: string
+): string {
+  return brandingUiStillFileUrl(row, row?.slide2_poster, thumb);
+}
+
+/** Fast preload still for Pre-Builder story slide 3 video. */
+export function brandingUiSlide3PosterUrl(
+  row: PbBrandingUiItem | null | undefined,
+  thumb?: string
+): string {
+  return brandingUiStillFileUrl(row, row?.slide3_poster, thumb);
 }
 
 /** Pre-Builder selected-card background (image or video). */

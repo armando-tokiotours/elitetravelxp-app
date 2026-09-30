@@ -339,7 +339,7 @@ export function PreEliteBuilderClient() {
             </span>
           </Link>
           <p className="text-xs tracking-[0.18em] text-white/50 uppercase">
-            Pre-Elite Builder
+            PRE-BUILDER
           </p>
         </div>
       </header>

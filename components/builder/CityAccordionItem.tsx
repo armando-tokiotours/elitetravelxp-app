@@ -293,8 +293,19 @@ export function CityAccordionItem({
               />
             </span>
             <span className="min-w-0 flex-1 overflow-hidden">
-              <span className="block break-words text-sm font-semibold leading-tight text-white">
-                {name}
+              <span className="flex items-center gap-1.5">
+                <span className="block break-words text-sm font-semibold leading-tight text-white">
+                  {name}
+                </span>
+                {!isLast && transit === "unset" ? (
+                  <span
+                    className="inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-[#E60F43] text-[10px] font-black text-white"
+                    title="Transport not set"
+                    aria-label="Action required: pick transport"
+                  >
+                    !
+                  </span>
+                ) : null}
               </span>
               <span className={`text-xs font-medium ${nightsStatusClass}`}>
                 {isStay
@@ -303,6 +314,25 @@ export function CityAccordionItem({
                     ? "Arrival · 0 nights"
                     : "Departure · 0 nights"}
               </span>
+              {!isLast ? (
+                <span
+                  className={`mt-0.5 block text-[10px] font-semibold uppercase tracking-wider ${
+                    transit === "unset"
+                      ? "text-[#E60F43]"
+                      : transit === "self"
+                        ? "text-white/45"
+                        : "text-[#F6A724]"
+                  }`}
+                >
+                  {transit === "unset"
+                    ? "! Transport · action required"
+                    : transit === "self"
+                      ? "Transport · self-arranged"
+                      : transit === "public"
+                        ? "Transport · public / rail"
+                        : "Transport · private"}
+                </span>
+              ) : null}
             </span>
             {dateLabel ? (
               <span className="shrink-0 text-xs text-zinc-400">

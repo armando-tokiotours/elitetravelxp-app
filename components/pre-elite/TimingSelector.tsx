@@ -229,7 +229,14 @@ export function TimingSelector({ value, onChange, tripType }: Props) {
   const [monthDropOpen, setMonthDropOpen] = useState(false);
   const [monthQuery, setMonthQuery] = useState("");
   const monthRootRef = useRef<HTMLDivElement>(null);
+  const monthBtnRef = useRef<HTMLButtonElement>(null);
   const monthSearchRef = useRef<HTMLInputElement>(null);
+  const [monthMenuPos, setMonthMenuPos] = useState<{
+    top: number;
+    left: number;
+    width: number;
+    maxHeight: number;
+  } | null>(null);
   const [view, setView] = useState(() => {
     const anchor = initialStart || today;
     return { year: anchor.getFullYear(), month: anchor.getMonth() };
@@ -249,17 +256,45 @@ export function TimingSelector({ value, onChange, tripType }: Props) {
   }, [open]);
 
   useEffect(() => {
-    if (!monthDropOpen) return;
+    if (!monthDropOpen) {
+      setMonthMenuPos(null);
+      return;
+    }
+    const place = () => {
+      const btn = monthBtnRef.current;
+      if (!btn) return;
+      const r = btn.getBoundingClientRect();
+      const gap = 6;
+      const spaceBelow = window.innerHeight - r.bottom - gap - 16;
+      const spaceAbove = r.top - gap - 16;
+      const preferBelow = spaceBelow >= 180 || spaceBelow >= spaceAbove;
+      const maxHeight = Math.min(320, Math.max(140, preferBelow ? spaceBelow : spaceAbove));
+      const top = preferBelow
+        ? r.bottom + gap
+        : Math.max(8, r.top - gap - maxHeight);
+      setMonthMenuPos({
+        top,
+        left: r.left,
+        width: r.width,
+        maxHeight,
+      });
+    };
+    place();
     const t = window.setTimeout(() => monthSearchRef.current?.focus(), 40);
     const onDoc = (e: MouseEvent) => {
-      if (!monthRootRef.current?.contains(e.target as Node)) {
-        setMonthDropOpen(false);
-        setMonthQuery("");
-      }
+      const t = e.target as Node;
+      if (monthRootRef.current?.contains(t)) return;
+      if ((t as HTMLElement).closest?.("[data-month-season-menu]")) return;
+      setMonthDropOpen(false);
+      setMonthQuery("");
     };
+    window.addEventListener("resize", place);
+    window.addEventListener("scroll", place, true);
     document.addEventListener("mousedown", onDoc);
     return () => {
       window.clearTimeout(t);
+      window.removeEventListener("resize", place);
+      window.removeEventListener("scroll", place, true);
       document.removeEventListener("mousedown", onDoc);
     };
   }, [monthDropOpen]);
@@ -529,6 +564,7 @@ export function TimingSelector({ value, onChange, tripType }: Props) {
       ) : (
         <div ref={monthRootRef} className="relative">
           <button
+            ref={monthBtnRef}
             type="button"
             aria-label="Target month or season"
             aria-expanded={monthDropOpen}
@@ -553,75 +589,88 @@ export function TimingSelector({ value, onChange, tripType }: Props) {
             />
           </button>
 
-          {monthDropOpen ? (
-            <div className="absolute left-0 right-0 top-[calc(100%+0.35rem)] z-50 overflow-hidden rounded-2xl border border-white/10 bg-[#0D1117] shadow-2xl">
-              <div className="flex items-center gap-2 border-b border-white/10 px-3 py-2">
-                <Search className="h-3.5 w-3.5 shrink-0 text-white/40" aria-hidden />
-                <input
-                  ref={monthSearchRef}
-                  value={monthQuery}
-                  onChange={(e) => setMonthQuery(e.target.value)}
-                  placeholder="Search month or season…"
-                  className="min-w-0 flex-1 bg-transparent text-sm text-white outline-none placeholder:text-white/35"
-                />
-                {monthQuery ? (
-                  <button
-                    type="button"
-                    aria-label="Clear search"
-                    onClick={() => setMonthQuery("")}
-                    className="rounded-full p-1 text-white/40 hover:text-white"
-                  >
-                    <X className="h-3.5 w-3.5" />
-                  </button>
-                ) : null}
-              </div>
-              <ul
-                className="max-h-52 overflow-y-auto overscroll-contain py-1"
-                role="listbox"
+          {mounted &&
+            monthDropOpen &&
+            monthMenuPos &&
+            createPortal(
+              <div
+                data-month-season-menu
+                className="fixed z-[10050] overflow-hidden rounded-2xl border border-white/10 bg-[#0D1117] shadow-2xl"
+                style={{
+                  top: monthMenuPos.top,
+                  left: monthMenuPos.left,
+                  width: monthMenuPos.width,
+                }}
               >
-                {filteredMonths.length === 0 ? (
-                  <li className="px-3 py-3 text-center text-xs text-white/40">
-                    No months match
-                  </li>
-                ) : (
-                  filteredMonths.map((item) => {
-                    const selected = selectedMonthKey === item.key;
-                    return (
-                      <li key={item.key}>
-                        <button
-                          type="button"
-                          role="option"
-                          aria-selected={selected}
-                          onClick={() => pickMonth(item.key)}
-                          className={`flex w-full items-center gap-2.5 px-3 py-2.5 text-left text-sm transition hover:bg-white/5 ${
-                            selected
-                              ? "bg-[#075473]/25 text-white"
-                              : "text-white/85"
-                          }`}
-                        >
-                          <span className="min-w-0 flex-1">
-                            <span className="block truncate font-medium">
-                              {item.season}
-                              <span className="text-white/40"> · </span>
-                              <span className="text-[#075473]">{item.short}</span>
-                            </span>
-                            {item.peak ? (
-                              <span className="mt-0.5 block truncate text-[10px] text-white/45">
-                                {item.peak}
+                <div className="flex items-center gap-2 border-b border-white/10 px-3 py-2">
+                  <Search className="h-3.5 w-3.5 shrink-0 text-white/40" aria-hidden />
+                  <input
+                    ref={monthSearchRef}
+                    value={monthQuery}
+                    onChange={(e) => setMonthQuery(e.target.value)}
+                    placeholder="Search month or season…"
+                    className="min-w-0 flex-1 bg-transparent text-sm text-white outline-none placeholder:text-white/35"
+                  />
+                  {monthQuery ? (
+                    <button
+                      type="button"
+                      aria-label="Clear search"
+                      onClick={() => setMonthQuery("")}
+                      className="rounded-full p-1 text-white/40 hover:text-white"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  ) : null}
+                </div>
+                <ul
+                  className="overflow-y-auto overscroll-contain py-1"
+                  style={{ maxHeight: monthMenuPos.maxHeight }}
+                  role="listbox"
+                >
+                  {filteredMonths.length === 0 ? (
+                    <li className="px-3 py-3 text-center text-xs text-white/40">
+                      No months match
+                    </li>
+                  ) : (
+                    filteredMonths.map((item) => {
+                      const selected = selectedMonthKey === item.key;
+                      return (
+                        <li key={item.key}>
+                          <button
+                            type="button"
+                            role="option"
+                            aria-selected={selected}
+                            onClick={() => pickMonth(item.key)}
+                            className={`flex w-full items-center gap-2.5 px-3 py-2.5 text-left text-sm transition hover:bg-white/5 ${
+                              selected
+                                ? "bg-[#075473]/25 text-white"
+                                : "text-white/85"
+                            }`}
+                          >
+                            <span className="min-w-0 flex-1">
+                              <span className="block truncate font-medium">
+                                {item.season}
+                                <span className="text-white/40"> · </span>
+                                <span className="text-[#075473]">{item.short}</span>
                               </span>
-                            ) : null}
-                          </span>
-                        </button>
-                      </li>
-                    );
-                  })
-                )}
-              </ul>
-              <p className="border-t border-white/10 px-3 py-1.5 text-[10px] text-white/35">
-                {monthOptions.length} months · scroll or type to find
-              </p>
-            </div>
-          ) : null}
+                              {item.peak ? (
+                                <span className="mt-0.5 block truncate text-[10px] text-white/45">
+                                  {item.peak}
+                                </span>
+                              ) : null}
+                            </span>
+                          </button>
+                        </li>
+                      );
+                    })
+                  )}
+                </ul>
+                <p className="border-t border-white/10 px-3 py-1.5 text-[10px] text-white/35">
+                  {monthOptions.length} months · scroll or type to find
+                </p>
+              </div>,
+              document.body
+            )}
         </div>
       )}
 

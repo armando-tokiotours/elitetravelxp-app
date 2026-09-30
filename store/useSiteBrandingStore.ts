@@ -8,6 +8,9 @@ import {
   brandingUiSlide3Url,
   brandingUiCardUrl,
   brandingUiCardPosterUrl,
+  brandingUiMediaPosterUrl,
+  brandingUiSlide2PosterUrl,
+  brandingUiSlide3PosterUrl,
   fetchBrandingUiItems,
   type PbBrandingUiItem,
 } from "@/lib/pocketbase/client";
@@ -57,6 +60,10 @@ export interface ResolvedBrandingUiItem {
   cardUrl: string;
   /** Still frame when card is a video */
   cardPosterUrl: string;
+  /** Fast preload stills for story slide videos */
+  mediaPosterUrl: string;
+  slide2PosterUrl: string;
+  slide3PosterUrl: string;
   recordId: string | null;
 }
 
@@ -101,6 +108,9 @@ function resolveItem(
   const cardPosterUrl = cardIsVideo
     ? cardPosterPb || videoPosterUrlForSrc(cardUrl)
     : "";
+  const mediaPosterUrl = brandingUiMediaPosterUrl(row);
+  const slide2PosterUrl = brandingUiSlide2PosterUrl(row);
+  const slide3PosterUrl = brandingUiSlide3PosterUrl(row);
 
   return {
     key,
@@ -120,6 +130,9 @@ function resolveItem(
     slide3Url,
     cardUrl,
     cardPosterUrl,
+    mediaPosterUrl,
+    slide2PosterUrl,
+    slide3PosterUrl,
     recordId: row?.id ?? null,
   };
 }

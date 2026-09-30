@@ -28,6 +28,9 @@ import { useHybridTooltip } from "@/hooks/useHybridTooltip";
 import { BuilderPortalSheet } from "../BuilderPortalSheet";
 import { CityAccordionItem } from "../CityAccordionItem";
 import { CityThumb } from "../CityThumb";
+import { coerceTransitType } from "@/store/useBuilderStore";
+import { showSystemMessage } from "@/store/useSystemMessageStore";
+import { getSystemMessage } from "@/lib/systemMessages";
 
 export function LocationsEditorModal({
   open,
@@ -303,7 +306,22 @@ export function LocationsEditorModal({
               </div>
               <button
                 type="button"
-                onClick={onClose}
+                onClick={() => {
+                  const missing = locations.findIndex((loc, index) => {
+                    if (isTransitHubStop(loc)) return false;
+                    if (index === locations.length - 1) return false;
+                    return coerceTransitType(loc.transitType) === "unset";
+                  });
+                  if (missing >= 0) {
+                    setExpandedKey(locations[missing].key);
+                    showSystemMessage({
+                      text: getSystemMessage("builder_m_transit_required"),
+                      tone: "error",
+                    });
+                    return;
+                  }
+                  onClose();
+                }}
                 disabled={!matches}
                 className="w-full rounded-full bg-[#0B1F3A] py-3 text-sm font-semibold text-white transition hover:bg-[#143052] disabled:cursor-not-allowed disabled:opacity-40"
               >
