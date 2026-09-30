@@ -24,6 +24,7 @@ import { travelStyleTierRules } from "@/lib/preEliteHydrate";
 import { CityTransportModal } from "./CityTransportModal";
 import { ExplainerTriggerButton } from "../ExplainerTriggerButton";
 import { GoldLight } from "@/components/branding/GoldLight";
+import { TransportProductPicker } from "@/components/builder/TransportProductPicker";
 
 /**
  * Full-screen Drivers & City Transport editor (widget / progress step 6).
@@ -219,6 +220,8 @@ export function DriversEditorModal({
                 </div>
               ) : (
                 <>
+              <TransportProductPicker adults={adults + children} />
+
               {conciergeLocked ? (
                 <div className="group relative overflow-hidden rounded-2xl border border-[#075473]/40 bg-[#075473]/15 px-4 py-3">
                   <GoldLight color="#F6A724" placement="top-center" active />

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type PocketBase from "pocketbase";
 import { formatPbError } from "@/lib/pocketbase/admin-schema";
 import {
@@ -84,42 +84,6 @@ function OpsBoardInner() {
     })();
   }, [getClient, reloadPockets]);
 
-  const patchHub = async (
-    id: string,
-    data: Record<string, unknown>,
-    okMsg: string
-  ) => {
-    setSavingId(id);
-    setMsg(null);
-    try {
-      const pb = getClient();
-      const updated = await pb.collection("ops_hub").update(id, data, {
-        requestKey: null,
-      });
-      if (typeof data.status === "string") {
-        const { syncDetailStatusFromOpsHub } = await import(
-          "@/lib/syncOpsStatusToDetail"
-        );
-        await syncDetailStatusFromOpsHub(
-          pb,
-          updated as {
-            source?: string;
-            detail_collection?: string;
-            detail_id?: string;
-            pnr?: string;
-          },
-          data.status
-        );
-      }
-      setMsg(okMsg);
-      await reload();
-    } catch (e) {
-      setMsg(formatPbError(e));
-    } finally {
-      setSavingId(null);
-    }
-  };
-
   const withSave = async (
     key: string,
     fn: () => Promise<void>,
@@ -163,56 +127,36 @@ function OpsBoardInner() {
       </div>
       {msg ? <p className="text-sm text-[#075473]">{msg}</p> : null}
 
-      <div className="overflow-x-auto rounded-xl border border-zinc-800">
-        <table className="min-w-full text-left text-sm">
-          <thead className="border-b border-zinc-800 bg-zinc-950 text-[11px] uppercase tracking-wider text-zinc-500">
-            <tr>
-              <th className="px-3 py-2">PNR</th>
-              <th className="px-3 py-2">City / date</th>
-              <th className="px-3 py-2">Guests</th>
-              <th className="px-3 py-2">Status</th>
-              <th className="px-3 py-2">Agent</th>
-              <th className="px-3 py-2">Guide</th>
-              <th className="px-3 py-2">Driver</th>
-              <th className="px-3 py-2">Ticketer</th>
-              <th className="px-3 py-2">Tickets</th>
-              <th className="px-3 py-2">Pickup notes</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.length === 0 ? (
-              <tr>
-                <td colSpan={10} className="px-3 py-8 text-center text-zinc-500">
-                  No ops_hub rows yet — create a builder booking first.
-                </td>
-              </tr>
-            ) : (
-              rows.map((row) => (
-                <OpsRow
-                  key={row.id}
-                  row={row}
-                  dispatch={dispatchByPnr[String(row.pnr).toUpperCase()]}
-                  tickets={ticketsByPnr[String(row.pnr).toUpperCase()]}
-                  guides={guides}
-                  drivers={drivers}
-                  ticketers={ticketers}
-                  agents={agents}
-                  saving={savingId === row.id || savingId === row.pnr}
-                  staffId={staffId}
-                  pb={getClient()}
-                  onPatchHub={patchHub}
-                  onSave={withSave}
-                />
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+      {rows.length === 0 ? (
+        <p className="rounded-xl border border-dashed border-zinc-800 px-4 py-10 text-center text-sm text-zinc-500">
+          No ops_hub rows yet — create a builder booking first.
+        </p>
+      ) : (
+        <div className="grid gap-4 lg:grid-cols-2">
+          {rows.map((row) => (
+            <OpsCard
+              key={row.id}
+              row={row}
+              dispatch={dispatchByPnr[String(row.pnr).toUpperCase()]}
+              tickets={ticketsByPnr[String(row.pnr).toUpperCase()]}
+              guides={guides}
+              drivers={drivers}
+              ticketers={ticketers}
+              agents={agents}
+              saving={savingId === row.id || savingId === row.pnr}
+              staffId={staffId}
+              pb={getClient()}
+              onSave={withSave}
+              onReloadPockets={reloadPockets}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
 
-function OpsRow({
+function OpsCard({
   row,
   dispatch,
   tickets,
@@ -223,8 +167,8 @@ function OpsRow({
   saving,
   staffId,
   pb,
-  onPatchHub,
   onSave,
+  onReloadPockets,
 }: {
   row: OpsHubRow;
   dispatch?: OpsDispatchRow;
@@ -236,27 +180,47 @@ function OpsRow({
   saving: boolean;
   staffId: string | null;
   pb: PocketBase;
-  onPatchHub: (
-    id: string,
-    data: Record<string, unknown>,
-    okMsg: string
-  ) => Promise<void>;
   onSave: (
     key: string,
     fn: () => Promise<void>,
     okMsg: string
   ) => Promise<void>;
+  onReloadPockets: () => Promise<void>;
 }) {
-  const guideId = dispatch?.assigned_guide_id || "";
-  const driverId = dispatch?.assigned_driver_id || "";
+  const [status, setStatus] = useState(row.status || "incoming");
+  const [paymentConfirmed, setPaymentConfirmed] = useState(
+    Boolean(row.payment_confirmed)
+  );
+  const [agentId, setAgentId] = useState(row.assigned_agent_id || "");
+  const [guideId, setGuideId] = useState(dispatch?.assigned_guide_id || "");
+  const [driverId, setDriverId] = useState(dispatch?.assigned_driver_id || "");
+  const [ticketerId, setTicketerId] = useState(
+    tickets?.assigned_ticketer_id || row.assigned_ticketer_id || ""
+  );
+  const [ticketStatus, setTicketStatus] = useState(
+    tickets?.ticket_status || row.ticket_status || "none"
+  );
+  const [pickupNotes, setPickupNotes] = useState(row.pickup_notes || "");
+  const [dirty, setDirty] = useState(false);
+
+  useEffect(() => {
+    setStatus(row.status || "incoming");
+    setPaymentConfirmed(Boolean(row.payment_confirmed));
+    setAgentId(row.assigned_agent_id || "");
+    setGuideId(dispatch?.assigned_guide_id || "");
+    setDriverId(dispatch?.assigned_driver_id || "");
+    setTicketerId(
+      tickets?.assigned_ticketer_id || row.assigned_ticketer_id || ""
+    );
+    setTicketStatus(tickets?.ticket_status || row.ticket_status || "none");
+    setPickupNotes(row.pickup_notes || "");
+    setDirty(false);
+  }, [row, dispatch, tickets]);
+
   const guideMode = dispatch?.guide_mode || "unassigned";
   const driverMode = dispatch?.driver_mode || "unassigned";
   const guideBoard = Boolean(dispatch?.guide_board_visible);
   const driverBoard = Boolean(dispatch?.driver_board_visible);
-  const ticketerId =
-    tickets?.assigned_ticketer_id || row.assigned_ticketer_id || "";
-  const ticketStatus =
-    tickets?.ticket_status || row.ticket_status || "none";
   const ticketsNeeded =
     row.tickets_needed === true ||
     ticketStatus === "needed" ||
@@ -265,275 +229,323 @@ function OpsRow({
   const driverNeeded =
     row.driver_needed === true ||
     dispatch?.driver_needed === true ||
-    Boolean(driverId);
+    Boolean(driverId) ||
+    Boolean(dispatch?.assigned_driver_id);
   const guideNeeded =
     row.guide_needed === true ||
     dispatch?.guide_needed === true ||
-    Boolean(guideId);
+    Boolean(guideId) ||
+    Boolean(dispatch?.assigned_guide_id);
 
-  const guideLabel = useMemo(() => {
-    if (guideBoard || guideMode === "open") return "Board open";
-    if (guideMode === "claimed") return "Claimed";
-    if (guideMode === "direct") return "Direct";
-    return "—";
-  }, [guideBoard, guideMode]);
+  const ticketLines = Array.isArray(tickets?.ticket_lines)
+    ? (tickets?.ticket_lines as { name?: string; qty?: number }[])
+    : [];
+
+  const mark = <T,>(setter: (v: T) => void) => (v: T) => {
+    setter(v);
+    setDirty(true);
+  };
+
+  const persistCard = async () => {
+    const agent = agents.find((x) => x.id === agentId);
+    await pb.collection("ops_hub").update(
+      row.id,
+      {
+        status,
+        payment_confirmed: paymentConfirmed,
+        assigned_agent_id: agentId,
+        assigned_agent: agent?.name || agent?.email || row.assigned_agent || "",
+        pickup_notes: pickupNotes,
+      },
+      { requestKey: null }
+    );
+    if (typeof status === "string" && status !== row.status) {
+      const { syncDetailStatusFromOpsHub } = await import(
+        "@/lib/syncOpsStatusToDetail"
+      );
+      await syncDetailStatusFromOpsHub(
+        pb,
+        {
+          source: row.source,
+          pnr: row.pnr,
+        },
+        status
+      );
+    }
+    if (guideId && guideId !== (dispatch?.assigned_guide_id || "")) {
+      const g = guides.find((x) => x.id === guideId);
+      await assignGuide(pb, {
+        pnr: row.pnr,
+        staffId: guideId,
+        staffName: g?.name || g?.email || "",
+        byStaffId: staffId || undefined,
+      });
+    }
+    if (driverId && driverId !== (dispatch?.assigned_driver_id || "")) {
+      const d = drivers.find((x) => x.id === driverId);
+      await assignDriver(pb, {
+        pnr: row.pnr,
+        staffId: driverId,
+        staffName: d?.name || d?.email || "",
+        byStaffId: staffId || undefined,
+      });
+    }
+    await updateTicketsByPnr(pb, row.pnr, {
+      assigned_ticketer_id: ticketerId,
+      ticket_status: ticketStatus as "none" | "needed" | "ordered" | "done",
+    });
+    setDirty(false);
+    await onReloadPockets();
+  };
+
+  const saveThen = async (after?: () => Promise<void>, okMsg = "Card saved") => {
+    await onSave(row.id, async () => {
+      await persistCard();
+      if (after) await after();
+    }, okMsg);
+  };
 
   return (
-    <tr className="border-b border-zinc-900/80 align-top">
-      <td className="px-3 py-3 font-mono text-xs text-white">
-        {row.pnr}
-        <div className="mt-0.5 text-[10px] text-zinc-500">
-          {row.source || "—"}
+    <article className="relative overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-950/80 p-4">
+      <div className="relative z-10 space-y-4">
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div>
+            <p className="font-mono text-sm font-semibold text-white">{row.pnr}</p>
+            <p className="mt-0.5 text-sm text-zinc-300">
+              {row.primary_city || "—"} ·{" "}
+              {row.tour_date ? String(row.tour_date).slice(0, 10) : "—"}
+            </p>
+            <p className="mt-1 text-xs text-zinc-500">
+              {row.guest_summary || "—"} · {row.source || "direct"}
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            {guideNeeded ? (
+              <span className="rounded-full border border-[#075473]/40 bg-[#075473]/15 px-2 py-0.5 text-[10px] font-bold uppercase text-[#7ec8e3]">
+                Guide
+              </span>
+            ) : null}
+            {driverNeeded ? (
+              <span className="rounded-full border border-[#F6A724]/40 bg-[#F6A724]/10 px-2 py-0.5 text-[10px] font-bold uppercase text-[#F6A724]">
+                Driver
+              </span>
+            ) : null}
+            {ticketsNeeded ? (
+              <span className="rounded-full border border-[#1BA58A]/40 bg-[#1BA58A]/10 px-2 py-0.5 text-[10px] font-bold uppercase text-[#1BA58A]">
+                Tickets
+              </span>
+            ) : null}
+          </div>
         </div>
-      </td>
-      <td className="px-3 py-3">
-        <div>{row.primary_city || "—"}</div>
-        <div className="text-xs text-zinc-500">
-          {row.tour_date ? String(row.tour_date).slice(0, 10) : "—"}
+
+        <div className="grid gap-3 sm:grid-cols-2">
+          <label className="block text-[10px] font-bold uppercase tracking-wider text-zinc-500">
+            Status
+            <select
+              className="mt-1 w-full rounded-lg border border-zinc-700 bg-zinc-900 px-2 py-1.5 text-xs text-white"
+              value={status}
+              disabled={saving}
+              onChange={(e) => mark(setStatus)(e.target.value)}
+            >
+              {[
+                "draft",
+                "incoming",
+                "quoted",
+                "confirmed",
+                "in_ops",
+                "done",
+                "cancelled",
+              ].map((s) => (
+                <option key={s} value={s}>
+                  {s}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="block text-[10px] font-bold uppercase tracking-wider text-zinc-500">
+            Payment confirmed
+            <select
+              className="mt-1 w-full rounded-lg border border-zinc-700 bg-zinc-900 px-2 py-1.5 text-xs text-white"
+              value={paymentConfirmed ? "yes" : "no"}
+              disabled={saving}
+              onChange={(e) => mark(setPaymentConfirmed)(e.target.value === "yes")}
+            >
+              <option value="no">No</option>
+              <option value="yes">Yes</option>
+            </select>
+          </label>
+          {row.source === "agency" ? (
+            <p className="text-[10px] uppercase tracking-wider text-zinc-600 sm:col-span-2">
+              Concierge · Ops (agency)
+            </p>
+          ) : (
+            <label className="block text-[10px] font-bold uppercase tracking-wider text-zinc-500 sm:col-span-2">
+              Concierge agent
+              <select
+                className="mt-1 w-full rounded-lg border border-zinc-700 bg-zinc-900 px-2 py-1.5 text-xs text-white"
+                value={agentId}
+                disabled={saving}
+                onChange={(e) => mark(setAgentId)(e.target.value)}
+              >
+                <option value="">—</option>
+                {agents.map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.name || a.email}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
         </div>
-      </td>
-      <td className="px-3 py-3 text-xs text-zinc-400">
-        {row.guest_summary || "—"}
-      </td>
-      <td className="px-3 py-3">
-        <select
-          className="rounded border border-zinc-700 bg-zinc-950 px-2 py-1 text-xs"
-          value={row.status || "incoming"}
-          disabled={saving}
-          onChange={(e) =>
-            void onPatchHub(
-              row.id,
-              { status: e.target.value },
-              `Status → ${e.target.value}`
-            )
-          }
-        >
-          {[
-            "draft",
-            "incoming",
-            "quoted",
-            "confirmed",
-            "in_ops",
-            "done",
-            "cancelled",
-          ].map((s) => (
-            <option key={s} value={s}>
-              {s}
-            </option>
-          ))}
-        </select>
-      </td>
-      <td className="px-3 py-3">
-        {row.source === "agency" ? (
-          <span className="text-[10px] uppercase tracking-wider text-zinc-600">
-            Ops (agency)
-          </span>
-        ) : (
-          <select
-            className="max-w-[9rem] rounded border border-zinc-700 bg-zinc-950 px-2 py-1 text-xs"
-            value={row.assigned_agent_id || ""}
+
+        {guideNeeded ? (
+          <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-3">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">
+              Guide · {guideBoard || guideMode === "open" ? "Board open" : guideMode === "claimed" ? "Claimed" : guideMode === "direct" ? "Direct" : "Unassigned"}
+            </p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              <select
+                className="min-w-[10rem] flex-1 rounded-lg border border-zinc-700 bg-zinc-950 px-2 py-1.5 text-xs"
+                value={guideId}
+                disabled={saving}
+                onChange={(e) => mark(setGuideId)(e.target.value)}
+              >
+                <option value="">Assign direct…</option>
+                {guides.map((g) => (
+                  <option key={g.id} value={g.id}>
+                    {g.name || g.email}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                disabled={saving}
+                className="rounded-lg border border-zinc-600 px-3 py-1.5 text-[11px] text-zinc-300 hover:text-white disabled:opacity-40"
+                onClick={() =>
+                  void saveThen(
+                    () =>
+                      postGuideBoard(pb, {
+                        pnr: row.pnr,
+                        byStaffId: staffId || undefined,
+                      }).then(() => undefined),
+                    "Saved · guide posted to board"
+                  )
+                }
+              >
+                Save & post board
+              </button>
+            </div>
+          </div>
+        ) : null}
+
+        {driverNeeded ? (
+          <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-3">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">
+              Driver · {driverBoard || driverMode === "open" ? "Board open" : driverMode === "claimed" ? "Claimed" : driverMode === "direct" ? "Direct" : "Unassigned"}
+            </p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              <select
+                className="min-w-[10rem] flex-1 rounded-lg border border-zinc-700 bg-zinc-950 px-2 py-1.5 text-xs"
+                value={driverId}
+                disabled={saving}
+                onChange={(e) => mark(setDriverId)(e.target.value)}
+              >
+                <option value="">Assign direct…</option>
+                {drivers.map((d) => (
+                  <option key={d.id} value={d.id}>
+                    {d.name || d.email}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                disabled={saving}
+                className="rounded-lg border border-zinc-600 px-3 py-1.5 text-[11px] text-zinc-300 hover:text-white disabled:opacity-40"
+                onClick={() =>
+                  void saveThen(
+                    () =>
+                      postDriverBoard(pb, {
+                        pnr: row.pnr,
+                        byStaffId: staffId || undefined,
+                      }).then(() => undefined),
+                    "Saved · driver posted to board"
+                  )
+                }
+              >
+                Save & post board
+              </button>
+            </div>
+          </div>
+        ) : null}
+
+        {ticketsNeeded ? (
+          <div className="grid gap-2 rounded-xl border border-zinc-800 bg-zinc-900/50 p-3 sm:grid-cols-2">
+            <label className="block text-[10px] font-bold uppercase tracking-wider text-zinc-500">
+              Ticketer
+              <select
+                className="mt-1 w-full rounded-lg border border-zinc-700 bg-zinc-950 px-2 py-1.5 text-xs"
+                value={ticketerId}
+                disabled={saving}
+                onChange={(e) => mark(setTicketerId)(e.target.value)}
+              >
+                <option value="">—</option>
+                {ticketers.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.name || t.email}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="block text-[10px] font-bold uppercase tracking-wider text-zinc-500">
+              Ticket status
+              <select
+                className="mt-1 w-full rounded-lg border border-zinc-700 bg-zinc-950 px-2 py-1.5 text-xs"
+                value={ticketStatus}
+                disabled={saving}
+                onChange={(e) => mark(setTicketStatus)(e.target.value)}
+              >
+                {["none", "needed", "ordered", "done"].map((s) => (
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
+                ))}
+              </select>
+            </label>
+            {ticketLines.length > 0 ? (
+              <ul className="sm:col-span-2 space-y-1 text-xs text-zinc-400">
+                {ticketLines.map((line, i) => (
+                  <li key={i}>
+                    · {line.name || "Line"}
+                    {line.qty != null ? ` ×${line.qty}` : ""}
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+          </div>
+        ) : null}
+
+        <label className="block text-[10px] font-bold uppercase tracking-wider text-zinc-500">
+          Pickup notes
+          <textarea
+            className="mt-1 h-16 w-full rounded-lg border border-zinc-700 bg-zinc-900 px-2 py-1.5 text-xs text-white"
+            value={pickupNotes}
             disabled={saving}
-            onChange={(e) => {
-              const id = e.target.value;
-              const a = agents.find((x) => x.id === id);
-              void onPatchHub(
-                row.id,
-                {
-                  assigned_agent_id: id,
-                  assigned_agent:
-                    a?.name || a?.email || row.assigned_agent || "",
-                },
-                "Concierge agent assigned"
-              );
-            }}
-          >
-            <option value="">—</option>
-            {agents.map((a) => (
-              <option key={a.id} value={a.id}>
-                {a.name || a.email}
-              </option>
-            ))}
-          </select>
-        )}
-      </td>
-      <td className={`px-3 py-3 ${guideNeeded ? "" : "opacity-40"}`}>
-        <div className="space-y-1">
-          <select
-            className="max-w-[9rem] rounded border border-zinc-700 bg-zinc-950 px-2 py-1 text-xs"
-            value={guideId}
-            disabled={saving || !guideNeeded}
-            onChange={(e) => {
-              const id = e.target.value;
-              if (!id) return;
-              const g = guides.find((x) => x.id === id);
-              void onSave(
-                row.pnr,
-                () =>
-                  assignGuide(pb, {
-                    pnr: row.pnr,
-                    staffId: id,
-                    staffName: g?.name || g?.email || "",
-                    byStaffId: staffId || undefined,
-                  }).then(() => undefined),
-                "Guide assigned (direct)"
-              );
-            }}
-          >
-            <option value="">—</option>
-            {guides.map((g) => (
-              <option key={g.id} value={g.id}>
-                {g.name || g.email}
-              </option>
-            ))}
-          </select>
+            onChange={(e) => mark(setPickupNotes)(e.target.value)}
+          />
+        </label>
+
+        <div className="flex flex-wrap items-center gap-2 border-t border-zinc-800 pt-3">
           <button
             type="button"
-            disabled={saving}
-            className="block rounded border border-zinc-700 px-2 py-0.5 text-[10px] text-zinc-400 hover:text-white"
-            onClick={() =>
-              void onSave(
-                row.pnr,
-                () =>
-                  postGuideBoard(pb, {
-                    pnr: row.pnr,
-                    byStaffId: staffId || undefined,
-                  }).then(() => undefined),
-                "Guide posted to job board"
-              )
-            }
+            disabled={saving || !dirty}
+            className="rounded-full bg-[#075473] px-4 py-2 text-xs font-semibold text-white disabled:opacity-40"
+            onClick={() => void saveThen(undefined, "Card saved")}
           >
-            Post to board
+            {saving ? "Saving…" : dirty ? "Save card" : "Saved"}
           </button>
-          <span className="text-[10px] text-zinc-600">{guideLabel}</span>
+          <OpsStatusBadge status={ticketStatus} />
         </div>
-      </td>
-      <td className={`px-3 py-3 ${driverNeeded ? "" : "opacity-40"}`}>
-        <div className="space-y-1">
-          <select
-            className="max-w-[9rem] rounded border border-zinc-700 bg-zinc-950 px-2 py-1 text-xs"
-            value={driverId}
-            disabled={saving || !driverNeeded}
-            onChange={(e) => {
-              const id = e.target.value;
-              if (!id) return;
-              const d = drivers.find((x) => x.id === id);
-              void onSave(
-                row.pnr,
-                () =>
-                  assignDriver(pb, {
-                    pnr: row.pnr,
-                    staffId: id,
-                    staffName: d?.name || d?.email || "",
-                    byStaffId: staffId || undefined,
-                  }).then(() => undefined),
-                "Driver assigned (direct)"
-              );
-            }}
-          >
-            <option value="">—</option>
-            {drivers.map((d) => (
-              <option key={d.id} value={d.id}>
-                {d.name || d.email}
-              </option>
-            ))}
-          </select>
-          <button
-            type="button"
-            disabled={saving}
-            className="block rounded border border-zinc-700 px-2 py-0.5 text-[10px] text-zinc-400 hover:text-white"
-            onClick={() =>
-              void onSave(
-                row.pnr,
-                () =>
-                  postDriverBoard(pb, {
-                    pnr: row.pnr,
-                    byStaffId: staffId || undefined,
-                  }).then(() => undefined),
-                "Driver posted to job board"
-              )
-            }
-          >
-            Post to board
-          </button>
-          <span className="text-[10px] text-zinc-600">
-            {driverBoard || driverMode === "open"
-              ? "Board open"
-              : driverMode === "claimed"
-                ? "Claimed"
-                : driverMode === "direct"
-                  ? "Direct"
-                  : "—"}
-          </span>
-        </div>
-      </td>
-      <td className="px-3 py-3">
-        <select
-          className="max-w-[9rem] rounded border border-zinc-700 bg-zinc-950 px-2 py-1 text-xs"
-          value={ticketerId}
-          disabled={saving || !ticketsNeeded}
-          onChange={(e) => {
-            const id = e.target.value;
-            void onSave(
-              row.pnr,
-              async () => {
-                await updateTicketsByPnr(pb, row.pnr, {
-                  assigned_ticketer_id: id,
-                  ticket_status: id ? "needed" : "none",
-                });
-              },
-              "Ticketer assigned"
-            );
-          }}
-        >
-          <option value="">—</option>
-          {ticketers.map((t) => (
-            <option key={t.id} value={t.id}>
-              {t.name || t.email}
-            </option>
-          ))}
-        </select>
-      </td>
-      <td className="px-3 py-3">
-        <select
-          className="rounded border border-zinc-700 bg-zinc-950 px-2 py-1 text-xs"
-          value={ticketStatus}
-          disabled={saving}
-          onChange={(e) =>
-            void onSave(
-              row.pnr,
-              async () => {
-                await updateTicketsByPnr(pb, row.pnr, {
-                  ticket_status: e.target.value as
-                    | "none"
-                    | "needed"
-                    | "ordered"
-                    | "done",
-                });
-              },
-              `Tickets → ${e.target.value}`
-            )
-          }
-        >
-          {["none", "needed", "ordered", "done"].map((s) => (
-            <option key={s} value={s}>
-              {s}
-            </option>
-          ))}
-        </select>
-        <OpsStatusBadge status={ticketStatus} />
-      </td>
-      <td className="px-3 py-3">
-        <textarea
-          className="h-16 w-40 rounded border border-zinc-700 bg-zinc-950 px-2 py-1 text-xs"
-          defaultValue={row.pickup_notes || ""}
-          disabled={saving}
-          onBlur={(e) => {
-            const v = e.target.value;
-            if (v === (row.pickup_notes || "")) return;
-            void onPatchHub(row.id, { pickup_notes: v }, "Pickup notes saved");
-          }}
-        />
-      </td>
-    </tr>
+      </div>
+    </article>
   );
 }

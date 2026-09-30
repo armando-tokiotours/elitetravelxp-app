@@ -1,0 +1,391 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
+import { AnimatePresence, motion } from "framer-motion";
+import { ArrowLeft, Check } from "lucide-react";
+import { LazyVideo } from "@/components/ui/LazyVideo";
+import { useBuilderStore, type SpecialNeedId } from "@/store/useBuilderStore";
+import { FieldLabel } from "@/components/builder/ui";
+import { type PaceId } from "@/lib/travelPace";
+import { useSiteBrandingStore } from "@/store/useSiteBrandingStore";
+import { PaceDetailModal } from "@/components/builder/modals/PaceDetailModal";
+import { GuestCountStrip } from "@/components/branding/GuestCountStrip";
+import {
+  useSingleDayBuilderStore,
+  type SingleDayTravelPace,
+} from "@/store/useSingleDayBuilderStore";
+
+const SPECIAL_NEED_OPTIONS: { id: SpecialNeedId; label: string }[] = [
+  { id: "reduced_mobility", label: "Reduced mobility" },
+  { id: "baby_car_seat", label: "Kid / baby car seat" },
+  { id: "senior", label: "Senior" },
+];
+
+/**
+ * Builder S Guests & Pace — same UX as multi DurationEditorModal
+ * (pace cards + party + mobility). Hours/date live in SingleDayTripDetailModal.
+ */
+export function SingleDayGuestsEditorModal({
+  open,
+  onClose,
+}: {
+  open: boolean;
+  onClose: () => void;
+}) {
+  const adults = useSingleDayBuilderStore((s) => s.adults);
+  const children = useSingleDayBuilderStore((s) => s.children);
+  const travelPace = useSingleDayBuilderStore((s) => s.travelPace);
+  const setAdultsSd = useSingleDayBuilderStore((s) => s.setAdults);
+  const setChildrenSd = useSingleDayBuilderStore((s) => s.setChildren);
+  const setTravelPaceSd = useSingleDayBuilderStore((s) => s.setTravelPace);
+
+  const specialNeeds = useBuilderStore((s) => s.specialNeeds);
+  const setAdultsM = useBuilderStore((s) => s.setAdults);
+  const setChildrenM = useBuilderStore((s) => s.setChildren);
+  const setTravelPaceM = useBuilderStore((s) => s.setTravelPace);
+
+  const setAdults = (n: number) => {
+    setAdultsSd(n);
+    setAdultsM(n);
+  };
+  const setChildren = (n: number) => {
+    setChildrenSd(n);
+    setChildrenM(n);
+  };
+  const setTravelPace = (id: PaceId) => {
+    setTravelPaceSd(id as SingleDayTravelPace);
+    setTravelPaceM(id);
+  };
+
+  const ensureBrandingLoaded = useSiteBrandingStore((s) => s.ensureLoaded);
+  const brandingItems = useSiteBrandingStore((s) => s.itemsByKey);
+  const getTravelPaces = useSiteBrandingStore((s) => s.getTravelPaces);
+  const travelPaces = getTravelPaces();
+  void brandingItems;
+
+  const [mounted, setMounted] = useState(false);
+  const [paceModal, setPaceModal] = useState<PaceId | null>(null);
+
+  const totalGuests = adults + children;
+  const specialNeedsAnswered = specialNeeds.length > 0;
+  const canDone =
+    travelPace !== null && totalGuests > 0 && specialNeedsAnswered;
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    void ensureBrandingLoaded();
+    document.body.style.overflow = "hidden";
+  }, [open, ensureBrandingLoaded]);
+
+  useEffect(() => {
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, []);
+
+  if (!mounted) return null;
+
+  return createPortal(
+    <AnimatePresence
+      onExitComplete={() => {
+        document.body.style.overflow = "";
+      }}
+    >
+      {open ? (
+        <motion.div
+          key="single-guests-editor"
+          className="fixed inset-0 z-50 flex items-center justify-center tokio-modal-backdrop bg-[#05080C]/55 backdrop-blur-sm"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Configure guests and pace"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.2 }}
+        >
+          <motion.div
+            className="tokio-modal-content relative flex h-[100dvh] max-h-[100dvh] w-full flex-col overflow-hidden border border-white/10 md:max-w-4xl md:rounded-2xl lg:max-w-5xl"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 20 }}
+            transition={{ duration: 0.25, ease: "easeOut" }}
+          >
+            <div className="tokio-modal-chrome flex flex-shrink-0 items-center gap-4 border-b p-4 pt-[max(1rem,env(safe-area-inset-top))]">
+              <button
+                type="button"
+                onClick={onClose}
+                aria-label="Back"
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-zinc-700 bg-zinc-900 text-white transition hover:border-zinc-500"
+              >
+                <ArrowLeft className="h-5 w-5" />
+              </button>
+              <div className="min-w-0 flex-1">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#075473]">
+                  Configure
+                </p>
+                <h3 className="truncate font-display text-2xl text-white">
+                  Configure Trip Details
+                </h3>
+              </div>
+            </div>
+
+            <div className="flex min-h-0 flex-1 flex-col gap-8 overflow-y-auto p-4 pb-12">
+              <div>
+                <FieldLabel>Travel pace</FieldLabel>
+                <p className="mb-3 text-xs text-zinc-500">
+                  Tap a style to learn more, then confirm your preferred rhythm.
+                </p>
+                <div className="grid grid-cols-3 gap-2.5 sm:gap-3">
+                  {travelPaces.map((pace) => {
+                    const isSelected = travelPace === pace.id;
+                    const hasSelection = travelPace !== null;
+                    const cardClass = isSelected
+                      ? "border-2 border-[#075473] opacity-100 scale-100 z-10"
+                      : hasSelection
+                        ? "border border-zinc-800 opacity-40 grayscale-[50%] scale-95"
+                        : "border border-zinc-800 opacity-100 hover:border-accent-500/40 scale-100";
+                    return (
+                      <button
+                        key={pace.id}
+                        type="button"
+                        onClick={() => setPaceModal(pace.id)}
+                        aria-pressed={isSelected}
+                        className={`group relative overflow-hidden rounded-2xl text-left transition-all duration-300 ease-in-out ${cardClass}`}
+                      >
+                        <span className="relative block aspect-[3/4] w-full bg-zinc-900">
+                          {pace.isVideo && pace.mediaUrl ? (
+                            <LazyVideo
+                              src={pace.mediaUrl}
+                              poster={pace.posterUrl || undefined}
+                              muted
+                              loop
+                              playsInline
+                              autoPlay
+                              className="h-full w-full object-cover"
+                            />
+                          ) : pace.image ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              src={pace.image}
+                              alt=""
+                              className="h-full w-full object-cover"
+                            />
+                          ) : null}
+                          <span
+                            className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-transparent"
+                            aria-hidden
+                          />
+                          {isSelected ? (
+                            <span className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-full bg-[#D9718C] text-white">
+                              <Check className="h-3.5 w-3.5" strokeWidth={3} />
+                            </span>
+                          ) : null}
+                          <span className="absolute inset-x-0 bottom-0 p-2.5 sm:p-3">
+                            <span className="block font-display text-base text-white sm:text-lg">
+                              {pace.label}
+                            </span>
+                            <span className="mt-0.5 block text-[10px] leading-snug text-zinc-300 sm:text-[11px]">
+                              {pace.tagline}
+                            </span>
+                          </span>
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div>
+                <FieldLabel>Guests</FieldLabel>
+                <div className="mt-2 overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-900">
+                  <GuestStepper
+                    label="Adults"
+                    value={adults}
+                    onChange={setAdults}
+                    min={1}
+                    kind="adults"
+                  />
+                  <GuestStepper
+                    label="Children"
+                    value={children}
+                    onChange={setChildren}
+                    min={0}
+                    kind="kids"
+                  />
+                </div>
+                <p className="mt-1.5 text-xs text-zinc-400">
+                  Used for vehicles and private-driver sizing.
+                </p>
+                <SpecialNeedsAccordion />
+              </div>
+            </div>
+
+            <div className="tokio-modal-chrome flex flex-shrink-0 border-t p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+              <button
+                type="button"
+                onClick={onClose}
+                disabled={!canDone}
+                className="w-full rounded-full bg-[#054F70] py-3 text-sm font-semibold text-white transition hover:bg-[#043d57] disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                Done
+              </button>
+            </div>
+          </motion.div>
+
+          <PaceDetailModal
+            paceId={paceModal}
+            selected={travelPace}
+            onClose={() => setPaceModal(null)}
+            onSelect={(id) => {
+              setTravelPace(id);
+              setPaceModal(null);
+            }}
+          />
+        </motion.div>
+      ) : null}
+    </AnimatePresence>,
+    document.body
+  );
+}
+
+function GuestStepper({
+  label,
+  value,
+  onChange,
+  min,
+  kind,
+}: {
+  label: string;
+  value: number;
+  onChange: (n: number) => void;
+  min: number;
+  kind: "adults" | "kids";
+}) {
+  return (
+    <div className="flex items-center justify-between gap-2 border-b border-zinc-800 px-4 py-3.5 last:border-b-0">
+      <span className="w-16 shrink-0 text-sm font-medium text-white">{label}</span>
+      <GuestCountStrip kind={kind} count={value} />
+      <div className="flex shrink-0 items-center gap-3">
+        <button
+          type="button"
+          aria-label={`Decrease ${label}`}
+          onClick={() => onChange(Math.max(min, value - 1))}
+          className="flex h-9 w-9 items-center justify-center rounded-full border border-zinc-700 text-white transition hover:bg-zinc-950"
+        >
+          −
+        </button>
+        <span className="w-6 text-center text-sm font-semibold text-white">
+          {value}
+        </span>
+        <button
+          type="button"
+          aria-label={`Increase ${label}`}
+          onClick={() => onChange(value + 1)}
+          className="flex h-9 w-9 items-center justify-center rounded-full border border-zinc-700 text-white transition hover:bg-zinc-950"
+        >
+          +
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function SpecialNeedsAccordion() {
+  const [open, setOpen] = useState(false);
+  const [needsTap, setNeedsTap] = useState(true);
+  const specialNeeds = useBuilderStore((s) => s.specialNeeds);
+  const toggleSpecialNeed = useBuilderStore((s) => s.toggleSpecialNeed);
+  const noNeed = specialNeeds.includes("none");
+  const activeNeeds = specialNeeds.filter((id) => id !== "none");
+  const answered = specialNeeds.length > 0;
+
+  return (
+    <div className="mt-3">
+      <div className="flex min-h-8 items-center gap-2">
+        <button
+          type="button"
+          onClick={() => {
+            setNeedsTap(false);
+            setOpen((v) => !v);
+          }}
+          aria-expanded={open}
+          aria-label={
+            open
+              ? "Hide special mobility options"
+              : "Show special mobility options"
+          }
+          className={`relative flex h-7 shrink-0 items-center gap-1.5 rounded-full border px-2.5 text-[10px] font-bold uppercase tracking-wider transition ${
+            open
+              ? "border-white/50 bg-white/15 text-white"
+              : needsTap && !answered
+                ? "animate-locations-help-glow border-white/70 bg-white/10 text-white"
+                : answered
+                  ? noNeed
+                    ? "border-emerald-500/50 bg-emerald-500/10 text-emerald-400"
+                    : "border-[#D91147]/50 bg-[#D91147]/10 text-[#D91147]"
+                  : "border-zinc-600 bg-zinc-900 text-zinc-300 hover:border-zinc-500"
+          }`}
+        >
+          {needsTap && !open && !answered ? (
+            <span
+              aria-hidden
+              className="pointer-events-none absolute inset-0 animate-locations-help-ring rounded-full border border-white/80"
+            />
+          ) : null}
+          <span className="relative z-[1]">Special mobility</span>
+          {answered && !open ? (
+            <span className="relative z-[1] rounded-full bg-white/15 px-1.5 py-0.5 text-[9px]">
+              {noNeed ? "OK" : activeNeeds.length}
+            </span>
+          ) : null}
+        </button>
+        {open ? (
+          <p className="min-w-0 flex-1 text-[11px] leading-snug text-zinc-400">
+            Tap any that apply, or select{" "}
+            <span className="font-semibold text-zinc-300">No need</span> to
+            continue. Bookings staff will see this.
+          </p>
+        ) : null}
+      </div>
+      {open ? (
+        <div className="mt-2 flex flex-wrap gap-2">
+          {SPECIAL_NEED_OPTIONS.map((opt) => {
+            const on = specialNeeds.includes(opt.id);
+            return (
+              <button
+                key={opt.id}
+                type="button"
+                aria-pressed={on}
+                onClick={() => toggleSpecialNeed(opt.id)}
+                className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
+                  on
+                    ? "border-[#D91147]/60 bg-[#D91147]/15 text-white"
+                    : "border-zinc-700 bg-zinc-900 text-zinc-400 hover:border-zinc-500"
+                }`}
+              >
+                {opt.label}
+              </button>
+            );
+          })}
+          <button
+            type="button"
+            aria-pressed={noNeed}
+            onClick={() => toggleSpecialNeed("none")}
+            className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
+              noNeed
+                ? "border-emerald-500/60 bg-emerald-500/15 text-emerald-300"
+                : "border-zinc-700 bg-zinc-900 text-zinc-400 hover:border-zinc-500"
+            }`}
+          >
+            No need
+          </button>
+        </div>
+      ) : null}
+    </div>
+  );
+}

@@ -198,7 +198,7 @@ export function JapanBookingPass({
 
       <div className="relative z-10 grid grid-cols-1 md:grid-cols-12">
         <div className="space-y-4 border-b border-dashed border-white/15 p-6 md:col-span-8 md:border-r md:border-b-0">
-          <div className="flex items-center justify-between gap-2">
+          <div className="grid grid-cols-2 items-center gap-2">
             <div className="flex min-w-0 items-center gap-2">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
@@ -210,7 +210,7 @@ export function JapanBookingPass({
                 TOKIOTOURS
               </span>
             </div>
-            <div className="relative flex shrink-0 flex-wrap items-center justify-end gap-2">
+            <div className="relative flex flex-col items-end gap-1.5">
               {(() => {
                 const st = String(status || "DRAFT").toUpperCase();
                 const confirmed =

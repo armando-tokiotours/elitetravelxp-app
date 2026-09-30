@@ -22,6 +22,10 @@ import {
   tourDurationHours,
 } from "@/lib/tourValidator";
 import { useBuilderStore } from "@/store/useBuilderStore";
+import {
+  formatSingleDayDisplayDate,
+  useSingleDayBuilderStore,
+} from "@/store/useSingleDayBuilderStore";
 import { useActiveMatchProfile } from "@/store/useQuizStore";
 import { BottomNav } from "@/components/builder/BottomNav";
 import { ExperienceProfilerModal } from "@/components/quiz/ExperienceProfilerModal";
@@ -40,6 +44,8 @@ import {
   MobileAppNav,
 } from "@/components/navigation/AppSidebar";
 import { CrimsonGlow } from "@/components/branding/CrimsonGlow";
+import { createPortal } from "react-dom";
+import { AnimatePresence, motion } from "framer-motion";
 
 type ProfileTab = "tours" | "experiences" | "matches" | "places";
 
@@ -54,12 +60,19 @@ export function DiscoverFeed() {
   const [toast, setToast] = useState<string | null>(null);
   const [quizOpen, setQuizOpen] = useState(false);
   const [reelOpen, setReelOpen] = useState(false);
+  const [cityMismatch, setCityMismatch] = useState<{
+    tour: PbTour;
+    language: string;
+    cityName: string;
+  } | null>(null);
 
+  const tripMode = useBuilderStore((s) => s.tripMode);
   const locations = useBuilderStore((s) => s.locations);
   const arrivalDate = useBuilderStore((s) => s.arrivalDate);
   const selectedToursMap = useBuilderStore((s) => s.selectedTours);
   const addCityTour = useBuilderStore((s) => s.addCityTour);
   const removeCityTour = useBuilderStore((s) => s.removeCityTour);
+  const addLocation = useBuilderStore((s) => s.addLocation);
   const isEliteConcierge = useBuilderStore((s) => s.isEliteConcierge);
   const experienceProfile = useActiveMatchProfile();
   const userProfile = useItineraryStore((s) => s.userProfile);
@@ -69,6 +82,15 @@ export function DiscoverFeed() {
     () => ({ adults, children }),
     [adults, children]
   );
+
+  const sdTourDate = useSingleDayBuilderStore((s) => s.tourDate);
+  const sdCityFocus = useSingleDayBuilderStore((s) => s.cityFocus);
+  const sdExperiences = useSingleDayBuilderStore((s) => s.selectedExperiences);
+  const addExperience = useSingleDayBuilderStore((s) => s.addExperience);
+  const removeExperience = useSingleDayBuilderStore((s) => s.removeExperience);
+  const setCityFocus = useSingleDayBuilderStore((s) => s.setCityFocus);
+
+  const isSingle = tripMode === "single_day";
 
   useEffect(() => {
     useBuilderStore.persist.rehydrate();
@@ -135,9 +157,43 @@ export function DiscoverFeed() {
   const selectedTours = selectedCityId
     ? selectedToursMap[selectedCityId] ?? []
     : [];
-  const dayOptions = selectedCityId
-    ? chauffeurDaysForCity(arrivalDate, locations, selectedCityId)
-    : [];
+
+  const bookingHasCity = useMemo(() => {
+    if (!selectedCity) return false;
+    if (isSingle) {
+      return (
+        sdCityFocus.trim().toLowerCase() ===
+        selectedCity.name.trim().toLowerCase()
+      );
+    }
+    return locations.some((l) => l.cityId === selectedCity.id);
+  }, [isSingle, locations, sdCityFocus, selectedCity]);
+
+  const dayOptions = useMemo(() => {
+    if (!selectedCityId) return [];
+    if (isSingle) {
+      if (!sdTourDate || !bookingHasCity) return [];
+      return [
+        {
+          date: sdTourDate,
+          tripDay: 1,
+          label: `Tour day · ${formatSingleDayDisplayDate(sdTourDate)}`,
+        },
+      ];
+    }
+    return chauffeurDaysForCity(arrivalDate, locations, selectedCityId);
+  }, [
+    arrivalDate,
+    bookingHasCity,
+    isSingle,
+    locations,
+    sdTourDate,
+    selectedCityId,
+  ]);
+
+  const bookedTourIds = isSingle
+    ? sdExperiences.map((e) => e.tourId)
+    : selectedTours.map((t) => t.tourId);
 
   const gridTours =
     profileTab === "experiences"
@@ -152,10 +208,51 @@ export function DiscoverFeed() {
         cityTours,
         cityName,
         profile: experienceProfile,
-        bookedTourIds: selectedTours.map((t) => t.tourId),
+        bookedTourIds,
         limit: 8,
       }),
-    [cityTours, cityName, experienceProfile, selectedTours]
+    [cityTours, cityName, experienceProfile, bookedTourIds]
+  );
+
+  const tryAddSingle = useCallback(
+    (tour: PbTour, selectedLanguage: string) => {
+      if (!selectedLanguage.trim()) {
+        return {
+          ok: false as const,
+          message: "Select a preferred language before adding this experience.",
+        };
+      }
+      if (!sdTourDate) {
+        return {
+          ok: false as const,
+          message: "Set your tour date in Builder S before adding experiences.",
+        };
+      }
+      if (sdExperiences.some((e) => e.tourId === tour.id)) {
+        removeExperience(tour.id);
+        setToast("Removed from itinerary");
+        return { ok: true as const };
+      }
+      const used = sdExperiences.reduce(
+        (sum, e) => sum + (Number(e.duration_hours) || 0),
+        0
+      );
+      const hours = tourDurationHours(tour);
+      const cap = useSingleDayBuilderStore.getState().tourHours;
+      if (used + hours > cap + 0.01) {
+        return { ok: false as const, message: TOUR_DAY_PACKED_MESSAGE };
+      }
+      addExperience({
+        tourId: tour.id,
+        title: tour.title,
+        selectedLanguage: selectedLanguage.trim(),
+        duration_hours: hours,
+        price: tourPrice(tour, guests),
+      });
+      setToast(`Added · ${tour.title}`);
+      return { ok: true as const };
+    },
+    [addExperience, guests, removeExperience, sdExperiences, sdTourDate]
   );
 
   const tryAddTour = useCallback(
@@ -173,6 +270,9 @@ export function DiscoverFeed() {
           message:
             "Elite Concierge is on. Individual tours are managed by your concierge.",
         };
+      }
+      if (isSingle) {
+        return tryAddSingle(tour, selectedLanguage);
       }
       const check = canAddTourOnDate({
         selectedRows: selectedTours,
@@ -201,18 +301,21 @@ export function DiscoverFeed() {
         message: ok ? undefined : TOUR_DAY_PACKED_MESSAGE,
       };
     },
-    [addCityTour, guests, isEliteConcierge, selectedCityId, selectedTours]
+    [
+      addCityTour,
+      guests,
+      isEliteConcierge,
+      isSingle,
+      selectedCityId,
+      selectedTours,
+      tryAddSingle,
+    ]
   );
 
-  const handleAddFromModal = (tour: PbTour, selectedLanguage: string) => {
-    const booked = selectedTours.find((t) => t.tourId === tour.id);
-    if (booked) {
-      if (selectedCityId) removeCityTour(selectedCityId, tour.id);
-      setToast("Removed from itinerary");
-      return;
-    }
-    if (!selectedLanguage.trim()) {
-      setToast("Select a preferred language before adding this experience.");
+  const proceedAdd = (tour: PbTour, selectedLanguage: string) => {
+    if (isSingle) {
+      const result = tryAddSingle(tour, selectedLanguage);
+      if (!result.ok && result.message) setToast(result.message);
       return;
     }
     if (!arrivalDate || dayOptions.length === 0) {
@@ -236,6 +339,37 @@ export function DiscoverFeed() {
     setPendingLanguage(selectedLanguage);
     setModalSlide(null);
     setPickingTour(tour);
+  };
+
+  const handleAddFromModal = (tour: PbTour, selectedLanguage: string) => {
+    if (isSingle) {
+      const booked = sdExperiences.some((e) => e.tourId === tour.id);
+      if (booked) {
+        removeExperience(tour.id);
+        setToast("Removed from itinerary");
+        return;
+      }
+    } else {
+      const booked = selectedTours.find((t) => t.tourId === tour.id);
+      if (booked) {
+        if (selectedCityId) removeCityTour(selectedCityId, tour.id);
+        setToast("Removed from itinerary");
+        return;
+      }
+    }
+    if (!selectedLanguage.trim()) {
+      setToast("Select a preferred language before adding this experience.");
+      return;
+    }
+    if (!bookingHasCity) {
+      setCityMismatch({
+        tour,
+        language: selectedLanguage,
+        cityName: selectedCity?.name ?? "this city",
+      });
+      return;
+    }
+    proceedAdd(tour, selectedLanguage);
   };
 
   const cityImg = selectedCity
@@ -428,7 +562,7 @@ export function DiscoverFeed() {
                       <TourThumb
                         key={tour.id || `tour-${index}`}
                         tour={tour}
-                        booked={selectedTours.some((t) => t.tourId === tour.id)}
+                        booked={bookedTourIds.includes(tour.id)}
                         recommended={isBestMatchTour(tour, experienceProfile)}
                         onClick={() => setModalSlide(index)}
                       />
@@ -464,8 +598,14 @@ export function DiscoverFeed() {
         initialSlide={modalSlide ?? 0}
         guests={guests}
         hidePrice
-        isTourSelected={(id) => selectedTours.some((t) => t.tourId === id)}
+        isTourSelected={(id) => bookedTourIds.includes(id)}
         scheduledLabelFor={(id) => {
+          if (isSingle) {
+            if (!sdExperiences.some((e) => e.tourId === id) || !sdTourDate) {
+              return null;
+            }
+            return `Tour day · ${formatSingleDayDisplayDate(sdTourDate)}`;
+          }
           const row = selectedTours.find((t) => t.tourId === id);
           if (!row?.scheduledDate) return null;
           return (
@@ -474,6 +614,12 @@ export function DiscoverFeed() {
           );
         }}
         bookedLanguageFor={(id) => {
+          if (isSingle) {
+            return (
+              sdExperiences.find((e) => e.tourId === id)?.selectedLanguage ||
+              null
+            );
+          }
           const row = selectedTours.find((t) => t.tourId === id);
           return row?.selectedLanguage || null;
         }}
@@ -482,7 +628,7 @@ export function DiscoverFeed() {
       />
 
       <ScheduleTourDaySheet
-        open={!!pickingTour && !!pendingLanguage}
+        open={!!pickingTour && !!pendingLanguage && !isSingle}
         tour={pickingTour}
         cityName={cityName}
         dayOptions={dayOptions}
@@ -498,6 +644,106 @@ export function DiscoverFeed() {
         }
         onToast={setToast}
       />
+
+      {typeof document !== "undefined"
+        ? createPortal(
+            <AnimatePresence>
+              {cityMismatch ? (
+                <motion.div
+                  key="city-mismatch-fox"
+                  className="fixed inset-0 z-[120] flex items-end justify-center bg-black/70 px-4 pb-8 sm:items-center"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  role="dialog"
+                  aria-modal="true"
+                  aria-label="City not on your trip"
+                >
+                  <motion.div
+                    className="relative w-full max-w-md overflow-hidden rounded-3xl border border-white/15 bg-[#0D1117] p-5 shadow-2xl"
+                    initial={{ y: 24, opacity: 0 }}
+                    animate={{ y: 0, opacity: 1 }}
+                    exit={{ y: 24, opacity: 0 }}
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src="/brand/fox-peek.webp"
+                      alt=""
+                      className="mx-auto h-28 w-auto object-contain"
+                    />
+                    <p className="mt-3 text-center font-godiva text-lg uppercase tracking-wide text-white">
+                      {cityMismatch.cityName} isn&apos;t on your trip
+                    </p>
+                    <p className="mt-2 text-center text-sm text-zinc-400">
+                      Yes = add this city / another day. No = change your tour
+                      city to {cityMismatch.cityName}.
+                    </p>
+                    <div className="mt-5 grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        className="rounded-xl bg-[#075473] px-3 py-3 text-xs font-bold uppercase tracking-wider text-white"
+                        onClick={() => {
+                          const pending = cityMismatch;
+                          setCityMismatch(null);
+                          if (!pending.tour.city_id) {
+                            setToast("Missing city on this experience.");
+                            return;
+                          }
+                          if (isSingle) {
+                            const city = cities.find(
+                              (c) => c.id === pending.tour.city_id
+                            );
+                            if (city) setCityFocus(city.name);
+                            proceedAdd(pending.tour, pending.language);
+                            return;
+                          }
+                          addLocation(pending.tour.city_id);
+                          proceedAdd(pending.tour, pending.language);
+                        }}
+                      >
+                        Yes · add
+                      </button>
+                      <button
+                        type="button"
+                        className="rounded-xl border border-white/20 bg-black/40 px-3 py-3 text-xs font-bold uppercase tracking-wider text-white"
+                        onClick={() => {
+                          const pending = cityMismatch;
+                          setCityMismatch(null);
+                          const city = cities.find(
+                            (c) => c.id === pending.tour.city_id
+                          );
+                          if (isSingle) {
+                            if (city) setCityFocus(city.name);
+                            proceedAdd(pending.tour, pending.language);
+                            return;
+                          }
+                          // Change city: if not on route, add it then schedule
+                          if (
+                            city &&
+                            !locations.some((l) => l.cityId === city.id)
+                          ) {
+                            addLocation(city.id);
+                          }
+                          proceedAdd(pending.tour, pending.language);
+                        }}
+                      >
+                        No · change city
+                      </button>
+                    </div>
+                    <button
+                      type="button"
+                      className="mt-3 w-full text-center text-[11px] text-zinc-500 underline"
+                      onClick={() => setCityMismatch(null)}
+                    >
+                      Cancel
+                    </button>
+                  </motion.div>
+                </motion.div>
+              ) : null}
+            </AnimatePresence>,
+            document.body
+          )
+        : null}
 
       <div className="lg:hidden">
         <BottomNav />

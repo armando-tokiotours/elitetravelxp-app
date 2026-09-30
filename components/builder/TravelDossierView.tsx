@@ -387,9 +387,6 @@ function LocationSegment({
             thumb="600x400"
             className="h-36 w-full object-cover"
           />
-          <span className="absolute left-3 top-3 inline-flex rounded-full bg-[#075473] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-white shadow-sm">
-            Day {index + 1}
-          </span>
         </div>
 
         <div className="p-5">

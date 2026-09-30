@@ -53,6 +53,8 @@ export interface SingleDayBuilderState {
   preferredMovement: IntraCityTransport | null;
   blocks: DayBlock[];
   selectedExperiences: SingleDaySelectedExperience[];
+  /** Transport catalog picks → Ticketer (same as multi). */
+  selectedTransportProducts: import("@/lib/transportProducts").TransportTicketLine[];
   /** True after Save & Continue on Experiences (allows empty / skip). */
   experiencesStepDone: boolean;
   setTourDate: (iso: string | null) => void;
@@ -70,6 +72,10 @@ export interface SingleDayBuilderState {
   addExperience: (row: SingleDaySelectedExperience) => void;
   removeExperience: (tourId: string) => void;
   reorderExperiences: (fromIndex: number, toIndex: number) => void;
+  addTransportProduct: (
+    line: import("@/lib/transportProducts").TransportTicketLine
+  ) => void;
+  removeTransportProduct: (productId: string) => void;
   setExperiencesStepDone: (done: boolean) => void;
   addStop: (blockId: DayBlockId) => void;
   updateStop: (
@@ -153,6 +159,7 @@ const initialState = {
   preferredMovement: null as IntraCityTransport | null,
   blocks: initialBlocks,
   selectedExperiences: [] as SingleDaySelectedExperience[],
+  selectedTransportProducts: [] as import("@/lib/transportProducts").TransportTicketLine[],
   experiencesStepDone: false,
 };
 
@@ -201,6 +208,20 @@ export const useSingleDayBuilderStore = create<SingleDayBuilderState>()(
           selectedExperiences: get().selectedExperiences.filter(
             (e) => e.tourId !== tourId
           ),
+        }),
+
+      addTransportProduct: (line) => {
+        const without = (get().selectedTransportProducts || []).filter(
+          (x) => x.productId !== line.productId
+        );
+        set({ selectedTransportProducts: [...without, line] });
+      },
+
+      removeTransportProduct: (productId) =>
+        set({
+          selectedTransportProducts: (
+            get().selectedTransportProducts || []
+          ).filter((x) => x.productId !== productId),
         }),
 
       reorderExperiences: (fromIndex, toIndex) => {
@@ -260,12 +281,13 @@ export const useSingleDayBuilderStore = create<SingleDayBuilderState>()(
             stops: b.stops.map((s) => ({ ...s })),
           })),
           selectedExperiences: [],
+          selectedTransportProducts: [],
           experiencesStepDone: false,
         }),
     }),
     {
       name: "single-day-builder",
-      version: 5,
+      version: 6,
       migrate: (persisted, version) => {
         const p = (persisted || {}) as Record<string, unknown>;
         if (version < 3) {
@@ -300,6 +322,11 @@ export const useSingleDayBuilderStore = create<SingleDayBuilderState>()(
             selectedExperiences: Array.isArray(p.selectedExperiences)
               ? (p.selectedExperiences as SingleDaySelectedExperience[])
               : [],
+            selectedTransportProducts: Array.isArray(
+              p.selectedTransportProducts
+            )
+              ? p.selectedTransportProducts
+              : [],
             experiencesStepDone: Boolean(p.experiencesStepDone),
           } as SingleDayBuilderState;
         }
@@ -320,6 +347,16 @@ export const useSingleDayBuilderStore = create<SingleDayBuilderState>()(
               typeof p.preferredTourLanguage === "string"
                 ? p.preferredTourLanguage
                 : "EN",
+          };
+        }
+        if (version < 6) {
+          return {
+            ...(p as unknown as SingleDayBuilderState),
+            selectedTransportProducts: Array.isArray(
+              p.selectedTransportProducts
+            )
+              ? (p.selectedTransportProducts as import("@/lib/transportProducts").TransportTicketLine[])
+              : [],
           };
         }
         return p as unknown as SingleDayBuilderState;

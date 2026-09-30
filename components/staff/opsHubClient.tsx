@@ -29,6 +29,7 @@ export type OpsHubRow = {
   tickets_needed?: boolean;
   driver_needed?: boolean;
   guide_needed?: boolean;
+  payment_confirmed?: boolean;
 };
 
 export type StaffOption = {

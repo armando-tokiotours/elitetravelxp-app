@@ -49,6 +49,11 @@ const SILO2_PLANNED: StubCard[] = [];
 const SILO3_LIVE: MapLink[] = [
   { href: "/admin", label: "Admin / leads" },
   { href: "/team-access", label: "Team Access (content)" },
+  {
+    href: "/team-access/source-wizard",
+    label: "Source / catalog wizard",
+    note: "Independent page — cities, tours, vehicles → PocketBase (not Agency orders)",
+  },
   { href: "/ops", label: "Ops board (assign / job board)" },
   { href: "/ops/booking", label: "Booking master (PNR assemble)" },
   { href: "/ops/money", label: "Money pocket (owner)" },

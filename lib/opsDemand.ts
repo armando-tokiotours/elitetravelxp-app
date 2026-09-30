@@ -6,6 +6,7 @@
 import type PocketBase from "pocketbase";
 import type { BuilderState } from "@/store/useBuilderStore";
 import type { SingleDayBuilderState } from "@/store/useSingleDayBuilderStore";
+import type { TransportTicketLine } from "@/lib/transportProducts";
 import { ensureDispatchRow } from "@/lib/opsDispatch";
 import { ensureTicketsRow, updateTicketsByPnr } from "@/lib/opsTickets";
 
@@ -13,6 +14,7 @@ export type OpsDemandFlags = {
   ticketsNeeded: boolean;
   driverNeeded: boolean;
   guideNeeded: boolean;
+  ticketLines?: TransportTicketLine[];
 };
 
 export function demandFromMultiDay(
@@ -23,10 +25,13 @@ export function demandFromMultiDay(
     | "arrivalNeedsTicket"
     | "chauffeurSelections"
     | "chauffeurDays"
+    | "selectedTransportProducts"
   >
 ): OpsDemandFlags {
   const locations = state.locations || [];
-  let ticketsNeeded = Boolean(state.arrivalNeedsTicket);
+  const ticketLines = [...(state.selectedTransportProducts || [])];
+  let ticketsNeeded =
+    Boolean(state.arrivalNeedsTicket) || ticketLines.length > 0;
   let driverNeeded = false;
   let guideNeeded = Object.values(state.selectedTours || {}).some(
     (rows) => Array.isArray(rows) && rows.length > 0
@@ -58,24 +63,30 @@ export function demandFromMultiDay(
     }
   }
 
-  return { ticketsNeeded, driverNeeded, guideNeeded };
+  return { ticketsNeeded, driverNeeded, guideNeeded, ticketLines };
 }
 
 export function demandFromSingleDay(
   state: Pick<
     SingleDayBuilderState,
-    "selectedExperiences" | "preferredMovement" | "guidePreference"
+    | "selectedExperiences"
+    | "preferredMovement"
+    | "guidePreference"
+    | "selectedTransportProducts"
   >
 ): OpsDemandFlags {
   const transit = String(state.preferredMovement || "").toLowerCase();
   const guide = String(state.guidePreference || "").toLowerCase();
+  const ticketLines = [...(state.selectedTransportProducts || [])];
   const ticketsNeeded =
+    ticketLines.length > 0 ||
     transit.includes("suica") ||
     transit.includes("pasmo") ||
     transit.includes("ticket") ||
     transit.includes("public") ||
     transit.includes("rail") ||
-    transit.includes("train");
+    transit.includes("train") ||
+    transit.includes("subway");
   const driverNeeded =
     transit.includes("private") ||
     transit.includes("chauffeur") ||
@@ -85,7 +96,7 @@ export function demandFromSingleDay(
     guide.includes("guide") ||
     guide.includes("private");
 
-  return { ticketsNeeded, driverNeeded, guideNeeded };
+  return { ticketsNeeded, driverNeeded, guideNeeded, ticketLines };
 }
 
 /** Persist demand onto ops_dispatch + ops_hub + ops_tickets. */
@@ -128,17 +139,27 @@ export async function applyOpsDemandForPnr(
   }
 
   await ensureTicketsRow(pb, pnr);
+  const lines = demand.ticketLines || [];
   if (demand.ticketsNeeded) {
     const row = await ensureTicketsRow(pb, pnr);
     const cur = String(row.ticket_status || "none");
+    const patch: Record<string, unknown> = {
+      ticket_lines: lines,
+    };
     if (cur === "none" || cur === "") {
-      await updateTicketsByPnr(pb, pnr, { ticket_status: "needed" });
+      patch.ticket_status = "needed";
     }
+    await updateTicketsByPnr(pb, pnr, patch);
   } else {
     const row = await ensureTicketsRow(pb, pnr);
     const cur = String(row.ticket_status || "none");
     if (cur === "needed" && !row.assigned_ticketer_id) {
-      await updateTicketsByPnr(pb, pnr, { ticket_status: "none" });
+      await updateTicketsByPnr(pb, pnr, {
+        ticket_status: "none",
+        ticket_lines: [],
+      });
+    } else if (lines.length > 0) {
+      await updateTicketsByPnr(pb, pnr, { ticket_lines: lines });
     }
   }
 }

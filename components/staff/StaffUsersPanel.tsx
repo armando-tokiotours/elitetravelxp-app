@@ -3,6 +3,13 @@
 import { useEffect, useState } from "react";
 import type PocketBase from "pocketbase";
 import { formatPbError } from "@/lib/pocketbase/admin-schema";
+import { getPbBaseUrl } from "@/lib/pocketbase/client";
+import {
+  ensureStaffProfile,
+  getStaffProfile,
+  updateStaffProfile,
+  type StaffProfile,
+} from "@/lib/staffProfiles";
 import {
   ROLE_LABELS,
   STAFF_ROLES,
@@ -26,6 +33,9 @@ export function StaffUsersPanel({
   currentEmail: string | null;
 }) {
   const [rows, setRows] = useState<TeamUser[]>([]);
+  const [profiles, setProfiles] = useState<Record<string, StaffProfile | null>>(
+    {}
+  );
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
@@ -39,16 +49,29 @@ export function StaffUsersPanel({
   const [resetId, setResetId] = useState<string | null>(null);
   const [resetPass, setResetPass] = useState("");
   const [resetConfirm, setResetConfirm] = useState("");
+  const [editUser, setEditUser] = useState<TeamUser | null>(null);
 
   const load = async () => {
     setLoading(true);
     setError(null);
     try {
-      const list = await getClient().collection("staff").getFullList<TeamUser>({
+      const pb = getClient();
+      const list = await pb.collection("staff").getFullList<TeamUser>({
         sort: "role,email",
         requestKey: null,
       });
       setRows(list);
+      const map: Record<string, StaffProfile | null> = {};
+      await Promise.all(
+        list.map(async (u) => {
+          try {
+            map[u.id] = await getStaffProfile(pb, u.id);
+          } catch {
+            map[u.id] = null;
+          }
+        })
+      );
+      setProfiles(map);
     } catch (e) {
       setError(
         `${formatPbError(e)} — restart PocketBase if the staff collection is new.`
@@ -88,7 +111,6 @@ export function StaffUsersPanel({
         { requestKey: null }
       );
       try {
-        const { ensureStaffProfile } = await import("@/lib/staffProfiles");
         await ensureStaffProfile(getClient(), created.id, {
           display_name: name.trim(),
         });
@@ -163,12 +185,18 @@ export function StaffUsersPanel({
     }
   };
 
+  const photoUrl = (staffId: string) => {
+    const p = profiles[staffId];
+    if (!p?.photo || !p.id) return null;
+    return `${getPbBaseUrl()}/api/files/staff_profiles/${p.id}/${p.photo}`;
+  };
+
   return (
     <div className="rounded-2xl border border-zinc-800/80 bg-zinc-900/60 p-5">
       <h2 className="font-display text-2xl text-white">Staff & roles</h2>
       <p className="mt-1 text-sm text-zinc-400">
-        Roles: owner, ops, ticketer, guide, driver, agency. Superuser login still
-        works as break-glass owner. Google SSO stub until OAuth is configured.
+        Owner license cards — open any staff to edit photo and profile. Roles:
+        owner, ops, ticketer, guide, driver, agency.
       </p>
 
       {error ? (
@@ -254,36 +282,46 @@ export function StaffUsersPanel({
       </div>
 
       <div className="mt-6">
-        <h3 className="mb-3 font-medium text-zinc-100">Existing staff</h3>
+        <h3 className="mb-3 font-medium text-zinc-100">Staff licenses</h3>
         {loading ? (
           <p className="text-sm text-zinc-400">Loading…</p>
         ) : rows.length === 0 ? (
           <p className="text-sm text-zinc-500">No staff rows yet.</p>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[560px] text-left text-sm">
-              <thead>
-                <tr className="border-b border-zinc-800 text-xs uppercase tracking-wider text-zinc-400">
-                  <th className="pb-2 font-medium">Email</th>
-                  <th className="pb-2 font-medium">Role</th>
-                  <th className="pb-2 text-right font-medium">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((row) => (
-                  <tr key={row.id} className="border-b border-zinc-800/60">
-                    <td className="py-3 pr-3 font-medium text-zinc-100">
-                      {row.name ? `${row.name} · ` : ""}
-                      {row.email}
-                      {row.email === currentEmail ? (
-                        <span className="ml-2 text-xs font-normal text-zinc-500">
-                          (you)
-                        </span>
-                      ) : null}
-                    </td>
-                    <td className="py-3">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {rows.map((row) => {
+              const p = profiles[row.id];
+              const url = photoUrl(row.id);
+              return (
+                <article
+                  key={row.id}
+                  className="overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-950"
+                >
+                  <div className="flex gap-3 p-3">
+                    <div className="h-16 w-16 shrink-0 overflow-hidden rounded-xl bg-zinc-800">
+                      {url ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={url}
+                          alt=""
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        <div className="flex h-full items-center justify-center text-lg font-bold text-zinc-600">
+                          {(row.name || row.email || "?").slice(0, 1).toUpperCase()}
+                        </div>
+                      )}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate font-medium text-white">
+                        {p?.display_name || row.name || "—"}
+                        {row.email === currentEmail ? (
+                          <span className="ml-1 text-xs text-zinc-500">(you)</span>
+                        ) : null}
+                      </p>
+                      <p className="truncate text-xs text-zinc-500">{row.email}</p>
                       <select
-                        className="rounded border border-zinc-700 bg-zinc-950 px-2 py-1 text-xs"
+                        className="mt-1.5 w-full rounded border border-zinc-700 bg-zinc-900 px-2 py-1 text-[11px]"
                         value={row.role || "ops"}
                         onChange={(e) =>
                           void updateRole(row.id, e.target.value as StaffRole)
@@ -295,32 +333,39 @@ export function StaffUsersPanel({
                           </option>
                         ))}
                       </select>
-                    </td>
-                    <td className="whitespace-nowrap py-3 text-right">
-                      <button
-                        type="button"
-                        className="mr-3 text-[#075473]"
-                        onClick={() => {
-                          setResetId(row.id);
-                          setResetPass("");
-                          setResetConfirm("");
-                        }}
-                      >
-                        Reset password
-                      </button>
-                      <button
-                        type="button"
-                        className="text-red-400 disabled:opacity-40"
-                        disabled={row.email === currentEmail}
-                        onClick={() => void removeUser(row)}
-                      >
-                        Delete
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap gap-2 border-t border-zinc-800 px-3 py-2">
+                    <button
+                      type="button"
+                      className="rounded-full bg-[#075473] px-3 py-1 text-[11px] font-semibold text-white"
+                      onClick={() => setEditUser(row)}
+                    >
+                      Edit license
+                    </button>
+                    <button
+                      type="button"
+                      className="rounded-full border border-zinc-700 px-3 py-1 text-[11px] text-zinc-300"
+                      onClick={() => {
+                        setResetId(row.id);
+                        setResetPass("");
+                        setResetConfirm("");
+                      }}
+                    >
+                      Reset password
+                    </button>
+                    <button
+                      type="button"
+                      className="rounded-full border border-red-500/30 px-3 py-1 text-[11px] text-red-400 disabled:opacity-40"
+                      disabled={row.email === currentEmail}
+                      onClick={() => void removeUser(row)}
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </article>
+              );
+            })}
           </div>
         )}
       </div>
@@ -365,6 +410,200 @@ export function StaffUsersPanel({
           </div>
         </div>
       ) : null}
+
+      {editUser ? (
+        <OwnerStaffLicenseEditor
+          user={editUser}
+          profile={profiles[editUser.id] || null}
+          getClient={getClient}
+          onClose={() => setEditUser(null)}
+          onSaved={async () => {
+            setMsg(`Updated · ${editUser.email}`);
+            setEditUser(null);
+            await load();
+          }}
+          onError={(m) => setError(m)}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+function OwnerStaffLicenseEditor({
+  user,
+  profile,
+  getClient,
+  onClose,
+  onSaved,
+  onError,
+}: {
+  user: TeamUser;
+  profile: StaffProfile | null;
+  getClient: () => PocketBase;
+  onClose: () => void;
+  onSaved: () => Promise<void>;
+  onError: (m: string) => void;
+}) {
+  const [displayName, setDisplayName] = useState(
+    profile?.display_name || user.name || ""
+  );
+  const [phone, setPhone] = useState(profile?.phone || "");
+  const [bio, setBio] = useState(profile?.bio || "");
+  const [languages, setLanguages] = useState(profile?.languages || "");
+  const [cities, setCities] = useState(profile?.strength_cities || "");
+  const [videoUrl, setVideoUrl] = useState(profile?.video_url || "");
+  const [bankInfo, setBankInfo] = useState(profile?.bank_info || "");
+  const [paymentLink, setPaymentLink] = useState(profile?.payment_link || "");
+  const [payoutNotes, setPayoutNotes] = useState(profile?.payout_notes || "");
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  const existingPhoto =
+    profile?.photo && profile.id
+      ? `${getPbBaseUrl()}/api/files/staff_profiles/${profile.id}/${profile.photo}`
+      : null;
+  const preview =
+    photoFile != null ? URL.createObjectURL(photoFile) : existingPhoto;
+
+  const save = async () => {
+    setSaving(true);
+    try {
+      const pb = getClient();
+      await pb.collection("staff").update(
+        user.id,
+        { name: displayName.trim() },
+        { requestKey: null }
+      );
+      await updateStaffProfile(
+        pb,
+        user.id,
+        {
+          display_name: displayName.trim(),
+          phone: phone.trim(),
+          bio: bio.trim(),
+          languages: languages.trim(),
+          strength_cities: cities.trim(),
+          video_url: videoUrl.trim(),
+          bank_info: bankInfo.trim(),
+          payment_link: paymentLink.trim(),
+          payout_notes: payoutNotes.trim(),
+        },
+        { photo: photoFile || undefined }
+      );
+      await onSaved();
+    } catch (e) {
+      onError(formatPbError(e));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 p-4 sm:items-center">
+      <div className="max-h-[90dvh] w-full max-w-lg overflow-y-auto rounded-2xl border border-zinc-700 bg-zinc-950 p-5">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">
+              Staff license
+            </p>
+            <h3 className="font-display text-xl text-white">{user.email}</h3>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-full border border-zinc-700 px-3 py-1 text-xs text-zinc-300"
+          >
+            Close
+          </button>
+        </div>
+
+        <div className="mt-4 flex gap-4">
+          <div className="h-24 w-24 shrink-0 overflow-hidden rounded-2xl bg-zinc-800">
+            {preview ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={preview} alt="" className="h-full w-full object-cover" />
+            ) : (
+              <div className="flex h-full items-center justify-center text-zinc-600">
+                No photo
+              </div>
+            )}
+          </div>
+          <label className="flex-1 text-xs uppercase tracking-wider text-zinc-400">
+            Photo
+            <input
+              type="file"
+              accept="image/*"
+              className="mt-1 block w-full text-xs text-zinc-300"
+              onChange={(e) => setPhotoFile(e.target.files?.[0] || null)}
+            />
+            {photoFile ? (
+              <p className="mt-1 normal-case tracking-normal text-zinc-500">
+                {(photoFile.size / 1024).toFixed(0)} KB · recommended under 180KB
+              </p>
+            ) : null}
+          </label>
+        </div>
+
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          {(
+            [
+              ["Display name", displayName, setDisplayName],
+              ["Phone", phone, setPhone],
+              ["Languages", languages, setLanguages],
+              ["Strength cities", cities, setCities],
+              ["Video URL", videoUrl, setVideoUrl],
+              ["Payment link", paymentLink, setPaymentLink],
+            ] as const
+          ).map(([label, value, set]) => (
+            <label
+              key={label}
+              className="block text-xs uppercase tracking-wider text-zinc-400"
+            >
+              {label}
+              <input
+                value={value}
+                onChange={(e) => set(e.target.value)}
+                className="mt-1 w-full rounded-xl border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-100"
+              />
+            </label>
+          ))}
+          <label className="block text-xs uppercase tracking-wider text-zinc-400 sm:col-span-2">
+            Bio
+            <textarea
+              value={bio}
+              onChange={(e) => setBio(e.target.value)}
+              rows={3}
+              className="mt-1 w-full rounded-xl border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-100"
+            />
+          </label>
+          <label className="block text-xs uppercase tracking-wider text-zinc-400 sm:col-span-2">
+            Bank info
+            <textarea
+              value={bankInfo}
+              onChange={(e) => setBankInfo(e.target.value)}
+              rows={2}
+              className="mt-1 w-full rounded-xl border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-100"
+            />
+          </label>
+          <label className="block text-xs uppercase tracking-wider text-zinc-400 sm:col-span-2">
+            Payout notes
+            <input
+              value={payoutNotes}
+              onChange={(e) => setPayoutNotes(e.target.value)}
+              className="mt-1 w-full rounded-xl border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-100"
+            />
+          </label>
+        </div>
+
+        <button
+          type="button"
+          disabled={saving}
+          onClick={() => void save()}
+          className="mt-5 w-full rounded-full bg-[#1BA58A] py-3 text-sm font-semibold text-white disabled:opacity-50"
+        >
+          {saving ? "Saving…" : "Save license"}
+        </button>
+      </div>
     </div>
   );
 }

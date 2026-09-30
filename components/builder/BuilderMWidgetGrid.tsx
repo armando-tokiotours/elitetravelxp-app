@@ -341,7 +341,7 @@ export function BuilderMWidgetGrid({
               </div>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src="/brand/guest-cat.webp"
+                src="/brand/cat-2.png"
                 alt=""
                 aria-hidden
                 className="pointer-events-none absolute bottom-0 left-1/2 z-0 h-[5.75rem] w-auto -translate-x-1/2 select-none object-contain object-bottom"

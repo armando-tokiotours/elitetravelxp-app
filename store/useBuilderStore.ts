@@ -228,6 +228,8 @@ export interface BuilderState {
    * Source of truth for Step 5 + chauffeur-by-tour sync.
    */
   selectedTours: SelectedToursByCity;
+  /** Transport catalog picks (Suica, Shinkansen…) → Ticketer lines */
+  selectedTransportProducts: import("@/lib/transportProducts").TransportTicketLine[];
   /** @deprecated unique tour ids — derived from selectedTours */
   selectedTourIds: string[];
   /** @deprecated city → tour ids — derived from selectedTours */
@@ -342,6 +344,10 @@ export interface BuilderActions {
   /** Schedule a tour on a specific stay date (required for chauffeur-by-tour). */
   addCityTour: (cityId: string, tour: SelectedTour) => boolean;
   removeCityTour: (cityId: string, tourId: string) => void;
+  addTransportProduct: (
+    line: import("@/lib/transportProducts").TransportTicketLine
+  ) => void;
+  removeTransportProduct: (productId: string) => void;
   /** Replace all date-bound tour selections (used by Tailored Experiences draft commit). */
   commitSelectedTours: (selectedTours: SelectedToursByCity) => void;
   setSelectedTourIds: (ids: string[]) => void;
@@ -431,6 +437,7 @@ const initialState: BuilderState = {
   arrivalTicketType: "none",
   arrivalTicketPricePerPax: 0,
   selectedTours: {},
+  selectedTransportProducts: [],
   selectedTourIds: [],
   selectedToursByCity: {},
   isEliteConcierge: false,
@@ -491,6 +498,7 @@ const BUILDER_PERSIST_KEYS = [
   "arrivalTicketType",
   "arrivalTicketPricePerPax",
   "selectedTours",
+  "selectedTransportProducts",
   "selectedTourIds",
   "selectedToursByCity",
   "isEliteConcierge",
@@ -1274,6 +1282,22 @@ export const useBuilderStore = create<BuilderState & BuilderActions>()(
         };
         set(syncTourDerived(selectedTours));
         return true;
+      },
+
+      addTransportProduct: (line) => {
+        const s = get();
+        const without = (s.selectedTransportProducts || []).filter(
+          (x) => x.productId !== line.productId
+        );
+        set({ selectedTransportProducts: [...without, line] });
+      },
+
+      removeTransportProduct: (productId) => {
+        set({
+          selectedTransportProducts: (
+            get().selectedTransportProducts || []
+          ).filter((x) => x.productId !== productId),
+        });
       },
 
       removeCityTour: (cityId, tourId) => {

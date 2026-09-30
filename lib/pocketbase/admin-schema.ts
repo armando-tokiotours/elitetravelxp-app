@@ -4,6 +4,7 @@ export type CollectionKey =
   | "cities"
   | "tours"
   | "vehicles"
+  | "transport_products"
   | "transfers"
   | "hubs"
   | "accommodations"
@@ -255,6 +256,72 @@ export const COLLECTIONS: CollectionDef[] = [
         type: "bool",
       },
       { key: "is_active", label: "Active", type: "bool" },
+    ],
+  },
+  {
+    id: "transport_products",
+    label: "Transport",
+    titleKey: "name",
+    sort: "sort_order,name",
+    fileFields: ["cover_photo", "explainer_video"],
+    detailKeys: ["transport_type", "price_per_person"],
+    fields: [
+      { key: "name", label: "Name", type: "text", required: true },
+      {
+        key: "transport_type",
+        label: "Type",
+        type: "select",
+        required: true,
+        options: [
+          "suica",
+          "bullet_train",
+          "local_rail",
+          "ferry",
+          "bike",
+          "ride",
+          "other",
+        ],
+        hint: "Suica / bullet train / ferry / bike / ride — Ticketer line items",
+      },
+      { key: "description", label: "Description", type: "textarea" },
+      {
+        key: "price_per_person",
+        label: "Price per person (€)",
+        type: "number",
+        required: true,
+      },
+      {
+        key: "duration_hours",
+        label: "Duration / total hours",
+        type: "number",
+        hint: "How long this ticket covers (e.g. Suica day pass hours, train ride)",
+      },
+      {
+        key: "total_hours_note",
+        label: "Hours note (guest-facing)",
+        type: "text",
+        hint: "Make duration crystal clear for guests and ticketer",
+      },
+      {
+        key: "explainer_url",
+        label: "Explainer link (URL)",
+        type: "text",
+      },
+      {
+        key: "explainer_video",
+        label: "Explainer video",
+        type: "file",
+        accept: "video/mp4,video/webm,video/quicktime",
+      },
+      {
+        key: "cover_photo",
+        label: "Cover photo",
+        type: "file",
+        accept: "image/*",
+      },
+      { key: "city_id", label: "City (optional)", type: "city" },
+      { key: "is_active", label: "Active", type: "bool" },
+      { key: "sort_order", label: "Sort order", type: "number" },
     ],
   },
   {

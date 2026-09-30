@@ -4,7 +4,7 @@ import dynamic from "next/dynamic";
 import { useCallback, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
-import { ArrowLeft, Car, Check, Clock, Footprints, Train } from "lucide-react";
+import { ArrowLeft, Car, Check, Clock, Footprints, Train, TrainFront } from "lucide-react";
 import type { BuilderConfig, PbCity, PbTour } from "@/lib/pocketbase/client";
 import { cityPhoto, pbFileUrl } from "@/lib/pocketbase/client";
 import { PB_THUMBS } from "@/lib/mediaStandards";
@@ -21,11 +21,20 @@ import { GoldLight } from "@/components/branding/GoldLight";
 import { resolveSingleDayCityThumbnail } from "@/config/mediaConfig";
 import { SingleDayProgressBar } from "@/components/builder-single/SingleDayProgressBar";
 import { MovementDetailModal } from "@/components/builder-s/MovementDetailModal";
+import { ExplainerTriggerButton } from "@/components/builder/ExplainerTriggerButton";
 
 const SingleDayTripDetailModal = dynamic(
   () =>
     import("@/components/builder-s/SingleDayTripDetailModal").then((m) => ({
       default: m.SingleDayTripDetailModal,
+    })),
+  { ssr: false }
+);
+
+const SingleDayGuestsEditorModal = dynamic(
+  () =>
+    import("@/components/builder-s/SingleDayGuestsEditorModal").then((m) => ({
+      default: m.SingleDayGuestsEditorModal,
     })),
   { ssr: false }
 );
@@ -67,11 +76,11 @@ const TRANSPORT_OPTIONS: {
   icon: typeof Footprints;
   spotlight: string;
 }[] = [
-  { id: "walk", label: "Walking", icon: Footprints, spotlight: "#DC6E8A" },
-  { id: "subway", label: "Subway", icon: Train, spotlight: "#054F70" },
+  { id: "walk", label: "Walk", icon: Footprints, spotlight: "#DC6E8A" },
+  { id: "subway", label: "Public / Suica", icon: Train, spotlight: "#054F70" },
   {
     id: "private_driver",
-    label: "Private driver",
+    label: "Private / taxi",
     icon: Car,
     spotlight: "#F6A724",
   },
@@ -113,9 +122,8 @@ export function BuilderSView({
   const [movementModal, setMovementModal] =
     useState<IntraCityTransport | null>(null);
 
-  const tripMounted = useLazyModalMount(
-    activeEditModal === "duration" || activeEditModal === "guests"
-  );
+  const durationMounted = useLazyModalMount(activeEditModal === "duration");
+  const guestsMounted = useLazyModalMount(activeEditModal === "guests");
   const cityMounted = useLazyModalMount(activeEditModal === "locations");
   const toursMounted = useLazyModalMount(activeEditModal === "tours");
   const logisticsMounted = useLazyModalMount(activeEditModal === "logistics");
@@ -124,6 +132,7 @@ export function BuilderSView({
   const tourHours = useSingleDayBuilderStore((s) => s.tourHours);
   const adults = useSingleDayBuilderStore((s) => s.adults);
   const children = useSingleDayBuilderStore((s) => s.children);
+  const travelPace = useSingleDayBuilderStore((s) => s.travelPace);
   const cityFocus = useSingleDayBuilderStore((s) => s.cityFocus);
   const selectedExperiences = useSingleDayBuilderStore(
     (s) => s.selectedExperiences
@@ -152,12 +161,22 @@ export function BuilderSView({
 
   const guestCount = adults + children;
   const dateText = tourDate ? formatSingleDayDisplayDate(tourDate) : null;
-  const experiencesLabel =
-    selectedExperiences.length === 0
-      ? "Choose Experiences"
-      : `${selectedExperiences.length} Experience${
-          selectedExperiences.length === 1 ? "" : "s"
-        } Selected`;
+  const paceLabel =
+    travelPace === "fast"
+      ? "Fast pace"
+      : travelPace === "relaxed"
+        ? "Relaxed pace"
+        : travelPace === "moderate"
+          ? "Balanced pace"
+          : "Set pace";
+  const transportLabel =
+    preferredMovement === "private_driver"
+      ? "Private / taxi"
+      : preferredMovement === "subway"
+        ? "Public / Suica"
+        : preferredMovement === "walk"
+          ? "Walk"
+          : "Set transport";
 
   const cities = config?.cities ?? [];
   const scheduled = totalScheduledMinutes(blocks);
@@ -166,60 +185,6 @@ export function BuilderSView({
     <>
       <SingleDayProgressBar />
       <div className="mx-auto w-full max-w-2xl space-y-5 px-4 py-6">
-        <div className="grid grid-cols-2 gap-3.5">
-          <div>
-            <button
-              type="button"
-              onClick={() => openEditModal("duration")}
-              className={HALF}
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-xl" aria-hidden>
-                  📅
-                </span>
-                <span className="rounded-full bg-amber-500/10 px-2 py-0.5 font-mono text-[10px] font-bold uppercase tracking-widest text-amber-400">
-                  DAY
-                </span>
-              </div>
-              <div className="mt-3">
-                <h3 className="font-godiva text-lg font-black leading-none text-white">
-                  {tourHours}H TOUR
-                </h3>
-                <p className="mt-1 font-mono text-[11px] text-zinc-300">
-                  {dateText || "Set Tour Date"}
-                </p>
-              </div>
-            </button>
-            <WidgetLabel>Days &amp; Dates</WidgetLabel>
-          </div>
-
-          <div>
-            <button
-              type="button"
-              onClick={() => openEditModal("guests")}
-              className={HALF}
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-xl" aria-hidden>
-                  👥
-                </span>
-                <span className="rounded-full bg-cyan-500/10 px-2 py-0.5 font-mono text-[10px] font-bold uppercase tracking-widest text-cyan-400">
-                  PARTY
-                </span>
-              </div>
-              <div className="mt-3">
-                <h3 className="font-godiva text-lg font-black leading-none text-white">
-                  {guestCount || 2} GUESTS
-                </h3>
-                <p className="mt-1 font-mono text-[11px] text-zinc-300">
-                  Single-day pace
-                </p>
-              </div>
-            </button>
-            <WidgetLabel>Guests &amp; Pace</WidgetLabel>
-          </div>
-        </div>
-
         <div>
           <button
             type="button"
@@ -251,31 +216,108 @@ export function BuilderSView({
               ✏️
             </span>
           </button>
-          <WidgetLabel>Locations &amp; Nights</WidgetLabel>
+          <WidgetLabel>City</WidgetLabel>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3.5">
+          <div>
+            <button
+              type="button"
+              onClick={() => openEditModal("duration")}
+              className={HALF}
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-xl" aria-hidden>
+                  📅
+                </span>
+                <span className="rounded-full bg-amber-500/10 px-2 py-0.5 font-mono text-[10px] font-bold uppercase tracking-widest text-amber-400">
+                  DAY
+                </span>
+              </div>
+              <div className="mt-3">
+                <h3 className="font-godiva text-lg font-black leading-none text-white">
+                  {tourHours}H TOUR
+                </h3>
+                <p className="mt-1 font-mono text-[11px] text-zinc-300">
+                  {dateText || "Set Tour Date"}
+                </p>
+              </div>
+            </button>
+            <WidgetLabel>Hours &amp; Date</WidgetLabel>
+          </div>
+
+          <div>
+            <button
+              type="button"
+              onClick={() => openEditModal("guests")}
+              className={HALF}
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-xl" aria-hidden>
+                  👥
+                </span>
+                <span className="rounded-full bg-cyan-500/10 px-2 py-0.5 font-mono text-[10px] font-bold uppercase tracking-widest text-cyan-400">
+                  PARTY
+                </span>
+              </div>
+              <div className="mt-3">
+                <h3 className="font-godiva text-lg font-black leading-none text-white">
+                  {guestCount || 2} GUESTS
+                </h3>
+                <p className="mt-1 font-mono text-[11px] text-zinc-300">
+                  {paceLabel}
+                </p>
+              </div>
+            </button>
+            <WidgetLabel>Guests &amp; Pace</WidgetLabel>
+          </div>
         </div>
 
         <div>
           <button
             type="button"
             onClick={() => openEditModal("tours")}
-            className={`${WIDGET_SHELL} flex items-center justify-between`}
+            className={`${WIDGET_SHELL} h-[13.5rem] p-0`}
           >
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-pink-500/20 bg-pink-500/10 text-lg text-pink-400">
-                <span aria-hidden>🎎</span>
+            {selectedExperiences.length === 0 ? (
+              <div className="relative flex h-full flex-col overflow-hidden bg-gradient-to-b from-[#1a2840] to-[#0A1017]">
+                <div className="relative z-10 flex flex-1 flex-col items-center justify-center px-4 pb-16 text-center">
+                  <p className="font-godiva text-base font-bold uppercase leading-snug text-white">
+                    No experiences or tours chosen
+                  </p>
+                  <p className="mt-2 font-mono text-[11px] font-bold tracking-wider text-pink-400 uppercase">
+                    I&apos;m boring…
+                  </p>
+                </div>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src="/brand/cat-2.png"
+                  alt=""
+                  aria-hidden
+                  className="pointer-events-none absolute bottom-0 left-1/2 z-0 h-[6.5rem] w-auto -translate-x-1/2 select-none object-contain object-bottom"
+                />
               </div>
-              <div>
-                <span className="block font-mono text-[10px] font-bold uppercase tracking-wider text-pink-400">
-                  EXPERIENCES &amp; PLACES
-                </span>
-                <h3 className="mt-0.5 text-sm font-bold uppercase text-white">
-                  {experiencesLabel}
-                </h3>
+            ) : (
+              <div className="flex h-full w-full flex-col">
+                {selectedExperiences.slice(0, 4).map((exp) => (
+                  <div
+                    key={exp.tourId}
+                    className="relative min-h-0 flex-1 overflow-hidden border-b border-black/40 last:border-b-0"
+                  >
+                    <div className="absolute inset-0 bg-gradient-to-br from-[#3a1a2e] to-[#0B1F3A]" />
+                    <div
+                      className="absolute inset-0 bg-gradient-to-r from-black/75 via-black/35 to-transparent"
+                      aria-hidden
+                    />
+                    <div className="relative z-10 flex h-full items-end px-3 pb-2">
+                      <p className="line-clamp-1 font-godiva text-xs font-bold uppercase tracking-wide text-white drop-shadow">
+                        {exp.title}
+                      </p>
+                    </div>
+                  </div>
+                ))}
               </div>
-            </div>
-            <span className="text-sm text-zinc-500" aria-hidden>
-              ✏️
-            </span>
+            )}
           </button>
           <WidgetLabel>Tours &amp; Experiences</WidgetLabel>
         </div>
@@ -285,31 +327,34 @@ export function BuilderSView({
             <button
               type="button"
               onClick={() => openEditModal("logistics")}
-              className={HALF}
+              className={`${WIDGET_SHELL} flex min-h-[12rem] flex-col justify-between p-4`}
             >
               <div className="flex items-center justify-between">
-                <span className="text-xl" aria-hidden>
-                  🏨
+                <span className="flex h-11 w-11 items-center justify-center rounded-xl border border-cyan-500/25 bg-cyan-500/10 text-cyan-400">
+                  <TrainFront className="h-5 w-5" aria-hidden />
                 </span>
-                <span className="rounded-full bg-amber-500/10 px-2 py-0.5 font-mono text-[10px] font-bold uppercase tracking-widest text-amber-400">
-                  DAY
+                <span className="rounded-full bg-cyan-500/10 px-2 py-0.5 font-mono text-[10px] font-bold uppercase tracking-widest text-cyan-400">
+                  MOVE
                 </span>
               </div>
-              <div className="mt-3">
-                <h3 className="text-sm font-bold uppercase leading-tight text-white">
-                  Starts {startTime}
+              <div className="mt-auto">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">
+                  Transport
+                </p>
+                <h3 className="mt-1 font-godiva text-lg font-black uppercase leading-tight text-white">
+                  {transportLabel}
                 </h3>
                 <p className="mt-1 font-mono text-[10px] text-zinc-400">
-                  {(preferredMovement ?? "walk").replace("_", " ")}
+                  Starts {startTime}
                   {meetingPoint ? ` · ${meetingPoint}` : ""}
                 </p>
               </div>
             </button>
-            <WidgetLabel>Hotels &amp; Transport</WidgetLabel>
+            <WidgetLabel>Transport</WidgetLabel>
           </div>
 
           <div>
-            <div className="relative flex h-36 w-full flex-col items-center justify-center overflow-hidden rounded-[22px] border border-dashed border-white/5 bg-[#0A1017]/50 p-4 text-center">
+            <div className="relative flex min-h-[12rem] w-full flex-col items-center justify-center overflow-hidden rounded-[22px] border border-dashed border-white/5 bg-[#0A1017]/50 p-4 text-center">
               <span className="text-2xl opacity-40" aria-hidden>
                 🌸
               </span>
@@ -325,13 +370,18 @@ export function BuilderSView({
         </div>
       </div>
 
-      {tripMounted ? (
+      {durationMounted ? (
         <SingleDayTripDetailModal
-          open={
-            activeEditModal === "duration" || activeEditModal === "guests"
-          }
+          open={activeEditModal === "duration"}
           onClose={() => setActiveEditModal(null)}
           seasonTiers={config?.seasonTiers ?? []}
+        />
+      ) : null}
+
+      {guestsMounted ? (
+        <SingleDayGuestsEditorModal
+          open={activeEditModal === "guests"}
+          onClose={() => setActiveEditModal(null)}
         />
       ) : null}
 
@@ -570,9 +620,30 @@ function LogisticsModal({
               >
                 <ArrowLeft className="h-5 w-5" />
               </button>
-              <h3 className="font-display text-xl text-white">Day Logistics</h3>
+              <h3 className="font-display text-xl text-white">
+                Drivers &amp; Transport
+              </h3>
             </div>
             <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-4 py-5">
+              <div className="rounded-xl border border-white/10 bg-black/30 p-3 text-sm text-zinc-300">
+                <p className="font-godiva text-base uppercase tracking-wide text-white">
+                  How you move today
+                </p>
+                <p className="mt-2 text-xs text-zinc-400">
+                  Public rail may need tickets (Suica/PASMO). Private chauffeur /
+                  taxi is assigned after Ops confirms.
+                </p>
+                <div className="mt-3 space-y-2">
+                  <ExplainerTriggerButton
+                    featureKey="public_transport_explainer"
+                    title="Public transport &amp; Suica explained"
+                  />
+                  <ExplainerTriggerButton
+                    featureKey="daily_transport_explainer"
+                    title="Watch: Why you need private daily transport"
+                  />
+                </div>
+              </div>
               <div>
                 <p className="mb-2 text-[10px] font-bold uppercase tracking-widest text-white">
                   Start time

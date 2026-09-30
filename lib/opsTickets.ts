@@ -14,6 +14,8 @@ export type OpsTicketsRow = {
   ticket_status?: TicketStatus | string;
   ticket_notes?: string;
   assigned_ticketer_id?: string;
+  /** Catalog picks (Suica, Shinkansen…) — same idea as experience lines. */
+  ticket_lines?: unknown;
 };
 
 function safePnr(pnr: string): string {
@@ -64,7 +66,7 @@ async function dualWriteHubTickets(
 export async function updateTicketsByPnr(
   pb: PocketBase,
   pnrRaw: string,
-  patch: Partial<Omit<OpsTicketsRow, "id" | "pnr">>
+  patch: Partial<Omit<OpsTicketsRow, "id" | "pnr">> & Record<string, unknown>
 ): Promise<OpsTicketsRow> {
   const pnr = safePnr(pnrRaw);
   const row = await ensureTicketsRow(pb, pnr);
