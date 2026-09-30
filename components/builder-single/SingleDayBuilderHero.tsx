@@ -7,18 +7,25 @@ import {
 } from "@/config/teamConfig";
 import {
   BUILDER_S_HERO_LS_KEY,
+  SINGLE_DAY_BUILDER_CONFIG,
   SINGLE_DAY_BUILDER_HERO_KEY,
+  SINGLE_DAY_HERO_PUBLIC_FALLBACK,
   readBuilderSHeroLocalCache,
   type BuilderSHeroLocalCache,
 } from "@/config/mediaConfig";
+import { isVideoFilename } from "@/lib/brandingUi";
+import { LazyVideo } from "@/components/ui/LazyVideo";
 import { useSiteBrandingStore } from "@/store/useSiteBrandingStore";
+import {
+  fetchPublicBrandAssets,
+} from "@/lib/pocketbase/client";
 
 /** Single-day peek character (1-Day Pass ticket) */
 const HERO_CHARACTER_SRC = "/images/peek-character-1day.png";
 
 /**
- * Builder S hero — solid dark base + peek character + copy.
- * No scenic photo/video/scrim (those caused the slow dark flash).
+ * Builder S hero — Team Branding still/video (poster-first) + peek character + copy.
+ * Prefer admin poster / public still; never paint black while media loads.
  */
 export function SingleDayBuilderHero() {
   const ensureLoaded = useSiteBrandingStore((s) => s.ensureLoaded);
@@ -29,6 +36,7 @@ export function SingleDayBuilderHero() {
   const [localCache, setLocalCache] = useState<BuilderSHeroLocalCache | null>(
     null
   );
+  const [publicHero, setPublicHero] = useState(SINGLE_DAY_HERO_PUBLIC_FALLBACK);
 
   useEffect(() => {
     void ensureLoaded();
@@ -45,6 +53,17 @@ export function SingleDayBuilderHero() {
     return () => window.removeEventListener("storage", onStorage);
   }, []);
 
+  useEffect(() => {
+    let cancelled = false;
+    void fetchPublicBrandAssets().then((assets) => {
+      if (cancelled) return;
+      if (assets.hero_single) setPublicHero(assets.hero_single);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const item = getItem(SINGLE_DAY_BUILDER_HERO_KEY);
   const team = BUILDER_S_HERO_CONFIG;
   const fromPb = resolveBuilderSHeroCopy(item);
@@ -57,18 +76,46 @@ export function SingleDayBuilderHero() {
   const heroLine1 = team.heroLine1;
   const heroLine2 = team.heroLine2;
 
+  const mediaUrl =
+    localCache?.mediaUrl?.trim() ||
+    item.mediaUrl?.trim() ||
+    publicHero ||
+    SINGLE_DAY_BUILDER_CONFIG.hero.fallbackImage;
+  const isVideo = isVideoFilename(mediaUrl);
+  const posterUrl =
+    item.posterUrl?.trim() ||
+    publicHero ||
+    SINGLE_DAY_BUILDER_CONFIG.hero.fallbackImage;
+
   return (
     <section
       className="builder-hero relative z-10 h-[65vh] w-full min-h-[280px] overflow-hidden bg-[#05080C] sm:h-[80vh] md:min-h-[420px]"
       aria-label="Single-day builder hero"
     >
-      {/* Soft bottom fade into glass card — no photo/scrim */}
+      {isVideo ? (
+        <LazyVideo
+          src={mediaUrl}
+          poster={posterUrl}
+          className="absolute inset-0 z-0 h-full w-full object-cover"
+          muted
+          loop
+          playsInline
+          autoPlay
+        />
+      ) : (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={mediaUrl || posterUrl}
+          alt=""
+          className="absolute inset-0 z-0 h-full w-full object-cover"
+        />
+      )}
+
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-0 z-10 bg-gradient-to-t from-[#05080C] via-[#05080C]/40 to-transparent"
+        className="pointer-events-none absolute inset-0 z-10 bg-gradient-to-t from-[#05080C] via-[#05080C]/55 to-[#05080C]/25"
       />
 
-      {/* Peek character */}
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src={HERO_CHARACTER_SRC}
@@ -77,7 +124,6 @@ export function SingleDayBuilderHero() {
         className="pointer-events-none absolute bottom-0 left-0 z-20 h-[230px] w-auto select-none object-contain object-left-bottom drop-shadow-[0_8px_24px_rgba(0,0,0,0.55)] sm:h-[300px]"
       />
 
-      {/* Typography */}
       <div className="absolute top-1/2 left-4 z-30 flex max-w-[85%] -translate-y-1/2 flex-col items-start text-left sm:left-12 sm:max-w-md">
         <h1 className="flex flex-col items-start text-left leading-tight">
           <span className="relative z-10 -mb-6 translate-y-1 font-beauty text-[3.3rem] font-normal leading-none text-[#E11D48] drop-shadow-[0_2px_12px_rgba(0,0,0,0.65)] sm:-mb-9 sm:translate-y-1.5 sm:text-[5.28rem]">

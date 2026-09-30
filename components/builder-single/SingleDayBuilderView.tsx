@@ -410,29 +410,33 @@ export function SingleDayBuilderView() {
             >
               <div className="grid gap-5">
                 <div>
-                  <p className="mb-2 text-[10px] font-bold uppercase tracking-widest text-[#1BA58A]">
+                  <p className="mb-2 text-[10px] font-bold uppercase tracking-widest text-white">
                     Start time
                   </p>
-                  <div className="flex flex-wrap gap-2">
-                    {START_TIMES.map((t) => (
-                      <button
-                        key={t}
-                        type="button"
-                        onClick={() => setStartTime(t)}
-                        className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
-                          startTime === t
-                            ? "bg-[#075473] text-white"
-                            : `${GLASS_CARD} text-white/70 hover:border-white/30`
-                        }`}
-                      >
-                        {t}
-                      </button>
-                    ))}
+                  <div className="relative">
+                    <select
+                      value={startTime}
+                      onChange={(e) => setStartTime(e.target.value)}
+                      className="w-full cursor-pointer appearance-none rounded-xl border border-white/15 bg-[#121212] px-3 py-3 pr-10 text-base text-white outline-none focus:border-[#075473]"
+                      aria-label="Start time"
+                    >
+                      {START_TIMES.map((t) => (
+                        <option key={t} value={t} className="bg-[#121212] text-white">
+                          {t}
+                        </option>
+                      ))}
+                    </select>
+                    <span
+                      aria-hidden
+                      className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-white/45"
+                    >
+                      <Clock className="h-4 w-4" />
+                    </span>
                   </div>
                 </div>
 
                 <div>
-                  <p className="mb-2 text-[10px] font-bold uppercase tracking-widest text-[#1BA58A]">
+                  <p className="mb-2 text-[10px] font-bold uppercase tracking-widest text-white">
                     Meeting point
                   </p>
                   <p className="mb-2 text-xs text-white/45">
@@ -446,7 +450,7 @@ export function SingleDayBuilderView() {
                       setMeetingPoint(meetingPoint.replace(/\s+/g, " ").trim())
                     }
                     placeholder="e.g. Park Hyatt Tokyo lobby · Tokyo Station Yaesu"
-                    className="w-full rounded-xl border border-white/15 bg-[#121212] px-3 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-[#075473]"
+                    className="w-full rounded-xl border border-white/15 bg-[#121212] px-3 py-3 text-base text-white outline-none placeholder:text-white/30 focus:border-[#075473]"
                   />
                 </div>
 
@@ -464,7 +468,7 @@ export function SingleDayBuilderView() {
                 )}
 
                 <div>
-                  <p className="mb-2 text-[10px] font-bold uppercase tracking-widest text-[#1BA58A]">
+                  <p className="mb-2 text-[10px] font-bold uppercase tracking-widest text-white">
                     Preferred movement
                   </p>
                   <p className="mb-2 text-xs text-white/45">

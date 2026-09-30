@@ -28,6 +28,18 @@ export const WARM_VIDEO_PATHS: readonly string[] = [
   "/videos/activity-matcher-guide.mp4",
 ];
 
+/** Extra assets for Pre-Build → Builder handoff (heroes + peek characters). */
+export const BUILDER_ENTRY_IMAGE_PATHS: readonly string[] = [
+  ...WARM_IMAGE_PATHS,
+  "/brand/hero-background.jpg",
+  "/brand/hero-single-day.jpg",
+  "/images/tokyo-day-hero.jpg",
+];
+
+export const BUILDER_ENTRY_VIDEO_PATHS: readonly string[] = [
+  ...WARM_VIDEO_PATHS,
+];
+
 export type WarmProgress = {
   loaded: number;
   total: number;
@@ -100,8 +112,27 @@ function warmVideo(src: string, timeoutMs = 12_000): Promise<void> {
 export async function warmCriticalAssets(
   onProgress?: (p: WarmProgress) => void
 ): Promise<void> {
-  const images = [...new Set(WARM_IMAGE_PATHS)];
-  const videos = [...new Set(WARM_VIDEO_PATHS)];
+  return warmAssetLists(WARM_IMAGE_PATHS, WARM_VIDEO_PATHS, onProgress);
+}
+
+/** Pre-Build → Builder: warm characters + hero stills + key reels. */
+export async function warmBuilderEntryAssets(
+  onProgress?: (p: WarmProgress) => void
+): Promise<void> {
+  return warmAssetLists(
+    BUILDER_ENTRY_IMAGE_PATHS,
+    BUILDER_ENTRY_VIDEO_PATHS,
+    onProgress
+  );
+}
+
+async function warmAssetLists(
+  imagePaths: readonly string[],
+  videoPaths: readonly string[],
+  onProgress?: (p: WarmProgress) => void
+): Promise<void> {
+  const images = [...new Set(imagePaths)];
+  const videos = [...new Set(videoPaths)];
   const total = images.length + videos.length;
   let loaded = 0;
 

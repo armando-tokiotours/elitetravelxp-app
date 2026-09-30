@@ -92,7 +92,7 @@ function resolveItem(
       : key === "single_day_builder_hero"
         ? SINGLE_DAY_BUILDER_CONFIG.hero.fallbackImage
         : isVideo
-          ? ""
+          ? videoPosterUrlForSrc(mediaUrl)
           : mediaUrl);
   const slide3Url = brandingUiSlide3Url(row);
   const cardUrl = brandingUiCardUrl(row);

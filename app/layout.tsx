@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
 import { DynamicTypography } from "@/components/layout/DynamicTypography";
 import { SeasonalParticlesHost } from "@/components/branding/SeasonalParticles";
@@ -69,6 +69,15 @@ export const metadata: Metadata = {
     siteName: "TOKIOTOURS",
     type: "website",
   },
+};
+
+/** Block page pinch-zoom; photos use PinchZoomPhoto instead (Instagram-style). */
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+  viewportFit: "cover",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

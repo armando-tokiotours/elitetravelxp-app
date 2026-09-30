@@ -10,6 +10,7 @@ import {
   brandingHeroUrl,
   brandingLogoUrl,
   brandingUiMediaUrl,
+  brandingUiPosterUrl,
   fetchPublicBrandAssets,
   type PbBrandingUiItem,
   type PbSiteBranding,
@@ -95,6 +96,8 @@ export function SiteBrandingPanel({ getClient }: { getClient: () => PbClient }) 
   );
   const [sdFile, setSdFile] = useState<File | null>(null);
   const [sdPreview, setSdPreview] = useState("");
+  const [sdPosterFile, setSdPosterFile] = useState<File | null>(null);
+  const [sdPosterPreview, setSdPosterPreview] = useState("");
   const [saveSdToPublic, setSaveSdToPublic] = useState(true);
   const [sdSaving, setSdSaving] = useState(false);
   const [sdMsg, setSdMsg] = useState<string | null>(null);
@@ -178,6 +181,8 @@ export function SiteBrandingPanel({ getClient }: { getClient: () => PbClient }) 
         SINGLE_DAY_HERO_PUBLIC_FALLBACK;
       setSdPreview(sdMedia);
       setSdFile(null);
+      setSdPosterPreview(brandingUiPosterUrl(sd) || "");
+      setSdPosterFile(null);
     } catch (e) {
       setError(formatPbError(e));
     } finally {
@@ -313,6 +318,14 @@ export function SiteBrandingPanel({ getClient }: { getClient: () => PbClient }) 
       if (sdFile) {
         const opt = await optimizeFileForUpload(sdFile);
         fd.append("media", opt.file);
+        // Auto first-frame poster when admin did not upload a custom still
+        if (!sdPosterFile && opt.posterFile) {
+          fd.append("poster", opt.posterFile);
+        }
+      }
+      if (sdPosterFile) {
+        const optPoster = await optimizeFileForUpload(sdPosterFile);
+        fd.append("poster", optPoster.file);
       }
 
       let saved: PbBrandingUiItem;
@@ -347,6 +360,8 @@ export function SiteBrandingPanel({ getClient }: { getClient: () => PbClient }) 
         );
       }
 
+      const usedCustomPoster = Boolean(sdPosterFile);
+      const usedAutoPoster = Boolean(sdFile && !sdPosterFile);
       setPublicAssets(nextAssets);
       setSdRecord(saved);
       const resolvedMedia =
@@ -355,6 +370,8 @@ export function SiteBrandingPanel({ getClient }: { getClient: () => PbClient }) 
         SINGLE_DAY_BUILDER_CONFIG.hero.fallbackImage;
       setSdPreview(resolvedMedia);
       setSdFile(null);
+      setSdPosterPreview(brandingUiPosterUrl(saved) || sdPosterPreview);
+      setSdPosterFile(null);
       writeBuilderSHeroLocalCache({
         scriptAccent: sdScript,
         mainTitlePrefix: sdPrefix,
@@ -362,7 +379,19 @@ export function SiteBrandingPanel({ getClient }: { getClient: () => PbClient }) 
         mediaUrl: resolvedMedia || undefined,
       });
       useSiteBrandingStore.setState({ loaded: false, itemsByKey: {} });
-      setSdMsg(["Builder S hero saved.", ...notes].join(" "));
+      setSdMsg(
+        [
+          "Builder S hero saved.",
+          usedCustomPoster
+            ? "Using your uploaded preload poster."
+            : usedAutoPoster
+              ? "Auto frame saved as preload poster (upload a still to override)."
+              : "",
+          ...notes,
+        ]
+          .filter(Boolean)
+          .join(" ")
+      );
     } catch (e) {
       setSdError(formatPbError(e));
     } finally {
@@ -585,6 +614,20 @@ export function SiteBrandingPanel({ getClient }: { getClient: () => PbClient }) 
               pathHint: publicAssets.hero_single
                 ? `Current public file: ${publicAssets.hero_single}`
                 : "Images only · video stays in PocketBase",
+            }}
+          />
+        </div>
+
+        <div className="mt-4">
+          <UploadField
+            label="Fast preload poster (required for video)"
+            hint="Still shown before video plays · upload your pick or leave empty to auto-grab ~0.05s frame"
+            preview={sdPosterPreview}
+            previewClass="aspect-[16/9] w-full object-cover"
+            accept="image/*"
+            onFile={(f) => {
+              setSdPosterFile(f);
+              if (f) setSdPosterPreview(URL.createObjectURL(f));
             }}
           />
         </div>

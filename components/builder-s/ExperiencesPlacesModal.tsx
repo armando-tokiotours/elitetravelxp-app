@@ -22,6 +22,8 @@ import {
   type PbCity,
   type PbTour,
 } from "@/lib/pocketbase/client";
+import { LazyVideo } from "@/components/ui/LazyVideo";
+import { PinchZoomPhoto } from "@/components/ui/PinchZoomPhoto";
 import { PB_THUMBS } from "@/lib/mediaStandards";
 import { tourDurationHours } from "@/lib/tourValidator";
 import {
@@ -42,7 +44,6 @@ import {
   type SingleDaySelectedExperience,
 } from "@/store/useSingleDayBuilderStore";
 import { useActiveMatchProfile } from "@/store/useQuizStore";
-import { LazyVideo } from "@/components/ui/LazyVideo";
 
 /**
  * Builder S — full Experiences & Places configure modal
@@ -393,7 +394,10 @@ export function ExperiencesPlacesModal({
                       data-lat={loc?.lat ?? undefined}
                       data-lng={loc?.lng ?? undefined}
                     >
-                      <div className="relative aspect-[3/4] w-full overflow-hidden bg-zinc-900 sm:aspect-[16/9]">
+                      <PinchZoomPhoto
+                        className="relative aspect-[3/4] w-full bg-zinc-900 sm:aspect-[16/9]"
+                        disabled={Boolean(pbMedia && mediaType === "Video")}
+                      >
                         {pbMedia && mediaType === "Video" ? (
                           <LazyVideo
                             src={pbMedia}
@@ -409,6 +413,7 @@ export function ExperiencesPlacesModal({
                           <img
                             src={poster}
                             alt=""
+                            draggable={false}
                             className="absolute inset-0 h-full w-full object-cover"
                             onError={(e) => {
                               (e.currentTarget as HTMLImageElement).src =
@@ -430,7 +435,7 @@ export function ExperiencesPlacesModal({
                             Place
                           </span>
                         ) : null}
-                      </div>
+                      </PinchZoomPhoto>
                       <div className="flex items-start gap-3 p-3">
                         <div className="min-w-0 flex-1">
                           <h4 className="truncate text-sm font-semibold text-white">

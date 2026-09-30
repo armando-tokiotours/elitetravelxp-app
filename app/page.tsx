@@ -44,22 +44,25 @@ export default function HomePage() {
             hotels, cities, tours, and transfers curated in PocketBase.
           </p>
           <div
-            className="mt-10 flex w-full max-w-xs flex-col gap-3 pt-4 animate-fade-up"
+            className="mt-10 flex w-full max-w-sm items-stretch gap-2 pt-4 animate-fade-up"
             style={{ animationDelay: "0.2s" }}
           >
             <Link
               href="/pre-elite-builder"
-              className="w-full rounded-full border border-amber-500/60 px-6 py-3 text-center font-godiva text-xs font-bold uppercase tracking-widest text-amber-300 shadow-md transition-all hover:bg-amber-500/10"
+              className="flex w-2/3 items-center justify-center rounded-2xl border border-amber-500/60 px-4 py-3 text-center font-godiva text-xs font-bold uppercase tracking-widest text-amber-300 shadow-md transition-all hover:bg-amber-500/10"
             >
-              START TRIP BRIEF →
+              START TRIP →
             </Link>
-            <button
-              type="button"
-              onClick={() => setManageOpen(true)}
-              className="w-full rounded-full border border-zinc-700 bg-zinc-900/80 px-6 py-3 text-center font-godiva text-xs font-bold uppercase tracking-widest text-white shadow-md transition-all hover:bg-zinc-800"
-            >
-              MANAGE BOOKING
-            </button>
+            <div className="flex w-1/3 flex-col gap-2">
+              <div className="min-h-0 flex-1" aria-hidden />
+              <button
+                type="button"
+                onClick={() => setManageOpen(true)}
+                className="flex flex-1 items-center justify-center rounded-2xl border border-zinc-700 bg-zinc-900/80 px-2 py-2 text-center font-godiva text-[0.65rem] font-bold uppercase leading-tight tracking-wider text-white shadow-md transition-all hover:bg-zinc-800"
+              >
+                MANAGE BOOKING
+              </button>
+            </div>
           </div>
         </main>
 

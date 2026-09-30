@@ -24,7 +24,7 @@ export function CityLanguageSelect({
 
   return (
     <div className="mb-4 space-y-1.5">
-      <label className="block text-[10px] font-bold uppercase tracking-wider text-[#1BA58A]">
+      <label className="block text-[10px] font-bold uppercase tracking-wider text-white">
         Preferred tour language for {cityName || "city"}
       </label>
       <p className="text-[10px] font-semibold uppercase tracking-wider text-white/35">
@@ -35,7 +35,7 @@ export function CityLanguageSelect({
           value={safeValue}
           onChange={(e) => onChange(e.target.value)}
           aria-label={`Preferred tour language for ${cityName}`}
-          className="w-full cursor-pointer appearance-none rounded-xl border border-white/15 bg-[#0D1117]/90 py-2.5 pl-3 pr-10 text-xs text-white backdrop-blur-md outline-none transition focus:border-[#1BA58A]"
+          className="w-full cursor-pointer appearance-none rounded-xl border border-white/15 bg-[#0D1117]/90 py-2.5 pl-3 pr-10 text-base text-white backdrop-blur-md outline-none transition focus:border-[#075473]"
         >
           {options.map((opt, index) => (
             <option key={opt.code || `lang-${index}`} value={opt.code}>

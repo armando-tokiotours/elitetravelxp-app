@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
+import { PinchZoomPhoto } from "@/components/ui/PinchZoomPhoto";
 import type { SeasonTierName } from "@/store/useBuilderStore";
 
 const SEASON_IMAGES: Record<SeasonTierName, string> = {
@@ -92,14 +93,15 @@ export function SeasonalityDetailModal({
 
             <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 pb-[max(7rem,env(safe-area-inset-bottom))] sm:px-5">
               <article className="overflow-hidden rounded-2xl border border-[#EEE8DF] bg-white shadow-[0_4px_20px_rgba(11,31,58,0.06)]">
-                <div className="relative aspect-[4/5] max-h-[45dvh] w-full bg-[#0B1F3A] sm:max-h-[50dvh]">
+                <PinchZoomPhoto className="relative aspect-[4/5] max-h-[45dvh] w-full bg-[#0B1F3A] sm:max-h-[50dvh]">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={image}
                     alt=""
+                    draggable={false}
                     className="h-full w-full object-cover"
                   />
-                </div>
+                </PinchZoomPhoto>
                 <div className="px-4 py-4 sm:px-5">
                   {crowds ? (
                     <p className="text-sm font-semibold text-[#075473]">

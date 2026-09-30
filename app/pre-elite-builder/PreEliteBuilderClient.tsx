@@ -242,7 +242,7 @@ export function PreEliteBuilderClient() {
           ? "What is this journey actually for?"
           : step === 4
             ? "Tell us the friction you want us to remove. Select every concern that applies."
-            : "Choose Multi-Day or Single-Day, then share dates and contact details. No payment yet.";
+            : "Choose Multi-Day or Single-Day,\nthen share dates and contact details. No payment yet.";
 
   const goNext = () => {
     const message = stepError(step, draft);
@@ -409,7 +409,7 @@ export function PreEliteBuilderClient() {
                 <p
                   className={
                     step === 5
-                      ? "mt-1 max-w-xl pr-20 text-xs leading-snug text-white/60 sm:pr-32 sm:text-sm"
+                      ? "mt-1 max-w-xl whitespace-pre-line pr-20 text-xs leading-snug text-white/60 sm:pr-32 sm:text-sm"
                       : "mt-1 max-w-xl pr-20 text-xs leading-snug text-white/60 sm:mt-2 sm:pr-32 sm:text-sm sm:leading-relaxed"
                   }
                 >
@@ -707,7 +707,7 @@ function ChoiceList({
             aria-pressed={on}
             aria-label={`Preview and select ${title}`}
             onClick={() => onOpenStory(option.id)}
-            className={`group relative w-full min-h-[7.875rem] cursor-pointer overflow-hidden rounded-2xl border p-5 text-left transition-all duration-300 ${
+            className={`group relative w-full min-h-[7rem] cursor-pointer overflow-hidden rounded-2xl border p-5 text-left transition-all duration-300 ${
               on
                 ? "scale-[1.01]"
                 : "border-white/10 bg-[#0A1017] opacity-60 hover:border-white/20 hover:opacity-90"

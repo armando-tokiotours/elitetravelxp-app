@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import { LazyVideo } from "@/components/ui/LazyVideo";
+import { PinchZoomPhoto } from "@/components/ui/PinchZoomPhoto";
 import { paceBrandingKey } from "@/lib/brandingUi";
 import { type PaceId } from "@/lib/travelPace";
 import type { TravelPace } from "@/store/useBuilderStore";
@@ -93,7 +94,7 @@ export function PaceDetailModal({
 
             <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-5">
               <article className="overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900">
-                <div className="relative aspect-[4/5] max-h-[42dvh] w-full bg-zinc-950 sm:max-h-[48dvh]">
+                <PinchZoomPhoto className="relative aspect-[4/5] max-h-[42dvh] w-full bg-zinc-950 sm:max-h-[48dvh]">
                   {pace.isVideo && pace.mediaUrl ? (
                     <LazyVideo
                       src={pace.mediaUrl}
@@ -109,10 +110,11 @@ export function PaceDetailModal({
                     <img
                       src={pace.mediaUrl}
                       alt=""
+                      draggable={false}
                       className="h-full w-full object-cover"
                     />
                   ) : null}
-                </div>
+                </PinchZoomPhoto>
                 <div className="px-4 py-4 sm:px-5">
                   <p className="text-sm font-semibold text-white">
                     {pace.subtitle}

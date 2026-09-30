@@ -15,6 +15,11 @@ import {
 } from "@/lib/preEliteBuilder";
 import { hydrateStoresFromPreEliteBrief } from "@/lib/preEliteHydrate";
 import { useModalDismiss } from "@/hooks/useModalDismiss";
+import {
+  BuilderEntryChargingOverlay,
+  runBuilderEntryWarm,
+} from "@/components/branding/HomeAssetWarmGate";
+import type { WarmProgress } from "@/lib/assetWarmup";
 import { TokioClockLoader } from "@/components/common/TokioClockLoader";
 import { SystemMessageFox } from "@/components/branding/SystemMessageFox";
 import {
@@ -95,6 +100,13 @@ export function PreBuildConfirmation({
   const [resendOpen, setResendOpen] = useState(false);
   const [saveGateOpen, setSaveGateOpen] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
+  const [builderCharging, setBuilderCharging] = useState(false);
+  const [builderWarmProgress, setBuilderWarmProgress] = useState<WarmProgress>({
+    loaded: 0,
+    total: 1,
+    percent: 0,
+    done: false,
+  });
   const emailSentCount = usePreBuilderStore((s) => s.emailSentCount);
   const bumpEmailSentCount = usePreBuilderStore((s) => s.bumpEmailSentCount);
   const { showHi, triggerHi } = useMascotHiTap();
@@ -167,26 +179,34 @@ export function PreBuildConfirmation({
             single.selectedExperiences.length > 0 ||
             !!single.cityFocus)));
 
-    if (alreadyLoaded) {
-      router.push(
-        isSingleDay
+    const href = (() => {
+      if (alreadyLoaded) {
+        return isSingleDay
           ? `/builder-single?ref=${encodeURIComponent(bookingRef)}`
-          : `/builder?ref=${encodeURIComponent(bookingRef)}`
-      );
-      return;
-    }
+          : `/builder?ref=${encodeURIComponent(bookingRef)}`;
+      }
+      const result = hydrateStoresFromPreEliteBrief({
+        bookingRef,
+        fullName,
+        email,
+        itineraryData,
+      });
+      if (!result) {
+        return isSingleDay ? "/builder-single" : "/builder";
+      }
+      return result.href;
+    })();
 
-    const result = hydrateStoresFromPreEliteBrief({
-      bookingRef,
-      fullName,
-      email,
-      itineraryData,
+    setBuilderCharging(true);
+    setBuilderWarmProgress({
+      loaded: 0,
+      total: 1,
+      percent: 0,
+      done: false,
     });
-    if (!result) {
-      router.push(isSingleDay ? "/builder-single" : "/builder");
-      return;
-    }
-    router.push(result.href);
+    void runBuilderEntryWarm((p) => setBuilderWarmProgress(p)).then(() => {
+      router.push(href);
+    });
   };
 
   /** html2pdf can leave a full-screen overlay that swallows all clicks. */
@@ -535,6 +555,10 @@ export function PreBuildConfirmation({
         >
           {toast}
         </div>
+      ) : null}
+
+      {builderCharging ? (
+        <BuilderEntryChargingOverlay progress={builderWarmProgress} />
       ) : null}
     </>
   );

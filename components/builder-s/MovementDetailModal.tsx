@@ -6,6 +6,7 @@ import { X } from "lucide-react";
 import { useModalDismiss } from "@/hooks/useModalDismiss";
 import { BrandMedia } from "@/components/ui/BrandMedia";
 import { LazyVideo } from "@/components/ui/LazyVideo";
+import { PinchZoomPhoto } from "@/components/ui/PinchZoomPhoto";
 import { useSiteBrandingStore } from "@/store/useSiteBrandingStore";
 import type { IntraCityTransport } from "@/store/useSingleDayBuilderStore";
 
@@ -71,7 +72,7 @@ export function MovementDetailModal({
               <X className="h-5 w-5" strokeWidth={2.5} />
             </button>
 
-            <div className="relative aspect-[16/10] w-full bg-zinc-900">
+            <PinchZoomPhoto className="relative aspect-[16/10] w-full bg-zinc-900">
               {item.isVideo && item.mediaUrl ? (
                 <LazyVideo
                   src={item.mediaUrl}
@@ -88,13 +89,14 @@ export function MovementDetailModal({
                   fallback="/brand/hero-single-day.jpg"
                   alt=""
                   className="h-full w-full object-cover"
+                  draggable={false}
                 />
               )}
-              <div className="absolute inset-0 bg-gradient-to-t from-[#0D1117] via-transparent to-transparent" />
-            </div>
+              <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#0D1117] via-transparent to-transparent" />
+            </PinchZoomPhoto>
 
             <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-5 py-4 pb-[max(1.5rem,env(safe-area-inset-bottom))]">
-              <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#1BA58A]">
+              <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-white">
                 Preferred movement
               </p>
               <h3 className="font-godiva text-2xl uppercase tracking-wider text-white">

@@ -40,7 +40,7 @@ export function SingleDayProgressBar() {
     SECTIONS.length <= 1 ? 0 : (lastReached / (SECTIONS.length - 1)) * 100;
 
   return (
-    <div className="sticky top-0 z-40 overflow-visible border-b border-[#2C2C2E] bg-[#000000] px-3 py-3.5 shadow-xl backdrop-blur-md sm:px-6">
+    <div className="sticky top-[3.75rem] z-40 overflow-visible border-b border-[#2C2C2E] bg-[#000000] px-3 py-3.5 shadow-xl backdrop-blur-md lg:top-0 sm:px-6">
       <TimelineMascotRow variant="single">
         <ol className="relative flex items-start justify-between gap-1">
           <span

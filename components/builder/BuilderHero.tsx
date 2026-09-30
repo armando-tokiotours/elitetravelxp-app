@@ -2,7 +2,9 @@
 
 import { useEffect, useState } from "react";
 import {
-  DEFAULT_SITE_BRANDING,
+  DEFAULT_HERO_IMAGE,
+  brandingHeroUrl,
+  fetchPublicBrandAssets,
   type PbSiteBranding,
 } from "@/lib/pocketbase/client";
 
@@ -12,23 +14,32 @@ const HERO_SUBTITLE_DEFAULT =
 const HERO_CHARACTER_SRC = "/images/peek-character.png";
 
 /**
- * Multi-day builder hero — solid dark + character + copy.
- * Scenic photo/video/scrim removed (same as Builder S).
+ * Multi-day builder hero — admin still (or public brand fallback) + character + copy.
+ * Video/scrim removed so first paint stays instant; image is the Team Branding upload.
  */
 export function BuilderHero({ branding }: { branding: PbSiteBranding | null }) {
   const [subtitle, setSubtitle] = useState(
     () =>
       branding?.hero_subtitle?.trim() ||
-      DEFAULT_SITE_BRANDING.hero_subtitle ||
       HERO_SUBTITLE_DEFAULT
   );
+  const [heroSrc, setHeroSrc] = useState(DEFAULT_HERO_IMAGE);
 
   useEffect(() => {
     setSubtitle(
-      branding?.hero_subtitle?.trim() ||
-        DEFAULT_SITE_BRANDING.hero_subtitle ||
-        HERO_SUBTITLE_DEFAULT
+      branding?.hero_subtitle?.trim() || HERO_SUBTITLE_DEFAULT
     );
+  }, [branding]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void fetchPublicBrandAssets().then((assets) => {
+      if (cancelled) return;
+      setHeroSrc(brandingHeroUrl(branding, assets));
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [branding]);
 
   return (
@@ -36,9 +47,15 @@ export function BuilderHero({ branding }: { branding: PbSiteBranding | null }) {
       className="builder-hero relative z-10 h-[65vh] w-full min-h-[280px] overflow-hidden bg-[#05080C] sm:h-[80vh] md:min-h-[420px]"
       aria-label="Hero"
     >
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={heroSrc}
+        alt=""
+        className="absolute inset-0 z-0 h-full w-full object-cover"
+      />
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-0 z-10 bg-gradient-to-t from-[#05080C] via-[#05080C]/40 to-transparent"
+        className="pointer-events-none absolute inset-0 z-10 bg-gradient-to-t from-[#05080C] via-[#05080C]/55 to-[#05080C]/25"
       />
 
       {/* eslint-disable-next-line @next/next/no-img-element */}

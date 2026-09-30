@@ -681,19 +681,19 @@ export function TimingSelector({ value, onChange, tripType }: Props) {
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                className="tokio-modal-backdrop fixed inset-0 z-[9998] flex items-end justify-center p-0 sm:items-center sm:p-4"
+                className="tokio-modal-backdrop fixed inset-0 z-[9998] flex items-center justify-center p-4"
                 onClick={() => setOpen(false)}
               >
                 <motion.div
                   role="dialog"
                   aria-modal="true"
                   aria-labelledby="timing-modal-title"
-                  initial={{ y: 40, opacity: 0 }}
-                  animate={{ y: 0, opacity: 1 }}
-                  exit={{ y: 24, opacity: 0 }}
+                  initial={{ scale: 0.96, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  exit={{ scale: 0.96, opacity: 0 }}
                   transition={{ type: "spring", damping: 26, stiffness: 320 }}
                   onClick={(e) => e.stopPropagation()}
-                  className="tokio-modal-content relative z-[9999] max-h-[88dvh] w-full max-w-md overflow-y-auto rounded-t-3xl border border-white/10 p-5 sm:rounded-3xl sm:p-6"
+                  className="tokio-modal-content relative z-[9999] max-h-[88dvh] w-full max-w-md overflow-y-auto rounded-3xl border border-white/10 p-5 sm:p-6"
                 >
                   <div className="mb-4 flex items-start justify-between gap-3">
                     <div>
