@@ -17,6 +17,8 @@ export interface SelectedTour {
   languages?: string[];
   /** Guest-overridden duration (tailor-made); UI slider comes later */
   customDuration?: boolean;
+  /** tours.access_type — drives Ops ticketer demand */
+  access_type?: string;
 }
 
 export type SelectedToursByCity = Record<string, SelectedTour[]>;

@@ -66,9 +66,6 @@ export function LocationsNightsSection({
   const removeLocation = useBuilderStore((s) => s.removeLocation);
   const setLocationNights = useBuilderStore((s) => s.setLocationNights);
   const setLocationVisitType = useBuilderStore((s) => s.setLocationVisitType);
-  const setLocationTransitType = useBuilderStore(
-    (s) => s.setLocationTransitType
-  );
   const reorderLocations = useBuilderStore((s) => s.reorderLocations);
   const toggleTour = useBuilderStore((s) => s.toggleTour);
   const syncRouteTransitHubs = useBuilderStore((s) => s.syncRouteTransitHubs);
@@ -272,7 +269,6 @@ export function LocationsNightsSection({
         onReorder={handleReorder}
         onNights={(key, n) => setLocationNights(key, n)}
         onVisitType={(key, t) => setLocationVisitType(key, t)}
-        onTransit={(key, t) => setLocationTransitType(key, t)}
         onRemove={(key) => removeLocation(key)}
         onAddTour={(id) => {
           if (!selectedTourIds.includes(id)) toggleTour(id);
@@ -398,8 +394,8 @@ function RouteSummaryWidget({
         </div>
       ) : (
         <p className="mt-3 text-sm text-zinc-500">
-          Tap to add cities, set nights per stop, and choose transit. Hotels are
-          optional in the next step.
+          Tap to add cities and set nights per stop. Inter-city travel is set in
+          Transport. Hotels are optional in the next step.
         </p>
       )}
 

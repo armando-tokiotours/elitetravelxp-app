@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowRight, FileText, Luggage, Printer, Receipt, Save, Send, Wallet } from "lucide-react";
+import { ArrowRight, Printer, Receipt, Save, Send, Wallet } from "lucide-react";
 import { submitBookingRequest } from "@/lib/bookingRequest";
 import { calculateSingleDayQuote, formatEur } from "@/lib/singleDayPricing";
 import { useBuilderStore } from "@/store/useBuilderStore";
@@ -34,6 +34,7 @@ import { getSystemMessage } from "@/lib/systemMessages";
 import {
   fetchPaymentConfigured,
   isSingleDayBuilderComplete,
+  singleDayIncompleteFoxMessage,
 } from "@/lib/itineraryGates";
 import { useItineraryStore } from "@/store/useItineraryStore";
 import { usePreBuilderStore } from "@/store/usePreBuilderStore";
@@ -163,7 +164,14 @@ export default function SingleDayItineraryPageClient() {
       })
     ) {
       showSystemMessage({
-        text: getSystemMessage("builder_incomplete"),
+        text: singleDayIncompleteFoxMessage({
+          tourDate,
+          tourHours,
+          adults,
+          cityFocus,
+          selectedExperienceCount: selectedExperiences.length,
+          experiencesStepDone,
+        }),
         tone: "error",
       });
       return;
@@ -192,7 +200,14 @@ export default function SingleDayItineraryPageClient() {
       })
     ) {
       showSystemMessage({
-        text: getSystemMessage("builder_incomplete"),
+        text: singleDayIncompleteFoxMessage({
+          tourDate,
+          tourHours,
+          adults,
+          cityFocus,
+          selectedExperienceCount: selectedExperiences.length,
+          experiencesStepDone,
+        }),
         tone: "error",
       });
       return;
@@ -220,7 +235,8 @@ export default function SingleDayItineraryPageClient() {
       bookingRef: ref,
       email: guestEmail,
       state: sd,
-      status: "in_progress",
+      // Autosave stays draft (BAL "lead") until Save & Email / submit
+      status: "lead",
       quote: quote ? { min: quote.min, max: quote.max } : undefined,
     });
     showSystemMessage({
@@ -385,66 +401,57 @@ export default function SingleDayItineraryPageClient() {
           </div>
 
           <div
-            className="mt-4 flex flex-col gap-2 border-t border-white/10 pt-2"
-            role="tablist"
-            aria-label="Single-day itinerary view"
+            className="mt-4 flex flex-col gap-2.5 border-t border-white/10 pt-3"
+            role="toolbar"
+            aria-label="Single-day itinerary actions"
           >
-            <div className="grid grid-cols-2 gap-2">
-              <ToggleBtn
-                active={activeView === "dossier"}
-                onClick={() => setMode("dossier")}
-                icon={<Luggage className="h-3.5 w-3.5" />}
-                label="Travel Dossier"
-                className="w-full justify-center"
-              />
+            <div className="mx-auto grid w-full max-w-lg grid-cols-4 gap-2.5">
               <ToggleBtn
                 active={activeView === "invoice"}
-                onClick={requestInvoiceView}
+                onClick={() => {
+                  if (activeView === "invoice") setMode("dossier");
+                  else void requestInvoiceView();
+                }}
                 icon={<Receipt className="h-3.5 w-3.5" />}
                 label="Invoice"
                 className="w-full justify-center"
               />
-            </div>
-            <div className="grid grid-cols-5 items-center gap-2">
               <button
                 type="button"
                 onClick={() => void requestSaveOnly()}
-                aria-label="Save"
+                aria-label="Save document"
                 title="Save"
-                className="col-span-1 inline-flex items-center justify-center rounded-xl border border-white/10 bg-black/40 p-2.5 text-zinc-200 hover:text-white"
+                className="inline-flex items-center justify-center rounded-xl border border-white/10 bg-white/5 p-2.5 text-white transition-colors hover:bg-white/10"
               >
                 <Save className="h-4 w-4" aria-hidden />
               </button>
-              <span className="col-span-1" aria-hidden />
               <button
                 type="button"
                 onClick={() => void requestSendPdf()}
-                aria-label="Send"
-                title="Send"
-                className="col-span-1 inline-flex items-center justify-center rounded-xl border border-white/15 bg-transparent p-2.5 text-white hover:border-white/30 hover:bg-white/5"
+                aria-label="Send / Share"
+                title="Send / Share"
+                className="inline-flex items-center justify-center rounded-xl border border-white/10 bg-white/5 p-2.5 text-white transition-colors hover:bg-white/10"
               >
                 <Send className="h-4 w-4" aria-hidden />
               </button>
-              <span className="col-span-1" aria-hidden />
               <button
                 type="button"
                 onClick={requestPrintOnly}
-                aria-label="Print"
+                aria-label="Print dossier"
                 title="Print"
-                className="col-span-1 inline-flex items-center justify-center rounded-xl border border-white/10 bg-black/40 p-2.5 text-zinc-200 hover:text-white"
+                className="inline-flex items-center justify-center rounded-xl border border-white/10 bg-white/5 p-2.5 text-white transition-colors hover:bg-white/10"
               >
                 <Printer className="h-4 w-4" aria-hidden />
               </button>
             </div>
-            <div className="grid grid-cols-5 items-center gap-2">
+            <div className="mx-auto grid w-full max-w-lg grid-cols-2 gap-3">
               <Link
                 href="/builder-single"
-                className="col-span-3 inline-flex items-center justify-center gap-1.5 rounded-xl border border-zinc-700 bg-black/30 px-3.5 py-2 text-[11px] font-bold tracking-wider text-zinc-300 uppercase transition-all hover:bg-black/60"
+                className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-white/20 bg-transparent px-3.5 py-3 text-[11px] font-bold tracking-wider text-zinc-300 uppercase transition-all hover:bg-white/5"
               >
                 ← Continue editing
               </Link>
-              <span className="col-span-1" aria-hidden />
-              <div className="col-span-1 flex justify-end">
+              <div className="flex w-full [&_button]:w-full">
                 <NewBookingResetButton variant="nav" />
               </div>
             </div>

@@ -413,7 +413,7 @@ export function ManageBookingModal({
           <input
             value={pnr}
             onChange={(e) => setPnr(e.target.value.toUpperCase())}
-            placeholder="Booking Reference (e.g. JPN-7K9P2X)"
+            placeholder="Booking Reference (e.g. JPN-A8F2K9)"
             autoComplete="off"
             spellCheck={false}
             className="mb-3 w-full rounded-xl border border-zinc-800 bg-zinc-900 p-3 text-sm uppercase tracking-wider text-white outline-none placeholder:normal-case placeholder:tracking-normal placeholder:text-zinc-500 focus:border-zinc-600"

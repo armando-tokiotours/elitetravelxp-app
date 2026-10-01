@@ -285,10 +285,8 @@ export function hydrateStoresFromPreEliteBrief(
       preEliteMotivation: data.tripMotivation,
       preElitePainPoints: data.painPoints,
       confirmedBookingRef: bookingRef,
-      bookingStatus: "in_progress" as const,
-      tempBookingRef: bookingRef.startsWith("TMP-")
-        ? bookingRef
-        : s.tempBookingRef || bookingRef,
+      bookingStatus: "draft" as const,
+      tempBookingRef: bookingRef || s.tempBookingRef,
       highestUnlockedStep: Math.max(1, s.highestUnlockedStep),
     };
   });
@@ -338,7 +336,7 @@ export function hydrateStoresFromPreEliteBrief(
         : null,
       userProfileTag: kept ? kept.userProfileTag : null,
       confirmedBookingRef: bookingRef,
-      bookingStatus: "in_progress",
+      bookingStatus: "draft",
       tempBookingRef: bookingRef,
     };
   });

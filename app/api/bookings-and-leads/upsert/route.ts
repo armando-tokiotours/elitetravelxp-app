@@ -44,7 +44,7 @@ export async function POST(request: Request) {
       body?.dossierPdfUrl ?? body?.dossier_pdf_url ?? null;
     const recordEmailSent = Boolean(body?.recordEmailSent);
 
-    // Accept official JPN- or draft TMP- refs (Builder M/S in-progress sync).
+    // Accept official JPN- (and legacy TMP-/TK- on normalize).
     if (!isValidBookingPNR(bookingRef) && !isTempBookingRef(bookingRef)) {
       return NextResponse.json(
         { error: "A valid booking_ref (PNR) is required." },
@@ -117,17 +117,71 @@ export async function POST(request: Request) {
           ticketsNeeded?: boolean;
           driverNeeded?: boolean;
           guideNeeded?: boolean;
+          ticketLines?: unknown[];
         }
       | undefined;
     if (demand) {
-      void import("@/lib/opsDemand").then(({ applyOpsDemandForPnrAdmin }) =>
-        applyOpsDemandForPnrAdmin(bookingRef, {
-          ticketsNeeded: Boolean(demand.ticketsNeeded),
-          driverNeeded: Boolean(demand.driverNeeded),
-          // Single/multi tour days always need guide desk (Ops decides assign or not)
-          guideNeeded: demand.guideNeeded !== false,
-        })
-      );
+      void (async () => {
+        try {
+          const { getAdminPocketBase } = await import("@/lib/pocketbase/admin");
+          const {
+            applyOpsDemandForPnr,
+            enrichDemandFromTourCatalog,
+            tourIdsFromSelections,
+          } = await import("@/lib/opsDemand");
+          const pb = await getAdminPocketBase();
+          const tourIds = tourIdsFromSelections(selections);
+          const base = {
+            ticketsNeeded: Boolean(demand.ticketsNeeded),
+            driverNeeded: Boolean(demand.driverNeeded),
+            guideNeeded: demand.guideNeeded !== false,
+            ticketLines: Array.isArray(demand.ticketLines)
+              ? (demand.ticketLines as never[])
+              : [],
+          };
+          const enriched = await enrichDemandFromTourCatalog(
+            pb,
+            base,
+            tourIds
+          );
+          await applyOpsDemandForPnr(pb, bookingRef, enriched);
+        } catch (err) {
+          console.warn(
+            "[bookings-and-leads/upsert] demand",
+            err instanceof Error ? err.message : err
+          );
+        }
+      })();
+    } else {
+      // Still heal tickets from selections even if client omitted demand.
+      void (async () => {
+        try {
+          const { getAdminPocketBase } = await import("@/lib/pocketbase/admin");
+          const {
+            applyOpsDemandForPnr,
+            enrichDemandFromTourCatalog,
+            tourIdsFromSelections,
+          } = await import("@/lib/opsDemand");
+          const pb = await getAdminPocketBase();
+          const tourIds = tourIdsFromSelections(selections);
+          if (tourIds.length === 0) return;
+          const enriched = await enrichDemandFromTourCatalog(
+            pb,
+            {
+              ticketsNeeded: false,
+              driverNeeded: false,
+              guideNeeded: true,
+              ticketLines: [],
+            },
+            tourIds
+          );
+          if (enriched.ticketsNeeded) {
+            await applyOpsDemandForPnr(pb, bookingRef, enriched);
+          }
+        } catch {
+          /* ignore */
+        }
+      })();
     }
 
     return NextResponse.json({

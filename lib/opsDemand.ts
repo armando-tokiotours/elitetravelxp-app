@@ -1,12 +1,24 @@
 /**
  * Derive Ops demand flags from guest itinerary selections.
  * Ticketer / driver / guide portals only surface jobs when needed.
+ *
+ * Tickets needed when:
+ * - transport products / Suica / public rail picks
+ * - selected experiences with access_type Ticket / Admission / VIP / Time-sensitive
+ * - legacy title heuristics (teamLab, Ghibli, …) when access_type missing
  */
 
 import type PocketBase from "pocketbase";
 import type { BuilderState } from "@/store/useBuilderStore";
 import type { SingleDayBuilderState } from "@/store/useSingleDayBuilderStore";
 import type { TransportTicketLine } from "@/lib/transportProducts";
+import {
+  accessTypeNeedsTicketer,
+  accessTypePurchaseMode,
+  accessTypeStaffLabel,
+  experienceNeedsEntryTicket,
+  type ExperienceAccessTicketLine,
+} from "@/lib/accessType";
 import { ensureDispatchRow } from "@/lib/opsDispatch";
 import { ensureTicketsRow, updateTicketsByPnr } from "@/lib/opsTickets";
 
@@ -14,8 +26,41 @@ export type OpsDemandFlags = {
   ticketsNeeded: boolean;
   driverNeeded: boolean;
   guideNeeded: boolean;
-  ticketLines?: TransportTicketLine[];
+  ticketLines?: Array<TransportTicketLine | ExperienceAccessTicketLine>;
 };
+
+function experienceTicketLinesFromRows(
+  rows: Array<{
+    tourId?: string;
+    title?: string;
+    access_type?: string;
+  }>
+): ExperienceAccessTicketLine[] {
+  const out: ExperienceAccessTicketLine[] = [];
+  for (const e of rows) {
+    const access = String(e.access_type || "").trim();
+    const needs =
+      accessTypeNeedsTicketer(access) ||
+      experienceNeedsEntryTicket({
+        title: e.title,
+        access_type: access || null,
+      });
+    if (!needs) continue;
+    const resolved =
+      access ||
+      (experienceNeedsEntryTicket({ title: e.title })
+        ? "direct_ticket"
+        : "");
+    out.push({
+      tourId: e.tourId,
+      name: String(e.title || "Experience").trim() || "Experience",
+      qty: 1,
+      accessType: resolved || "direct_ticket",
+      purchaseMode: accessTypePurchaseMode(resolved || "direct_ticket"),
+    });
+  }
+  return out;
+}
 
 export function demandFromMultiDay(
   state: Pick<
@@ -29,7 +74,9 @@ export function demandFromMultiDay(
   >
 ): OpsDemandFlags {
   const locations = state.locations || [];
-  const ticketLines = [...(state.selectedTransportProducts || [])];
+  const ticketLines: Array<TransportTicketLine | ExperienceAccessTicketLine> = [
+    ...(state.selectedTransportProducts || []),
+  ];
   let ticketsNeeded =
     Boolean(state.arrivalNeedsTicket) || ticketLines.length > 0;
   let driverNeeded = false;
@@ -62,6 +109,27 @@ export function demandFromMultiDay(
     }
   }
 
+  const tourRows: Array<{
+    tourId?: string;
+    title?: string;
+    access_type?: string;
+  }> = [];
+  const selected = state.selectedTours || {};
+  for (const list of Object.values(selected)) {
+    for (const t of list || []) {
+      tourRows.push({
+        tourId: t.tourId,
+        title: t.title,
+        access_type: (t as { access_type?: string }).access_type,
+      });
+    }
+  }
+  const expLines = experienceTicketLinesFromRows(tourRows);
+  if (expLines.length > 0) {
+    ticketsNeeded = true;
+    ticketLines.push(...expLines);
+  }
+
   return { ticketsNeeded, driverNeeded, guideNeeded, ticketLines };
 }
 
@@ -76,7 +144,18 @@ export function demandFromSingleDay(
   >
 ): OpsDemandFlags {
   const transit = String(state.preferredMovement || "").toLowerCase();
-  const ticketLines = [...(state.selectedTransportProducts || [])];
+  const ticketLines: Array<TransportTicketLine | ExperienceAccessTicketLine> = [
+    ...(state.selectedTransportProducts || []),
+  ];
+  const expLines = experienceTicketLinesFromRows(
+    (state.selectedExperiences || []).map((e) => ({
+      tourId: e.tourId,
+      title: e.title,
+      access_type: e.access_type,
+    }))
+  );
+  if (expLines.length > 0) ticketLines.push(...expLines);
+
   const ticketsNeeded =
     ticketLines.length > 0 ||
     transit.includes("suica") ||
@@ -85,16 +164,8 @@ export function demandFromSingleDay(
     transit.includes("public") ||
     transit.includes("rail") ||
     transit.includes("train") ||
-    transit.includes("subway") ||
-    (state.selectedExperiences || []).some((e) => {
-      const t = String(e.title || "").toLowerCase();
-      return (
-        t.includes("teamlab") ||
-        t.includes("team lab") ||
-        t.includes("ghibli") ||
-        t.includes("disney")
-      );
-    });
+    transit.includes("subway");
+
   const driverNeeded =
     transit.includes("private") ||
     transit.includes("chauffeur") ||
@@ -103,6 +174,72 @@ export function demandFromSingleDay(
   const guideNeeded = true;
 
   return { ticketsNeeded, driverNeeded, guideNeeded, ticketLines };
+}
+
+/**
+ * Look up tours.access_type for IDs missing on the client snapshot,
+ * then merge into demand (heals TeamLab-style activities already booked).
+ */
+export async function enrichDemandFromTourCatalog(
+  pb: PocketBase,
+  demand: OpsDemandFlags,
+  tourIds: string[]
+): Promise<OpsDemandFlags> {
+  const ids = [...new Set(tourIds.map((id) => String(id || "").trim()).filter(Boolean))];
+  if (ids.length === 0) return demand;
+
+  const lines = [...(demand.ticketLines || [])];
+  const haveTour = new Set(
+    lines
+      .map((l) => String((l as ExperienceAccessTicketLine).tourId || "").trim())
+      .filter(Boolean)
+  );
+  let ticketsNeeded = demand.ticketsNeeded;
+
+  for (const id of ids) {
+    if (haveTour.has(id)) continue;
+    try {
+      const tour = await pb.collection("tours").getOne<{
+        id: string;
+        title?: string;
+        name?: string;
+        access_type?: string;
+        is_self_guided?: boolean;
+        description?: string;
+      }>(id, { requestKey: null });
+      const access = String(tour.access_type || "").trim();
+      const title = String(tour.title || tour.name || id).trim();
+      const needs =
+        accessTypeNeedsTicketer(access) ||
+        experienceNeedsEntryTicket({
+          title,
+          description: tour.description,
+          access_type: access,
+          is_self_guided: tour.is_self_guided,
+        });
+      if (!needs) continue;
+      const resolved =
+        access ||
+        (experienceNeedsEntryTicket({ title }) ? "direct_ticket" : "direct_ticket");
+      ticketsNeeded = true;
+      lines.push({
+        tourId: id,
+        name: `${title} · ${accessTypeStaffLabel(resolved)}`,
+        qty: 1,
+        accessType: resolved,
+        purchaseMode: accessTypePurchaseMode(resolved),
+      });
+      haveTour.add(id);
+    } catch {
+      /* skip missing tour */
+    }
+  }
+
+  return {
+    ...demand,
+    ticketsNeeded,
+    ticketLines: lines,
+  };
 }
 
 /** Persist demand onto ops_dispatch + ops_hub + ops_tickets. */
@@ -185,4 +322,28 @@ export async function applyOpsDemandForPnrAdmin(
       err instanceof Error ? err.message : "apply failed"
     );
   }
+}
+
+/** Extract tour IDs from BAL selections JSON. */
+export function tourIdsFromSelections(selections: unknown): string[] {
+  if (!selections || typeof selections !== "object") return [];
+  const s = selections as Record<string, unknown>;
+  const ids: string[] = [];
+  if (Array.isArray(s.selectedExperienceIds)) {
+    for (const id of s.selectedExperienceIds) {
+      if (id) ids.push(String(id));
+    }
+  }
+  if (Array.isArray(s.experienceIds)) {
+    for (const id of s.experienceIds) {
+      if (id) ids.push(String(id));
+    }
+  }
+  if (Array.isArray(s.experienceSchedule)) {
+    for (const row of s.experienceSchedule) {
+      const tid = (row as { tourId?: string })?.tourId;
+      if (tid) ids.push(String(tid));
+    }
+  }
+  return [...new Set(ids)];
 }

@@ -26,6 +26,7 @@ import { CityFocusModal } from "@/components/builder/modals/CityFocusModal";
 import { MeetingPointPlacesPicker } from "@/components/builder/MeetingPointPlacesPicker";
 import { LazyVideo } from "@/components/ui/LazyVideo";
 import { useSiteBrandingStore } from "@/store/useSiteBrandingStore";
+import { SelfArrangeMicroTable } from "@/components/builder/SelfArrangeMicroTable";
 import type { GeoapifyPlace } from "@/lib/geoapify";
 import { languageFlag, languageToCode } from "@/lib/tourLanguages";
 import {
@@ -673,6 +674,8 @@ export function BuilderSView({
           onOpenMovement={setMovementModal}
           scheduled={scheduled}
           tourHours={tourHours}
+          city={selectedCity}
+          cityName={cityFocus || selectedCity?.name || "City"}
         />
       ) : null}
 
@@ -866,6 +869,8 @@ function LogisticsModal({
   onOpenMovement,
   scheduled,
   tourHours,
+  city,
+  cityName,
 }: {
   open: boolean;
   onClose: () => void;
@@ -874,6 +879,8 @@ function LogisticsModal({
   onOpenMovement: (m: IntraCityTransport) => void;
   scheduled: number;
   tourHours: number;
+  city?: PbCity | null;
+  cityName: string;
 }) {
   const [mounted, setMounted] = useState(false);
   const ensureBrandingLoaded = useSiteBrandingStore((s) => s.ensureLoaded);
@@ -896,7 +903,7 @@ function LogisticsModal({
     <BuilderEditModalShell
       open={open}
       onClose={onClose}
-      title="Hotels & Transport"
+      title="Transport"
       mounted={mounted}
       footer={
         <button
@@ -981,6 +988,13 @@ function LogisticsModal({
                     );
                   })}
                 </div>
+                {preferredMovement === "walk" ? (
+                  <SelfArrangeMicroTable
+                    city={city}
+                    nights={1}
+                    cityName={cityName}
+                  />
+                ) : null}
               </div>
               <div
                 className={`flex items-center justify-between rounded-2xl border border-white/10 px-3 py-2.5 text-xs ${

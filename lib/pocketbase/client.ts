@@ -158,6 +158,12 @@ export interface PbCity {
   base_price_modifier?: number;
   /** Guided languages available in this city (Builder language dropdown). */
   available_languages?: string[];
+  /** Self-arranged comparison: typical taxi/Uber hop (€). */
+  avg_taxi_eur?: number;
+  /** Self-arranged comparison: typical subway/day-pass (€). */
+  avg_subway_day_eur?: number;
+  /** Self-arranged comparison: typical wait mins. */
+  taxi_wait_mins?: number;
   is_active?: boolean;
   sort_order?: number;
   collectionId: string;
@@ -270,6 +276,8 @@ export interface PbCityMovement {
   private_transit_time_mins?: number;
   private_transit_cost?: number;
   is_recommended_order?: boolean;
+  /** Optional link to transport_products (Shinkansen / Suica line item). */
+  linked_transport_product_id?: string;
   collectionId?: string;
   expand?: {
     from_city_id?: PbCity;
@@ -555,7 +563,8 @@ export interface PbTour {
   /** VIP / niche — only recommended when quiz allows niche */
   is_niche?: boolean;
   /**
-   * guided_route (tours) | direct_ticket | vip_event | time_sensitive
+   * guided_route | direct_ticket (buy before) | admission (on-site) |
+   * vip_event | time_sensitive
    */
   access_type?: string;
   /** hidden_gem | classic_highlight | balanced_mix */

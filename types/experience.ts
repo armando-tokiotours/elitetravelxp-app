@@ -18,6 +18,7 @@ export type ExperiencePaceTag = "relaxed" | "standard" | "active";
 export type ExperienceAccessType =
   | "guided_route"
   | "direct_ticket"
+  | "admission"
   | "vip_event"
   | "time_sensitive";
 
@@ -114,8 +115,13 @@ export const ACCESS_TYPE_OPTIONS: {
   },
   {
     id: "direct_ticket",
-    label: "Ticket / Admission",
-    hint: "Direct entry ticket",
+    label: "Ticket",
+    hint: "Buy before — timed entry / voucher",
+  },
+  {
+    id: "admission",
+    label: "Admission",
+    hint: "Buy on-site at the door",
   },
   {
     id: "vip_event",
@@ -162,6 +168,7 @@ const PACE_SET = new Set<string>(["relaxed", "standard", "active"]);
 const ACCESS_SET = new Set<string>([
   "guided_route",
   "direct_ticket",
+  "admission",
   "vip_event",
   "time_sensitive",
 ]);
@@ -190,6 +197,7 @@ export function normalizeAccessType(raw: unknown): ExperienceAccessType | null {
   const v = String(raw ?? "")
     .toLowerCase()
     .trim();
+  if (v === "ticket") return "direct_ticket";
   return ACCESS_SET.has(v) ? (v as ExperienceAccessType) : null;
 }
 

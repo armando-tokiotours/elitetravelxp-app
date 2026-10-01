@@ -13,6 +13,8 @@ const LINKS = [
   { href: "/builder", label: "Trip Builder" },
   { href: "/discover", label: "Discover Experiences" },
   { href: "/builder/itinerary", label: "My Saved Itineraries" },
+  { href: "/faq", label: "FAQ" },
+  { href: "/policies", label: "Terms & Policies" },
 ] as const;
 
 export function AppShell({

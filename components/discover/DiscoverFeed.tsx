@@ -248,6 +248,7 @@ export function DiscoverFeed() {
         selectedLanguage: selectedLanguage.trim(),
         duration_hours: hours,
         price: tourPrice(tour, guests),
+        access_type: String(tour.access_type || "").trim() || undefined,
       });
       setToast(`Added · ${tour.title}`);
       return { ok: true as const };
@@ -293,6 +294,7 @@ export function DiscoverFeed() {
         scheduledDate,
         selectedLanguage: selectedLanguage.trim(),
         price: tourPrice(tour, guests),
+        access_type: String(tour.access_type || "").trim() || undefined,
         ...(tour.languages?.length ? { languages: tour.languages } : {}),
       });
       if (ok) setToast(`Added · ${tour.title}`);

@@ -1,16 +1,19 @@
 "use client";
 
-import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
+  BookOpen,
   Briefcase,
   Building2,
   Car,
+  ChevronDown,
+  ChevronUp,
   ClipboardList,
   CreditCard,
-  Home,
+  Link2,
   Map,
+  RefreshCw,
   Settings2,
   Ticket,
   UserCircle,
@@ -33,6 +36,9 @@ import {
 } from "@/lib/staffRoles";
 import { useTeamAuth } from "@/store/useTeamAuth";
 import { ShortcutTile } from "@/components/staff/ShortcutTile";
+
+const STAFF_NAV_EXPANDED_KEY = "staff-nav-expanded";
+export const STAFF_PORTAL_REFRESH_EVENT = "staff-portal-refresh";
 
 type StaffNavLink = {
   href: string;
@@ -66,6 +72,12 @@ function linksForRole(role: StaffRole | null): StaffNavLink[] {
       href: "/agent",
       label: "Concierge",
       icon: <Users className="h-5 w-5" strokeWidth={2} />,
+    });
+  if (canAccessAgent(role))
+    links.push({
+      href: "/agent/draft",
+      label: "Draft link",
+      icon: <Link2 className="h-5 w-5" strokeWidth={2} />,
     });
   if (canAccessTicketer(role))
     links.push({
@@ -119,6 +131,12 @@ function linksForRole(role: StaffRole | null): StaffNavLink[] {
       href: "/team-access",
       label: "Content",
       icon: <Settings2 className="h-5 w-5" strokeWidth={2} />,
+    });
+  if (canAccessTeamAccess(role))
+    links.push({
+      href: "/staff/logic-dictionary",
+      label: "Logic dictionary",
+      icon: <BookOpen className="h-5 w-5" strokeWidth={2} />,
     });
 
   return links;
@@ -243,20 +261,25 @@ export function StaffPortalShell({
   title,
   allow,
   children,
+  wide = false,
 }: {
   title: string;
   allow: (role: StaffRole | null) => boolean;
   children: ReactNode;
+  /** Wider content + header for email-style split layouts (e.g. /ops). */
+  wide?: boolean;
 }) {
   const pathname = usePathname();
   const router = useRouter();
   const [ready, setReady] = useState(false);
+  const [isNavExpanded, setIsNavExpanded] = useState(false);
   const isAuthenticated = useTeamAuth((s) => s.isAuthenticated);
   const email = useTeamAuth((s) => s.email);
   const role = useTeamAuth((s) => s.role);
   const logout = useTeamAuth((s) => s.logout);
   const hydrateAuth = useTeamAuth((s) => s.hydrateAuth);
   const homePath = useTeamAuth((s) => s.homePath);
+  const maxW = wide ? "max-w-[90rem]" : "max-w-6xl";
 
   useEffect(() => {
     let cancelled = false;
@@ -272,6 +295,27 @@ export function StaffPortalShell({
   }, [hydrateAuth]);
 
   useEffect(() => {
+    try {
+      const raw = localStorage.getItem(STAFF_NAV_EXPANDED_KEY);
+      if (raw === "1" || raw === "true") setIsNavExpanded(true);
+      else setIsNavExpanded(false);
+    } catch {
+      setIsNavExpanded(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(
+        STAFF_NAV_EXPANDED_KEY,
+        isNavExpanded ? "1" : "0"
+      );
+    } catch {
+      /* ignore */
+    }
+  }, [isNavExpanded]);
+
+  useEffect(() => {
     if (!ready || !isAuthenticated) return;
     if (!allow(role)) {
       router.replace(homePath());
@@ -279,16 +323,29 @@ export function StaffPortalShell({
   }, [ready, isAuthenticated, role, allow, router, homePath]);
 
   const links = linksForRole(role);
+  const ribbonSummary = useMemo(
+    () => links.map((l) => l.label).join(" · ") || "Modules",
+    [links]
+  );
+
+  const handleRefresh = () => {
+    window.dispatchEvent(new CustomEvent(STAFF_PORTAL_REFRESH_EVENT));
+    router.refresh();
+  };
 
   return (
-    <div className="min-h-screen bg-[#0B0F14] text-zinc-200">
-      <header className="sticky top-0 z-40 border-b border-zinc-800 bg-[#0B0F14]/95 backdrop-blur">
-        <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-3 px-4 py-3 sm:px-6">
+    <div className="flex min-h-screen flex-col bg-[#0B0F14] text-zinc-200">
+      <header className="sticky top-0 z-40 border-b border-zinc-800 bg-[#0A1017]/95 backdrop-blur">
+        <div
+          className={`mx-auto flex ${maxW} flex-wrap items-center gap-2 px-4 py-2 sm:px-6`}
+        >
           <div className="min-w-0 flex-1">
-            <p className="text-[0.6rem] font-semibold uppercase tracking-[0.3em] text-[#075473]">
+            <p className="text-[0.6rem] font-semibold tracking-[0.3em] text-[#075473] uppercase">
               TOKIOTOURS · Staff
             </p>
-            <h1 className="font-display text-xl text-white">{title}</h1>
+            <h1 className="font-display text-lg leading-tight text-white sm:text-xl">
+              {title}
+            </h1>
           </div>
           {isAuthenticated && role ? (
             <p className="text-xs text-zinc-500">
@@ -308,28 +365,68 @@ export function StaffPortalShell({
             </button>
           ) : null}
         </div>
+
         {isAuthenticated && links.length > 0 ? (
-          <nav className="mx-auto flex max-w-6xl gap-2 overflow-x-auto px-4 pb-3 sm:px-6">
-            {links.map((l) => {
-              const active =
-                pathname === l.href ||
-                (l.href !== "/ops" && pathname.startsWith(l.href + "/")) ||
-                (l.href === "/ops" && pathname === "/ops");
-              return (
-                <ShortcutTile
-                  key={l.href}
-                  href={l.href}
-                  label={l.label}
-                  icon={l.icon}
-                  active={active}
-                />
-              );
-            })}
-          </nav>
+          <div className="border-t border-white/10">
+            <div
+              className={`mx-auto flex ${maxW} items-center justify-between gap-3 px-4 py-1.5 sm:px-6`}
+            >
+              <button
+                type="button"
+                onClick={() => setIsNavExpanded((v) => !v)}
+                className="flex min-w-0 flex-1 items-center gap-2 text-left text-xs text-zinc-400 transition hover:text-white"
+                aria-expanded={isNavExpanded}
+              >
+                <span className="shrink-0 font-bold tracking-wider text-[#F6A724] uppercase">
+                  Navigation
+                </span>
+                {isNavExpanded ? (
+                  <ChevronUp className="h-3.5 w-3.5 shrink-0 text-zinc-500" />
+                ) : (
+                  <ChevronDown className="h-3.5 w-3.5 shrink-0 text-zinc-500" />
+                )}
+                <span className="truncate text-zinc-500">
+                  {isNavExpanded ? "Hide menu" : ribbonSummary}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleRefresh}
+                className="ml-auto flex shrink-0 items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-3 py-1 text-xs font-medium text-zinc-300 transition hover:bg-white/10 hover:text-white"
+              >
+                <RefreshCw className="h-3.5 w-3.5" aria-hidden />
+                Refresh
+              </button>
+            </div>
+
+            {isNavExpanded ? (
+              <nav
+                className={`mx-auto flex ${maxW} gap-2 overflow-x-auto border-t border-white/5 px-4 py-2.5 sm:px-6`}
+              >
+                {links.map((l) => {
+                  const active =
+                    pathname === l.href ||
+                    (l.href !== "/ops" &&
+                      pathname.startsWith(l.href + "/")) ||
+                    (l.href === "/ops" && pathname === "/ops");
+                  return (
+                    <ShortcutTile
+                      key={l.href}
+                      href={l.href}
+                      label={l.label}
+                      icon={l.icon}
+                      active={active}
+                    />
+                  );
+                })}
+              </nav>
+            ) : null}
+          </div>
         ) : null}
       </header>
 
-      <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6">
+      <div className={`mx-auto w-full flex-1 ${maxW} px-4 py-2 sm:px-6`}>
         {!ready ? (
           <p className="py-16 text-center text-sm text-zinc-400">Loading…</p>
         ) : !isAuthenticated ? (

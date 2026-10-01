@@ -30,6 +30,8 @@ export interface SingleDaySelectedExperience {
   selectedLanguage: string;
   duration_hours: number;
   price?: number;
+  /** tours.access_type — drives Ops ticketer demand */
+  access_type?: string;
 }
 
 export interface SingleDayBuilderState {

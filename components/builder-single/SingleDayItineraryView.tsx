@@ -33,7 +33,7 @@ import {
   DayServiceIdleRow,
   experienceNeedsEntryTicket,
 } from "@/components/dossier/DayStaffCards";
-import { useOpsStaffNames } from "@/lib/useOpsStaffNames";
+import { useOpsBookingSnapshot } from "@/lib/useOpsStaffNames";
 import { useConciergeAgentName } from "@/lib/useConciergeAgentName";
 import {
   buildDossierQrUrl,
@@ -63,6 +63,8 @@ export function SingleDayItineraryView() {
   const cityFocus = useSingleDayBuilderStore((s) => s.cityFocus);
   const guidePreference = useSingleDayBuilderStore((s) => s.guidePreference);
   const preferredMovement = useSingleDayBuilderStore((s) => s.preferredMovement);
+  const meetingPoint = useSingleDayBuilderStore((s) => s.meetingPoint);
+  const meetingPointName = useSingleDayBuilderStore((s) => s.meetingPointName);
   const selectedExperiences = useSingleDayBuilderStore(
     (s) => s.selectedExperiences
   );
@@ -163,7 +165,17 @@ export function SingleDayItineraryView() {
     bookingStatus,
   });
   const conciergeAgentName = useConciergeAgentName(pnrCode);
-  const { guideName, driverName } = useOpsStaffNames(pnrCode);
+  const ops = useOpsBookingSnapshot(pnrCode);
+  const guideName = ops.guideName;
+  const driverName = ops.driverName;
+  const guideConfirmLabel = ops.guideLabel;
+  const driverConfirmLabel = ops.driverLabel;
+  const ticketsPurchaseAllowed = ops.ticketsPurchaseAllowed;
+  const ticketGuestLabel = ops.ticketGuestLabel;
+  const agentDisplay =
+    ops.assignedAgent || conciergeAgentName || null;
+  const passStatus =
+    ops.passStatus || mapBookingStatusToPass(bookingStatus);
   const passDate = dateLabel === "Date TBD" ? "" : dateLabel.toUpperCase();
   const pickup = startTime || "09:00";
   const highlights = buildSingleDayHighlights({
@@ -192,6 +204,7 @@ export function SingleDayItineraryView() {
           key: stop.tourId,
           title: tour?.title || stop.title,
           timeLabel: stop.timeSlot || stop.startTime,
+          accessType: String(tour?.access_type || "").trim() || undefined,
         };
       })
       .filter((x): x is NonNullable<typeof x> => Boolean(x));
@@ -223,14 +236,14 @@ export function SingleDayItineraryView() {
         durationText={hoursLabel}
         startDateText={passDate}
         endDateText={passDate}
-        status={mapBookingStatusToPass(bookingStatus)}
+        status={passStatus}
         qrValue={buildDossierQrUrl(pnrCode, "/builder-single/itinerary")}
-        conciergeAgentName={conciergeAgentName}
+        conciergeAgentName={agentDisplay}
       />
 
       <CoordinationTeamSection
         pnr={pnrCode}
-        agentName={conciergeAgentName}
+        agentName={agentDisplay}
         guestEmail={passengerEmail || undefined}
         guestName={passengerName || undefined}
         tripPath="/builder-single/itinerary"
@@ -256,7 +269,7 @@ export function SingleDayItineraryView() {
               <StaffIdentityCard
                 role="driver"
                 name={driverName}
-                emptyLabel="No driver assigned yet"
+                emptyLabel={driverConfirmLabel}
               />
             ) : (
               <DayServiceIdleRow
@@ -275,7 +288,7 @@ export function SingleDayItineraryView() {
               <StaffIdentityCard
                 role="guide"
                 name={guideName}
-                emptyLabel="No guide assigned yet"
+                emptyLabel={guideConfirmLabel}
               />
             ) : (
               <DayServiceIdleRow
@@ -285,21 +298,32 @@ export function SingleDayItineraryView() {
             )}
           </div>
 
-          {/* Line 3 — Tickets (teamLab / timed entry / direct ticket) */}
+          {/* Line 3 — Tickets (gated by payment for purchase confirmation) */}
           <div className="space-y-1.5">
             <p className="text-[9px] font-bold uppercase tracking-widest text-white/45">
               Tickets
             </p>
             {ticketStops.length > 0 ? (
-              <div className="space-y-2">
-                {ticketStops.map((t) => (
-                  <TicketStubCard
-                    key={t.key}
-                    title={t.title}
-                    subtitle={`Entry · ${t.timeLabel}`}
-                  />
-                ))}
-              </div>
+              !ticketsPurchaseAllowed ? (
+                <DayServiceIdleRow
+                  label="Tickets"
+                  message={
+                    ticketGuestLabel ||
+                    "Waiting for payment confirmation"
+                  }
+                />
+              ) : (
+                <div className="space-y-2">
+                  {ticketStops.map((t) => (
+                    <TicketStubCard
+                      key={t.key}
+                      title={t.title}
+                      subtitle={`Entry · ${t.timeLabel}`}
+                      accessType={t.accessType}
+                    />
+                  ))}
+                </div>
+              )
             ) : (
               <DayServiceIdleRow
                 label="Tickets"
@@ -316,6 +340,8 @@ export function SingleDayItineraryView() {
         endTime={dropOffTime}
         totalHours={tourHours}
         cityLabel={cityLabel}
+        meetingPointName={meetingPointName || null}
+        meetingPointAddress={meetingPoint || null}
         variant="screen"
       />
     </div>

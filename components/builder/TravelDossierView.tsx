@@ -49,7 +49,7 @@ import {
   type ServiceIconState,
 } from "@/components/dossier/DayStaffCards";
 import { useConciergeAgentName } from "@/lib/useConciergeAgentName";
-import { useOpsStaffNames } from "@/lib/useOpsStaffNames";
+import { useOpsBookingSnapshot } from "@/lib/useOpsStaffNames";
 import {
   buildDossierQrUrl,
   buildRouteBreakdown,
@@ -146,7 +146,14 @@ export function TravelDossierView({
     bookingStatus: state.bookingStatus,
   });
   const conciergeAgentName = useConciergeAgentName(pnrCode);
-  const { guideName, driverName } = useOpsStaffNames(pnrCode);
+  const ops = useOpsBookingSnapshot(pnrCode);
+  const guideName = ops.guideName;
+  const driverName = ops.driverName;
+  const guideLabel = ops.guideLabel;
+  const driverLabel = ops.driverLabel;
+  const agentDisplay = ops.assignedAgent || conciergeAgentName || null;
+  const passStatus =
+    ops.passStatus || mapBookingStatusToPass(state.bookingStatus);
   const routeBreakdown = buildRouteBreakdown(state.locations, cityName);
   const hasSuica = (state.locations || []).some((l) => {
     const t = String(l.ticketType || "").toLowerCase();
@@ -201,14 +208,14 @@ export function TravelDossierView({
         startDateText={startDateText}
         endDateText={endDateText}
         routeBreakdown={routeBreakdown}
-        status={mapBookingStatusToPass(state.bookingStatus)}
+        status={passStatus}
         qrValue={buildDossierQrUrl(pnrCode, "/builder/itinerary")}
-        conciergeAgentName={conciergeAgentName}
+        conciergeAgentName={agentDisplay}
       />
 
       <CoordinationTeamSection
         pnr={pnrCode}
-        agentName={conciergeAgentName}
+        agentName={agentDisplay}
         guestEmail={passengerEmail || undefined}
         guestName={passengerName || undefined}
         tripPath="/builder/itinerary"
@@ -270,7 +277,9 @@ export function TravelDossierView({
                   onOpenTransit={(leg) => openLeg(leg)}
                   totalGuests={totalGuests}
                   guideName={hasGuidedTours ? guideName : null}
+                  guideLabel={hasGuidedTours ? guideLabel : undefined}
                   driverName={hasPrivateDriver ? driverName : null}
+                  driverLabel={hasPrivateDriver ? driverLabel : undefined}
                   showGuideCard={hasGuidedTours}
                   showDriverCard={hasPrivateDriver}
                 />
@@ -314,7 +323,9 @@ function LocationSegment({
   onOpenTransit,
   totalGuests,
   guideName,
+  guideLabel,
   driverName,
+  driverLabel,
   showGuideCard,
   showDriverCard,
 }: {
@@ -329,7 +340,9 @@ function LocationSegment({
   onOpenTransit: (leg: InterCityTransitLeg) => void;
   totalGuests: number;
   guideName?: string | null;
+  guideLabel?: string;
   driverName?: string | null;
+  driverLabel?: string;
   showGuideCard?: boolean;
   showDriverCard?: boolean;
 }) {
@@ -491,10 +504,18 @@ function LocationSegment({
           {(showGuideCard || showDriverCard) && (
             <div className="mt-3 grid gap-2 border-t border-dashed border-white/10 pt-3 sm:grid-cols-2">
               {showGuideCard ? (
-                <StaffIdentityCard role="guide" name={guideName} />
+                <StaffIdentityCard
+                  role="guide"
+                  name={guideName}
+                  emptyLabel={guideLabel}
+                />
               ) : null}
               {showDriverCard ? (
-                <StaffIdentityCard role="driver" name={driverName} />
+                <StaffIdentityCard
+                  role="driver"
+                  name={driverName}
+                  emptyLabel={driverLabel}
+                />
               ) : null}
             </div>
           )}

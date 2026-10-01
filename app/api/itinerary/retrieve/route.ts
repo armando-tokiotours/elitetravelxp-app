@@ -94,7 +94,7 @@ export async function POST(request: Request) {
     }
     if (!isValidBookingPNR(pnr) && !isTempBookingRef(pnr)) {
       return NextResponse.json(
-        { error: "Enter a valid booking PNR (e.g. JPN-7K9P2X)." },
+        { error: "Enter a valid booking PNR (e.g. JPN-A8F2K9)." },
         { status: 400 }
       );
     }

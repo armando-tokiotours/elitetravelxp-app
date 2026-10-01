@@ -20,7 +20,6 @@ import {
   type matchSeasonalHighlights,
 } from "@/lib/seasonalMatcher";
 import type {
-  CityTransitType,
   CityVisitType,
   LocationStop,
 } from "@/store/useBuilderStore";
@@ -28,9 +27,7 @@ import { useHybridTooltip } from "@/hooks/useHybridTooltip";
 import { BuilderPortalSheet } from "../BuilderPortalSheet";
 import { CityAccordionItem } from "../CityAccordionItem";
 import { CityThumb } from "../CityThumb";
-import { coerceTransitType } from "@/store/useBuilderStore";
 import { showSystemMessage } from "@/store/useSystemMessageStore";
-import { getSystemMessage } from "@/lib/systemMessages";
 import { HorizontalHelpAccordion } from "../HorizontalHelpAccordion";
 import { GoldLight } from "@/components/branding/GoldLight";
 
@@ -60,7 +57,6 @@ export function LocationsEditorModal({
   onReorder,
   onNights,
   onVisitType,
-  onTransit,
   onRemove,
   onAddTour,
   onAddCity,
@@ -93,7 +89,6 @@ export function LocationsEditorModal({
   onReorder: (next: LocationStop[]) => void;
   onNights: (key: string, n: number) => void;
   onVisitType: (key: string, t: CityVisitType) => void;
-  onTransit: (key: string, t: CityTransitType) => void;
   onRemove: (key: string) => void;
   onAddTour: (id: string) => void;
   onAddCity: (cityId: string) => boolean;
@@ -280,7 +275,6 @@ export function LocationsEditorModal({
                         selectedTourIds={selectedTourIds}
                         onNights={(n) => onNights(loc.key, n)}
                         onVisitType={(t) => onVisitType(loc.key, t)}
-                        onTransit={(t) => onTransit(loc.key, t)}
                         onRemove={() => onRemove(loc.key)}
                         onAddTour={onAddTour}
                       />
@@ -317,22 +311,7 @@ export function LocationsEditorModal({
               </div>
               <button
                 type="button"
-                onClick={() => {
-                  const missing = locations.findIndex((loc, index) => {
-                    if (isTransitHubStop(loc)) return false;
-                    if (index === locations.length - 1) return false;
-                    return coerceTransitType(loc.transitType) === "unset";
-                  });
-                  if (missing >= 0) {
-                    setExpandedKey(locations[missing].key);
-                    showSystemMessage({
-                      text: getSystemMessage("builder_m_transit_required"),
-                      tone: "error",
-                    });
-                    return;
-                  }
-                  onClose();
-                }}
+                onClick={() => onClose()}
                 disabled={!matches}
                 className="w-full rounded-full bg-[#0B1F3A] py-3 text-sm font-semibold text-white transition hover:bg-[#143052] disabled:cursor-not-allowed disabled:opacity-40"
               >

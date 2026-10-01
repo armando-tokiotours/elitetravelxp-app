@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import { ArrowLeft, Lock } from "lucide-react";
@@ -27,6 +27,8 @@ import { CityThumb } from "../CityThumb";
 import { GoldLight } from "@/components/branding/GoldLight";
 import { HorizontalHelpAccordion } from "../HorizontalHelpAccordion";
 import { CITY_PLACEHOLDER, cityPbImageUrl } from "@/lib/cityMedia";
+import { showSystemMessage } from "@/store/useSystemMessageStore";
+import { getSystemMessage } from "@/lib/systemMessages";
 
 const ROOM_KEYS: {
   key: keyof HotelRoomCounts;
@@ -226,14 +228,99 @@ export function HotelsEditorModal({
 }) {
   const [mounted, setMounted] = useState(false);
   const [showFoxIntro, setShowFoxIntro] = useState(true);
+  const [showSelfArrangeModal, setShowSelfArrangeModal] = useState(false);
+  const [expandedCityId, setExpandedCityId] = useState<string | null>(null);
+  const setNeedHotels = useBuilderStore((s) => s.setNeedHotels);
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
   useEffect(() => {
-    if (open) setShowFoxIntro(true);
+    if (open) {
+      setShowFoxIntro(true);
+      setShowSelfArrangeModal(false);
+      setExpandedCityId(null);
+    }
   }, [open]);
+
+  const applySelfArrangeAll = () => {
+    setNeedHotels(false);
+    for (const cityId of orderedCityIds) {
+      onChange(cityId, { needsHotel: false });
+    }
+    onClose();
+  };
+
+  const applyTokioToursBooks = () => {
+    setNeedHotels(true);
+    for (const cityId of orderedCityIds) {
+      const pref = cityHotels[cityId];
+      if (!pref || pref.needsHotel !== true) {
+        onChange(cityId, { needsHotel: true });
+      }
+    }
+    setShowFoxIntro(false);
+    setExpandedCityId(orderedCityIds[0] ?? null);
+  };
+
+  const citiesMissingRooms = (): string[] => {
+    const missing: string[] = [];
+    for (const cityId of orderedCityIds) {
+      const pref = cityHotels[cityId];
+      if (!pref?.needsHotel) continue;
+      const rooms = pref.rooms ?? { standard: 0, twin: 0, superior: 0 };
+      const occ =
+        Number(pref.standardOccupancy) === 1 ? (1 as const) : (2 as const);
+      const status = getHotelAllocationStatus(rooms, totalGuests, occ);
+      if (!status.covered) {
+        missing.push(cityName(cityId) || "this city");
+      }
+    }
+    return missing;
+  };
+
+  const onDoneHotels = () => {
+    if (orderedCityIds.length === 0) {
+      onClose();
+      return;
+    }
+    const missing = citiesMissingRooms();
+    if (missing.length > 0) {
+      const cityList =
+        missing.length === 1
+          ? missing[0]
+          : missing.length === 2
+            ? `${missing[0]} and ${missing[1]}`
+            : `${missing.slice(0, -1).join(", ")}, and ${missing[missing.length - 1]}`;
+      const firstMissingId = orderedCityIds.find((id) => {
+        const pref = cityHotels[id];
+        if (!pref?.needsHotel) return false;
+        const rooms = pref.rooms ?? { standard: 0, twin: 0, superior: 0 };
+        const occ =
+          Number(pref.standardOccupancy) === 1 ? (1 as const) : (2 as const);
+        return !getHotelAllocationStatus(rooms, totalGuests, occ).covered;
+      });
+      if (firstMissingId) setExpandedCityId(firstMissingId);
+      showSystemMessage({
+        text:
+          missing.length === 1
+            ? `Pick rooms for ${cityList} — guests still need beds.`
+            : `Pick rooms for ${cityList}.`,
+        tone: "error",
+        durationMs: 8000,
+      });
+      return;
+    }
+    if (!hotelsComplete) {
+      showSystemMessage({
+        text: getSystemMessage("builder_m_hotel_rooms_required"),
+        tone: "error",
+      });
+      return;
+    }
+    onClose();
+  };
 
   useEffect(() => {
     if (!open) return;
@@ -294,8 +381,8 @@ export function HotelsEditorModal({
                 <div className="flex flex-1 flex-col items-center justify-center gap-4 px-2 text-center">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
-                    src="/brand/fox-peek-right.png"
-                    alt=""
+                    src="/brand/fox-a.png"
+                    alt="TokioTours Concierge Fox"
                     className="h-28 w-auto object-contain"
                   />
                   <p className="font-godiva text-xl uppercase tracking-wide text-white">
@@ -308,14 +395,14 @@ export function HotelsEditorModal({
                   <div className="mt-2 grid w-full max-w-sm gap-2">
                     <button
                       type="button"
-                      onClick={() => setShowFoxIntro(false)}
+                      onClick={() => setShowSelfArrangeModal(true)}
                       className="rounded-xl bg-[#075473] px-4 py-3 text-xs font-bold tracking-wider text-white uppercase"
                     >
                       I do — self-arrange per city
                     </button>
                     <button
                       type="button"
-                      onClick={() => setShowFoxIntro(false)}
+                      onClick={applyTokioToursBooks}
                       className="rounded-xl border border-[#F6A724]/40 bg-[#F6A724]/10 px-4 py-3 text-xs font-bold tracking-wider text-[#F6A724] uppercase"
                     >
                       You do — TokioTours books
@@ -327,14 +414,6 @@ export function HotelsEditorModal({
                       className="rounded-xl border border-white/10 px-4 py-2 text-[11px] text-zinc-400 hover:text-white"
                     >
                       Read: Japanese hotels guide
-                    </a>
-                    <a
-                      href="https://www.booking.com/"
-                      target="_blank"
-                      rel="noreferrer"
-                      className="rounded-xl border border-white/10 px-4 py-2 text-[11px] text-zinc-400 hover:text-white"
-                    >
-                      Browse Booking.com
                     </a>
                     <a
                       href="https://www.tokiotours.nl/"
@@ -397,7 +476,7 @@ export function HotelsEditorModal({
                   Choose cities in Step 3 to configure hotels per stop.
                 </p>
               ) : (
-                <div className="flex flex-col gap-4">
+                <div className="flex flex-col gap-3">
                   {orderedCityIds.map((cityId, index) => (
                     <CityHotelCard
                       key={cityId || `hotel-city-${index}`}
@@ -411,7 +490,22 @@ export function HotelsEditorModal({
                       accommodations={accommodations.filter(
                         (a) => a.city_id === cityId
                       )}
-                      onChange={(patch) => onChange(cityId, patch)}
+                      expanded={expandedCityId === cityId}
+                      onToggleExpand={() =>
+                        setExpandedCityId((prev) =>
+                          prev === cityId ? null : cityId
+                        )
+                      }
+                      onChange={(patch) => {
+                        onChange(cityId, patch);
+                        if (patch.needsHotel === true) {
+                          setExpandedCityId(cityId);
+                        } else if (patch.needsHotel === false) {
+                          setExpandedCityId((prev) =>
+                            prev === cityId ? null : prev
+                          );
+                        }
+                      }}
                     />
                   ))}
                 </div>
@@ -446,9 +540,8 @@ export function HotelsEditorModal({
               </div>
               <button
                 type="button"
-                onClick={onClose}
-                disabled={!hotelsComplete && orderedCityIds.length > 0}
-                className="w-full rounded-full bg-[#0B1F3A] py-3 text-sm font-semibold text-white transition hover:bg-[#143052] disabled:cursor-not-allowed disabled:opacity-40"
+                onClick={onDoneHotels}
+                className="w-full rounded-full bg-[#0B1F3A] py-3 text-sm font-semibold text-white transition hover:bg-[#143052]"
               >
                 Done
               </button>
@@ -456,6 +549,52 @@ export function HotelsEditorModal({
               )}
             </div>
           </motion.div>
+
+          {showSelfArrangeModal ? (
+            <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm">
+              <div
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="self-arrange-hotels-title"
+                className="w-full max-w-sm rounded-2xl border border-white/10 bg-[#0A1017] p-6 shadow-2xl"
+              >
+                <h3
+                  id="self-arrange-hotels-title"
+                  className="mb-3 font-godiva text-xl text-[#F6A724]"
+                >
+                  Self-Arranged Hotels
+                </h3>
+                <p className="mb-4 text-sm leading-relaxed text-zinc-300">
+                  Booking your own hotels is the most cost-effective option!
+                </p>
+                <p className="mb-6 text-sm leading-relaxed text-zinc-400">
+                  Remember, you can always ask our Concierge for advice or
+                  curated recommendations at any time. A small concierge fee
+                  applies if you decide you want us to handle the final bookings
+                  for you later.
+                </p>
+                <div className="flex flex-col gap-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowSelfArrangeModal(false);
+                      applySelfArrangeAll();
+                    }}
+                    className="w-full rounded-lg bg-[#075473] py-3 font-medium text-white transition-colors hover:bg-[#075473]/80"
+                  >
+                    Got it, continue
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowSelfArrangeModal(false)}
+                    className="w-full rounded-lg border border-white/20 bg-transparent py-3 font-medium text-white transition-colors hover:bg-white/5"
+                  >
+                    Go back
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : null}
         </motion.div>
       ) : null}
     </AnimatePresence>,
@@ -472,6 +611,8 @@ function CityHotelCard({
   seasonTier,
   totalGuests,
   accommodations,
+  expanded,
+  onToggleExpand,
   onChange,
 }: {
   cityId: string;
@@ -482,6 +623,8 @@ function CityHotelCard({
   seasonTier: "Low" | "Mid" | "High" | null;
   totalGuests: number;
   accommodations: PbAccommodation[];
+  expanded: boolean;
+  onToggleExpand: () => void;
   onChange: (patch: Partial<CityHotelPref>) => void;
 }) {
   const needsHotel = pref?.needsHotel ?? false;
@@ -506,6 +649,27 @@ function CityHotelCard({
     standardOccupancy
   );
   const mixLabel = formatHotelRoomsSummary(rooms, standardOccupancy);
+  const cardRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!expanded || !needsHotel) return;
+    const el = cardRef.current;
+    if (!el) return;
+    let cancelled = false;
+    const scroll = () => {
+      if (cancelled) return;
+      el.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+        inline: "nearest",
+      });
+    };
+    const t = window.setTimeout(scroll, 60);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(t);
+    };
+  }, [expanded, needsHotel]);
 
   const [matrixRate, setMatrixRate] = useState<{
     min: number;
@@ -573,15 +737,22 @@ function CityHotelCard({
   };
 
   return (
-    <div className="rounded-2xl border border-zinc-800 bg-zinc-900">
-      <div className="group relative flex w-full flex-col gap-3 overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900/80 p-4 sm:flex-row sm:items-center sm:justify-between">
-        <GoldLight
-          color="#F6A724"
-          placement="top-center"
-          active={needsHotel}
-        />
-        <div className="relative z-10 flex min-w-0 w-full items-center gap-3 overflow-hidden">
-          <span className="h-16 w-16 shrink-0 overflow-hidden rounded-lg border border-zinc-700">
+    <div
+      ref={cardRef}
+      className="rounded-2xl border border-zinc-800 bg-zinc-900"
+      style={{ zoom: 0.93 }}
+    >
+      <div className="group relative flex w-full flex-col gap-2 overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900/80 p-3 sm:flex-row sm:items-center sm:justify-between">
+        {needsHotel && expanded ? (
+          <GoldLight color="#F6A724" placement="top-center" active />
+        ) : null}
+        <button
+          type="button"
+          onClick={onToggleExpand}
+          aria-expanded={expanded}
+          className="relative z-10 flex min-w-0 w-full items-center gap-2.5 overflow-hidden text-left"
+        >
+          <span className="h-14 w-14 shrink-0 overflow-hidden rounded-lg border border-zinc-700">
             <CityThumb
               city={city}
               name={cityName}
@@ -590,18 +761,18 @@ function CityHotelCard({
               className="h-full w-full object-cover"
             />
           </span>
-          <div className="flex min-w-0 flex-1 flex-col gap-1 overflow-hidden">
-            <h3 className="break-words text-sm font-semibold leading-tight tracking-wide text-white sm:text-xl sm:font-bold">
+          <div className="flex min-w-0 flex-1 flex-col gap-0.5 overflow-hidden">
+            <h3 className="break-words text-sm font-semibold leading-tight tracking-wide text-white sm:text-lg sm:font-bold">
               {cityName}
             </h3>
-            <p className="break-words text-xs leading-tight text-zinc-400">
+            <p className="break-words text-[11px] leading-tight text-zinc-400">
               {needsHotel
                 ? `Luxury Accommodations · ${starRating}-Star Tier`
                 : "No hotel needed · Self-arranged (€0)"}
             </p>
           </div>
-        </div>
-        <label className="relative z-10 flex shrink-0 cursor-pointer items-center justify-between gap-2.5 text-xs text-zinc-400 sm:justify-end">
+        </button>
+        <label className="relative z-10 flex shrink-0 cursor-pointer items-center justify-between gap-2 text-xs text-zinc-400 sm:justify-end">
           <span className="min-w-0 break-words leading-tight sm:hidden">
             Need a hotel in {cityName}?
           </span>
@@ -610,7 +781,10 @@ function CityHotelCard({
             type="button"
             role="switch"
             aria-checked={needsHotel}
-            onClick={() => onChange({ needsHotel: !needsHotel })}
+            onClick={(e) => {
+              e.preventDefault();
+              onChange({ needsHotel: !needsHotel });
+            }}
             className={`relative h-7 w-12 shrink-0 rounded-full transition ${
               needsHotel ? "bg-[#075473]" : "bg-zinc-700"
             }`}
@@ -624,16 +798,16 @@ function CityHotelCard({
         </label>
       </div>
 
-      {needsHotel ? (
-        <div className="space-y-5 border-t border-zinc-800 px-4 py-4">
+      {needsHotel && expanded ? (
+        <div className="space-y-3.5 border-t border-zinc-800 px-3 py-3">
           <div>
             <FieldLabel>Star rating</FieldLabel>
             {tierRules.vipHighlight ? (
-              <p className="mt-1 text-xs text-[#075473]">
+              <p className="mt-0.5 text-[11px] text-[#075473]">
                 VIP Bespoke · exclusive 5-star luxury ryokans & hotels
               </p>
             ) : preEliteTravelStyle === "classic_explorer" ? (
-              <p className="mt-1 text-xs text-zinc-400">
+              <p className="mt-0.5 text-[11px] text-zinc-400">
                 Classic Explorer · 3–4★ boutique stays and authentic ryokans
               </p>
             ) : null}
@@ -643,7 +817,9 @@ function CityHotelCard({
                   n as HotelStarRating
                 );
                 const selected =
-                  allowed && starRating >= n && n >= Math.min(...tierRules.allowedHotelStars);
+                  allowed &&
+                  starRating >= n &&
+                  n >= Math.min(...tierRules.allowedHotelStars);
                 if (!allowed) {
                   return (
                     <span
@@ -690,9 +866,9 @@ function CityHotelCard({
 
           <div>
             <FieldLabel>Rooms</FieldLabel>
-            <div className="mt-2 max-h-[min(50vh,22rem)] overflow-y-auto overscroll-contain rounded-xl">
+            <div className="mt-1.5 rounded-xl">
               <div
-                className={`sticky top-0 z-20 mb-3 rounded-lg border-b border-zinc-800 px-3 py-2 shadow-sm backdrop-blur-md ${
+                className={`mb-2 rounded-lg border border-zinc-800 px-2.5 py-1.5 ${
                   allocation.remainingGuests > 0
                     ? "bg-accent-950/90 text-accent-500"
                     : allocation.remainingGuests === 0 &&
@@ -701,7 +877,7 @@ function CityHotelCard({
                       : "bg-zinc-900/90 text-zinc-400"
                 }`}
               >
-                <p className="text-xs font-medium">
+                <p className="text-[11px] font-medium">
                   {allocation.remainingGuests > 0 ? (
                     <>
                       <span aria-hidden>⚠️ </span>
@@ -719,32 +895,32 @@ function CityHotelCard({
                 </p>
               </div>
 
-              <div className="space-y-2 pb-4">
+              <div className="space-y-1.5">
                 {ROOM_KEYS.map(({ key, label, capacityLabel }) => (
                   <div
                     key={key}
-                    className="rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2.5"
+                    className="rounded-lg border border-zinc-800 bg-zinc-950 px-2.5 py-2"
                   >
-                    <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center justify-between gap-2">
                       <div className="min-w-0">
                         <span className="text-sm font-medium text-white">
                           {label}
                         </span>
-                        <p className="text-[11px] text-zinc-500">
+                        <p className="text-[10px] text-zinc-500">
                           {capacityLabel}
                         </p>
                       </div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1.5">
                         <button
                           type="button"
                           aria-label={`Fewer ${label} rooms`}
                           disabled={rooms[key] <= 0}
                           onClick={() => bump(key, -1)}
-                          className="flex h-8 w-8 items-center justify-center rounded-full border border-zinc-700 text-white disabled:opacity-30"
+                          className="flex h-7 w-7 items-center justify-center rounded-full border border-zinc-700 text-white disabled:opacity-30"
                         >
                           −
                         </button>
-                        <span className="w-6 text-center text-sm font-semibold text-white">
+                        <span className="w-5 text-center text-sm font-semibold text-white">
                           {rooms[key]}
                         </span>
                         <button
@@ -752,7 +928,7 @@ function CityHotelCard({
                           aria-label={`More ${label} rooms`}
                           disabled={!allocation.canAdd}
                           onClick={() => bump(key, 1)}
-                          className="flex h-8 w-8 items-center justify-center rounded-full border border-zinc-700 text-white disabled:opacity-30"
+                          className="flex h-7 w-7 items-center justify-center rounded-full border border-zinc-700 text-white disabled:opacity-30"
                         >
                           +
                         </button>
@@ -760,7 +936,7 @@ function CityHotelCard({
                     </div>
 
                     {key === "standard" && rooms.standard > 0 ? (
-                      <div className="mt-2 flex items-center gap-1.5">
+                      <div className="mt-1.5 flex items-center gap-1.5">
                         <span className="text-[10px] uppercase tracking-wider text-zinc-500">
                           Occupancy
                         </span>
@@ -772,7 +948,7 @@ function CityHotelCard({
                             onClick={() =>
                               onChange({ standardOccupancy: occ })
                             }
-                            className={`rounded-full px-2.5 py-1 text-xs font-medium transition ${
+                            className={`rounded-full px-2 py-0.5 text-[11px] font-medium transition ${
                               standardOccupancy === occ
                                 ? "bg-[#0B1F3A] text-white ring-1 ring-[#075473]/40"
                                 : "bg-zinc-900 text-zinc-400 ring-1 ring-zinc-700 hover:ring-zinc-500"
@@ -789,7 +965,7 @@ function CityHotelCard({
             </div>
 
             {mixLabel ? (
-              <p className="mt-2 text-xs text-zinc-400">
+              <p className="mt-1.5 text-[11px] text-zinc-400">
                 Mix: <span className="text-zinc-300">{mixLabel}</span>
               </p>
             ) : null}
@@ -797,7 +973,7 @@ function CityHotelCard({
 
           <div>
             <FieldLabel>Breakfast</FieldLabel>
-            <div className="mt-4 flex items-center gap-3">
+            <div className="mt-2 flex items-center gap-2">
               <BreakfastPill
                 active={breakfast}
                 onClick={() => onChange({ breakfast: true })}

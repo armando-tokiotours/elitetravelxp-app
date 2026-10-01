@@ -30,13 +30,18 @@ export function CoordinationTeamSection({
 
   const reload = useCallback(async () => {
     const ref = String(pnr || "").trim();
-    if (!ref || ref.startsWith("TMP-")) return;
+    if (!ref) return;
     try {
       const [agentRes, commRes] = await Promise.all([
         fetch(`/api/bookings/concierge-agent?pnr=${encodeURIComponent(ref)}`, {
           cache: "no-store",
         }),
-        fetch(`/api/comm?pnr=${encodeURIComponent(ref)}`, { cache: "no-store" }),
+        // Messaging hub is JPN-only today; TMP still loads agent assignment.
+        ref.startsWith("TMP-")
+          ? Promise.resolve(null)
+          : fetch(`/api/comm?pnr=${encodeURIComponent(ref)}`, {
+              cache: "no-store",
+            }),
       ]);
       if (agentRes.ok) {
         const data = (await agentRes.json()) as {
@@ -48,7 +53,7 @@ export function CoordinationTeamSection({
         };
         setAgent(data.agent || null);
       }
-      if (commRes.ok) {
+      if (commRes && commRes.ok) {
         const data = (await commRes.json()) as {
           messages?: { author_role?: string }[];
         };

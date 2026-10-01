@@ -391,7 +391,7 @@ export async function handleSendItinerary(
       mailId,
       mailNote: mailSent ? undefined : mailNote,
       message: mailSent
-        ? `Proposal emailed to you and copy sent to ${TEAM_EMAIL_CONFIG.routing.bccRecipient}. Your booking PNR is ${bookingRef}.`
+        ? `Proposal emailed to ${contactEmail}. A team copy also went to ${TEAM_EMAIL_CONFIG.routing.bccRecipient}. Your booking PNR is ${bookingRef}.`
         : `Saved with PNR ${bookingRef}. Email could not be sent yet — keep your PNR to retrieve this itinerary.`,
     });
   } catch (err) {

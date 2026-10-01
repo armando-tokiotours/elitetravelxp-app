@@ -2,8 +2,9 @@ import type { Metadata } from "next";
 import { OpsBoardApp } from "@/components/staff/OpsBoardApp";
 
 export const metadata: Metadata = {
-  title: "Ops board",
-  description: "Assign guide, driver, and ticketer by PNR.",
+  title: "Ops inquiries",
+  description:
+    "Email-style ops inbox: assign guide, payout, tickets, and status by PNR.",
   robots: { index: false, follow: false },
 };
 

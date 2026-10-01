@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { formatPbError } from "@/lib/pocketbase/admin-schema";
 import { canAccessAgency } from "@/lib/staffRoles";
-import { generateConfirmedPNR } from "@/utils/pnr";
+import { generatePNR } from "@/utils/pnr";
 import { useTeamAuth } from "@/store/useTeamAuth";
 import { StaffPortalShell } from "@/components/staff/StaffPortalShell";
 
@@ -117,7 +117,7 @@ function AgencyInner() {
     setError(null);
     try {
       const pb = getClient();
-      const pnr = generateConfirmedPNR();
+      const pnr = generatePNR();
       const agency =
         agencies.find((a) => a.id === selectedAgencyId) ||
         null;

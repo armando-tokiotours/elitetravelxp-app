@@ -43,6 +43,7 @@ import { getSystemMessage } from "@/lib/systemMessages";
 import {
   fetchPaymentConfigured,
   isMultiDayBuilderComplete,
+  multiDayIncompleteFoxMessage,
 } from "@/lib/itineraryGates";
 import { SystemMessageFox } from "@/components/branding/SystemMessageFox";
 
@@ -191,8 +192,18 @@ export default function ItineraryPageClient() {
         cityHotels: state.cityHotels,
       })
     ) {
+      const snap = {
+        arrivalDate: state.arrivalDate,
+        durationDays: state.durationDays,
+        adults: state.adults,
+        children: state.children,
+        arrivalTransferId: state.arrivalTransferId,
+        departureTransferId: state.departureTransferId,
+        locations: state.locations,
+        cityHotels: state.cityHotels,
+      };
       showSystemMessage({
-        text: getSystemMessage("builder_incomplete"),
+        text: multiDayIncompleteFoxMessage(state.highestUnlockedStep, snap),
         tone: "error",
       });
       return;
@@ -222,8 +233,18 @@ export default function ItineraryPageClient() {
         cityHotels: state.cityHotels,
       })
     ) {
+      const snap = {
+        arrivalDate: state.arrivalDate,
+        durationDays: state.durationDays,
+        adults: state.adults,
+        children: state.children,
+        arrivalTransferId: state.arrivalTransferId,
+        departureTransferId: state.departureTransferId,
+        locations: state.locations,
+        cityHotels: state.cityHotels,
+      };
       showSystemMessage({
-        text: getSystemMessage("builder_incomplete"),
+        text: multiDayIncompleteFoxMessage(state.highestUnlockedStep, snap),
         tone: "error",
       });
       return;
@@ -255,7 +276,8 @@ export default function ItineraryPageClient() {
       email: guestEmail,
       state,
       cityNames,
-      status: "in_progress",
+      // Autosave stays draft (BAL "lead") until Save & Email / submit
+      status: "lead",
       quote: quote ? { min: quote.min, max: quote.max } : undefined,
     });
     showSystemMessage({

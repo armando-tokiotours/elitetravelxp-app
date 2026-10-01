@@ -150,7 +150,7 @@ export function JapanBookingPass({
                   {pnrCode}
                 </span>{" "}
                 is currently in{" "}
-                <span className="font-bold text-amber-400">
+                <span className="font-bold text-gray-400">
                   {String(status || "DRAFT").toUpperCase()}
                 </span>{" "}
                 status.
@@ -213,25 +213,39 @@ export function JapanBookingPass({
             <div className="relative flex flex-col items-end gap-1.5">
               {(() => {
                 const st = String(status || "DRAFT").toUpperCase();
+                const isDraft = st === "DRAFT";
                 const confirmed =
                   st === "CONFIRMED" || st === "IN_OPS" || st === "DONE";
                 const cancelled = st === "CANCELLED" || st === "CANCELED";
+                const incoming =
+                  st === "INCOMING" ||
+                  st === "IN_PROGRESS" ||
+                  st === "QUOTED" ||
+                  st === "REVIEW";
                 const spot = confirmed
                   ? "#1BA58A"
                   : cancelled
                     ? "#E60F43"
-                    : "#F6A724";
+                    : isDraft
+                      ? "#71717A"
+                      : "#F6A724";
                 return (
                   <span
                     className={`group relative overflow-hidden rounded-full border px-[0.9rem] py-[0.4rem] text-[16px] font-bold tracking-widest uppercase shadow-lg ${
-                      confirmed
-                        ? "border-emerald-400/50 bg-emerald-500/20 text-emerald-200"
-                        : cancelled
-                          ? "border-red-500/50 bg-red-500/20 text-red-200"
-                          : "border-amber-400/50 bg-amber-500/20 text-amber-200"
+                      isDraft
+                        ? "border-gray-500/30 bg-gray-500/20 text-gray-400"
+                        : confirmed
+                          ? "border-emerald-400/50 bg-emerald-500/20 text-emerald-200"
+                          : cancelled
+                            ? "border-red-500/50 bg-red-500/20 text-red-200"
+                            : incoming
+                              ? "border-amber-400/50 bg-amber-500/20 text-amber-200"
+                              : "border-amber-400/50 bg-amber-500/20 text-amber-200"
                     }`}
                   >
-                    <GoldLight color={spot} placement="top-center" active />
+                    {isDraft ? null : (
+                      <GoldLight color={spot} placement="top-center" active />
+                    )}
                     <span className="relative z-10">{st}</span>
                   </span>
                 );

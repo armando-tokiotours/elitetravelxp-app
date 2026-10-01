@@ -64,7 +64,8 @@ migrate((app) => {
           name: "expertise_topics",
           type: "select",
           required: false,
-          maxSelect: 10,
+          // PocketBase select maxSelect hard-cap is 7
+          maxSelect: 7,
           values: [
             "Pop Culture",
             "Pokemon",
@@ -166,7 +167,8 @@ migrate((app) => {
           name: "operating_cities",
           type: "select",
           required: false,
-          maxSelect: 8,
+          // PocketBase select maxSelect hard-cap is 7
+          maxSelect: 7,
           values: [
             "Tokyo",
             "Kyoto",

@@ -140,18 +140,25 @@ export function TailoredExperiencesModal({
     let ok = false;
     setDraftTours((prev) => {
       const current = prev[cityId] ?? [];
-      const without = current.filter((t) => t.tourId !== tour.tourId);
+      // Replace only the same tour on the same date; allow a second booking
+      // of the same tourId on a different day after the duplicate confirm.
+      const withoutSameSlot = current.filter(
+        (t) =>
+          !(
+            t.tourId === tour.tourId &&
+            t.scheduledDate === tour.scheduledDate
+          )
+      );
       const duration_hours = Number(tour.duration_hours) || 0;
       const check = canAddTourOnDate({
-        selectedRows: without,
+        selectedRows: withoutSameSlot,
         scheduledDate: tour.scheduledDate,
         newTourDurationHours: duration_hours,
-        tourId: tour.tourId,
       });
       if (!check.ok) return prev;
       ok = true;
       const nextRows = sortSelectedToursChronologically([
-        ...without,
+        ...withoutSameSlot,
         {
           tourId: tour.tourId,
           title: tour.title,
@@ -697,11 +704,29 @@ export function TailoredExperiencesModal({
                 }
                 const cityRows = selectedToursMap[drawerCityId] ?? [];
                 const duration_hours = Number(tour.duration_hours) || 0;
+                const sameSlot = cityRows.some(
+                  (t) =>
+                    t.tourId === tour.id && t.scheduledDate === scheduledDate
+                );
+                const isDuplicate = cityRows.some((t) => t.tourId === tour.id);
+                if (isDuplicate && !sameSlot) {
+                  const confirmAdd = window.confirm(
+                    `You have already selected "${tour.title}" for this city. Are you sure you want to book it twice?`
+                  );
+                  if (!confirmAdd) return { ok: false };
+                }
                 const check = canAddTourOnDate({
-                  selectedRows: cityRows,
+                  selectedRows: sameSlot
+                    ? cityRows.filter(
+                        (t) =>
+                          !(
+                            t.tourId === tour.id &&
+                            t.scheduledDate === scheduledDate
+                          )
+                      )
+                    : cityRows,
                   scheduledDate,
                   newTourDurationHours: duration_hours,
-                  tourId: tour.id,
                 });
                 if (!check.ok) {
                   return {
@@ -749,6 +774,16 @@ export function TailoredExperiencesModal({
 function dayShortLabel(label: string): string {
   const m = label.match(/^Day\s+\d+/i);
   return m ? m[0] : label;
+}
+
+/** e.g. "14 Oct" from YYYY-MM-DD; empty string if invalid. */
+function formatStayDayDate(iso: string | undefined | null): string {
+  if (!iso) return "";
+  const [y, m, d] = iso.split("-").map(Number);
+  if (!y || !m || !d) return "";
+  const dt = new Date(y, m - 1, d);
+  if (Number.isNaN(dt.getTime())) return "";
+  return dt.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
 }
 
 function CityExperienceAccordion({
@@ -803,16 +838,68 @@ function CityExperienceAccordion({
         `${driverDayCount} Driver Day${driverDayCount === 1 ? "" : "s"}`,
       ].join(" · ");
 
-  const orderedTours = useMemo(
-    () => sortSelectedToursChronologically(selectedTours),
-    [selectedTours]
-  );
-
   const chauffeurDayLabels = useMemo(() => {
     return dayOptions
       .filter((d) => isBillableChauffeurDay(daySelections[d.date]))
       .map((d) => dayShortLabel(d.label));
   }, [dayOptions, daySelections]);
+
+  const dayItineraryList = (
+    <div className="h-full rounded-xl border border-white/5 bg-black/40 px-3 py-3">
+      {dayOptions.length > 0 ? (
+        <ul className="space-y-1">
+          {dayOptions.map((day, index) => {
+            const dateString = formatStayDayDate(day.date);
+            const dayTours = selectedTours.filter(
+              (t) => t.scheduledDate === day.date
+            );
+            const dayBit = dateString
+              ? `${dateString} · Day ${index + 1}`
+              : `Day ${index + 1}`;
+            return (
+              <li
+                key={day.date || `day-${index}`}
+                className="text-sm text-zinc-300"
+              >
+                <span className="inline-block w-28 shrink-0 text-zinc-500">
+                  {dayBit}
+                </span>
+                <span className="ml-2 font-medium">
+                  {dayTours.length > 0 ? (
+                    dayTours
+                      .map(
+                        (t) =>
+                          `${t.title}${
+                            t.duration_hours
+                              ? `, ${t.duration_hours}h`
+                              : ""
+                          }`
+                      )
+                      .join(" | ")
+                  ) : (
+                    <span className="italic text-zinc-500">Free day</span>
+                  )}
+                </span>
+              </li>
+            );
+          })}
+        </ul>
+      ) : (
+        <p className="text-xs text-zinc-500">
+          {arrivalDateMissing
+            ? "Set your arrival date to see day-by-day dates."
+            : hideTransport
+              ? `Tap City Experiences to add tours and tickets. Max ${MAX_TOUR_HOURS_PER_DAY}h of activities per day.`
+              : `Tap a widget to add experiences or configure private transport. Max ${MAX_TOUR_HOURS_PER_DAY}h of activities per day.`}
+        </p>
+      )}
+      {chauffeurDayLabels.length > 0 && !hideTransport ? (
+        <p className="mt-2 text-xs text-zinc-400">
+          {chauffeurDayLabels.join(", ")}: Private Chauffeur
+        </p>
+      ) : null}
+    </div>
+  );
 
   return (
     <div className="group relative overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-900 shadow-[0_2px_12px_rgba(11,31,58,0.04)]">
@@ -857,80 +944,66 @@ function CityExperienceAccordion({
 
       {expanded ? (
         <div className="relative z-10 border-t border-zinc-800 px-4 py-4">
-          <div
-            className={`mb-4 grid gap-3 ${
-              hideTransport ? "grid-cols-1" : "grid-cols-2"
-            }`}
-          >
-            <button
-              type="button"
-              onClick={onBrowse}
-              className="cursor-pointer rounded-xl border border-zinc-800 bg-zinc-900 p-4 text-left transition-all hover:bg-zinc-800"
-            >
-              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#F29727]/15 text-[#F29727]">
-                <Ticket className="h-4 w-4" aria-hidden />
-              </span>
-              <p className="mt-2 text-sm font-bold text-white md:text-base">
-                City Experiences
-              </p>
-              <p className="mt-1 text-xs text-zinc-400">
-                {experienceCount} selected
-              </p>
-            </button>
-
-            {!hideTransport ? (
-              <button
-                type="button"
-                onClick={() => setTransportOpen(true)}
-                className="cursor-pointer rounded-xl border border-zinc-800 bg-zinc-900 p-4 text-left transition-all hover:bg-zinc-800"
-              >
-                <span className="flex h-8 w-8 items-center justify-center rounded-full bg-sky-500/15 text-sky-400">
-                  <Car className="h-4 w-4" aria-hidden />
-                </span>
-                <p className="mt-2 text-sm font-bold text-white md:text-base">
-                  City Transport
-                </p>
-                <p className="mt-1 text-xs text-zinc-400">
-                  {driverDayCount} Driver Day{driverDayCount === 1 ? "" : "s"}
-                </p>
-              </button>
-            ) : null}
-          </div>
-
-          {orderedTours.length > 0 || chauffeurDayLabels.length > 0 ? (
-            <div className="space-y-2 rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-3">
-              {orderedTours.length > 0 ? (
-                <ul className="space-y-1">
-                  {orderedTours.map((tour, index) => {
-                    const dayOpt = dayOptions.find(
-                      (d) => d.date === tour.scheduledDate
-                    );
-                    const dayBit = dayOpt
-                      ? dayShortLabel(dayOpt.label)
-                      : "Day ?";
-                    return (
-                      <li
-                        key={`${tour.tourId || "tour"}-${tour.scheduledDate || "day"}-${index}`}
-                        className="truncate text-xs text-zinc-300"
-                      >
-                        {dayBit} · {tour.title}
-                      </li>
-                    );
-                  })}
-                </ul>
-              ) : null}
-              {chauffeurDayLabels.length > 0 && !hideTransport ? (
-                <p className="text-xs text-zinc-400">
-                  {chauffeurDayLabels.join(", ")}: Private Chauffeur
-                </p>
-              ) : null}
+          {hideTransport ? (
+            <div className="mt-0 flex w-full flex-col items-stretch gap-4 sm:flex-row">
+              <div className="w-full flex-shrink-0 sm:w-1/3">
+                <button
+                  type="button"
+                  onClick={onBrowse}
+                  className="h-full w-full cursor-pointer rounded-xl border border-zinc-800 bg-zinc-900 p-4 text-left transition-all hover:bg-zinc-800"
+                >
+                  <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#F29727]/15 text-[#F29727]">
+                    <Ticket className="h-4 w-4" aria-hidden />
+                  </span>
+                  <p className="mt-2 text-sm font-bold text-white md:text-base">
+                    City Experiences
+                  </p>
+                  <p className="mt-1 text-xs text-zinc-400">
+                    {experienceCount} selected
+                  </p>
+                </button>
+              </div>
+              <div className="w-full flex-grow sm:w-2/3">
+                {dayItineraryList}
+              </div>
             </div>
           ) : (
-            <p className="text-xs text-zinc-500">
-              {hideTransport
-                ? `Tap City Experiences to add tours and tickets. Max ${MAX_TOUR_HOURS_PER_DAY}h of activities per day.`
-                : `Tap a widget to add experiences or configure private transport. Max ${MAX_TOUR_HOURS_PER_DAY}h of activities per day.`}
-            </p>
+            <>
+              <div className="mb-4 grid grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={onBrowse}
+                  className="cursor-pointer rounded-xl border border-zinc-800 bg-zinc-900 p-4 text-left transition-all hover:bg-zinc-800"
+                >
+                  <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#F29727]/15 text-[#F29727]">
+                    <Ticket className="h-4 w-4" aria-hidden />
+                  </span>
+                  <p className="mt-2 text-sm font-bold text-white md:text-base">
+                    City Experiences
+                  </p>
+                  <p className="mt-1 text-xs text-zinc-400">
+                    {experienceCount} selected
+                  </p>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTransportOpen(true)}
+                  className="cursor-pointer rounded-xl border border-zinc-800 bg-zinc-900 p-4 text-left transition-all hover:bg-zinc-800"
+                >
+                  <span className="flex h-8 w-8 items-center justify-center rounded-full bg-sky-500/15 text-sky-400">
+                    <Car className="h-4 w-4" aria-hidden />
+                  </span>
+                  <p className="mt-2 text-sm font-bold text-white md:text-base">
+                    City Transport
+                  </p>
+                  <p className="mt-1 text-xs text-zinc-400">
+                    {driverDayCount} Driver Day
+                    {driverDayCount === 1 ? "" : "s"}
+                  </p>
+                </button>
+              </div>
+              {dayItineraryList}
+            </>
           )}
         </div>
       ) : null}

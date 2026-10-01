@@ -14,6 +14,7 @@ import {
   parseItineraryData,
 } from "@/lib/preEliteBuilder";
 import { hydrateStoresFromPreEliteBrief } from "@/lib/preEliteHydrate";
+import { toPassStatusLabel } from "@/lib/bookingStatus";
 import { useModalDismiss } from "@/hooks/useModalDismiss";
 import {
   BuilderEntryChargingOverlay,
@@ -142,6 +143,14 @@ export function PreBuildConfirmation({
     emailSentCount >= 1 ||
     readBriefSaved(bookingRef) ||
     Boolean(readProposalSent(bookingRef));
+
+  const briefStatusLabel = toPassStatusLabel(
+    isEmailSent ||
+      emailSentCount >= 1 ||
+      Boolean(readProposalSent(bookingRef))
+      ? "incoming"
+      : "draft"
+  );
 
   useEffect(() => {
     const priorEmail =
@@ -366,6 +375,16 @@ export function PreBuildConfirmation({
           ? payload.emailSentCount
           : undefined
       );
+      try {
+        const { useBuilderStore } = await import("@/store/useBuilderStore");
+        const { useItineraryStore } = await import("@/store/useItineraryStore");
+        useBuilderStore
+          .getState()
+          .confirmBookingRef(bookingRef, "in_progress");
+        useItineraryStore.setState({ bookingStatus: "in_progress" });
+      } catch {
+        /* optional local promote */
+      }
       setResendOpen(false);
       const okMsg = resend
         ? "Email resent — check your inbox and spam folder."
@@ -577,10 +596,21 @@ export function PreBuildConfirmation({
           </div>
         </div>
 
-        {/* 3. Centered Booking Reference Number */}
-        <div className="my-6 text-center">
+        {/* 3. Centered Booking Reference + status */}
+        <div className="my-6 flex flex-wrap items-center justify-center gap-2">
           <span className="rounded-xl border border-amber-500/20 bg-amber-500/10 px-5 py-2 font-mono text-xl font-bold tracking-wider text-[#F6A724] shadow-inner">
             {bookingRef}
+          </span>
+          <span
+            className={`rounded-full border px-2.5 py-1 text-[10px] font-bold tracking-wider uppercase ${
+              briefStatusLabel === "DRAFT"
+                ? "border-zinc-600 bg-zinc-900/80 text-zinc-400"
+                : briefStatusLabel === "INCOMING"
+                  ? "border-[#075473]/50 bg-[#075473]/20 text-[#7ec8e3]"
+                  : "border-emerald-500/40 bg-emerald-500/10 text-emerald-300"
+            }`}
+          >
+            {briefStatusLabel}
           </span>
         </div>
 

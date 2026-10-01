@@ -4,8 +4,14 @@ import { useCallback, useEffect, useState } from "react";
 import {
   claimDriverJob,
   claimGuideJob,
+  refuseGuideJob,
   type OpsDispatchRow,
 } from "@/lib/opsDispatch";
+import {
+  guideConfirmStaffLabel,
+  isGuidePendingAcceptance,
+  normalizeGuideConfirmStatus,
+} from "@/lib/guideConfirmStatus";
 import {
   loadPayoutsForStaff,
   type OpsPayoutRow,
@@ -117,7 +123,7 @@ function DispatchPortal({ kind }: { kind: "guide" | "driver" }) {
       } else {
         filter =
           kind === "guide"
-            ? `(guide_board_visible=true || guide_mode="open") && assigned_guide_id=""`
+            ? `(guide_board_visible=true || guide_mode="open" || guide_mode="posted_open_board") && assigned_guide_id=""`
             : `(driver_board_visible=true || driver_mode="open") && assigned_driver_id=""`;
       }
 
@@ -180,8 +186,27 @@ function DispatchPortal({ kind }: { kind: "guide" | "driver" }) {
       } else {
         await claimDriverJob(pb, { pnr, staffId, staffName });
       }
-      setMsg(`Claimed ${pnr}`);
+      setMsg(`Accepted ${pnr}`);
       setTab("mine");
+      await reload();
+    } catch (e) {
+      setMsg(formatPbError(e));
+    } finally {
+      setClaiming(null);
+    }
+  };
+
+  const onRefuse = async (pnr: string) => {
+    if (!staffId) {
+      setMsg("Sign in as guide staff to refuse.");
+      return;
+    }
+    setClaiming(pnr);
+    setMsg(null);
+    try {
+      const pb = getClient();
+      await refuseGuideJob(pb, { pnr, staffId });
+      setMsg(`Refused ${pnr} — Ops can reassign or post board`);
       await reload();
     } catch (e) {
       setMsg(formatPbError(e));
@@ -299,6 +324,18 @@ function DispatchPortal({ kind }: { kind: "guide" | "driver" }) {
             dispatchRows.map((d) => {
               const hub = hubByPnr[String(d.pnr).toUpperCase()];
               const asgId = assignmentByPnr[String(d.pnr).toUpperCase()];
+              const guideStatus =
+                kind === "guide"
+                  ? normalizeGuideConfirmStatus(d.guide_mode, {
+                      boardVisible: Boolean(d.guide_board_visible),
+                      assignedGuideId: d.assigned_guide_id,
+                      guideResponse: d.guide_response,
+                    })
+                  : null;
+              const needsAccept =
+                kind === "guide" &&
+                tab === "mine" &&
+                isGuidePendingAcceptance(d.guide_mode, d.guide_response);
               return (
                 <li
                   key={d.id}
@@ -317,7 +354,14 @@ function DispatchPortal({ kind }: { kind: "guide" | "driver" }) {
                         {hub?.guest_summary || "—"}
                       </p>
                     </div>
-                    <OpsStatusBadge status={hub?.status} />
+                    <div className="flex flex-col items-end gap-1">
+                      <OpsStatusBadge status={hub?.status} />
+                      {guideStatus ? (
+                        <span className="text-[10px] tracking-wider text-zinc-500 uppercase">
+                          {guideConfirmStaffLabel(guideStatus)}
+                        </span>
+                      ) : null}
+                    </div>
                   </div>
                   <p className="mt-3 whitespace-pre-wrap text-sm text-zinc-400">
                     {hub?.pickup_notes ||
@@ -334,6 +378,26 @@ function DispatchPortal({ kind }: { kind: "guide" | "driver" }) {
                     >
                       {claiming === d.pnr ? "Claiming…" : "Claim job"}
                     </button>
+                  ) : null}
+                  {needsAccept ? (
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        disabled={claiming === d.pnr || !staffId}
+                        className="rounded-lg bg-emerald-700 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
+                        onClick={() => void onClaim(d.pnr)}
+                      >
+                        {claiming === d.pnr ? "Accepting…" : "Accept job"}
+                      </button>
+                      <button
+                        type="button"
+                        disabled={claiming === d.pnr || !staffId}
+                        className="rounded-lg border border-red-500/50 px-3 py-1.5 text-xs font-semibold text-red-300 disabled:opacity-50"
+                        onClick={() => void onRefuse(d.pnr)}
+                      >
+                        {claiming === d.pnr ? "…" : "Refuse job"}
+                      </button>
+                    </div>
                   ) : null}
                   {kind === "guide" && tab === "mine" && asgId ? (
                     <TourCompletionReportForm

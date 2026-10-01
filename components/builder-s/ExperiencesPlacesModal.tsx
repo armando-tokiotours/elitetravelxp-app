@@ -160,6 +160,7 @@ export function ExperiencesPlacesModal({
       selectedLanguage: lang,
       duration_hours: hours,
       price: tourPrice(item, guests),
+      access_type: String(item.access_type || "").trim() || undefined,
     };
     addExperience(row);
     setToast(`Added · ${item.title}`);

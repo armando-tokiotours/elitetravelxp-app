@@ -84,8 +84,8 @@ export function ScheduleTourDaySheet({
                           return;
                         }
                         const result = onSelectDay(day.date);
-                        if (!result.ok && result.message) {
-                          onToast(result.message);
+                        if (!result.ok) {
+                          if (result.message) onToast(result.message);
                           return;
                         }
                         onClose();

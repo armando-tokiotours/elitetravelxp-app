@@ -10,9 +10,13 @@ import type {
 import { ELITE_CONCIERGE_FEE } from "@/lib/eliteConcierge";
 import {
   generateTempPNR,
+  isTempBookingRef,
+  isValidBookingPNR,
+  normalizeBookingPNR,
   promoteTempToOfficial,
   resolveOfficialPNR,
   normalizeBookingStatus,
+  TK_PNR_RE,
   type BookingStatus,
 } from "@/utils/pnr";
 
@@ -82,7 +86,7 @@ export interface ItineraryState {
   clientEmail: string;
   clientNotes: string;
 
-  /** Draft TMP-… while building; locked JPN-… after request/deposit */
+  /** Draft / session ref — JPN-XXXXXX (legacy TMP-/TK- upgrade on ensure) */
   tempBookingRef: string;
   confirmedBookingRef: string | null;
   bookingStatus: BookingStatus;
@@ -301,8 +305,23 @@ export const useItineraryStore = create<ItineraryState & ItineraryActions>()(
 
       ensureTempBookingRef: () => {
         const s = get();
-        if (s.tempBookingRef && /^TMP-[A-Z2-9]{6}$/i.test(s.tempBookingRef)) {
-          return s.tempBookingRef;
+        const raw = String(s.tempBookingRef || "").trim();
+        if (raw) {
+          if (isTempBookingRef(raw)) {
+            const next = normalizeBookingPNR(raw);
+            set({ tempBookingRef: next });
+            return next;
+          }
+          const normalized = normalizeBookingPNR(raw);
+          if (TK_PNR_RE.test(normalized)) {
+            const next = generateTempPNR();
+            set({ tempBookingRef: next });
+            return next;
+          }
+          if (isValidBookingPNR(normalized)) {
+            if (normalized !== raw) set({ tempBookingRef: normalized });
+            return normalized;
+          }
         }
         const next = generateTempPNR();
         set({ tempBookingRef: next });

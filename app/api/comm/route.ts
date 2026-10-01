@@ -15,13 +15,12 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "pnr required" }, { status: 400 });
     }
     const agent = await findConciergeAgentByPnr(pnr);
-    if (agent) {
-      await ensureCommThread({
-        pnr,
-        agentId: agent.id,
-        agentName: agent.name,
-      });
-    }
+    // Always ensure a thread exists so guests can message before assignment
+    await ensureCommThread({
+      pnr,
+      agentId: agent?.id,
+      agentName: agent?.name,
+    });
     const messages = await listCommMessages(pnr);
     return NextResponse.json({
       agent: agent
@@ -58,22 +57,24 @@ export async function POST(request: Request) {
         { status: 400 }
       );
     }
+    // Guests may message before any concierge is assigned — lands in Ops pool
     const agent = await findConciergeAgentByPnr(pnr);
-    if (authorRole === "guest" && !agent) {
-      return NextResponse.json(
-        { error: "No agent assigned yet." },
-        { status: 409 }
-      );
-    }
     const msg = await postCommMessage({
       pnr,
       authorRole,
       authorName: String(body?.authorName || "").trim() || undefined,
+      authorId: String(body?.authorId || "").trim() || undefined,
       body: text,
       agentId: agent?.id,
       agentName: agent?.name,
       guestEmail: body?.guestEmail ? String(body.guestEmail) : undefined,
     });
+    if (!msg) {
+      return NextResponse.json(
+        { error: "Could not post message" },
+        { status: 500 }
+      );
+    }
     return NextResponse.json({ ok: true, message: msg });
   } catch (err) {
     return NextResponse.json(

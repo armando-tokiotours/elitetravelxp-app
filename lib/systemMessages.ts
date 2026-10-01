@@ -27,6 +27,7 @@ export type SystemMessageKey =
   | "payment_not_ready"
   | "builder_incomplete"
   | "builder_m_transit_required"
+  | "builder_m_hotel_rooms_required"
   | "sending_again"
   | "sending_pdf";
 
@@ -176,6 +177,12 @@ export const SYSTEM_MESSAGE_CATALOG: readonly SystemMessageDef[] = [
     group: "builder_m",
     defaultText:
       "Pick how you will travel between cities (Self, Public, or Private) before saving.",
+  },
+  {
+    key: "builder_m_hotel_rooms_required",
+    label: "Builder M · hotel rooms required",
+    group: "builder_m",
+    defaultText: "Pick rooms for each city where you need a hotel.",
   },
   {
     key: "sending_again",

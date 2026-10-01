@@ -108,7 +108,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json({
       success: true,
-      message: `Proposal emailed successfully to guest & team (${TEAM_EMAIL_CONFIG.routing.bccRecipient})!`,
+      message: `Proposal emailed to ${email}. A team copy also went to ${TEAM_EMAIL_CONFIG.routing.bccRecipient}.`,
       id: result.id,
     });
   } catch (err: unknown) {

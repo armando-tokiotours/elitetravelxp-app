@@ -25,7 +25,16 @@ export interface UpsertOpsHubFromDirectInput {
   status?: BookingLeadStatus | OpsHubStatus | string | null;
   primaryCity?: string | null;
   tourDate?: string | null;
+  /** Inclusive trip end date (YYYY-MM-DD). Derived from duration when omitted. */
+  endDate?: string | null;
+  /** Used to derive endDate when endDate is missing (multi-day nights/days). */
+  durationDays?: number | null;
   guestSummary?: string | null;
+  /**
+   * When true (default on guest save), mark inbox unread so Ops re-reviews.
+   * Pass false for silent admin syncs.
+   */
+  markUnread?: boolean;
 }
 
 function safePnr(pnr: string): string {
@@ -72,6 +81,21 @@ export async function upsertOpsHubFromDirect(
   const tourDateRaw = input.tourDate
     ? String(input.tourDate).slice(0, 10)
     : "";
+  let endDateRaw = input.endDate ? String(input.endDate).slice(0, 10) : "";
+  if (!endDateRaw && tourDateRaw) {
+    const days = Math.max(0, Number(input.durationDays) || 0);
+    if (days > 1) {
+      const d = new Date(`${tourDateRaw}T12:00:00`);
+      if (!Number.isNaN(d.getTime())) {
+        d.setDate(d.getDate() + (days - 1));
+        endDateRaw = d.toISOString().slice(0, 10);
+      }
+    } else {
+      endDateRaw = tourDateRaw;
+    }
+  }
+
+  const markUnread = input.markUnread !== false;
   const fields: Record<string, unknown> = {
     pnr,
     source: "direct" as OpsHubSource,
@@ -84,6 +108,8 @@ export async function upsertOpsHubFromDirect(
     guide_needed: true,
   };
   if (tourDateRaw) fields.tour_date = tourDateRaw;
+  if (endDateRaw) fields.end_date = endDateRaw;
+  if (markUnread) fields.is_read = false;
 
   try {
     const pb = await getAdminPocketBase();
@@ -106,7 +132,7 @@ export async function upsertOpsHubFromDirect(
 
     const created = await pb
       .collection("ops_hub")
-      .create(fields, { requestKey: null });
+      .create({ ...fields, is_read: false }, { requestKey: null });
     void ensurePocketRowsForPnr(pnr);
     return { ok: true, id: created.id, created: true };
   } catch (err) {

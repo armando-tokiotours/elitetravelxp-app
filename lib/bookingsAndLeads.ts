@@ -7,9 +7,11 @@ import {
   formatCitiesList,
   formatDurationLabel,
 } from "@/lib/bookingLeadAudit";
+import { chauffeurDaysFromSelections, migrateLegacyChauffeurDays } from "@/lib/chauffeurSelections";
 import { getAdminPocketBase } from "@/lib/pocketbase/admin";
 import type { BuilderState } from "@/store/useBuilderStore";
 import type { SingleDayBuilderState } from "@/store/useSingleDayBuilderStore";
+import { calculateCityDateRanges } from "@/lib/dateCascade";
 
 export type BookingLeadType = "multi_day" | "single_day";
 
@@ -33,12 +35,34 @@ export interface BookingLeadGuests {
 export interface MultiDaySelections {
   locationCityIds: string[];
   hotelByCity: Record<string, string>;
+  /**
+   * Stay stops in route order (duplicates allowed — e.g. Tokyo → Kyoto → Tokyo).
+   * Includes dates + incoming transit for Ops timeline.
+   */
+  locationStops?: Array<{
+    cityId: string;
+    cityName?: string;
+    nights: number;
+    startDate?: string;
+    endDate?: string;
+    hotelArrangement: "self" | "tokiotours" | "unset";
+    hotelStar?: string;
+    /** How guest arrives into this stay (from previous hub/city). */
+    incomingTransitType?: string;
+    needsTicket?: boolean;
+    ticketType?: string;
+    ticketPricePerPax?: number;
+  }>;
   experienceIds: string[];
   experienceSchedule?: Array<{
     tourId: string;
     cityId: string;
     date?: string;
     language?: string;
+    /** Snapshot title for Ops (avoids raw id display). */
+    title?: string;
+    durationHours?: number;
+    accessType?: string;
   }>;
   transitByLeg?: Array<{
     fromCityId: string;
@@ -48,10 +72,36 @@ export interface MultiDaySelections {
   pace?: string | null;
   arrivalTransferId?: string | null;
   departureTransferId?: string | null;
+  /** Human labels for Ops timeline (no hub catalog fetch needed). */
+  arrivalHubLabel?: string | null;
+  departureHubLabel?: string | null;
+  airportPickup?: boolean;
+  airportDropoff?: boolean;
+  arrivalTransitType?: string | null;
   durationDays?: number;
   experienceService?: string | null;
   /** Special mobility / party needs for ops staff */
   specialNeeds?: string[];
+  /** Public transit pass questionnaire — Tours step + Ticketer */
+  guestHasJRPass?: boolean | null;
+  guestHasICCard?: boolean | null;
+  guestNeedsTransitHelp?: boolean | null;
+  /** In-city transport mode per stay city */
+  localTransitByCity?: Array<{
+    cityId: string;
+    localTransitType: string;
+  }>;
+  /** cityId → chauffeur dates (YYYY-MM-DD) for day CAR badges */
+  chauffeurDaysByCity?: Record<string, string[]>;
+  /** Catalog transport products (Suica, Kamakura rail, Shinkansen…) */
+  transportTickets?: Array<{
+    productId: string;
+    name: string;
+    transportType: string;
+    pricePerPerson?: number;
+    quantity?: number;
+    cityId?: string;
+  }>;
 }
 
 /** Single-day: IDs + hour-by-hour prefs */
@@ -145,6 +195,7 @@ function syncOpsHubFromBal(opts: {
   status?: string | null;
   primaryCity?: string | null;
   tourDate?: string | null;
+  durationDays?: number | null;
   guests?: BookingLeadGuests | null;
 }): void {
   void import("@/lib/opsHub")
@@ -155,7 +206,9 @@ function syncOpsHubFromBal(opts: {
         status: opts.status,
         primaryCity: opts.primaryCity,
         tourDate: opts.tourDate,
+        durationDays: opts.durationDays,
         guestSummary: formatGuestSummary(opts.guests),
+        markUnread: true,
       })
     )
     .catch((err) => {
@@ -177,20 +230,87 @@ export function buildMultiDaySelections(
     | "travelPace"
     | "arrivalTransferId"
     | "departureTransferId"
+    | "arrivalDate"
+    | "airportPickup"
+    | "airportDropoff"
+    | "arrivalTransitType"
     | "durationDays"
     | "experienceService"
     | "specialNeeds"
-  >
+    | "guestHasJRPass"
+    | "guestHasICCard"
+    | "guestNeedsTransitHelp"
+    | "chauffeurSelections"
+    | "selectedTransportProducts"
+  >,
+  opts?: {
+    cityNames?: Record<string, string>;
+    hubNames?: Record<string, string>;
+  }
 ): MultiDaySelections {
-  const locationCityIds = (state.locations || [])
-    .map((l) => l.cityId)
-    .filter(Boolean);
+  const cityNames = opts?.cityNames || {};
+  const hubNames = opts?.hubNames || {};
+
+  const stayLocs = (state.locations || []).filter(
+    (l) =>
+      (!l.visitType || l.visitType === "stay") &&
+      !l.isTransitHub &&
+      l.cityId
+  );
+  const locationCityIds = stayLocs.map((l) => l.cityId);
 
   const hotelByCity: Record<string, string> = {};
   for (const [cityId, pref] of Object.entries(state.cityHotels || {})) {
     if (!pref?.needsHotel) continue;
-    // Compact hotel preference key (no full accommodation blob)
     hotelByCity[cityId] = `${pref.starRating || "4-star"}`;
+  }
+
+  const ranges = calculateCityDateRanges(state.arrivalDate, stayLocs);
+  const allLocs = state.locations || [];
+
+  const locationStops: NonNullable<MultiDaySelections["locationStops"]> = [];
+  for (let i = 0; i < stayLocs.length; i++) {
+    const loc = stayLocs[i];
+    const range = ranges[i];
+    const pref = state.cityHotels?.[loc.cityId];
+    let hotelArrangement: "self" | "tokiotours" | "unset" = "unset";
+    let hotelStar: string | undefined;
+    if (pref) {
+      if (pref.needsHotel) {
+        hotelArrangement = "tokiotours";
+        hotelStar = String(pref.starRating || "4");
+      } else {
+        hotelArrangement = "self";
+      }
+    } else if (hotelByCity[loc.cityId]) {
+      hotelArrangement = "tokiotours";
+      hotelStar = hotelByCity[loc.cityId];
+    }
+
+    // Previous stop in full route (hub or prior stay) owns transit into this city
+    const fullIdx = allLocs.findIndex((l) => l.key === loc.key);
+    const prev =
+      fullIdx > 0
+        ? allLocs[fullIdx - 1]
+        : i > 0
+          ? stayLocs[i - 1]
+          : allLocs.find((l) => l.visitType === "arrival" || l.isTransitHub) ||
+            null;
+    const incoming = prev ? String(prev.transitType || "unset") : "unset";
+
+    locationStops.push({
+      cityId: loc.cityId,
+      cityName: cityNames[loc.cityId] || undefined,
+      nights: Math.max(0, Number(loc.nights) || 0),
+      startDate: range?.startDate,
+      endDate: range?.endDate,
+      hotelArrangement,
+      hotelStar,
+      incomingTransitType: incoming === "unset" ? undefined : incoming,
+      needsTicket: Boolean(prev?.needsTicket),
+      ticketType: prev?.ticketType,
+      ticketPricePerPax: prev?.ticketPricePerPax,
+    });
   }
 
   const experienceSchedule: MultiDaySelections["experienceSchedule"] = [];
@@ -204,6 +324,12 @@ export function buildMultiDaySelections(
         cityId,
         date: row.scheduledDate || undefined,
         language: row.selectedLanguage || undefined,
+        title: String(row.title || "").trim() || undefined,
+        durationHours:
+          Number(row.duration_hours) > 0
+            ? Number(row.duration_hours)
+            : undefined,
+        accessType: String(row.access_type || "").trim() || undefined,
       });
     }
   }
@@ -214,11 +340,23 @@ export function buildMultiDaySelections(
   }
 
   const transitByLeg: MultiDaySelections["transitByLeg"] = [];
-  const locs = state.locations || [];
-  for (let i = 0; i < locs.length; i++) {
-    const from = locs[i];
-    const to = locs[i + 1];
-    if (!from || !to) continue;
+  const localTransitByCity: MultiDaySelections["localTransitByCity"] = [];
+  for (let i = 0; i < allLocs.length; i++) {
+    const from = allLocs[i];
+    const to = allLocs[i + 1];
+    if (!from) continue;
+    if (
+      from.localTransitType &&
+      from.localTransitType !== "unset" &&
+      from.cityId &&
+      !from.isTransitHub
+    ) {
+      localTransitByCity.push({
+        cityId: from.cityId,
+        localTransitType: from.localTransitType,
+      });
+    }
+    if (!to) continue;
     if (from.transitType && from.transitType !== "unset") {
       transitByLeg.push({
         fromCityId: from.cityId,
@@ -228,20 +366,69 @@ export function buildMultiDaySelections(
     }
   }
 
+  const arrivalHub = allLocs.find(
+    (l) =>
+      l.key === "__transit_arrival__" ||
+      l.visitType === "arrival" ||
+      (l.isTransitHub && l.visitType !== "departure")
+  );
+  const departureHub = allLocs.find(
+    (l) =>
+      l.key === "__transit_departure__" || l.visitType === "departure"
+  );
+  const arrivalHubId =
+    arrivalHub?.hubId || state.arrivalTransferId || arrivalHub?.cityId || null;
+  const departureHubId =
+    departureHub?.hubId ||
+    state.departureTransferId ||
+    departureHub?.cityId ||
+    null;
+
+  const chauffeurDaysByCity = chauffeurDaysFromSelections(
+    state.chauffeurSelections
+  );
+  const transportTickets: NonNullable<MultiDaySelections["transportTickets"]> =
+    (state.selectedTransportProducts || []).map((p) => ({
+      productId: p.productId,
+      name: p.name,
+      transportType: p.transportType,
+      pricePerPerson: p.pricePerPerson,
+      quantity: p.quantity,
+      cityId: p.cityId,
+    }));
+
   return {
     locationCityIds,
     hotelByCity,
+    locationStops,
     experienceIds: uniqueExp,
     experienceSchedule,
     transitByLeg,
+    localTransitByCity,
+    chauffeurDaysByCity,
+    transportTickets,
     pace: state.travelPace ?? null,
     arrivalTransferId: state.arrivalTransferId ?? null,
     departureTransferId: state.departureTransferId ?? null,
+    arrivalHubLabel:
+      (arrivalHubId && hubNames[arrivalHubId]) ||
+      (arrivalHub?.cityId && cityNames[arrivalHub.cityId]) ||
+      null,
+    departureHubLabel:
+      (departureHubId && hubNames[departureHubId]) ||
+      (departureHub?.cityId && cityNames[departureHub.cityId]) ||
+      null,
+    airportPickup: Boolean(state.airportPickup),
+    airportDropoff: Boolean(state.airportDropoff),
+    arrivalTransitType: state.arrivalTransitType || null,
     durationDays: state.durationDays || undefined,
     experienceService: state.experienceService ?? null,
     specialNeeds: Array.isArray(state.specialNeeds)
       ? [...state.specialNeeds]
       : [],
+    guestHasJRPass: state.guestHasJRPass ?? null,
+    guestHasICCard: state.guestHasICCard ?? null,
+    guestNeedsTransitHelp: state.guestNeedsTransitHelp ?? null,
   };
 }
 
@@ -382,6 +569,24 @@ export async function upsertBookingsAndLeads(
     fields.meeting_point_lng = Number(input.meetingPointLng);
   }
 
+  // Guest transit pass answers (also inside selections JSON)
+  const selObj =
+    selectionsPayload && typeof selectionsPayload === "object"
+      ? (selectionsPayload as Record<string, unknown>)
+      : {};
+  if (selObj.guestHasJRPass === true || selObj.guestHasJRPass === false) {
+    fields.guest_has_jr_pass = selObj.guestHasJRPass;
+  }
+  if (selObj.guestHasICCard === true || selObj.guestHasICCard === false) {
+    fields.guest_has_ic_card = selObj.guestHasICCard;
+  }
+  if (
+    selObj.guestNeedsTransitHelp === true ||
+    selObj.guestNeedsTransitHelp === false
+  ) {
+    fields.guest_needs_transit_help = selObj.guestNeedsTransitHelp;
+  }
+
   const STATUS_RANK: Record<string, number> = {
     draft: 1,
     lead: 1,
@@ -463,6 +668,7 @@ export async function upsertBookingsAndLeads(
         status: String(nextStatus),
         primaryCity,
         tourDate: tourDateRaw || null,
+        durationDays: durationNum || null,
         guests,
       });
       return { ok: true, id: updated.id, created: false };
@@ -487,6 +693,7 @@ export async function upsertBookingsAndLeads(
       status: requestedStatus,
       primaryCity,
       tourDate: tourDateRaw || null,
+      durationDays: durationNum || null,
       guests,
     });
     return { ok: true, id: created.id, created: true };
@@ -542,6 +749,8 @@ export async function recordBookingLeadEmailSent(opts: {
       const patch: Record<string, unknown> = {
         email_sent_count: nextCount,
         last_email_sent_at: nowIso,
+        // Save & Email promotes draft → incoming (BAL stores in_progress)
+        status: "in_progress",
       };
       if (!existing.first_email_sent_at) {
         patch.first_email_sent_at = nowIso;
@@ -549,6 +758,24 @@ export async function recordBookingLeadEmailSent(opts: {
       await pb
         .collection("bookings_and_leads")
         .update(existing.id, patch, { requestKey: null });
+      void syncOpsHubFromBal({
+        pnr: bookingRef,
+        detailId: existing.id,
+        status: "incoming",
+        primaryCity: "Tokyo",
+      });
+      try {
+        const booking = await pb
+          .collection("bookings")
+          .getFirstListItem(`booking_ref="${bookingRef}"`, {
+            requestKey: null,
+          });
+        await pb
+          .collection("bookings")
+          .update(booking.id, { status: "in_progress" }, { requestKey: null });
+      } catch {
+        /* pre-elite bookings row optional */
+      }
       return { ok: true, emailSentCount: nextCount };
     }
 
@@ -557,7 +784,7 @@ export async function recordBookingLeadEmailSent(opts: {
         booking_ref: bookingRef,
         email,
         type,
-        status: "lead",
+        status: "in_progress",
         source: "direct",
         primary_city: "Tokyo",
         guests: { adults: 2, kids: 0 },
@@ -580,15 +807,26 @@ export async function recordBookingLeadEmailSent(opts: {
       void syncOpsHubFromBal({
         pnr: bookingRef,
         detailId: created.id,
-        status: "lead",
+        status: "incoming",
         primaryCity: "Tokyo",
         guests: { adults: 2, kids: 0 },
       });
     }
+    try {
+      const booking = await pb
+        .collection("bookings")
+        .getFirstListItem(`booking_ref="${bookingRef}"`, {
+          requestKey: null,
+        });
+      await pb
+        .collection("bookings")
+        .update(booking.id, { status: "in_progress" }, { requestKey: null });
+    } catch {
+      /* optional */
+    }
     return {
       ok: true,
       emailSentCount: 1,
-      ...(created?.id ? {} : {}),
     };
   } catch (err) {
     const message =
@@ -660,13 +898,39 @@ export function expandMultiDaySelectionsToState(
 ): Record<string, unknown> {
   const sel = (record.selections || {}) as MultiDaySelections;
   const guests = record.guests || { adults: 2, kids: 0 };
-  const locations = (sel.locationCityIds || []).map((cityId, i) => ({
-    key: `loc_${cityId}_${i}`,
-    cityId,
-    nights: i === 0 ? Math.max(0, (sel.durationDays || 1) - 1) : 0,
-    visitType: "stay" as const,
-    transitType: "unset" as const,
-  }));
+  const localByCity = new Map(
+    (sel.localTransitByCity || []).map((r) => [
+      r.cityId,
+      r.localTransitType,
+    ])
+  );
+  const transitByFrom = new Map(
+    (sel.transitByLeg || []).map((r) => [r.fromCityId, r.transitType])
+  );
+
+  const locations = (sel.locationCityIds || []).map((cityId, i, arr) => {
+    const nextId = arr[i + 1];
+    const transitRaw = nextId ? transitByFrom.get(cityId) : undefined;
+    const localRaw = localByCity.get(cityId);
+    return {
+      key: `loc_${cityId}_${i}`,
+      cityId,
+      nights: i === 0 ? Math.max(0, (sel.durationDays || 1) - 1) : 0,
+      visitType: "stay" as const,
+      transitType:
+        transitRaw === "self" ||
+        transitRaw === "public" ||
+        transitRaw === "private"
+          ? transitRaw
+          : ("unset" as const),
+      localTransitType:
+        localRaw === "self" ||
+        localRaw === "public" ||
+        localRaw === "private"
+          ? localRaw
+          : ("unset" as const),
+    };
+  });
 
   const selectedTours: Record<
     string,
@@ -677,6 +941,7 @@ export function expandMultiDaySelectionsToState(
       scheduledDate: string;
       selectedLanguage: string;
       price: number;
+      access_type?: string;
     }>
   > = {};
   for (const row of sel.experienceSchedule || []) {
@@ -684,11 +949,12 @@ export function expandMultiDaySelectionsToState(
     const list = selectedTours[row.cityId] || [];
     list.push({
       tourId: row.tourId,
-      title: "",
-      duration_hours: 0,
+      title: String(row.title || "").trim() || row.tourId,
+      duration_hours: Number(row.durationHours) || 0,
       scheduledDate: row.date || record.tour_date || "",
       selectedLanguage: row.language || "",
       price: 0,
+      access_type: row.accessType,
     });
     selectedTours[row.cityId] = list;
   }
@@ -706,6 +972,28 @@ export function expandMultiDaySelectionsToState(
     arrivalTransferId: sel.arrivalTransferId ?? null,
     departureTransferId: sel.departureTransferId ?? null,
     experienceService: sel.experienceService ?? "tailored",
+    chauffeurSelections: migrateLegacyChauffeurDays(sel.chauffeurDaysByCity),
+    selectedTransportProducts: (sel.transportTickets || []).map((t) => ({
+      productId: t.productId,
+      name: t.name,
+      transportType: t.transportType,
+      pricePerPerson: Number(t.pricePerPerson) || 0,
+      quantity: Number(t.quantity) || 1,
+      cityId: t.cityId,
+    })),
+    guestHasJRPass:
+      sel.guestHasJRPass === true || sel.guestHasJRPass === false
+        ? sel.guestHasJRPass
+        : null,
+    guestHasICCard:
+      sel.guestHasICCard === true || sel.guestHasICCard === false
+        ? sel.guestHasICCard
+        : null,
+    guestNeedsTransitHelp:
+      sel.guestNeedsTransitHelp === true ||
+      sel.guestNeedsTransitHelp === false
+        ? sel.guestNeedsTransitHelp
+        : null,
     confirmedBookingRef: record.booking_ref,
     bookingStatus:
       record.status === "confirmed"

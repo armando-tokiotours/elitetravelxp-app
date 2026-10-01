@@ -1,9 +1,6 @@
-import { generateConfirmedPNR } from "@/utils/pnr";
+import { generatePNR } from "@/lib/generatePNR";
 
-/** Official lead reference for a pre-elite qualification. */
-export function generatePNR(): string {
-  return generateConfirmedPNR();
-}
+export { generatePNR };
 
 export const TRAVEL_STYLES = [
   {

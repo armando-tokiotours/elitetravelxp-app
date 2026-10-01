@@ -34,6 +34,7 @@ export function TourDetailPanel({
   /** Edge-to-edge layout for Discover reel slides */
   fullscreen = false,
   onAdd,
+  onRemove,
 }: {
   tour: PbTour;
   guests: { adults: number; children: number };
@@ -50,6 +51,8 @@ export function TourDetailPanel({
   fullscreen?: boolean;
   /** Pass selected language code when adding; omit / empty when removing. */
   onAdd: (selectedLanguage?: string) => void;
+  /** When set, selected cards show Remove separately and Add books again. */
+  onRemove?: () => void;
 }) {
   const [activeTab, setActiveTab] = useState<InfoTab>("description");
   const [pickedLanguage, setPickedLanguage] = useState("");
@@ -109,6 +112,13 @@ export function TourDetailPanel({
 
   const handleAddClick = () => {
     if (selected) {
+      if (onRemove) {
+        // Book again on another day
+        onAdd(
+          pickedLanguage || bookedLanguage || defaultLanguage || "EN"
+        );
+        return;
+      }
       onAdd();
       return;
     }
@@ -267,8 +277,17 @@ export function TourDetailPanel({
               {bodyText}
             </p>
             {selected && scheduledLabel ? (
-              <p className="text-xs font-medium text-[#F6A724]">
-                Scheduled · {scheduledLabel}
+              <p className="flex flex-wrap items-center gap-2 text-xs font-medium text-[#F6A724]">
+                <span>Scheduled · {scheduledLabel}</span>
+                {onRemove ? (
+                  <button
+                    type="button"
+                    onClick={onRemove}
+                    className="rounded-md border border-white/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-zinc-300 hover:bg-white/10 hover:text-white"
+                  >
+                    Remove
+                  </button>
+                ) : null}
               </p>
             ) : null}
           </div>
@@ -323,7 +342,7 @@ export function TourDetailPanel({
               ) : (
                 <Plus className="h-3.5 w-3.5" aria-hidden />
               )}
-              {selected ? "Added" : "+ Add"}
+              {selected ? (onRemove ? "Add again" : "Added") : "+ Add"}
             </button>
           </div>
         </div>
@@ -455,8 +474,17 @@ export function TourDetailPanel({
         </div>
 
         {selected && scheduledLabel ? (
-          <p className="mt-2 text-xs font-medium text-[#075473]">
-            Scheduled · {scheduledLabel}
+          <p className="mt-2 flex flex-wrap items-center gap-2 text-xs font-medium text-[#075473]">
+            <span>Scheduled · {scheduledLabel}</span>
+            {onRemove ? (
+              <button
+                type="button"
+                onClick={onRemove}
+                className="rounded-md border border-[#075473]/25 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[#5C6570] hover:bg-[#F7F3EB] hover:text-[#0B1F3A]"
+              >
+                Remove
+              </button>
+            ) : null}
           </p>
         ) : null}
       </div>
@@ -517,7 +545,7 @@ export function TourDetailPanel({
           ) : (
             <Plus className="h-4 w-4" aria-hidden />
           )}
-          {selected ? "Added" : "+ Add"}
+          {selected ? (onRemove ? "Add again" : "Added") : "+ Add"}
         </button>
       </div>
     </article>

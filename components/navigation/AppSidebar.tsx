@@ -5,10 +5,12 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import {
   Bookmark,
+  CircleHelp,
   ClipboardList,
   Compass,
   Home,
   LogOut,
+  ScrollText,
   Ticket,
   User,
   Wrench,
@@ -29,7 +31,9 @@ export type AppNavId =
   | "builder"
   | "discover"
   | "manage"
-  | "itinerary";
+  | "itinerary"
+  | "faq"
+  | "policies";
 
 export interface AppNavItem {
   id: AppNavId;
@@ -78,6 +82,18 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
     href: "/builder/itinerary",
     label: "My Saved Itineraries",
     icon: Bookmark,
+  },
+  {
+    id: "faq",
+    href: "/faq",
+    label: "FAQ",
+    icon: CircleHelp,
+  },
+  {
+    id: "policies",
+    href: "/policies",
+    label: "Terms & Policies",
+    icon: ScrollText,
   },
 ];
 

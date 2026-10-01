@@ -1,6 +1,12 @@
 "use client";
 
 import { Car, Ticket, UserRound } from "lucide-react";
+import {
+  accessTypeGuestBadge,
+  experienceNeedsEntryTicket,
+} from "@/lib/accessType";
+
+export { experienceNeedsEntryTicket };
 
 export type ServiceIconState = "none" | "pending" | "confirmed" | "cancelled";
 
@@ -134,16 +140,20 @@ export function StaffIdentityCard({
 export function TicketStubCard({
   title,
   subtitle,
+  accessType,
 }: {
   title: string;
   subtitle?: string;
+  /** tours.access_type — Ticket vs Admission vs VIP vs Timed */
+  accessType?: string | null;
 }) {
+  const badge = accessTypeGuestBadge(accessType);
   return (
     <div className="relative overflow-hidden rounded-lg border border-dashed border-amber-500/40 bg-gradient-to-r from-amber-950/40 to-zinc-950/80 px-3 py-2">
       <div className="absolute top-1/2 -left-1.5 h-3 w-3 -translate-y-1/2 rounded-full bg-[#04080C]" />
       <div className="absolute top-1/2 -right-1.5 h-3 w-3 -translate-y-1/2 rounded-full bg-[#04080C]" />
       <p className="text-[9px] font-bold tracking-[0.2em] text-amber-400/80 uppercase">
-        Ticket
+        {badge}
       </p>
       <p className="text-sm font-semibold text-white">{title}</p>
       {subtitle ? (
@@ -151,39 +161,6 @@ export function TicketStubCard({
       ) : null}
     </div>
   );
-}
-
-/**
- * Detect entry-ticket experiences (teamLab, direct ticket, timed entry, etc.).
- */
-export function experienceNeedsEntryTicket(input: {
-  title?: string | null;
-  description?: string | null;
-  access_type?: string | null;
-  is_self_guided?: boolean | null;
-  category?: string | null;
-}): boolean {
-  const access = String(input.access_type || "").toLowerCase();
-  if (
-    access === "direct_ticket" ||
-    access === "time_sensitive" ||
-    access === "vip_event"
-  ) {
-    return true;
-  }
-  if (input.is_self_guided) return true;
-  const hay = `${input.title || ""} ${input.description || ""}`.toLowerCase();
-  if (
-    hay.includes("teamlab") ||
-    hay.includes("team lab") ||
-    hay.includes("ghibli") ||
-    hay.includes("disney") ||
-    hay.includes("timed entry") ||
-    hay.includes("admission")
-  ) {
-    return true;
-  }
-  return false;
 }
 
 /** Quiet “not applicable” row for day services. */

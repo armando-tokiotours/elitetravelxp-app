@@ -63,13 +63,16 @@ export function GuestCommPage({
   }, [reload]);
 
   const title = useMemo(
-    () => (agentName ? `Chat with ${agentName}` : "Communications"),
+    () =>
+      agentName
+        ? `Chat with ${agentName}`
+        : "Chat with TokioTours Concierge",
     [agentName]
   );
 
   const send = async () => {
     const text = draft.trim();
-    if (!text || !agentName) return;
+    if (!text || busy) return;
     setBusy(true);
     setError(null);
     try {
@@ -128,6 +131,12 @@ export function GuestCommPage({
       </div>
 
       <div className="min-h-0 flex-1 space-y-3 overflow-y-auto rounded-2xl border border-white/10 bg-[#0A1017]/90 p-4">
+        {!agentName ? (
+          <p className="rounded-lg border border-white/5 bg-black/30 px-3 py-2 text-xs text-zinc-400">
+            Your message goes straight to our ops team. A concierge will pick it
+            up and reply here.
+          </p>
+        ) : null}
         {messages.length === 0 ? (
           <p className="text-sm text-zinc-600">No messages yet.</p>
         ) : (
@@ -154,17 +163,19 @@ export function GuestCommPage({
         <input
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
-          disabled={!agentName || busy}
-          placeholder={
-            agentName
-              ? "Write a message…"
-              : "Waiting for agent assignment…"
-          }
+          disabled={busy}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault();
+              void send();
+            }
+          }}
+          placeholder="Write a message to TokioTours…"
           className="min-w-0 flex-1 rounded-xl border border-zinc-700 bg-zinc-950 px-3 py-2.5 text-sm text-white outline-none focus:border-[#075473] disabled:opacity-50"
         />
         <button
           type="button"
-          disabled={!agentName || busy || !draft.trim()}
+          disabled={busy || !draft.trim()}
           onClick={() => void send()}
           className="rounded-xl bg-[#075473] px-4 py-2 text-xs font-bold tracking-wider text-white uppercase disabled:opacity-40"
         >

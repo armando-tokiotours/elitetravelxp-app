@@ -1,6 +1,19 @@
-/** Airline-style booking PNR helpers (TMP- draft vs JPN- official). */
+/**
+ * Booking PNR helpers.
+ * Canonical format: JPN-XXXXXX (see lib/generatePNR.ts).
+ * Legacy TMP- / TK- still accepted when reading old rows — never minted.
+ */
 
-const PNR_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // no O/0/I/1
+import {
+  generatePNR,
+  JPN_PNR_RE,
+  LEGACY_JPN_PNR_RE,
+  LEGACY_TMP_PNR_RE,
+  TK_PNR_RE,
+} from "@/lib/generatePNR";
+
+export { generatePNR } from "@/lib/generatePNR";
+export { JPN_PNR_RE, LEGACY_JPN_PNR_RE, LEGACY_TMP_PNR_RE, TK_PNR_RE };
 
 /**
  * Lead / itinerary lifecycle:
@@ -35,52 +48,52 @@ export function normalizeBookingStatus(raw: unknown): BookingStatus {
   return "draft";
 }
 
-function randomCode(length = 6): string {
-  let code = "";
-  for (let i = 0; i < length; i++) {
-    code += PNR_CHARS.charAt(Math.floor(Math.random() * PNR_CHARS.length));
-  }
-  return code;
-}
-
-/** Draft session reference: TMP- + 6 chars. */
+/** New sessions mint JPN-XXXXXX immediately (no TMP- / TK-). */
 export function generateTempPNR(): string {
-  return `TMP-${randomCode(6)}`;
+  return generatePNR();
 }
 
-/** Official locked reference: JPN- + 6 chars. */
+/** Same as generatePNR — one format for draft and confirmed. */
 export function generateConfirmedPNR(): string {
-  return `JPN-${randomCode(6)}`;
+  return generatePNR();
 }
 
-/** @deprecated Use generateTempPNR */
+/** @deprecated Use generateTempPNR / generatePNR */
 export const generateTempBookingRef = generateTempPNR;
 
-/** @deprecated Use generateConfirmedPNR */
+/** @deprecated Use generateConfirmedPNR / generatePNR */
 export const generateBookingPNR = generateConfirmedPNR;
 
-/** Promote TMP-XXXXXX → JPN-XXXXXX (same body). */
+/**
+ * Promote legacy TMP- → JPN- (same body).
+ * JPN- and legacy TK- pass through. Unknown → mint JPN-.
+ */
 export function promoteTempToOfficial(ref: string): string {
   const cleaned = String(ref || "")
     .trim()
     .toUpperCase();
-  if (/^TMP-[A-Z2-9]{6}$/.test(cleaned)) {
+  if (LEGACY_TMP_PNR_RE.test(cleaned)) {
     return `JPN-${cleaned.slice(4)}`;
   }
-  if (isValidBookingPNR(cleaned)) return normalizeBookingPNR(cleaned);
-  return generateConfirmedPNR();
+  if (isOfficialPNR(cleaned)) {
+    return normalizeBookingPNR(cleaned);
+  }
+  return generatePNR();
 }
 
-/** Resolve draft input to an official JPN- code (promote TMP or pass-through JPN). */
+/** Prefer existing valid ref; otherwise mint JPN-. */
 export function resolveOfficialPNR(preferred?: string): string {
   const cleaned = String(preferred || "")
     .trim()
     .toUpperCase();
-  if (/^TMP-[A-Z2-9]{6}$/.test(cleaned)) {
+  if (LEGACY_TMP_PNR_RE.test(cleaned)) {
     return promoteTempToOfficial(cleaned);
   }
-  if (isValidBookingPNR(cleaned)) return cleaned;
-  return generateConfirmedPNR();
+  if (isOfficialPNR(cleaned)) return cleaned;
+  if (LEGACY_TMP_PNR_RE.test(normalizeBookingPNR(cleaned))) {
+    return promoteTempToOfficial(cleaned);
+  }
+  return generatePNR();
 }
 
 export function normalizeBookingPNR(raw: string): string {
@@ -88,18 +101,53 @@ export function normalizeBookingPNR(raw: string): string {
     .trim()
     .toUpperCase()
     .replace(/\s+/g, "");
-  if (/^JPN-[A-Z2-9]{6}$/.test(cleaned)) return cleaned;
-  if (/^TMP-[A-Z2-9]{6}$/.test(cleaned)) return cleaned;
+  // Legacy TMP drafts → official JPN (same body)
+  if (LEGACY_TMP_PNR_RE.test(cleaned)) {
+    return `JPN-${cleaned.slice(4)}`;
+  }
+  if (JPN_PNR_RE.test(cleaned)) return cleaned;
+  if (TK_PNR_RE.test(cleaned)) return cleaned; // legacy short refs only
+  // Bare 6-char body → JPN-
   if (/^[A-Z2-9]{6}$/.test(cleaned)) return `JPN-${cleaned}`;
+  // Bare 4-char body → legacy TK- (do not invent JPN from short body)
+  if (/^[A-Z2-9]{4}$/.test(cleaned)) return `TK-${cleaned}`;
   return cleaned;
 }
 
-export function isValidBookingPNR(raw: string): boolean {
-  return /^JPN-[A-Z2-9]{6}$/.test(normalizeBookingPNR(raw));
+function isOfficialPNR(cleaned: string): boolean {
+  return JPN_PNR_RE.test(cleaned) || TK_PNR_RE.test(cleaned);
 }
 
+/** Any usable booking ref for APIs (JPN-, legacy TK-, or pre-normalize TMP-). */
+export function isAcceptableBookingPNR(raw: string): boolean {
+  const cleaned = String(raw || "")
+    .trim()
+    .toUpperCase()
+    .replace(/\s+/g, "");
+  if (LEGACY_TMP_PNR_RE.test(cleaned)) return true;
+  const n = normalizeBookingPNR(raw);
+  return JPN_PNR_RE.test(n) || TK_PNR_RE.test(n);
+}
+
+/**
+ * Canonical / locked official ref (JPN- preferred; legacy TK- still valid).
+ * New drafts use JPN- from the start.
+ */
+export function isValidBookingPNR(raw: string): boolean {
+  const n = normalizeBookingPNR(raw);
+  return JPN_PNR_RE.test(n) || TK_PNR_RE.test(n);
+}
+
+/**
+ * True only for raw TMP- strings before normalize.
+ * After normalizeBookingPNR, TMP becomes JPN so this is for pre-check only.
+ */
 export function isTempBookingRef(raw: string): boolean {
-  return /^TMP-[A-Z2-9]{6}$/.test(normalizeBookingPNR(raw));
+  const cleaned = String(raw || "")
+    .trim()
+    .toUpperCase()
+    .replace(/\s+/g, "");
+  return LEGACY_TMP_PNR_RE.test(cleaned);
 }
 
 /** UI badge label per spec. */
@@ -142,7 +190,7 @@ export function activeBookingRef(opts: {
   bookingStatus: BookingStatus;
 }): string {
   if (normalizeBookingStatus(opts.bookingStatus) === "draft") {
-    return opts.tempBookingRef || "";
+    return opts.tempBookingRef || opts.confirmedBookingRef || "";
   }
   return opts.confirmedBookingRef || opts.tempBookingRef || "";
 }

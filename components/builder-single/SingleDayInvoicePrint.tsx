@@ -43,6 +43,7 @@ export function SingleDayInvoicePrint({
   const cityFocus = useSingleDayBuilderStore((s) => s.cityFocus);
   const guidePreference = useSingleDayBuilderStore((s) => s.guidePreference);
   const meetingPoint = useSingleDayBuilderStore((s) => s.meetingPoint);
+  const meetingPointName = useSingleDayBuilderStore((s) => s.meetingPointName);
   const preferredTourLanguage = useSingleDayBuilderStore(
     (s) => s.preferredTourLanguage
   );
@@ -196,6 +197,8 @@ export function SingleDayInvoicePrint({
               endTime={endTime}
               totalHours={tourHours}
               cityLabel={cityFocus.trim() || undefined}
+              meetingPointName={meetingPointName || null}
+              meetingPointAddress={meetingPoint || null}
               variant="print"
             />
             <ul className="mt-4 space-y-1.5 text-sm">

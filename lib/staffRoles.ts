@@ -1,8 +1,12 @@
 /**
  * Staff roles — view/access helpers for Silo 3 portals.
  *
- * ops = Operations manager (all ops visibility + assign)
- * agent = Concierge agent (face-to-client for direct / non-agency bookings)
+ * Pipeline hierarchy (Ops → Concierge → Vendors):
+ *   owner / ops  ≈ ADMIN_OPS     — full system + assign concierge
+ *   agent        ≈ CONCIERGE     — client hub, vendor dispatch, inspector
+ *   guide        ≈ GUIDE         — assigned tours only
+ *   driver       ≈ DRIVER        — assigned transport only
+ *   ticketer     ≈ TICKET_SUPPLIER — ticket lines only
  */
 
 export const STAFF_ROLES = [
@@ -31,7 +35,7 @@ export function homePathForRole(role: StaffRole | null | undefined): string {
     case "ops":
       return "/ops";
     case "agent":
-      return "/agent";
+      return "/ops";
     case "ticketer":
       return "/ticketer";
     case "guide":
@@ -53,8 +57,9 @@ export function canAccessAdmin(role: StaffRole | null | undefined): boolean {
   return role === "owner" || role === "ops";
 }
 
+/** Ops inbox + booking inspector (Ops managers + Concierge agents). */
 export function canAccessOpsBoard(role: StaffRole | null | undefined): boolean {
-  return role === "owner" || role === "ops";
+  return role === "owner" || role === "ops" || role === "agent";
 }
 
 export function canAccessMoney(role: StaffRole | null | undefined): boolean {
@@ -81,11 +86,16 @@ export function canAccessAgency(role: StaffRole | null | undefined): boolean {
   return role === "owner" || role === "ops" || role === "agency";
 }
 
+/** Vendors never see financials / margin in their portals. */
+export function isVendorRole(role: StaffRole | null | undefined): boolean {
+  return role === "guide" || role === "driver" || role === "ticketer";
+}
+
 export const ROLE_LABELS: Record<StaffRole, string> = {
-  owner: "Owner",
+  owner: "Owner (Admin Ops)",
   ops: "Operations manager",
   agent: "Concierge agent",
-  ticketer: "Ticketer",
+  ticketer: "Ticket supplier",
   guide: "Guide",
   driver: "Driver Coordinator",
   agency: "Agency",

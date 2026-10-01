@@ -12,6 +12,9 @@ export interface RouteCityLike {
 
 export interface RouteLocationLike {
   cityId: string;
+  isTransitHub?: boolean;
+  visitType?: string;
+  key?: string;
 }
 
 export interface CityMovementLike {
@@ -46,16 +49,57 @@ function hubCityLabel(hub: RouteHubLike, cities: RouteCityLike[]): string {
   return hub.name;
 }
 
-/** Topological order of selected cities using recommended directed edges. */
+/** Overnight / stay stops only — hubs are not middle route nodes. */
+function stayLocations(locations: RouteLocationLike[]): RouteLocationLike[] {
+  return locations.filter((l) => {
+    if (l.isTransitHub) return false;
+    if (l.key === "__transit_arrival__" || l.key === "__transit_departure__") {
+      return false;
+    }
+    if (l.visitType === "arrival" || l.visitType === "departure") return false;
+    return Boolean(l.cityId);
+  });
+}
+
+/** Drop consecutive duplicate city ids (Tokyo, Tokyo → Tokyo). */
+export function collapseConsecutiveCityIds(ids: string[]): string[] {
+  const out: string[] = [];
+  for (const id of ids) {
+    if (!id) continue;
+    if (out.length && out[out.length - 1] === id) continue;
+    out.push(id);
+  }
+  return out;
+}
+
+/** Unique city ids preserving first-seen order. */
+function uniqueCityIdsPreserveOrder(ids: string[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const id of ids) {
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    out.push(id);
+  }
+  return out;
+}
+
+/**
+ * Topological order of unique selected cities using recommended directed edges.
+ * Never emits consecutive duplicates (queue is built from unique ids only).
+ */
 function suggestOrder(
   cityIds: string[],
   movements: CityMovementLike[],
   cities: RouteCityLike[]
 ): string[] | null {
-  const selected = new Set(cityIds);
+  const uniqueIds = uniqueCityIdsPreserveOrder(cityIds);
+  if (uniqueIds.length < 2) return null;
+
+  const selected = new Set(uniqueIds);
   const indeg = new Map<string, number>();
   const adj = new Map<string, string[]>();
-  for (const id of cityIds) {
+  for (const id of uniqueIds) {
     indeg.set(id, 0);
     adj.set(id, []);
   }
@@ -71,26 +115,61 @@ function suggestOrder(
   }
   if (edgeCount === 0) return null;
 
-  const queue = cityIds.filter((id) => (indeg.get(id) ?? 0) === 0);
+  // Unique queue only — duplicate cityIds must not enqueue the same node twice
+  const queue = uniqueIds.filter((id) => (indeg.get(id) ?? 0) === 0);
   const ordered: string[] = [];
+  const visited = new Set<string>();
   while (queue.length) {
-    // Stable: prefer earlier appearance in current list when ties
-    queue.sort((a, b) => cityIds.indexOf(a) - cityIds.indexOf(b));
+    queue.sort((a, b) => uniqueIds.indexOf(a) - uniqueIds.indexOf(b));
     const next = queue.shift()!;
+    if (visited.has(next)) continue;
+    visited.add(next);
     ordered.push(next);
     for (const to of adj.get(next) ?? []) {
       const d = (indeg.get(to) ?? 1) - 1;
       indeg.set(to, d);
-      if (d === 0) queue.push(to);
+      if (d === 0 && !visited.has(to)) queue.push(to);
     }
   }
 
-  if (ordered.length !== cityIds.length) return null;
-  if (ordered.every((id, i) => id === cityIds[i])) return null;
+  if (ordered.length !== uniqueIds.length) return null;
+  if (ordered.every((id, i) => id === uniqueIds[i])) return null;
 
-  // Ensure names resolve
   if (ordered.some((id) => !cities.some((c) => c.id === id))) return null;
   return ordered;
+}
+
+/**
+ * Pin arrival / departure hub cities at the ends; only middle nodes move.
+ * Legitimate split-stays (Tokyo → Kyoto → Tokyo) keep the return leg.
+ */
+function applyHubAnchors(
+  orderedUnique: string[],
+  arrivalCityId: string | undefined,
+  departureCityId: string | undefined
+): string[] {
+  const arrival = arrivalCityId?.trim() || "";
+  const departure = departureCityId?.trim() || "";
+  let middle = [...orderedUnique];
+
+  if (arrival) {
+    middle = middle.filter((id) => id !== arrival);
+  }
+  if (departure && departure !== arrival) {
+    middle = middle.filter((id) => id !== departure);
+  } else if (departure && departure === arrival) {
+    // Return to same hub city: keep middle without the hub city
+    middle = middle.filter((id) => id !== arrival);
+  }
+
+  const path: string[] = [];
+  if (arrival) path.push(arrival);
+  path.push(...middle);
+  if (departure) {
+    if (path[path.length - 1] !== departure) path.push(departure);
+  }
+
+  return collapseConsecutiveCityIds(path);
 }
 
 function legIsAgainstRecommended(
@@ -98,6 +177,7 @@ function legIsAgainstRecommended(
   toId: string,
   movements: CityMovementLike[]
 ): boolean {
+  if (fromId === toId) return false;
   const forward = movements.find(
     (m) => m.from_city_id === fromId && m.to_city_id === toId
   );
@@ -123,10 +203,11 @@ export function validateCityRoute(
   movements: CityMovementLike[] = []
 ): RouteWarning[] {
   const warnings: RouteWarning[] = [];
-  if (locations.length === 0) return warnings;
+  const stays = stayLocations(locations);
+  if (stays.length === 0) return warnings;
 
-  const first = locations[0];
-  const last = locations[locations.length - 1];
+  const first = stays[0];
+  const last = stays[stays.length - 1];
   const firstName = cityName(first.cityId, cities, "your first city");
   const lastName = cityName(last.cityId, cities, "your last city");
 
@@ -148,13 +229,17 @@ export function validateCityRoute(
     });
   }
 
-  if (locations.length >= 2 && movements.length > 0) {
+  const stayIdsCollapsed = collapseConsecutiveCityIds(
+    stays.map((l) => l.cityId)
+  );
+
+  if (stayIdsCollapsed.length >= 2 && movements.length > 0) {
     let against = 0;
-    for (let i = 0; i < locations.length - 1; i++) {
+    for (let i = 0; i < stayIdsCollapsed.length - 1; i++) {
       if (
         legIsAgainstRecommended(
-          locations[i].cityId,
-          locations[i + 1].cityId,
+          stayIdsCollapsed[i],
+          stayIdsCollapsed[i + 1],
           movements
         )
       ) {
@@ -163,17 +248,36 @@ export function validateCityRoute(
     }
 
     if (against > 0) {
-      const ids = locations.map((l) => l.cityId);
-      const suggested = suggestOrder(ids, movements, cities);
-      if (suggested) {
-        const path = suggested
+      const suggestedCore = suggestOrder(stayIdsCollapsed, movements, cities);
+      if (suggestedCore) {
+        const anchored = applyHubAnchors(
+          suggestedCore,
+          arrivalHub?.city_id || stayIdsCollapsed[0],
+          departureHub?.city_id ||
+            stayIdsCollapsed[stayIdsCollapsed.length - 1]
+        );
+        const pathNames = collapseConsecutiveCityIds(anchored)
           .map((id) => cityName(id, cities))
-          .join(" → ");
-        warnings.push({
-          type: "inefficient",
-          title: "Route Efficiency Hint",
-          body: `We recommend ordering your stay as ${path} to minimize transit time.`,
-        });
+          .filter(Boolean);
+        // Final name-level consecutive dedupe (two ids → same display name)
+        const pathDisplay: string[] = [];
+        for (const name of pathNames) {
+          if (
+            pathDisplay.length &&
+            pathDisplay[pathDisplay.length - 1] === name
+          ) {
+            continue;
+          }
+          pathDisplay.push(name);
+        }
+        const path = pathDisplay.join(" → ");
+        if (path) {
+          warnings.push({
+            type: "inefficient",
+            title: "Route Efficiency Hint",
+            body: `We recommend ordering your stay as ${path} to minimize transit time.`,
+          });
+        }
       } else {
         warnings.push({
           type: "inefficient",

@@ -126,6 +126,7 @@ const PACE_ALLOWED = new Set(["relaxed", "standard", "active"]);
 const ACCESS_ALLOWED = new Set([
   "guided_route",
   "direct_ticket",
+  "admission",
   "vip_event",
   "time_sensitive",
 ]);

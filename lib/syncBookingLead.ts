@@ -170,7 +170,13 @@ export async function syncMultiDayBookingLead(opts: {
   if (!email || !bookingRef) return false;
 
   const primaryCity = primaryCityFromMultiDay(opts.state, opts.cityNames);
-  const cityNamesList = (opts.state.locations || [])
+  const stayOnly = (opts.state.locations || []).filter(
+    (l) =>
+      (!l.visitType || l.visitType === "stay") &&
+      !l.isTransitHub &&
+      l.cityId
+  );
+  const cityNamesList = stayOnly
     .map((l) => opts.cityNames?.[l.cityId] || "")
     .filter(Boolean);
   if (!cityNamesList.length && primaryCity) cityNamesList.push(primaryCity);
@@ -178,7 +184,9 @@ export async function syncMultiDayBookingLead(opts: {
     adults: opts.state.adults,
     kids: opts.state.children,
   };
-  const selections = buildMultiDaySelections(opts.state);
+  const selections = buildMultiDaySelections(opts.state, {
+    cityNames: opts.cityNames,
+  });
   const q = quoteFields(opts.quote);
   const status = opts.status || "lead";
   const { demandFromMultiDay } = await import("@/lib/opsDemand");

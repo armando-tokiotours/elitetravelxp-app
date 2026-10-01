@@ -6,14 +6,11 @@ import type { PbCity } from "@/lib/pocketbase/client";
 import { formatCityDateSingle } from "@/lib/dateCascade";
 import type { SeasonalMatch } from "@/lib/seasonalMatcher";
 import type {
-  CityTransitType,
   CityVisitType,
   LocationStop,
 } from "@/store/useBuilderStore";
-import { coerceTransitType } from "@/store/useBuilderStore";
 import { isTransitHubStop } from "@/lib/transitHubs";
 import { allowedVisitTypesForIndex } from "@/lib/locationRules";
-import { useHybridTooltip } from "@/hooks/useHybridTooltip";
 import { CrimsonGlow } from "@/components/branding/CrimsonGlow";
 import { GoldLight } from "@/components/branding/GoldLight";
 import { ConciergeSuggestionCard } from "./ConciergeSuggestionCard";
@@ -36,7 +33,7 @@ export function CityAccordionItem({
   selectedTourIds,
   onNights,
   onVisitType,
-  onTransit,
+  onTransit: _onTransit,
   onRemove,
   onAddTour,
 }: {
@@ -58,14 +55,15 @@ export function CityAccordionItem({
   selectedTourIds: string[];
   onNights: (n: number) => void;
   onVisitType: (t: CityVisitType) => void;
-  onTransit: (t: CityTransitType) => void;
+  /** @deprecated Transit is set in Transport section, not Locations. */
+  onTransit?: (t: import("@/store/useBuilderStore").CityTransitType) => void;
   onRemove: () => void;
   onAddTour: (tourId: string) => void;
 }) {
+  void _onTransit;
   const controls = useDragControls();
   const locked = isTransitHubStop(loc);
   const name = displayName || city?.name || "City";
-  const transit: CityTransitType = coerceTransitType(loc.transitType);
   const allowedVisitTypes = allowedVisitTypesForIndex(index, totalLocations);
   const visitType: CityVisitType = locked
     ? loc.visitType === "departure"
@@ -75,10 +73,8 @@ export function CityAccordionItem({
       ? loc.visitType
       : "stay";
   const isStay = !locked && visitType === "stay";
-  const isLast = index === totalLocations - 1;
   const nightsOk = isStay ? loc.nights >= 1 : true;
-  const transitOk = locked || isLast || transit !== "unset";
-  const isConfigured = nightsOk && transitOk;
+  const isConfigured = nightsOk;
   const nightsStatusClass = isConfigured
     ? "text-emerald-400"
     : "text-[#075473]";
@@ -200,9 +196,8 @@ export function CityAccordionItem({
               </div>
             </div>
 
-            <div className="relative z-30 mt-4 w-full overflow-visible rounded-xl border-t border-zinc-800/80 bg-[#121212] p-3 pt-3 sm:p-3.5 space-y-3">
-              {/* Hide FROM on first overnight city — arrival hub is Step 2 */}
-              {showFromLabel ? (
+            {showFromLabel ? (
+              <div className="relative z-30 mt-4 w-full overflow-visible rounded-xl border-t border-zinc-800/80 bg-[#121212] p-3 pt-3 sm:p-3.5">
                 <div className="shrink-0 min-w-max">
                   <span className="mb-0.5 block text-[10px] font-bold uppercase tracking-wider text-zinc-400">
                     From
@@ -211,59 +206,8 @@ export function CityAccordionItem({
                     {fromLabel}
                   </p>
                 </div>
-              ) : null}
-
-              {/* Travel to next — all non-terminal stays */}
-              {!isLast ? (
-                <div
-                  className={`relative z-30 flex flex-col gap-1.5 overflow-visible ${
-                    showFromLabel
-                      ? "border-t border-zinc-800/80 pt-2.5"
-                      : ""
-                  }`}
-                >
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-[#075473]">
-                    Travel to next
-                  </span>
-                  {transit === "unset" ? (
-                    <p className="text-[10px] font-medium text-accent-500">
-                      ⚠️ Not configured
-                    </p>
-                  ) : null}
-                  <div className="relative z-30 flex flex-wrap items-center gap-2 overflow-visible">
-                    <div className="relative z-30 inline-flex shrink-0 overflow-visible rounded-full border border-zinc-700 bg-zinc-950 p-0.5">
-                      <TransitPill
-                        active={transit === "self"}
-                        onClick={() => onTransit("self")}
-                        label="Self"
-                        hint="€0"
-                        tooltip="Self-arranged — You figure out and manage your transit independently (€0)."
-                        tipWidth="w-52"
-                        tipAlign="left"
-                      />
-                      <TransitPill
-                        active={transit === "public"}
-                        onClick={() => onTransit("public")}
-                        label="Public"
-                        hint="Train"
-                        tooltip="Public Transit — We guide and secure train tickets/Shinkansen passes for your journey."
-                        tipWidth="w-52"
-                        tipAlign="center"
-                      />
-                      <TransitPill
-                        active={transit === "private"}
-                        onClick={() => onTransit("private")}
-                        label="Private"
-                        hint="Car"
-                        tooltip="Private Chauffeur — We provide a dedicated vehicle (e.g. Toyota Alphard) and private driver."
-                        tipWidth="w-52"
-                        tipAlign="right"
-                      />
-                    </div>
-                  </div>
-                </div>
-              ) : null}
-            </div>
+              </div>
+            ) : null}
 
             {suggestions.map((m, index) => (
               <ConciergeSuggestionCard
@@ -305,15 +249,6 @@ export function CityAccordionItem({
                     <span className="block break-words text-sm font-semibold leading-tight text-white">
                       {name}
                     </span>
-                    {!isLast && transit === "unset" ? (
-                      <span
-                        className="inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-[#E60F43] text-[10px] font-black text-white"
-                        title="Transport not set"
-                        aria-label="Action required: pick transport"
-                      >
-                        !
-                      </span>
-                    ) : null}
                   </span>
                   <span className={`text-xs font-medium ${nightsStatusClass}`}>
                     {isStay
@@ -324,25 +259,6 @@ export function CityAccordionItem({
                   </span>
                 </span>
               </span>
-              {!isLast ? (
-                <span
-                  className={`truncate pl-0.5 text-[9px] font-semibold uppercase leading-tight tracking-wide ${
-                    transit === "unset"
-                      ? "text-[#E60F43]"
-                      : transit === "self"
-                        ? "text-white/40"
-                        : "text-[#F6A724]"
-                  }`}
-                >
-                  {transit === "unset"
-                    ? "Transport: ! action required"
-                    : transit === "self"
-                      ? "Transport: self-arranged"
-                      : transit === "public"
-                        ? "Transport: public / rail"
-                        : "Transport: private"}
-                </span>
-              ) : null}
             </span>
             {dateLabel || startDate ? (
               <CityDateStack
@@ -435,89 +351,6 @@ function VisitPill({
     >
       {label}
     </button>
-  );
-}
-
-function TransitPill({
-  active,
-  onClick,
-  label,
-  hint,
-  tooltip,
-  tipWidth = "w-52",
-  tipAlign = "center",
-}: {
-  active: boolean;
-  onClick: () => void;
-  label: string;
-  hint: string;
-  tooltip: string;
-  tipWidth?: string;
-  tipAlign?: "left" | "center" | "right";
-}) {
-  const {
-    isOpen,
-    setIsOpen,
-    containerRef,
-    onMouseEnter,
-    onMouseLeave,
-  } = useHybridTooltip();
-
-  const tipPos =
-    tipAlign === "right"
-      ? "right-0 translate-x-0"
-      : tipAlign === "left"
-        ? "left-0 translate-x-0"
-        : "left-1/2 -translate-x-1/2";
-  const arrowPos =
-    tipAlign === "right"
-      ? "right-6 left-auto translate-x-0"
-      : tipAlign === "left"
-        ? "left-6 right-auto translate-x-0"
-        : "left-1/2 -translate-x-1/2";
-
-  return (
-    <div
-      ref={containerRef}
-      className="group relative z-50 inline-block overflow-visible"
-      onMouseEnter={onMouseEnter}
-      onMouseLeave={onMouseLeave}
-    >
-      <div
-        role="tooltip"
-        className={`pointer-events-none absolute bottom-full z-50 mb-2 max-w-[220px] whitespace-normal break-words rounded-xl border border-cyan-400/40 bg-[#075473] p-3 text-left text-xs font-semibold leading-snug text-white shadow-xl transition-all duration-150 ${tipPos} ${tipWidth} ${
-          isOpen
-            ? "visible opacity-100"
-            : "invisible opacity-0 group-hover:visible group-hover:opacity-100"
-        }`}
-      >
-        <p className="text-white font-semibold leading-snug">{tooltip}</p>
-        <div
-          className={`absolute top-full border-4 border-transparent border-t-[#075473] ${arrowPos}`}
-          aria-hidden
-        />
-      </div>
-      <button
-        type="button"
-        onClick={() => {
-          onClick();
-          setIsOpen((prev) => !prev);
-        }}
-        aria-expanded={isOpen}
-        className={`rounded-full px-3 py-1.5 text-xs font-semibold transition active:scale-95 ${
-          active
-            ? "bg-[#0B1F3A] text-white ring-1 ring-[#075473]/50"
-            : "text-zinc-400 hover:bg-zinc-800 hover:text-white"
-        }`}
-      >
-        {label}
-        <span
-          className={`ml-1 font-normal ${active ? "text-white/70" : "text-zinc-500"}`}
-        >
-          ({hint})
-        </span>
-      </button>
-    </div>
   );
 }
 

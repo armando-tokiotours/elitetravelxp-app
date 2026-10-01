@@ -111,3 +111,65 @@ export function toPassStatusLabel(
 export function canonicalStatusLabel(status?: string | null): string {
   return toCanonicalStatus(status).replace(/_/g, " ");
 }
+
+/**
+ * Builder autosave stays DRAFT until the guest explicitly submits or emails.
+ * Callers that only background-save must pass isSubmitted/sentViaEmail false.
+ */
+export function calculateInitialBookingStatus(data: {
+  isSubmitted?: boolean;
+  sentViaEmail?: boolean;
+  guestEmail?: string | null;
+  startDate?: string | null;
+  selectedTours?: unknown[] | null;
+  status?: string | null;
+}): CanonicalBookingStatus {
+  const existing = data.status != null ? toCanonicalStatus(data.status) : null;
+  // Never demote ops-advanced states via this helper
+  if (
+    existing &&
+    existing !== "draft" &&
+    existing !== "incoming"
+  ) {
+    return existing;
+  }
+
+  const isSubmittedByClient =
+    data.isSubmitted === true || data.sentViaEmail === true;
+  const hasCompleteData = Boolean(
+    data.guestEmail &&
+      data.startDate &&
+      Array.isArray(data.selectedTours) &&
+      data.selectedTours.length > 0
+  );
+
+  if (isSubmittedByClient && hasCompleteData) {
+    return "incoming";
+  }
+  return "draft";
+}
+
+/** Shared pass / ops pill classes — identical padding & type scale. */
+export function statusPillClassName(
+  status?: string | null
+): string {
+  const c = toCanonicalStatus(status);
+  if (c === "draft") {
+    return "border-gray-500/30 bg-gray-500/20 text-gray-400";
+  }
+  if (c === "incoming") {
+    return "border-amber-500/30 bg-amber-500/20 text-amber-300";
+  }
+  if (c === "cancelled") {
+    return "border-red-500/40 bg-red-500/20 text-red-300";
+  }
+  if (c === "confirmed" || c === "in_ops" || c === "done") {
+    return "border-emerald-500/40 bg-emerald-500/20 text-emerald-300";
+  }
+  return "border-blue-500/30 bg-blue-500/20 text-blue-300";
+}
+
+/** BAL write status for draft-phase autosaves (alias of draft in PB). */
+export function draftLeadWriteStatus(): "lead" {
+  return "lead";
+}

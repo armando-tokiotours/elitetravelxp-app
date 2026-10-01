@@ -16,6 +16,7 @@ import { matchSeasonalHighlights } from "@/lib/seasonalMatcher";
 import { resolveSeasonInsight } from "@/lib/seasonality";
 import { travelPaceLabel } from "@/lib/travelPace";
 import {
+  BUILDER_ALL_STEPS_COMPLETE,
   canOpenBuilderStep,
   isBuilderStepComplete,
   type BuilderStepSnapshot,
@@ -26,6 +27,7 @@ import {
   getHotelAllocationStatus,
 } from "@/lib/hotelCalculator";
 import {
+  coerceTransitType,
   formatDisplayDate,
   normalizeCityHotelPref,
   useBuilderStore,
@@ -37,6 +39,12 @@ import {
   type BuilderEditModalId,
 } from "./BuilderEditModalContext";
 import { BuilderMWidgetGrid } from "./BuilderMWidgetGrid";
+import {
+  hotelArrangeImageUrls,
+  transportArrangeImageUrls,
+  type HotelArrangeKind,
+  type TransportArrangeKind,
+} from "./DynamicWidgetBackground";
 import { ProgressBar } from "./ProgressBar";
 import { useLazyModalMount } from "./modals/useLazyModalMount";
 import { getSystemMessage } from "@/lib/systemMessages";
@@ -122,10 +130,11 @@ function modalToStep(
       return 3;
     case "hotels_transport":
       return 4;
+    case "drivers":
+      // Unlock with Tours after hotels — Transport cards before/alongside tours
+      return 5;
     case "tours":
       return 5;
-    case "drivers":
-      return 6;
     default:
       return null;
   }
@@ -193,9 +202,6 @@ export function BuilderMView({
   const removeLocation = useBuilderStore((s) => s.removeLocation);
   const setLocationNights = useBuilderStore((s) => s.setLocationNights);
   const setLocationVisitType = useBuilderStore((s) => s.setLocationVisitType);
-  const setLocationTransitType = useBuilderStore(
-    (s) => s.setLocationTransitType
-  );
   const reorderLocations = useBuilderStore((s) => s.reorderLocations);
   const toggleTour = useBuilderStore((s) => s.toggleTour);
   const syncRouteTransitHubs = useBuilderStore((s) => s.syncRouteTransitHubs);
@@ -288,18 +294,6 @@ export function BuilderMView({
     ]
   );
 
-  const closeAndAdvance = useCallback(
-    (closed: Exclude<BuilderEditModalId, null>) => {
-      setActiveEditModal(null);
-      const step = modalToStep(closed);
-      if (step == null) return;
-      if (isBuilderStepComplete(step, useBuilderStore.getState())) {
-        unlockBuilderStep(step + 1);
-      }
-    },
-    [unlockBuilderStep]
-  );
-
   const openEditModal = useCallback(
     (id: Exclude<BuilderEditModalId, null>) => {
       const step = modalToStep(id);
@@ -326,6 +320,26 @@ export function BuilderMView({
       setActiveEditModal(id);
     },
     [ensureCityHotels, highestUnlockedStep, locations, setExperienceService]
+  );
+
+  const closeAndAdvance = useCallback(
+    (closed: Exclude<BuilderEditModalId, null>) => {
+      setActiveEditModal(null);
+      const step = modalToStep(closed);
+      if (step == null) return;
+      const state = useBuilderStore.getState();
+      if (isBuilderStepComplete(step, state)) {
+        // Transport Done must unlock past step 6 → complete (7), otherwise
+        // itinerary fox keeps saying "Still need: Transport".
+        if (closed === "drivers") {
+          unlockBuilderStep(BUILDER_ALL_STEPS_COMPLETE);
+        } else {
+          unlockBuilderStep(step + 1);
+        }
+      }
+      // Stay on the widget grid — pulsar rings the next card; user taps to open.
+    },
+    [unlockBuilderStep]
   );
 
   const locked = useMemo(() => {
@@ -425,6 +439,23 @@ export function BuilderMView({
     return "Mix-arranged";
   }, [cityHotels, locations]);
 
+  const hotelBgImages = useMemo(() => {
+    const stayIds = [
+      ...new Set(
+        locations
+          .filter((l) => !isTransitHubStop(l) && (l.nights || 0) > 0)
+          .map((l) => l.cityId)
+      ),
+    ];
+    const kinds = new Set<HotelArrangeKind>();
+    for (const id of stayIds) {
+      const pref = cityHotels[id];
+      if (pref == null) continue;
+      kinds.add(pref.needsHotel ? "tokiotours" : "self");
+    }
+    return hotelArrangeImageUrls(kinds);
+  }, [cityHotels, locations]);
+
   const hotelCityChecks = useMemo(() => {
     return locations
       .filter((l) => !isTransitHubStop(l) && (l.nights || 0) > 0)
@@ -440,14 +471,79 @@ export function BuilderMView({
       });
   }, [cityHotels, cityLabelMap, locations]);
 
+  /** Stay cities in route order (unique), matching DriversEditorModal stop list. */
+  const stayTransportStops = useMemo(() => {
+    const stayLocs = locations.filter(
+      (l) => !isTransitHubStop(l) && (l.nights || 0) > 0
+    );
+    const unique: typeof stayLocs = [];
+    const seen = new Set<string>();
+    for (const loc of stayLocs) {
+      if (seen.has(loc.cityId)) continue;
+      seen.add(loc.cityId);
+      unique.push(loc);
+    }
+    return unique.map((loc, i) => ({
+      loc,
+      hasNext: Boolean(unique[i + 1]),
+      transitType: coerceTransitType(loc.transitType),
+      localTransitType: coerceTransitType(loc.localTransitType),
+    }));
+  }, [locations]);
+
   const transportArrangeLabel = useMemo(() => {
+    if (stayTransportStops.length === 0) return "Add cities first";
+    // Required picks: in-city for every stay + inter-city only when a next stay exists
+    const modes = stayTransportStops.flatMap((s) => {
+      const list = [s.localTransitType];
+      if (s.hasNext) list.push(s.transitType);
+      return list;
+    });
+    const unset = modes.filter((m) => m === "unset").length;
+    if (unset === modes.length) return "Set Self / Public / Pick-up";
+    const self = modes.filter((m) => m === "self").length;
+    const pub = modes.filter((m) => m === "public").length;
+    const priv = modes.filter((m) => m === "private").length;
     if (needDriver || countBillableChauffeurDays(chauffeurSelections) > 0) {
       return "Private drivers";
     }
-    const mode = config.transitModes.find((t) => t.id === transitModeId);
-    if (mode?.label) return mode.label;
-    return "Public tickets";
-  }, [chauffeurSelections, config.transitModes, needDriver, transitModeId]);
+    if (priv === modes.length) return "Private pick-up";
+    if (pub === modes.length) return "Public tickets";
+    if (self === modes.length) return "Self / walk";
+    if (unset > 0) return "Mix — set remaining";
+    return "Mix-arranged";
+  }, [chauffeurSelections, needDriver, stayTransportStops]);
+
+  const transportBgImages = useMemo(() => {
+    const kinds = new Set<TransportArrangeKind>();
+    for (const stop of stayTransportStops) {
+      for (const mode of [
+        stop.localTransitType,
+        ...(stop.hasNext ? [stop.transitType] : []),
+      ]) {
+        if (mode === "self" || mode === "public" || mode === "private") {
+          kinds.add(mode);
+        }
+      }
+    }
+    if (
+      needDriver ||
+      countBillableChauffeurDays(chauffeurSelections) > 0
+    ) {
+      kinds.add("private");
+    }
+    return transportArrangeImageUrls(kinds);
+  }, [chauffeurSelections, needDriver, stayTransportStops]);
+
+  const transportIncomplete = useMemo(() => {
+    if (stayTransportStops.length === 0) return true;
+    // Last city has no inter-city hop — only local + hops with a next stay count
+    return stayTransportStops.some(
+      (s) =>
+        s.localTransitType === "unset" ||
+        (s.hasNext && s.transitType === "unset")
+    );
+  }, [stayTransportStops]);
 
   const experienceBands = useMemo(() => {
     if (isEliteConcierge || experienceService === "concierge") {
@@ -657,6 +753,7 @@ export function BuilderMView({
       <BuilderMWidgetGrid
         onOpen={openEditModal}
         tripDays={durationDays}
+        arrivalDate={arrivalDate}
         startDateText={startDateText}
         guestCount={guestCount}
         paceLabel={paceLabel ? `${paceLabel} Pace` : null}
@@ -668,9 +765,13 @@ export function BuilderMView({
         airportDropoff={airportDropoff}
         cityBands={cityBands}
         hotelArrangeLabel={hotelArrangeLabel}
+        hotelBgImages={hotelBgImages}
         transportArrangeLabel={transportArrangeLabel}
+        transportBgImages={transportBgImages}
         experienceBands={experienceBands}
         hotelCityChecks={hotelCityChecks}
+        transportIncomplete={transportIncomplete}
+        highestUnlockedStep={highestUnlockedStep}
         locked={locked}
       />
 
@@ -760,7 +861,6 @@ export function BuilderMView({
           }}
           onNights={(key, n) => setLocationNights(key, n)}
           onVisitType={(key, t) => setLocationVisitType(key, t)}
-          onTransit={(key, t) => setLocationTransitType(key, t)}
           onRemove={(key) => removeLocation(key)}
           onAddTour={(id) => {
             if (!selectedTourIds.includes(id)) toggleTour(id);
@@ -812,6 +912,7 @@ export function BuilderMView({
           cityNames={cityNames}
           allowToursOnTravelDays={false}
           seasonalHighlights={config.seasonalHighlights}
+          hideTransport
         />
       ) : null}
 
@@ -819,8 +920,12 @@ export function BuilderMView({
         <DriversEditorModal
           open={activeEditModal === "drivers"}
           onClose={() => closeAndAdvance("drivers")}
+          onTransportComplete={() =>
+            unlockBuilderStep(BUILDER_ALL_STEPS_COMPLETE)
+          }
           cities={cities}
           cityNames={cityNames}
+          cityMovements={config.cityMovements}
           vehicles={config.vehicles}
           chauffeurRates={config.chauffeurRates}
         />

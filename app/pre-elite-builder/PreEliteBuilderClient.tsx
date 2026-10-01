@@ -4,7 +4,29 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
-import { ArrowLeft, ArrowRight, Minus, Plus } from "lucide-react";
+import {
+  AlertTriangle,
+  ArrowLeft,
+  ArrowRight,
+  CalendarDays,
+  Clock,
+  Compass,
+  Crown,
+  Heart,
+  Landmark,
+  Languages,
+  Minus,
+  Mountain,
+  Plane,
+  Plus,
+  Sparkles,
+  Star,
+  Sun,
+  User,
+  Users,
+  UtensilsCrossed,
+  type LucideIcon,
+} from "lucide-react";
 import {
   INTERESTS,
   MOTIVATIONS,
@@ -78,6 +100,30 @@ const CHOICE_SPOTLIGHT: Record<string, ChoiceSpotlight> = {
   tourist_traps: { color: "#DC6E8A", placement: "left-center" },
   authentic_dining: { color: "#054F70", placement: "bottom-center" },
   packed_itinerary: { color: "#1BA58A", placement: "right-center" },
+};
+
+/** Bare sticker icons — top-right of each choice card (no circle/pill). */
+const CHOICE_STICKER: Record<
+  string,
+  { Icon: LucideIcon; className: string }
+> = {
+  classic_explorer: { Icon: Compass, className: "text-[#075473]" },
+  premium_comfort: { Icon: Star, className: "text-[#F6A724]" },
+  vip_bespoke: { Icon: Crown, className: "text-white" },
+  culture_heritage: { Icon: Landmark, className: "text-[#E60F43]" },
+  food_culinary: { Icon: UtensilsCrossed, className: "text-[#DC6E8A]" },
+  modern_pop: { Icon: Sparkles, className: "text-[#7ec8e3]" },
+  nature_day_trips: { Icon: Mountain, className: "text-[#1BA58A]" },
+  family: { Icon: Users, className: "text-[#E60F43]" },
+  romantic: { Icon: Heart, className: "text-[#DC6E8A]" },
+  solo: { Icon: User, className: "text-[#7ec8e3]" },
+  first_time: { Icon: Plane, className: "text-[#1BA58A]" },
+  language_transit: { Icon: Languages, className: "text-[#E60F43]" },
+  tourist_traps: { Icon: AlertTriangle, className: "text-[#DC6E8A]" },
+  authentic_dining: { Icon: UtensilsCrossed, className: "text-[#7ec8e3]" },
+  packed_itinerary: { Icon: Clock, className: "text-[#1BA58A]" },
+  multi_day: { Icon: CalendarDays, className: "text-[#F6A724]" },
+  single_day: { Icon: Sun, className: "text-[#F6A724]" },
 };
 
 const PRE_ELITE_HERO_POSES = {
@@ -665,14 +711,6 @@ function ChoiceList({
   const isOn = (id: string) =>
     Array.isArray(selected) ? selected.includes(id) : selected === id;
 
-  const eyebrowColor = (eyebrow: string) => {
-    const key = eyebrow.trim().toLowerCase();
-    if (key === "most popular") return "#1BA58A";
-    if (key === "best value") return "#DC6E8A";
-    if (key === "exclusive") return "#F6A724";
-    return "#DC6E8A";
-  };
-
   return (
     <div className="grid gap-3">
       {options.map((option) => {
@@ -680,7 +718,6 @@ function ChoiceList({
         const story = resolveCopy?.(option.id);
         const title = story?.title || option.title;
         const description = option.description;
-        const badgeTag = option.eyebrow;
         const card = resolveCard?.(option.id, option.svgUrl) || {
           url:
             option.svgUrl?.trim() ||
@@ -699,6 +736,8 @@ function ChoiceList({
           if (!Number.isFinite(n) || h.length !== 6) return "34,211,238";
           return `${(n >> 16) & 255},${(n >> 8) & 255},${n & 255}`;
         })();
+        const sticker = CHOICE_STICKER[option.id];
+        const StickerIcon = sticker?.Icon;
 
         return (
           <button
@@ -707,10 +746,10 @@ function ChoiceList({
             aria-pressed={on}
             aria-label={`Preview and select ${title}`}
             onClick={() => onOpenStory(option.id)}
-            className={`group relative w-full min-h-[7rem] cursor-pointer overflow-hidden rounded-2xl border p-5 text-left transition-all duration-300 ${
+            className={`group relative w-full min-h-[7rem] cursor-pointer overflow-hidden rounded-2xl border p-5 pr-12 text-left transition-all duration-300 ${
               on
                 ? "scale-[1.01]"
-                : "border-white/10 bg-[#0A1017] opacity-60 hover:border-white/20 hover:opacity-90"
+                : "border-white/10 bg-[#0D1117]/70 hover:border-white/25"
             }`}
             style={
               on
@@ -767,39 +806,21 @@ function ChoiceList({
               />
             ) : null}
 
-            <div className="relative z-10 flex h-full flex-col justify-between space-y-2">
-              <div className="flex items-center justify-between gap-2">
-                {badgeTag ? (
-                  <span
-                    className="text-[10px] font-bold tracking-widest uppercase"
-                    style={{
-                      color: on
-                        ? accent
-                        : eyebrowColor(badgeTag),
-                    }}
-                  >
-                    {badgeTag}
-                  </span>
-                ) : (
-                  <span />
-                )}
-                {on ? (
-                  <span
-                    className="h-2 w-2 animate-ping rounded-full"
-                    style={{ backgroundColor: accent }}
-                  />
-                ) : null}
-              </div>
+            {/* Bare sticker icon — top-right, no circle/pill */}
+            {StickerIcon ? (
+              <StickerIcon
+                className={`pointer-events-none absolute top-4 right-4 z-10 h-5 w-5 ${sticker.className}`}
+                strokeWidth={1.75}
+                aria-hidden
+              />
+            ) : null}
 
+            <div className="relative z-10 flex h-full flex-col justify-end space-y-2 pt-1">
               <div>
                 <h3 className="font-godiva text-base font-bold tracking-wide text-white">
                   {title}
                 </h3>
-                <p
-                  className={`mt-1 text-xs leading-relaxed ${
-                    on ? "text-zinc-300" : "text-white/55"
-                  }`}
-                >
+                <p className="mt-1 text-xs leading-relaxed text-zinc-300">
                   {description}
                 </p>
               </div>
@@ -870,6 +891,8 @@ function ContactFields({
                 option.id === "multi_day"
                   ? "/brand/trip-multi-thumb.webp"
                   : "/brand/trip-single-thumb.webp";
+              const sticker = CHOICE_STICKER[option.id];
+              const StickerIcon = sticker?.Icon;
               return (
                 <button
                   key={option.id}
@@ -879,7 +902,7 @@ function ContactFields({
                   className={`group relative overflow-hidden rounded-2xl text-left transition ${
                     on
                       ? "border-2 bg-[#F6A724]/10"
-                      : "border border-white/10 bg-black/20 hover:border-white/25"
+                      : "border border-white/10 bg-[#0D1117]/70 hover:border-white/25"
                   }`}
                   style={
                     on
@@ -896,6 +919,13 @@ function ContactFields({
                     active={on}
                     className="!z-[1]"
                   />
+                  {StickerIcon ? (
+                    <StickerIcon
+                      className={`pointer-events-none absolute top-3 right-3 z-20 h-5 w-5 ${sticker.className}`}
+                      strokeWidth={1.75}
+                      aria-hidden
+                    />
+                  ) : null}
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={thumb}
@@ -904,13 +934,13 @@ function ContactFields({
                     draggable={false}
                     className="relative z-10 h-14 w-full object-cover sm:h-16"
                   />
-                  <div className="relative z-10 px-2.5 py-2 sm:px-3">
+                  <div className="relative z-10 px-2.5 py-2 pr-10 sm:px-3">
                     <span className="block text-[0.8rem] font-medium leading-snug text-white sm:text-sm">
                       {option.id === "multi_day"
                         ? "Multi-Day Journey"
                         : "Single-Day Tour"}
                     </span>
-                    <span className="mt-0.5 block text-[0.65rem] leading-snug text-white/55 sm:text-xs">
+                    <span className="mt-0.5 block text-[0.65rem] leading-snug text-zinc-300 sm:text-xs">
                       {option.id === "multi_day"
                         ? "Hotels, cities & full itinerary."
                         : "One focused 6–8 hour day trip."}

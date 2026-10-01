@@ -18,6 +18,7 @@ import {
 } from "@/lib/pocketbase/client";
 import { BrandingUiCardsAdmin } from "@/components/team/BrandingUiCardsAdmin";
 import { PreBuilderQuizBrandingAdmin } from "@/components/team/PreBuilderQuizBrandingAdmin";
+import { TransportCardsBrandingAdmin } from "@/components/team/TransportCardsBrandingAdmin";
 import { BRAND_LOGO, LOCAL_FONTS } from "@/lib/brand";
 import {
   SINGLE_DAY_BUILDER_CONFIG,
@@ -790,6 +791,8 @@ export function SiteBrandingPanel({ getClient }: { getClient: () => PbClient }) 
           . Link this page from campaigns when guests have a fixed spend limit.
         </p>
       </div>
+
+      <TransportCardsBrandingAdmin getClient={getClient} />
 
       <BrandingUiCardsAdmin getClient={getClient} />
         </>

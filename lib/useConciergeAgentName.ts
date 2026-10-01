@@ -8,7 +8,7 @@ export function useConciergeAgentName(pnr: string | null | undefined): string | 
 
   useEffect(() => {
     const ref = String(pnr || "").trim();
-    if (!ref || ref === "—" || ref.toUpperCase().startsWith("TMP-")) {
+    if (!ref || ref === "—") {
       setName(null);
       return;
     }

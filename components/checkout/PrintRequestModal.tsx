@@ -94,7 +94,7 @@ export function PrintRequestModal({
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [showDirectDownload, setShowDirectDownload] = useState(false);
-  const [pdfRef, setPdfRef] = useState(state.tempBookingRef || "TMP-DRAFT");
+  const [pdfRef, setPdfRef] = useState(state.tempBookingRef || "JPN-DRAFT");
   const [termsAccepted, setTermsAccepted] = useState(skipTerms);
   const [sendDocs, setSendDocs] = useState<SendDocSelection>({
     dossier: true,
@@ -131,7 +131,7 @@ export function PrintRequestModal({
       state.confirmedBookingRef ||
       state.tempBookingRef ||
       pdfRef ||
-      "TMP-DRAFT",
+      "JPN-DRAFT",
     [
       state.tempBookingRef,
       state.confirmedBookingRef,
@@ -160,11 +160,11 @@ export function PrintRequestModal({
     setNameLocked(Boolean(knownName));
 
     const ref =
-      state.confirmedBookingRef || state.tempBookingRef || "TMP-DRAFT";
+      state.confirmedBookingRef || state.tempBookingRef || "JPN-DRAFT";
     setPdfRef(ref);
 
     // Hydrate from original booking request when local stores are empty
-    if ((!knownEmail || !knownName) && ref && ref !== "TMP-DRAFT") {
+    if ((!knownEmail || !knownName) && ref && ref !== "JPN-DRAFT") {
       void fetch("/api/itinerary/contact", {
         method: "POST",
         headers: { "Content-Type": "application/json" },

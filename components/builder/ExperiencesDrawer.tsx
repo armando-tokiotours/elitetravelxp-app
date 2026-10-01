@@ -253,7 +253,26 @@ export function ExperiencesDrawer({
                       selected={Boolean(booked)}
                       onAdd={(lang) => {
                         if (booked) {
-                          onRemoveTour(tour.id);
+                          // Book again on another day; duplicate confirm is in onAddTour.
+                          const resolved =
+                            lang ||
+                            booked.selectedLanguage ||
+                            preferredTourLanguage ||
+                            "EN";
+                          if (dayOptions.length === 0) {
+                            setToast(
+                              "Set your arrival date and city nights in Steps 1–3 before scheduling experiences."
+                            );
+                            return;
+                          }
+                          if (dayOptions.length === 1) {
+                            setToast(
+                              "This city only has one stay day — remove the existing booking to reschedule it."
+                            );
+                            return;
+                          }
+                          setPendingLanguage(resolved);
+                          setPickingTourId(tour.id);
                           return;
                         }
                         const resolved =
@@ -290,6 +309,7 @@ export function ExperiencesDrawer({
                         setPendingLanguage(resolved);
                         setPickingTourId(tour.id);
                       }}
+                      onRemove={() => onRemoveTour(tour.id)}
                     />
                   );
                 })

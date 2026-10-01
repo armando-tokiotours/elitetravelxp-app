@@ -69,11 +69,17 @@ function TicketerInner() {
         filter = `assigned_ticketer_id="${staffId}" || ticket_status="needed" || ticket_status="ordered"`;
       }
       const list = await loadTickets(pb, filter);
-      // Hide pure "none" noise — never show bookings with no ticket demand
+      // Golden rule: ticketer only works purchase queue when payment confirmed
       setRows(
         list.filter((r) => {
           const st = String(r.ticket_status || "none");
           if (st === "none" || st === "") return false;
+          const hub = map[String(r.pnr).toUpperCase()];
+          // Owners/ops see all; ticketer role only paid bookings (or already done)
+          if (role === "ticketer") {
+            if (st === "done") return true;
+            if (!hub?.payment_confirmed) return false;
+          }
           return true;
         })
       );
@@ -94,8 +100,8 @@ function TicketerInner() {
   return (
     <div className="space-y-4">
       <p className="text-sm text-zinc-400">
-        Tickets pocket (ops_tickets) per PNR. You do not see guide or driver
-        pay.
+        Tickets pocket (ops_tickets) per PNR. Purchase queue only after Ops or
+        Concierge confirms payment. You do not see guide or driver pay.
       </p>
       {msg ? <p className="text-sm text-[#075473]">{msg}</p> : null}
       <ul className="space-y-3">
@@ -188,30 +194,49 @@ function TicketerInner() {
                   }}
                 />
                 <div className="mt-3 flex flex-wrap gap-2">
-                  {["needed", "ordered", "done"].map((s) => (
-                    <button
-                      key={s}
-                      type="button"
-                      className="rounded-lg border border-zinc-700 px-3 py-1.5 text-xs capitalize text-zinc-300 hover:border-[#075473] hover:text-white"
-                      onClick={async () => {
-                        try {
-                          await updateTicketsByPnr(getClient(), row.pnr, {
-                            ticket_status: s as
-                              | "needed"
-                              | "ordered"
-                              | "done",
-                          });
-                          setMsg(`${row.pnr} → ${s}`);
-                          await reload();
-                        } catch (err) {
-                          setMsg(formatPbError(err));
+                  {(["needed", "ordered", "done"] as const).map((s) => {
+                    const paid = Boolean(hub?.payment_confirmed);
+                    const blockDone = s === "done" && !paid;
+                    return (
+                      <button
+                        key={s}
+                        type="button"
+                        disabled={blockDone}
+                        title={
+                          blockDone
+                            ? "Payment must be confirmed before marking purchased"
+                            : undefined
                         }
-                      }}
-                    >
-                      Mark {s}
-                    </button>
-                  ))}
+                        className="rounded-lg border border-zinc-700 px-3 py-1.5 text-xs capitalize text-zinc-300 hover:border-[#075473] hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
+                        onClick={async () => {
+                          try {
+                            if (s === "done" && !hub?.payment_confirmed) {
+                              setMsg(
+                                "Payment not confirmed — cannot mark tickets purchased"
+                              );
+                              return;
+                            }
+                            await updateTicketsByPnr(getClient(), row.pnr, {
+                              ticket_status: s,
+                            });
+                            setMsg(`${row.pnr} → ${s}`);
+                            await reload();
+                          } catch (err) {
+                            setMsg(formatPbError(err));
+                          }
+                        }}
+                      >
+                        Mark {s}
+                      </button>
+                    );
+                  })}
                 </div>
+                {!hub?.payment_confirmed ? (
+                  <p className="mt-2 text-[11px] text-amber-400/90">
+                    Payment not confirmed yet — purchase locked until Ops or
+                    Concierge marks payment Yes.
+                  </p>
+                ) : null}
               </li>
             );
           })

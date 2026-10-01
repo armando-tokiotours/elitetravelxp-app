@@ -40,11 +40,13 @@ import { coerceExperienceProfile } from "@/lib/experienceProfiler";
 import { useItineraryStore } from "@/store/useItineraryStore";
 import {
   generateTempPNR,
+  isTempBookingRef,
   isValidBookingPNR,
   normalizeBookingPNR,
   normalizeBookingStatus,
   promoteTempToOfficial,
   resolveOfficialPNR,
+  TK_PNR_RE,
   type BookingStatus,
 } from "@/utils/pnr";
 
@@ -71,6 +73,11 @@ export interface LocationStop {
   visitType: CityVisitType;
   /** Transit mode to the *next* stop (next city, or departure hub on the last stop) */
   transitType: CityTransitType;
+  /**
+   * How guests move *inside* this stay city (Self / Public / Private).
+   * Separate from inter-city `transitType`.
+   */
+  localTransitType?: CityTransitType;
   /** When public: concierge pre-books tickets / IC cards for this leg */
   needsTicket?: boolean;
   ticketType?: TransitTicketType;
@@ -108,6 +115,7 @@ function normalizeLocation(
       : "arrival"
     : coerceVisitTypeForPosition(l.visitType, index, length);
   const transitType = coerceTransitType(l.transitType);
+  const localTransitType = coerceTransitType(l.localTransitType);
   const nights =
     visitType === "stay" && !isHub
       ? Math.max(1, Math.min(90, Math.round(Number(l.nights) || 1)))
@@ -140,6 +148,7 @@ function normalizeLocation(
     visitType,
     nights,
     transitType,
+    localTransitType,
     needsTicket,
     ticketType,
     ticketPricePerPax,
@@ -211,6 +220,13 @@ export interface BuilderState {
   children: number;
   /** Guest special needs — shown to bookings staff */
   specialNeeds: SpecialNeedId[];
+  /**
+   * Public-transport pass questionnaire (JR Pass / Suica).
+   * `null` = not answered yet · Tours step reads these later.
+   */
+  guestHasJRPass: boolean | null;
+  guestHasICCard: boolean | null;
+  guestNeedsTransitHelp: boolean | null;
   locations: LocationStop[];
   /** Per-city hotel preferences (keyed by cityId) */
   cityHotels: Record<string, CityHotelPref>;
@@ -262,9 +278,10 @@ export interface BuilderState {
   activeSeasonTier: SeasonTierName | null;
   activeSeasonNote: ActiveSeasonNote | null;
   /**
-   * Dual-stage booking reference lifecycle:
-   * - draft: tempBookingRef (TMP-…) while building
-   * - in_progress / confirmed: confirmedBookingRef (JPN-…) locked
+   * Booking reference lifecycle:
+   * - draft: tempBookingRef (JPN-XXXXXX from first paint)
+   * - in_progress / confirmed: confirmedBookingRef locked (same JPN- format)
+   * Legacy TMP-/TK- rows still hydrate from PocketBase / localStorage and upgrade.
    */
   tempBookingRef: string;
   confirmedBookingRef: string | null;
@@ -315,6 +332,11 @@ export interface BuilderActions {
   setLocationNights: (key: string, nights: number) => void;
   setLocationVisitType: (key: string, visitType: CityVisitType) => void;
   setLocationTransitType: (key: string, transitType: CityTransitType) => void;
+  /** In-city (local) Self / Public / Private for a stay stop. */
+  setLocationLocalTransitType: (
+    key: string,
+    localTransitType: CityTransitType
+  ) => void;
   setArrivalTransitType: (transitType: CityTransitType) => void;
   /** Save mode + optional public-rail ticket pre-book preference for a leg. */
   setLocationTransitChoice: (
@@ -376,6 +398,11 @@ export interface BuilderActions {
     note: ActiveSeasonNote | null
   ) => void;
   setTravelPace: (pace: TravelPace) => void;
+  setGuestTransitPasses: (answers: {
+    guestHasJRPass: boolean;
+    guestHasICCard: boolean;
+    guestNeedsTransitHelp: boolean;
+  }) => void;
   setPreferredTourLanguage: (code: string) => void;
   setTripMode: (mode: "multi_day" | "single_day") => void;
   setExperienceProfile: (profile: ExperienceProfile | null) => void;
@@ -391,7 +418,7 @@ export interface BuilderActions {
    */
   loadSavedItinerary: (payload: unknown) => void;
   hydrateFromSnapshot: (snapshot: Partial<BuilderState>) => void;
-  /** Ensure a temp TMP- ref exists for this browser session. */
+      /** Ensure a JPN- draft ref exists for this browser session. */
   ensureTempBookingRef: () => string;
   /**
    * Lock an official JPN- PNR after Print/Request or Revolut deposit.
@@ -429,6 +456,9 @@ const initialState: BuilderState = {
   adults: 2,
   children: 0,
   specialNeeds: [],
+  guestHasJRPass: null,
+  guestHasICCard: null,
+  guestNeedsTransitHelp: null,
   locations: [],
   cityHotels: {},
   transitModeId: null,
@@ -490,6 +520,9 @@ const BUILDER_PERSIST_KEYS = [
   "adults",
   "children",
   "specialNeeds",
+  "guestHasJRPass",
+  "guestHasICCard",
+  "guestNeedsTransitHelp",
   "locations",
   "cityHotels",
   "transitModeId",
@@ -551,8 +584,9 @@ function pickBuilderPayload(raw: unknown): Partial<BuilderState> {
       const ps = nested.bookingStatus;
       if (ps) {
         out.bookingStatus = normalizeBookingStatus(ps);
-      } else if (!out.bookingStatus || out.bookingStatus === "draft") {
-        out.bookingStatus = "in_progress";
+      } else if (!out.bookingStatus) {
+        // Missing status with a locked PNR still defaults to draft until submit/email
+        out.bookingStatus = "draft";
       }
     }
   }
@@ -653,6 +687,18 @@ export function mergePersistedBuilderState(
           ["reduced_mobility", "baby_car_seat", "senior", "none"].includes(id)
         )
       : current.specialNeeds,
+    guestHasJRPass:
+      p.guestHasJRPass === true || p.guestHasJRPass === false
+        ? p.guestHasJRPass
+        : current.guestHasJRPass,
+    guestHasICCard:
+      p.guestHasICCard === true || p.guestHasICCard === false
+        ? p.guestHasICCard
+        : current.guestHasICCard,
+    guestNeedsTransitHelp:
+      p.guestNeedsTransitHelp === true || p.guestNeedsTransitHelp === false
+        ? p.guestNeedsTransitHelp
+        : current.guestNeedsTransitHelp,
     experienceProfile: (() => {
       const coerced = coerceExperienceProfile(p.experienceProfile);
       return coerced ?? current.experienceProfile;
@@ -693,11 +739,8 @@ export function mergePersistedBuilderState(
       if (p.bookingStatus != null) {
         return normalizeBookingStatus(p.bookingStatus);
       }
-      return p.confirmedBookingRef || current.confirmedBookingRef
-        ? current.bookingStatus === "draft"
-          ? ("in_progress" as const)
-          : normalizeBookingStatus(current.bookingStatus)
-        : normalizeBookingStatus(current.bookingStatus || "draft");
+      // Keep draft until explicit submit / email — do not promote on hydrate
+      return normalizeBookingStatus(current.bookingStatus || "draft");
     })(),
     customBudgetTarget: (() => {
       if (!("customBudgetTarget" in p)) return current.customBudgetTarget;
@@ -1094,6 +1137,18 @@ export const useBuilderStore = create<BuilderState & BuilderActions>()(
           ),
         })),
 
+      setLocationLocalTransitType: (key, localTransitType) =>
+        set((s) => ({
+          locations: s.locations.map((l) =>
+            l.key === key
+              ? {
+                  ...l,
+                  localTransitType: coerceTransitType(localTransitType),
+                }
+              : l
+          ),
+        })),
+
       setArrivalTransitType: (transitType) =>
         set(() => {
           const mode = coerceTransitType(transitType);
@@ -1481,6 +1536,13 @@ export const useBuilderStore = create<BuilderState & BuilderActions>()(
               : null,
         }),
 
+      setGuestTransitPasses: (answers) =>
+        set({
+          guestHasJRPass: Boolean(answers.guestHasJRPass),
+          guestHasICCard: Boolean(answers.guestHasICCard),
+          guestNeedsTransitHelp: Boolean(answers.guestNeedsTransitHelp),
+        }),
+
       setPreferredTourLanguage: (code) =>
         set({ preferredTourLanguage: String(code || "EN").trim() || "EN" }),
 
@@ -1545,10 +1607,9 @@ export const useBuilderStore = create<BuilderState & BuilderActions>()(
             ...(locked
               ? {
                   confirmedBookingRef: locked,
-                  bookingStatus:
-                    merged.bookingStatus === "draft"
-                      ? ("in_progress" as const)
-                      : normalizeBookingStatus(merged.bookingStatus),
+                  bookingStatus: normalizeBookingStatus(
+                    merged.bookingStatus || "draft"
+                  ),
                 }
               : {}),
           };
@@ -1570,12 +1631,24 @@ export const useBuilderStore = create<BuilderState & BuilderActions>()(
         if (s.confirmedBookingRef && s.bookingStatus !== "draft") {
           return s.confirmedBookingRef;
         }
-        if (
-          s.tempBookingRef &&
-          (/^TMP-[A-Z2-9]{6}$/i.test(s.tempBookingRef) ||
-            isValidBookingPNR(s.tempBookingRef))
-        ) {
-          return s.tempBookingRef;
+        const raw = String(s.tempBookingRef || "").trim();
+        if (raw) {
+          // Legacy TMP- → JPN- (same body); drop short TK- drafts for a fresh JPN-
+          if (isTempBookingRef(raw)) {
+            const next = normalizeBookingPNR(raw);
+            set({ tempBookingRef: next });
+            return next;
+          }
+          const normalized = normalizeBookingPNR(raw);
+          if (TK_PNR_RE.test(normalized)) {
+            const next = generateTempPNR();
+            set({ tempBookingRef: next, bookingStatus: "draft" });
+            return next;
+          }
+          if (isValidBookingPNR(normalized)) {
+            if (normalized !== raw) set({ tempBookingRef: normalized });
+            return normalized;
+          }
         }
         const next = generateTempPNR();
         set({ tempBookingRef: next, bookingStatus: "draft" });

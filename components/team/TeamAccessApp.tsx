@@ -237,6 +237,15 @@ export function TeamAccessApp() {
             >
               Rules of Logic
             </SectionTab>
+            <Link
+              href="/staff/logic-dictionary"
+              className="mb-[-1px] inline-flex items-center gap-1.5 rounded-t-lg border border-transparent px-3 py-2 text-xs font-semibold tracking-wide text-zinc-500 uppercase transition hover:text-[#F6A724]"
+            >
+              Logic dictionary
+              <span className="rounded bg-white/5 px-1.5 py-0.5 text-[9px] font-mono normal-case tracking-normal text-zinc-600">
+                read-only
+              </span>
+            </Link>
             <SectionTab
               active={tab === "seasonality"}
               onClick={() => setTab("seasonality")}
@@ -1459,7 +1468,7 @@ function RecordEditModal({
                 : def.id === "tours" && f.key === "category"
                   ? "Tour = guided multi-stop day · Activity = ticket / VIP / single experience"
                   : def.id === "tours" && f.key === "access_type"
-                    ? "Ticket / Admission · Time-Sensitive Event · VIP Exclusive"
+                    ? "Ticket · Admission · Time-Sensitive · VIP Exclusive"
                     : f.hint;
 
             const span =
@@ -1543,7 +1552,8 @@ function RecordEditModal({
                       .filter((o) => o !== "guided_route")
                       .map((o) => {
                         const labels: Record<string, string> = {
-                          direct_ticket: "Ticket / Admission",
+                          direct_ticket: "Ticket",
+                          admission: "Admission",
                           vip_event: "VIP Exclusive",
                           time_sensitive: "Time-Sensitive Event",
                         };

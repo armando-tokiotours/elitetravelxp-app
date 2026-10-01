@@ -104,6 +104,8 @@ export function SingleDayTimelineInfographic({
   endTime,
   totalHours,
   cityLabel,
+  meetingPointName,
+  meetingPointAddress,
   variant = "screen",
 }: {
   stops: TimelineStop[];
@@ -111,6 +113,9 @@ export function SingleDayTimelineInfographic({
   endTime: string;
   totalHours: number;
   cityLabel?: string;
+  /** Guest-selected hotel / hub from map picker */
+  meetingPointName?: string | null;
+  meetingPointAddress?: string | null;
   /** screen = dark glass; print = high-contrast light */
   variant?: "screen" | "print";
 }) {
@@ -119,6 +124,26 @@ export function SingleDayTimelineInfographic({
     ? `${totalHours}.0`
     : (Math.round(totalHours * 10) / 10).toFixed(1);
   const windowLabel = `${formatClock12h(startTime)} – ${formatClock12h(endTime)} (${hoursLabel} Hours Total)`;
+
+  const placeName = String(meetingPointName || "").trim();
+  const placeAddress = String(meetingPointAddress || "").trim();
+  const pickupTitle =
+    placeName ||
+    (placeAddress && placeAddress !== placeName ? placeAddress : "") ||
+    "Hotel / Hub Pick-up";
+  const dropoffTitle =
+    placeName ||
+    (placeAddress && placeAddress !== placeName ? placeAddress : "") ||
+    "Hotel / Station Drop-off";
+  const placeSubtitleHint =
+    placeName && placeAddress && placeAddress !== placeName
+      ? placeAddress
+      : null;
+  const routeHint = placeName
+    ? `${cityLabel || "Tokyo"} · ${placeName}`
+    : cityLabel
+      ? `${cityLabel} · Hotel / Hub pick-up & drop-off`
+      : "Hotel / Hub pick-up & drop-off";
 
   if (stops.length === 0) {
     return (
@@ -157,13 +182,13 @@ export function SingleDayTimelineInfographic({
         >
           {windowLabel}
         </p>
-        {cityLabel ? (
+        {cityLabel || placeName ? (
           <p
             className={`mt-1 text-xs ${
               isPrint ? "text-zinc-500" : "text-white/45"
             }`}
           >
-            {cityLabel} · Hotel / Hub pick-up & drop-off
+            {routeHint}
           </p>
         ) : null}
       </header>
@@ -172,11 +197,13 @@ export function SingleDayTimelineInfographic({
         kind="arrival"
         headerMain="Pick-up Pass"
         headerStub="Start"
-        title="Hotel / Hub Pick-up"
+        title={pickupTitle}
         subtitle={
-          cityLabel
-            ? `${cityLabel} · Private day tour begins`
-            : "Private day tour begins"
+          placeSubtitleHint
+            ? placeSubtitleHint
+            : cityLabel
+              ? `${cityLabel} · Private day tour begins`
+              : "Private day tour begins"
         }
         dateLabel={formatClock12h(startTime)}
         hubCode={cityHubCode(cityLabel)}
@@ -314,11 +341,13 @@ export function SingleDayTimelineInfographic({
         kind="departure"
         headerMain="Drop-off Pass"
         headerStub="End"
-        title="Hotel / Station Drop-off"
+        title={dropoffTitle}
         subtitle={
-          cityLabel
-            ? `${cityLabel} · Private day tour ends`
-            : "Private day tour ends"
+          placeSubtitleHint
+            ? placeSubtitleHint
+            : cityLabel
+              ? `${cityLabel} · Private day tour ends`
+              : "Private day tour ends"
         }
         dateLabel={formatClock12h(endTime)}
         hubCode={cityHubCode(cityLabel)}

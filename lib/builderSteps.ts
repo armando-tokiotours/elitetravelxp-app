@@ -1,6 +1,7 @@
 /**
  * Sequential Builder step validation + unlock helpers.
- * Steps: 1 Duration → 2 Arrival → 3 Locations → 4 Hotels → 5 Tours → 6 Drivers
+ * Steps: 1 Duration → 2 Arrival → 3 Locations → 4 Hotels → 5 Tours & Transport → 6 (legacy slot)
+ * Widget map: hotels=4, tours+drivers unlock together at 5 after hotels complete.
  */
 
 import {

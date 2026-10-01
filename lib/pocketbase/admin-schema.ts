@@ -81,6 +81,24 @@ export const COLLECTIONS: CollectionDef[] = [
       },
       { key: "base_price", label: "Base price (€)", type: "number" },
       {
+        key: "avg_taxi_eur",
+        label: "Self-arrange · avg taxi/Uber (€)",
+        type: "number",
+        hint: "Shown when guest picks Self — estimated out-of-pocket hop",
+      },
+      {
+        key: "avg_subway_day_eur",
+        label: "Self-arrange · avg subway / day (€)",
+        type: "number",
+        hint: "Typical local rail/subway day spend for Self comparison",
+      },
+      {
+        key: "taxi_wait_mins",
+        label: "Self-arrange · taxi wait (mins)",
+        type: "number",
+        hint: "Typical wait / transfer friction shown on Self micro-table",
+      },
+      {
         key: "available_languages",
         label: "Available languages",
         type: "multiselect",
@@ -140,10 +158,11 @@ export const COLLECTIONS: CollectionDef[] = [
         options: [
           "guided_route",
           "direct_ticket",
+          "admission",
           "vip_event",
           "time_sensitive",
         ],
-        hint: "Activities: Ticket / VIP / Time-sensitive. Tours default to guided route.",
+        hint: "Ticket = buy before · Admission = on-site · VIP / Time-sensitive also need Ops.",
       },
       {
         key: "crowd_tag",
@@ -593,8 +612,9 @@ export const COLLECTIONS: CollectionDef[] = [
       },
       {
         key: "public_transit_cost",
-        label: "Public transit cost (€)",
+        label: "Public transit cost (€ per person)",
         type: "number",
+        hint: "Per-person bullet/express rail — multiplied by guest count in quotes",
       },
       {
         key: "private_transit_time_mins",
@@ -605,6 +625,13 @@ export const COLLECTIONS: CollectionDef[] = [
         key: "private_transit_cost",
         label: "Private transit cost (€)",
         type: "number",
+        hint: "Vehicle total for private chauffeur transfer (not × guests)",
+      },
+      {
+        key: "linked_transport_product_id",
+        label: "Linked transport ticket",
+        type: "text",
+        hint: "transport_products id (Shinkansen / Suica) auto-attached when Public is selected",
       },
       {
         key: "is_recommended_order",
@@ -693,6 +720,7 @@ export const COLLECTIONS: CollectionDef[] = [
           "guide_explainer",
           "daily_transport_explainer",
           "public_transport",
+          "self_arranged_transport",
         ],
       },
       { key: "title", label: "Title", type: "text", required: true },

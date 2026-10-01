@@ -23,6 +23,10 @@ import {
   isBillableChauffeurDay,
 } from "@/lib/chauffeurSelections";
 import { sumTransitTicketCosts } from "@/lib/transitTickets";
+import {
+  sumInterCityInvoiceEur,
+  sumSelectedTransportProductEur,
+} from "@/lib/interCityRoutes";
 import { ELITE_CONCIERGE_FEE } from "@/lib/eliteConcierge";
 import { normalizeBookingStatus } from "@/utils/pnr";
 
@@ -303,10 +307,16 @@ export function calculateBuilderQuote(
 
   const legs = Math.max(0, state.locations.length - 1);
   if (legs > 0) {
-    let transitMin = 0;
-    let transitMax = 0;
-    let pricedLegs = 0;
+    const interCity = sumInterCityInvoiceEur({
+      locations: state.locations,
+      movements: config.cityMovements,
+      guests,
+    });
+    let transitMin = interCity;
+    let transitMax = interCity;
+    // Fallback for public/private legs with no city_movements row
     let billableLegs = 0;
+    let pricedLegs = 0;
     for (let i = 0; i < state.locations.length - 1; i++) {
       const from = state.locations[i];
       const to = state.locations[i + 1];
@@ -317,17 +327,7 @@ export function calculateBuilderQuote(
       const movement = config.cityMovements?.find(
         (m) => m.from_city_id === from.cityId && m.to_city_id === to.cityId
       );
-      const usePrivate = from.transitType === "private";
-      if (movement) {
-        const cost = Number(
-          usePrivate
-            ? movement.private_transit_cost ?? 0
-            : movement.public_transit_cost ?? 0
-        );
-        transitMin += cost;
-        transitMax += cost;
-        pricedLegs++;
-      }
+      if (movement) pricedLegs++;
     }
     if (pricedLegs < billableLegs) {
       const transit = config.transitModes.find(
@@ -355,6 +355,15 @@ export function calculateBuilderQuote(
   if (ticketTotal > 0) {
     min += ticketTotal;
     max += ticketTotal;
+  }
+
+  const catalogTickets = sumSelectedTransportProductEur(
+    state.selectedTransportProducts,
+    guests
+  );
+  if (catalogTickets > 0) {
+    min += catalogTickets;
+    max += catalogTickets;
   }
 
   for (const rows of Object.values(state.selectedTours ?? {})) {
@@ -644,6 +653,13 @@ export function calculateInvoiceBreakdown(
 
   const legs = Math.max(0, state.locations.length - 1);
   if (hasPaidExp && legs > 0) {
+    const interCity = sumInterCityInvoiceEur({
+      locations: state.locations,
+      movements: config.cityMovements,
+      guests,
+    });
+    expMin += interCity;
+    expMax += interCity;
     let pricedLegs = 0;
     let billableLegs = 0;
     for (let i = 0; i < state.locations.length - 1; i++) {
@@ -656,17 +672,7 @@ export function calculateInvoiceBreakdown(
       const movement = config.cityMovements?.find(
         (m) => m.from_city_id === from.cityId && m.to_city_id === to.cityId
       );
-      const usePrivate = from.transitType === "private";
-      if (movement) {
-        const cost = Number(
-          usePrivate
-            ? movement.private_transit_cost ?? 0
-            : movement.public_transit_cost ?? 0
-        );
-        expMin += cost;
-        expMax += cost;
-        pricedLegs++;
-      }
+      if (movement) pricedLegs++;
     }
     if (pricedLegs < billableLegs) {
       const transit = config.transitModes.find(
@@ -693,6 +699,14 @@ export function calculateInvoiceBreakdown(
     if (ticketTotal > 0) {
       expMin += ticketTotal;
       expMax += ticketTotal;
+    }
+    const catalogTickets = sumSelectedTransportProductEur(
+      state.selectedTransportProducts,
+      guests
+    );
+    if (catalogTickets > 0) {
+      expMin += catalogTickets;
+      expMax += catalogTickets;
     }
   }
 

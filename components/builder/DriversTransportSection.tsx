@@ -18,7 +18,11 @@ import {
   priceFleetChauffeurDay,
 } from "@/lib/vehicleAllocator";
 import { BUILDER_ALL_STEPS_COMPLETE } from "@/lib/builderSteps";
-import { useBuilderStore } from "@/store/useBuilderStore";
+import {
+  coerceTransitType,
+  useBuilderStore,
+  type CityTransitType,
+} from "@/store/useBuilderStore";
 import { GoldLight } from "@/components/branding/GoldLight";
 import { SectionBlock } from "./ui";
 import { SectionContinue } from "./SectionContinue";
@@ -26,6 +30,13 @@ import { ExplainerTriggerButton } from "./ExplainerTriggerButton";
 import { CityTransportModal } from "./modals/CityTransportModal";
 import { formatUsd } from "@/lib/builder-pricing";
 import { travelStyleTierRules } from "@/lib/preEliteHydrate";
+
+function transitLegLabel(mode: CityTransitType): string {
+  if (mode === "self") return "Self / walk · €0";
+  if (mode === "public") return "Public transit · rail";
+  if (mode === "private") return "Private pick-up · car";
+  return "Choose: Self · Public · Private";
+}
 
 export function DriversTransportSection({
   cities = [],
@@ -48,6 +59,7 @@ export function DriversTransportSection({
   const toggleChauffeurDayTour = useBuilderStore(
     (s) => s.toggleChauffeurDayTour
   );
+  const setLocationTransitType = useBuilderStore((s) => s.setLocationTransitType);
   const experienceService = useBuilderStore((s) => s.experienceService);
   const isEliteConcierge = useBuilderStore((s) => s.isEliteConcierge);
   const preEliteTravelStyle = useBuilderStore((s) => s.preEliteTravelStyle);
@@ -62,15 +74,23 @@ export function DriversTransportSection({
 
   const stayStops = useMemo(() => {
     const seen = new Set<string>();
-    const stops: { key: string; cityId: string }[] = [];
+    const stops: {
+      key: string;
+      cityId: string;
+      locKey: string;
+      transitType: CityTransitType;
+    }[] = [];
     for (const loc of locations) {
       if (loc.visitType && loc.visitType !== "stay") continue;
       if (loc.nights <= 0) continue;
       if (seen.has(loc.cityId)) continue;
       seen.add(loc.cityId);
+      const locKey = loc.key?.trim() || loc.cityId;
       stops.push({
-        key: loc.key?.trim() || loc.cityId || `driver-${seen.size}`,
+        key: locKey || `driver-${seen.size}`,
         cityId: loc.cityId,
+        locKey,
+        transitType: coerceTransitType(loc.transitType),
       });
     }
     return stops;
@@ -235,45 +255,77 @@ export function DriversTransportSection({
                 : "";
 
             return (
-              <button
+              <div
                 key={stop.key?.trim() || `driver-${stop.cityId || "city"}-${name}`}
-                type="button"
-                onClick={() => setActiveCityId(stop.cityId)}
-                className="flex w-full items-center gap-3 rounded-2xl border border-zinc-800 bg-zinc-900 p-3 text-left transition hover:border-[#075473]/40 hover:bg-zinc-800/80 sm:p-4"
+                className="rounded-2xl border border-zinc-800 bg-zinc-900 p-3 sm:p-4"
               >
-                {img ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={img}
-                    alt=""
-                    className="h-14 w-20 shrink-0 rounded-lg object-cover"
-                  />
-                ) : (
-                  <div className="flex h-14 w-20 shrink-0 items-center justify-center rounded-lg bg-zinc-800 text-sky-400">
-                    <Car className="h-5 w-5" aria-hidden />
-                  </div>
-                )}
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate font-medium text-white">
-                    {name}
-                  </span>
-                  <span className="mt-0.5 block text-xs text-zinc-400">
-                    {!allowPrivate
-                      ? "Public Transit & Walking Guide · Suica / Bullet Rail Coverage"
-                      : driverDays === 0
-                        ? "Public transit (default)"
-                        : `${driverDays} private driver day${
+                <button
+                  type="button"
+                  onClick={() => setActiveCityId(stop.cityId)}
+                  className="flex w-full items-center gap-3 text-left"
+                >
+                  {img ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={img}
+                      alt=""
+                      className="h-14 w-20 shrink-0 rounded-lg object-cover"
+                    />
+                  ) : (
+                    <div className="flex h-14 w-20 shrink-0 items-center justify-center rounded-lg bg-zinc-800 text-sky-400">
+                      <Car className="h-5 w-5" aria-hidden />
+                    </div>
+                  )}
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate font-medium text-white">
+                      {name}
+                    </span>
+                    <span className="mt-0.5 block text-xs text-zinc-400">
+                      {!allowPrivate
+                        ? "Public Transit & Walking Guide · Suica / Bullet Rail Coverage"
+                        : transitLegLabel(stop.transitType)}
+                      {allowPrivate && driverDays > 0
+                        ? ` · ${driverDays} driver day${
                             driverDays === 1 ? "" : "s"
-                          }${fleet ? ` · ${fleet}` : ""}${
-                            rateLabel ? ` · ${rateLabel}/day` : ""
-                          }`}
+                          }`
+                        : ""}
+                      {fleet ? ` · ${fleet}` : ""}
+                      {rateLabel ? ` · ${rateLabel}/day` : ""}
+                    </span>
                   </span>
-                </span>
-                <ChevronRight
-                  className="h-4 w-4 shrink-0 text-zinc-600"
-                  aria-hidden
-                />
-              </button>
+                  <ChevronRight
+                    className="h-4 w-4 shrink-0 text-zinc-600"
+                    aria-hidden
+                  />
+                </button>
+                <div className="mt-3 flex flex-wrap gap-1.5">
+                  {(
+                    [
+                      ["self", "Self / walk"],
+                      ["public", "Public"],
+                      ["private", "Pick-up"],
+                    ] as const
+                  ).map(([mode, label]) => {
+                    const active = stop.transitType === mode;
+                    return (
+                      <button
+                        key={mode}
+                        type="button"
+                        onClick={() =>
+                          setLocationTransitType(stop.locKey, mode)
+                        }
+                        className={`rounded-full border px-3 py-1.5 text-[11px] font-semibold transition ${
+                          active
+                            ? "border-[#075473] bg-[#075473] text-white"
+                            : "border-zinc-700 bg-zinc-950 text-zinc-400 hover:text-white"
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
             );
           })}
         </div>
