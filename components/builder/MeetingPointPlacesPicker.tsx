@@ -24,20 +24,52 @@ const GeoapifyDarkMatterMap = dynamic(
   }
 );
 
+const TOKYO_FALLBACK = { lat: 35.681236, lng: 139.767125 };
+
+function makeCustomPlace(
+  text: string,
+  fallbackLat?: number | null,
+  fallbackLng?: number | null
+): GeoapifyPlace {
+  const name = text.trim();
+  const lat =
+    fallbackLat != null && Number.isFinite(fallbackLat)
+      ? fallbackLat
+      : TOKYO_FALLBACK.lat;
+  const lng =
+    fallbackLng != null && Number.isFinite(fallbackLng)
+      ? fallbackLng
+      : TOKYO_FALLBACK.lng;
+  return {
+    name,
+    address: name,
+    city: "",
+    lat,
+    lng,
+    placeId: `custom:${name.toLowerCase().replace(/\s+/g, "-").slice(0, 64)}`,
+  };
+}
+
 /**
  * Geoapify JP autocomplete + dark-matter map for Builder S meeting point.
+ * If search finds nothing, guests can still save the typed text as a custom point.
  */
 export function MeetingPointPlacesPicker({
   initialName,
   initialAddress,
   lat,
   lng,
+  fallbackLat,
+  fallbackLng,
   onResolved,
 }: {
   initialName?: string;
   initialAddress?: string;
   lat: number | null;
   lng: number | null;
+  /** City center used when saving a custom (ungoodcoded) meeting point */
+  fallbackLat?: number | null;
+  fallbackLng?: number | null;
   onResolved: (place: GeoapifyPlace | null) => void;
 }) {
   const listId = useId();
@@ -46,6 +78,7 @@ export function MeetingPointPlacesPicker({
   const [openList, setOpenList] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [hint, setHint] = useState("");
   const [selected, setSelected] = useState<GeoapifyPlace | null>(
     lat != null && lng != null
       ? {
@@ -107,6 +140,26 @@ export function MeetingPointPlacesPicker({
     setQuery(place.name);
     setSuggestions([]);
     setOpenList(false);
+    setError("");
+    setHint("");
+    onResolved(place);
+  };
+
+  const saveCustomTyped = (text: string) => {
+    const place = makeCustomPlace(
+      text,
+      selected?.lat ?? lat ?? fallbackLat,
+      selected?.lng ?? lng ?? fallbackLng
+    );
+    skipNextFetch.current = true;
+    setSelected(place);
+    setQuery(place.name);
+    setSuggestions([]);
+    setOpenList(false);
+    setError("");
+    setHint(
+      "Saved as custom meeting point — guide will use this text (pin is approximate)."
+    );
     onResolved(place);
   };
 
@@ -114,6 +167,7 @@ export function MeetingPointPlacesPicker({
     const text = query.trim();
     if (!text) {
       setSelected(null);
+      setHint("");
       onResolved(null);
       return;
     }
@@ -126,28 +180,42 @@ export function MeetingPointPlacesPicker({
     }
     setLoading(true);
     setError("");
+    setHint("");
     try {
       const place = await geoapifySearch(text);
-      if (!place) {
-        setError("No Japan match for that address.");
-        onResolved(null);
+      if (place) {
+        skipNextFetch.current = true;
+        setSelected(place);
+        setQuery(place.name);
+        setOpenList(false);
+        onResolved(place);
         return;
       }
-      skipNextFetch.current = true;
-      setSelected(place);
-      setQuery(place.name);
-      setOpenList(false);
-      onResolved(place);
+      // No Geoapify match (or no API key) — still allow typed save
+      saveCustomTyped(text);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Geocode failed");
-      onResolved(null);
+      // Network / key errors: still allow typed custom save
+      saveCustomTyped(text);
+      setError(
+        err instanceof Error
+          ? `${err.message} — saved typed text instead.`
+          : "Search failed — saved typed text instead."
+      );
     } finally {
       setLoading(false);
     }
   };
 
-  const mapLat = selected?.lat ?? lat;
-  const mapLng = selected?.lng ?? lng;
+  const mapLat = selected?.lat ?? lat ?? fallbackLat ?? null;
+  const mapLng = selected?.lng ?? lng ?? fallbackLng ?? null;
+  const showUseTyped =
+    query.trim().length >= 2 &&
+    !loading &&
+    suggestions.length === 0 &&
+    !(
+      selected &&
+      (selected.name === query.trim() || selected.address === query.trim())
+    );
 
   return (
     <div className="relative w-full">
@@ -165,6 +233,7 @@ export function MeetingPointPlacesPicker({
           onChange={(e) => {
             setQuery(e.target.value);
             setOpenList(true);
+            setHint("");
           }}
           onFocus={() => {
             if (suggestions.length) setOpenList(true);
@@ -187,7 +256,7 @@ export function MeetingPointPlacesPicker({
           <ul
             id={listId}
             role="listbox"
-            className="absolute left-0 right-0 top-full z-50 mt-2 max-h-60 overflow-y-auto rounded-xl border border-white/20 bg-[#0A1017]/95 py-1 shadow-2xl backdrop-blur-md"
+            className="absolute top-full right-0 left-0 z-50 mt-2 max-h-60 overflow-y-auto rounded-xl border border-white/20 bg-[#0A1017]/95 py-1 shadow-2xl backdrop-blur-md"
           >
             {suggestions.map((s) => (
               <li key={s.placeId || `${s.lat}-${s.lng}-${s.name}`}>
@@ -210,21 +279,34 @@ export function MeetingPointPlacesPicker({
           </ul>
         ) : null}
 
-        <div className="mt-2 flex items-center justify-between gap-2">
-          <p className="text-xs text-white/40">
+        <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+          <p className="min-w-0 flex-1 text-xs text-white/40">
             {loading
               ? "Searching Japan…"
               : error
                 ? error
-                : "Japan only · pick a suggestion or press Enter to geocode"}
+                : hint
+                  ? hint
+                  : "Japan only · pick a suggestion, or type any hotel name and save"}
           </p>
-          <button
-            type="button"
-            onClick={() => void resolveTypedAddress()}
-            className="shrink-0 rounded-full border border-white/15 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-white/70 hover:border-white/30"
-          >
-            Resolve
-          </button>
+          <div className="flex shrink-0 gap-1.5">
+            {showUseTyped ? (
+              <button
+                type="button"
+                onClick={() => saveCustomTyped(query)}
+                className="rounded-full border border-cyan-500/40 bg-cyan-500/10 px-2.5 py-1 text-[10px] font-bold tracking-wider text-cyan-300 uppercase hover:bg-cyan-500/20"
+              >
+                Use typed text
+              </button>
+            ) : null}
+            <button
+              type="button"
+              onClick={() => void resolveTypedAddress()}
+              className="rounded-full border border-white/15 px-2.5 py-1 text-[10px] font-bold tracking-wider text-white/70 uppercase hover:border-white/30"
+            >
+              Resolve
+            </button>
+          </div>
         </div>
       </div>
 

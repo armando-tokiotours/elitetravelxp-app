@@ -13,6 +13,7 @@ services:
       dockerfile: Dockerfile
       args:
         NEXT_PUBLIC_POCKETBASE_URL: ${PUBLIC_URL:-https://tokiotours-app.com}
+        NEXT_PUBLIC_GEOAPIFY_API_KEY: ${NEXT_PUBLIC_GEOAPIFY_API_KEY:-}
     container_name: elite-web
     restart: unless-stopped
     env_file: .env
@@ -21,6 +22,7 @@ services:
       PORT: "3000"
       HOSTNAME: "0.0.0.0"
       NEXT_PUBLIC_POCKETBASE_URL: ${PUBLIC_URL:-https://tokiotours-app.com}
+      NEXT_PUBLIC_GEOAPIFY_API_KEY: ${NEXT_PUBLIC_GEOAPIFY_API_KEY:-}
       # Server-side admin APIs use the Docker network (not public nginx)
       POCKETBASE_INTERNAL_URL: http://pocketbase:8090
       POCKETBASE_URL: http://pocketbase:8090
