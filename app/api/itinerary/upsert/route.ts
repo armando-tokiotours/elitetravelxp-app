@@ -155,6 +155,9 @@ export async function POST(request: Request) {
             guidePreference?: string;
             selectedExperiences?: Array<{ tourId: string }>;
             transitOption?: string;
+            preferredMovement?: string | null;
+            suicaNeeded?: boolean;
+            suicaValueEur?: number;
           }
         | undefined;
 

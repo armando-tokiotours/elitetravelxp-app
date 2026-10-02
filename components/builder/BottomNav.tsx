@@ -54,47 +54,62 @@ export function BottomNav() {
       ? "/builder-single/itinerary"
       : "/builder/itinerary";
 
-  const tabs = [
+  type NavTab =
+    | {
+        href: string;
+        label: string;
+        icon: typeof BuilderIcon;
+        kind: "link";
+        match: "builderE" | "builder" | "explore" | "itinerary";
+      }
+    | {
+        href: string;
+        label: string;
+        icon: typeof QuizIcon;
+        kind: "quiz";
+      };
+
+  const allTabs: NavTab[] = [
     {
       href: "/builder-e",
       label: "Builder E",
       icon: BuilderIcon,
-      kind: "link" as const,
-      match: "builderE" as const,
+      kind: "link",
+      match: "builderE",
     },
     {
       href: builderHref,
       label: builderLabel,
       icon: BuilderIcon,
-      kind: "link" as const,
-      match: "builder" as const,
+      kind: "link",
+      match: "builder",
     },
     {
       href: "/discover",
       label: "Explore",
       icon: DiscoverIcon,
-      kind: "link" as const,
-      match: "explore" as const,
+      kind: "link",
+      match: "explore",
     },
     {
       href: itineraryHref,
       label: "Itinerary",
       icon: ItineraryIcon,
-      kind: "link" as const,
-      match: "itinerary" as const,
+      kind: "link",
+      match: "itinerary",
     },
     {
       href: "#quiz",
       label: "Match Quiz",
       icon: QuizIcon,
-      kind: "quiz" as const,
+      kind: "quiz",
     },
-  ].filter((tab) => {
+  ];
+
+  const tabs = allTabs.filter((tab) => {
     // On Builder E, avoid duplicate Builder E + Builder M tabs
-    if (isBuilderE && tab.match === "builder") return false;
-    if (!isBuilderE && tab.match === "builderE") {
-      // Keep Builder E as first entry globally (replaces Pre-Build)
-      return true;
+    if (tab.kind === "link" && isBuilderE && tab.match === "builder") {
+      return false;
     }
     return true;
   });

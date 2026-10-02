@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
+import { Ticket } from "lucide-react";
 import { ManageBookingModal } from "@/components/modals/ManageBookingModal";
 import { BRAND_LOGO_ICON } from "@/lib/brand";
 

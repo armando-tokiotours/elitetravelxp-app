@@ -8,6 +8,7 @@ import { findConciergeAgentByPnr } from "@/lib/conciergeAgent";
 import {
   formatGuestMessageWithTopic,
   normalizeChatTopic,
+  type ChatTopic,
 } from "@/lib/chatTopics";
 
 /** GET ?pnr= — list messages + agent for a booking. */
@@ -47,7 +48,7 @@ export async function GET(request: Request) {
 async function parseCommPost(request: Request): Promise<{
   pnr: string;
   body: string;
-  topic: string | null;
+  topic: ChatTopic | null;
   authorRole: "guest" | "agent" | "ops";
   authorName: string;
   authorId: string;
