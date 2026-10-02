@@ -8,6 +8,7 @@ import {
   isStaffRole,
   type StaffRole,
 } from "@/lib/staffRoles";
+import { resolveStaffRoleForEmail } from "@/lib/staffRoleProvisioning";
 import type PocketBase from "pocketbase";
 import type { RecordModel } from "pocketbase";
 
@@ -24,7 +25,9 @@ interface TeamAuthState {
   agencyId: string | null;
   isAuthenticated: boolean;
   login: (email: string, password: string) => Promise<{ role: StaffRole }>;
-  /** Stub until Google OAuth Client ID/Secret is configured in PocketBase. */
+  /** Google Workspace SSO via PocketBase staff.oauth2 (google provider). */
+  loginWithGoogle: () => Promise<{ role: StaffRole }>;
+  /** @deprecated use loginWithGoogle */
   loginWithGoogleStub: () => never;
   logout: () => void;
   getClient: () => PocketBase;
@@ -71,8 +74,89 @@ export const useTeamAuth = create<TeamAuthState>()(
 
       loginWithGoogleStub: () => {
         throw new Error(
-          "Google sign-in is not enabled yet. Add a Google OAuth Client ID/Secret in PocketBase → staff → OAuth2, then we can turn this on."
+          "Use Sign in with Google Workspace. If it fails, ensure GOOGLE_CLIENT_ID/SECRET are set on PocketBase and redirect URI is registered."
         );
+      },
+
+      loginWithGoogle: async () => {
+        const pb = getTeamPocketBase();
+        pb.authStore.clear();
+
+        let authData: {
+          record?: RecordModel | null;
+          meta?: { email?: string; name?: string };
+          token?: string;
+        };
+        try {
+          authData = (await pb.collection("staff").authWithOAuth2({
+            provider: "google",
+          })) as typeof authData;
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err || "");
+          if (/provider|not enabled|oauth|404|400/i.test(msg)) {
+            throw new Error(
+              "Google Workspace SSO is not configured on PocketBase yet. Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET on the PocketBase process and restart it. Also add redirect URI: {PB_URL}/api/oauth2-redirect"
+            );
+          }
+          if (/create|failed to create|403/i.test(msg)) {
+            throw new Error(
+              "No staff account exists for this Google email. Ask an Owner/Ops admin to provision your @tokiotours.nl user in PocketBase → staff first."
+            );
+          }
+          throw err instanceof Error
+            ? err
+            : new Error("Google Workspace authentication failed.");
+        }
+
+        const record = authData.record || pb.authStore.record;
+        const email = String(
+          record?.email || authData.meta?.email || ""
+        )
+          .trim()
+          .toLowerCase();
+
+        if (!email) {
+          pb.authStore.clear();
+          clearAuth(set);
+          throw new Error("Google did not return an email address.");
+        }
+
+        if (record && record.active === false) {
+          pb.authStore.clear();
+          clearAuth(set);
+          throw new Error("This staff account is inactive.");
+        }
+
+        // Soft role sync: core team locked; others keep Admin / invite role
+        const preferred = resolveStaffRoleForEmail(email, {
+          currentRole: String(record?.role || ""),
+          accountType: String(
+            (record as { account_type?: string } | null | undefined)
+              ?.account_type || ""
+          ),
+        });
+        if (record?.id && String(record.role || "") !== preferred) {
+          try {
+            await pb.collection("staff").update(record.id, { role: preferred });
+            record.role = preferred;
+          } catch {
+            /* non-blocking if rules deny self-update */
+          }
+        }
+
+        const collection: AuthCollection = "staff";
+        const role = roleFromRecord(collection, record);
+        set({
+          token: pb.authStore.token,
+          record,
+          email,
+          role,
+          authCollection: collection,
+          staffId: String(record?.id || "") || null,
+          agencyId: String(record?.agency_id || "") || null,
+          isAuthenticated: true,
+        });
+        return { role };
       },
 
       ensureAuth: () => {

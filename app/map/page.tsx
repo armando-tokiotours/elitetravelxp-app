@@ -24,6 +24,10 @@ const SILO1_LIVE: MapLink[] = [
   { href: "/pre-build", label: "Pre-Build" },
   { href: "/builder", label: "Trip Builder (multi-day)" },
   { href: "/builder-single", label: "Trip Builder (single-day)" },
+  {
+    href: "/builder-e",
+    label: "Builder E (experiences & micro-services)",
+  },
   { href: "/discover", label: "Discover Experiences" },
   { href: "/builder/itinerary", label: "My Saved Itineraries" },
   { href: "/builder/preview", label: "Builder Preview" },
@@ -69,11 +73,10 @@ const SILO3_LIVE: MapLink[] = [
     label: "System Logic Dictionary",
     note: "Read-only hardcoded rules (routing / transport / tours) — not PB toggles",
   },
-  { href: "/ops", label: "Ops board (assign / job board)" },
+  { href: "/ops", label: "Ops inbox (Ops + Concierge)" },
   { href: "/ops/booking", label: "Booking master (PNR assemble)" },
   { href: "/ops/money", label: "Money pocket (owner)" },
   { href: "/agent", label: "Concierge agent portal" },
-  { href: "/ops", label: "Ops inbox (Ops + Concierge)" },
   { href: "/ticketer", label: "Ticketer portal" },
   { href: "/guide", label: "Guide portal (my jobs + board)" },
   { href: "/driver", label: "Driver portal (my jobs + board)" },
@@ -229,7 +232,7 @@ export default function MapPage() {
           </div>
           <ul className="grid gap-2 sm:grid-cols-2">
             {SILO1_LIVE.map((item) => (
-              <LiveLink key={item.href} item={item} />
+              <LiveLink key={`${item.href}-${item.label}`} item={item} />
             ))}
           </ul>
         </section>
@@ -259,7 +262,7 @@ export default function MapPage() {
           </div>
           <ul className="mb-4 grid gap-2 sm:grid-cols-2">
             {SILO3_LIVE.map((item) => (
-              <LiveLink key={item.href} item={item} />
+              <LiveLink key={`${item.href}-${item.label}`} item={item} />
             ))}
             {SILO3_COMM.map((item) => (
               <LiveLink key={`comm-${item.href}`} item={item} />

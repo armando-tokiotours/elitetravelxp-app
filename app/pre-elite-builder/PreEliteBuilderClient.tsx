@@ -2,13 +2,12 @@
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   AlertTriangle,
   ArrowLeft,
   ArrowRight,
-  CalendarDays,
   Clock,
   Compass,
   Crown,
@@ -21,7 +20,6 @@ import {
   Plus,
   Sparkles,
   Star,
-  Sun,
   User,
   Users,
   UtensilsCrossed,
@@ -32,16 +30,12 @@ import {
   MOTIVATIONS,
   PAIN_POINTS,
   TRAVEL_STYLES,
-  TRIP_TYPES,
-  emptyTiming,
-  normalizeTiming,
   stepError,
+  toItineraryData,
   type InterestId,
   type MotivationId,
   type PainPointId,
-  type PreEliteTiming,
   type TravelStyleId,
-  type TripType,
 } from "@/lib/preEliteBuilder";
 import { BRAND_LOGO_ICON } from "@/lib/brand";
 import {
@@ -56,9 +50,6 @@ import {
 } from "@/lib/preEliteBranding";
 import { isVideoFilename } from "@/lib/brandingUi";
 import { StoryExplanationModal } from "@/components/pre-elite/StoryExplanationModal";
-import { GuestPartyMascots } from "@/components/pre-elite/GuestPartyMascots";
-import { PhoneCountryField } from "@/components/pre-elite/PhoneCountryField";
-import { TimingSelector } from "@/components/pre-elite/TimingSelector";
 import { SystemMessageFox } from "@/components/branding/SystemMessageFox";
 import { BrandCharacterPreloader } from "@/components/branding/BrandCharacterPreloader";
 import { HoldUntilReadyMascot } from "@/components/branding/HoldUntilReadyMascot";
@@ -67,6 +58,9 @@ import {
   MascotHiZoom,
   useMascotHiTap,
 } from "@/components/branding/MascotHiTap";
+import { QuestionnaireCompletionModal } from "@/components/builder/QuestionnaireCompletionModal";
+import { hydrateStoresFromPreEliteBrief } from "@/lib/preEliteHydrate";
+import { useBuilderStore } from "@/store/useBuilderStore";
 import { usePreBuilderStore } from "@/store/usePreBuilderStore";
 import { showSystemMessage } from "@/store/useSystemMessageStore";
 import {
@@ -122,8 +116,6 @@ const CHOICE_STICKER: Record<
   tourist_traps: { Icon: AlertTriangle, className: "text-[#DC6E8A]" },
   authentic_dining: { Icon: UtensilsCrossed, className: "text-[#7ec8e3]" },
   packed_itinerary: { Icon: Clock, className: "text-[#1BA58A]" },
-  multi_day: { Icon: CalendarDays, className: "text-[#F6A724]" },
-  single_day: { Icon: Sun, className: "text-[#F6A724]" },
 };
 
 const PRE_ELITE_HERO_POSES = {
@@ -142,29 +134,49 @@ const STEP_TITLES = [
   "Interests",
   "Motivation",
   "What to avoid",
-  "Contact",
 ] as const;
+
+const QUIZ_STEP_COUNT = 4;
 
 export function PreEliteBuilderClient() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const draft = usePreBuilderStore();
   const [error, setError] = useState<string | null>(null);
-  const [submitting, setSubmitting] = useState(false);
   const [hydrated, setHydrated] = useState(false);
   const [activeStory, setActiveStory] = useState<StoryExplanation | null>(null);
+  const [showCompletion, setShowCompletion] = useState(false);
   const [localQuiz, setLocalQuiz] = useState(() =>
     typeof window !== "undefined" ? readPreEliteQuizLocalCache() : {}
   );
-  /** Step 5: note while typing name/email */
-  const [contactWriting, setContactWriting] = useState(false);
   /** Idle 7s → time.png; activity → look */
   const [isIdle, setIsIdle] = useState(false);
-  /** Pick / Continue / Save → bow for 1.3s */
+  /** Pick / Continue → bow for 1.3s */
   const [showBow, setShowBow] = useState(false);
   const bowTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const bowDelayRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { showHi, triggerHi } = useMascotHiTap();
+  const typeSeededRef = useRef(false);
+
+  // Seed trip type from landing modal (?type=single|multiday)
+  useEffect(() => {
+    if (typeSeededRef.current) return;
+    const raw = String(searchParams.get("type") || "")
+      .trim()
+      .toLowerCase();
+    if (raw === "single" || raw === "single_day") {
+      typeSeededRef.current = true;
+      usePreBuilderStore.getState().setTripType("single_day");
+    } else if (
+      raw === "multiday" ||
+      raw === "multi" ||
+      raw === "multi_day"
+    ) {
+      typeSeededRef.current = true;
+      usePreBuilderStore.getState().setTripType("multi_day");
+    }
+  }, [searchParams]);
 
   const triggerBow = () => {
     if (bowTimerRef.current) clearTimeout(bowTimerRef.current);
@@ -231,18 +243,29 @@ export function PreEliteBuilderClient() {
     return unsub;
   }, []);
 
-  const step = draft.step;
-  const submitted = Boolean(draft.bookingRef && draft.lastPayload);
+  const step = Math.min(QUIZ_STEP_COUNT, Math.max(1, draft.step));
+  const hasSavedContact =
+    draft.pnrDraftStatus === "SAVED" &&
+    Boolean(draft.bookingRef && draft.lastPayload?.email);
+  const hasTempDraft =
+    draft.pnrDraftStatus === "TEMPORARY_UNSAVED" && Boolean(draft.bookingRef);
 
-  // Already submitted → go straight to /pre-build (no interstitial).
+  // Saved contact brief → pre-build confirmation card
   useEffect(() => {
-    if (!hydrated || !submitted) return;
+    if (!hydrated || !hasSavedContact) return;
     router.replace("/pre-build");
-  }, [hydrated, submitted, router]);
+  }, [hydrated, hasSavedContact, router]);
+
+  // Temp quiz draft already entered builder once — resume builder
+  useEffect(() => {
+    if (!hydrated || !hasTempDraft || hasSavedContact) return;
+    const isSingle = draft.tripType === "single_day";
+    router.replace(isSingle ? "/builder-single" : "/builder");
+  }, [hydrated, hasTempDraft, hasSavedContact, draft.tripType, router]);
 
   // Idle timer: 7s without mouse/scroll/click → time mascot
   useEffect(() => {
-    if (!hydrated || submitted) return;
+    if (!hydrated || hasSavedContact || hasTempDraft) return;
     const bump = () => {
       setIsIdle(false);
       if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
@@ -266,15 +289,10 @@ export function PreEliteBuilderClient() {
       if (bowTimerRef.current) clearTimeout(bowTimerRef.current);
       if (bowDelayRef.current) clearTimeout(bowDelayRef.current);
     };
-  }, [hydrated, submitted]);
+  }, [hydrated, hasSavedContact, hasTempDraft]);
 
   const heroPose: PreEliteHeroPose = (() => {
     if (showBow) return "bow";
-    if (step === 5) {
-      if (contactWriting) return "note";
-      if (draft.tripType === "multi_day") return "multi";
-      if (draft.tripType === "single_day") return "single";
-    }
     if (isIdle) return "time";
     return "look";
   })();
@@ -286,9 +304,34 @@ export function PreEliteBuilderClient() {
         ? "Choose every thread you want woven in. You can select more than one."
         : step === 3
           ? "What is this journey actually for?"
-          : step === 4
-            ? "Tell us the friction you want us to remove. Select every concern that applies."
-            : "Choose Multi-Day or Single-Day,\nthen share dates and contact details. No payment yet.";
+          : "Tell us the friction you want us to remove. Select every concern that applies.";
+
+  const finishQuizLocally = () => {
+    if (!draft.tripType) {
+      const msg =
+        "Trip type missing — use START TRIP and choose Single-Day or Multi-Day.";
+      setError(msg);
+      showSystemMessage({ text: msg, tone: "error" });
+      return false;
+    }
+    const itinerary = toItineraryData(draft, { requireContact: false });
+    if (!itinerary) {
+      const msg = "Finish all preference steps before continuing.";
+      setError(msg);
+      showSystemMessage({ text: msg, tone: "error" });
+      return false;
+    }
+    const bookingRef = useBuilderStore.getState().ensureTempBookingRef();
+    const itineraryData = JSON.stringify(itinerary);
+    draft.markTemporaryDraft({ bookingRef, itineraryData });
+    hydrateStoresFromPreEliteBrief({
+      bookingRef,
+      fullName: "",
+      email: "",
+      itineraryData,
+    });
+    return true;
+  };
 
   const goNext = () => {
     const message = stepError(step, draft);
@@ -299,67 +342,19 @@ export function PreEliteBuilderClient() {
     }
     setError(null);
     triggerBow();
-    draft.setStep(Math.min(5, step + 1));
+    if (step >= QUIZ_STEP_COUNT) {
+      setShowCompletion(true);
+      return;
+    }
+    draft.setStep(Math.min(QUIZ_STEP_COUNT, step + 1));
   };
 
   const goBack = () => {
     setError(null);
-    // Leaving Step 5 → reset party counters to default (1 adult, 0 kids)
-    if (step === 5) {
-      draft.setContact({ adults: 1, children: 0 });
-    }
     draft.setStep(Math.max(1, step - 1));
   };
 
-  const submit = async () => {
-    const message = stepError(5, draft);
-    if (message) {
-      setError(message);
-      showSystemMessage({ text: message, tone: "error" });
-      return;
-    }
-    setError(null);
-    triggerBow();
-    setSubmitting(true);
-    try {
-      const res = await fetch("/api/pre-elite-builder", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          travelStyle: draft.travelStyle,
-          interests: draft.interests,
-          tripMotivation: draft.tripMotivation,
-          painPoints: draft.painPoints,
-          tripType: draft.tripType,
-          fullName: draft.fullName,
-          email: draft.email,
-          whatsapp: draft.whatsapp,
-          timing: draft.timing,
-          adults: draft.adults,
-          children: draft.children,
-        }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        throw new Error(data?.error || "Could not save your brief.");
-      }
-      await new Promise((r) => setTimeout(r, 900));
-      draft.markSubmitted({
-        bookingRef: String(data.bookingRef),
-        fullName: String(data.fullName || draft.fullName).trim(),
-        email: String(data.email || draft.email).trim().toLowerCase(),
-        status: "draft",
-        itineraryData: String(data.itineraryData || ""),
-      });
-      router.replace("/pre-build");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not save your brief.");
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const lockHero = hydrated && !submitted;
+  const lockHero = hydrated && !hasSavedContact && !hasTempDraft;
 
   return (
     <div
@@ -390,33 +385,14 @@ export function PreEliteBuilderClient() {
         </div>
       </header>
 
-      {!hydrated || submitted ? (
+      {!hydrated || hasSavedContact || hasTempDraft ? (
         <main className="relative mx-auto w-full max-w-3xl overflow-visible px-5 py-10 sm:py-14">
           <div className="h-80 rounded-3xl border border-zinc-800/80 bg-[#0D1117]/80 backdrop-blur-md" />
         </main>
       ) : (
         <div className="flex min-h-0 flex-1 flex-col justify-start overflow-x-visible overflow-y-visible sm:justify-center">
-          {/* Hero through progress — pt-4 so mascot ears clear header on mobile */}
-          <div
-            className={
-              step === 5
-                ? "relative z-40 mx-auto w-full max-w-3xl shrink-0 px-5 pt-4 sm:pt-3"
-                : "relative z-40 mx-auto w-full max-w-3xl shrink-0 px-5 pt-4 sm:pt-2"
-            }
-          >
-            <div
-              className={
-                step === 5
-                  ? "relative min-h-[6.25rem] overflow-visible sm:min-h-[8rem]"
-                  : "relative min-h-[6.5rem] overflow-visible sm:min-h-[8.5rem]"
-              }
-            >
-              {/* Guest party behind the cat-hood kid — Step 5 only; kid unchanged */}
-              <GuestPartyMascots
-                adults={draft.adults}
-                children={draft.children}
-                visible={step === 5}
-              />
+          <div className="relative z-40 mx-auto w-full max-w-3xl shrink-0 px-5 pt-4 sm:pt-2">
+            <div className="relative min-h-[6.5rem] overflow-visible sm:min-h-[8.5rem]">
               <span
                 role="button"
                 tabIndex={0}
@@ -441,51 +417,26 @@ export function PreEliteBuilderClient() {
               </span>
               <div className="relative z-10">
                 <p className="text-[10px] tracking-[0.22em] text-[#1CA67F] uppercase sm:text-xs">
-                  Step {step} of 5
+                  Step {step} of {QUIZ_STEP_COUNT}
                 </p>
-                <h1
-                  className={
-                    step === 5
-                      ? "mt-0.5 max-w-[70%] font-display text-2xl leading-tight text-white sm:mt-1 sm:max-w-none sm:text-4xl"
-                      : "mt-1 max-w-[70%] font-display text-2xl leading-tight text-white sm:mt-3 sm:max-w-none sm:text-4xl"
-                  }
-                >
-                  {step === 5 ? "Contact" : STEP_TITLES[step - 1]}
+                <h1 className="mt-1 max-w-[70%] font-display text-2xl leading-tight text-white sm:mt-3 sm:max-w-none sm:text-4xl">
+                  {STEP_TITLES[step - 1]}
                 </h1>
-                <p
-                  className={
-                    step === 5
-                      ? "mt-1 max-w-xl whitespace-pre-line pr-20 text-xs leading-snug text-white/60 sm:pr-32 sm:text-sm"
-                      : "mt-1 max-w-xl pr-20 text-xs leading-snug text-white/60 sm:mt-2 sm:pr-32 sm:text-sm sm:leading-relaxed"
-                  }
-                >
+                <p className="mt-1 max-w-xl pr-20 text-xs leading-snug text-white/60 sm:mt-2 sm:pr-32 sm:text-sm sm:leading-relaxed">
                   {stepBlurb}
                 </p>
               </div>
             </div>
-            <div
-              className={
-                step === 5
-                  ? "relative z-10 mt-2 h-1 overflow-hidden rounded-full bg-white/10 sm:mt-3"
-                  : "relative z-10 mt-3 h-1 overflow-hidden rounded-full bg-white/10 sm:mt-6"
-              }
-            >
+            <div className="relative z-10 mt-3 h-1 overflow-hidden rounded-full bg-white/10 sm:mt-6">
               <div
                 className="h-full rounded-full bg-[#075473] transition-all"
-                style={{ width: `${(step / 5) * 100}%` }}
+                style={{ width: `${(step / QUIZ_STEP_COUNT) * 100}%` }}
               />
             </div>
           </div>
 
-          {/* Form fills remaining viewport — scroll inside, no empty black strip */}
           <div className="min-h-0 flex-1 overflow-y-auto">
-            <div
-              className={
-                step === 5
-                  ? "mx-auto max-w-3xl px-5 pb-4 pt-2 sm:pb-6 sm:pt-3"
-                  : "mx-auto max-w-3xl px-5 pb-4 pt-2 sm:pb-8 sm:pt-4"
-              }
-            >
+            <div className="mx-auto max-w-3xl px-5 pb-4 pt-2 sm:pb-8 sm:pt-4">
               <div className="relative origin-top scale-[0.93] overflow-visible rounded-3xl border border-zinc-800/80 bg-[#0D1117]/80 p-5 backdrop-blur-md sm:p-7">
                 <AnimatePresence mode="wait">
                   <motion.div
@@ -586,27 +537,6 @@ export function PreEliteBuilderClient() {
                         onOpenStory={openStory}
                       />
                     )}
-                    {step === 5 && (
-                      <ContactFields
-                        tripType={draft.tripType}
-                        fullName={draft.fullName}
-                        email={draft.email}
-                        whatsapp={draft.whatsapp}
-                        timing={draft.timing}
-                        adults={draft.adults}
-                        children={draft.children}
-                        onWritingChange={setContactWriting}
-                        onChange={(patch) => {
-                          draft.setContact(patch);
-                          setError(null);
-                        }}
-                        onTripType={(tripType) => {
-                          draft.setTripType(tripType);
-                          setError(null);
-                          triggerBow();
-                        }}
-                      />
-                    )}
                   </motion.div>
                 </AnimatePresence>
 
@@ -620,37 +550,42 @@ export function PreEliteBuilderClient() {
                   <button
                     type="button"
                     onClick={goBack}
-                    disabled={step === 1 || submitting}
+                    disabled={step === 1}
                     className="inline-flex items-center gap-2 rounded-full px-4 py-2.5 text-sm text-white/70 disabled:opacity-30"
                   >
                     <ArrowLeft className="h-4 w-4" />
                     Back
                   </button>
-                  {step < 5 ? (
-                    <button
-                      type="button"
-                      onClick={goNext}
-                      className="inline-flex items-center gap-2 rounded-full bg-[#075473] px-5 py-2.5 text-sm font-medium text-white"
-                    >
-                      Continue
-                      <ArrowRight className="h-4 w-4" />
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => void submit()}
-                      disabled={submitting}
-                      className="inline-flex items-center gap-2 rounded-full bg-[#075473] px-5 py-2.5 text-sm font-medium text-white disabled:opacity-60"
-                    >
-                      {submitting ? "Saving…" : "Save Request →"}
-                    </button>
-                  )}
+                  <button
+                    type="button"
+                    onClick={goNext}
+                    className="inline-flex items-center gap-2 rounded-full bg-[#075473] px-5 py-2.5 text-sm font-medium text-white"
+                  >
+                    {step >= QUIZ_STEP_COUNT ? "Finish" : "Continue"}
+                    <ArrowRight className="h-4 w-4" />
+                  </button>
                 </div>
               </div>
             </div>
           </div>
         </div>
       )}
+
+      <QuestionnaireCompletionModal
+        open={showCompletion}
+        builderType={
+          draft.tripType === "single_day" ? "single" : "multiday"
+        }
+        onConfirm={() => {
+          const ok = finishQuizLocally();
+          if (!ok) {
+            setShowCompletion(false);
+            return false;
+          }
+          setShowCompletion(false);
+          return true;
+        }}
+      />
 
       <StoryExplanationModal
         open={Boolean(activeStory)}
@@ -683,7 +618,6 @@ export function PreEliteBuilderClient() {
     </div>
   );
 }
-
 function ChoiceList({
   options,
   selected,
@@ -832,258 +766,3 @@ function ChoiceList({
   );
 }
 
-function ContactFields({
-  tripType,
-  fullName,
-  email,
-  whatsapp,
-  timing,
-  adults,
-  children,
-  onChange,
-  onTripType,
-  onWritingChange,
-}: {
-  tripType: TripType | null;
-  fullName: string;
-  email: string;
-  whatsapp: string;
-  timing: PreEliteTiming;
-  adults: number;
-  children: number;
-  onChange: (patch: {
-    fullName?: string;
-    email?: string;
-    whatsapp?: string;
-    timing?: PreEliteTiming;
-    adults?: number;
-    children?: number;
-  }) => void;
-  onTripType: (tripType: TripType) => void;
-  /** Hero mascot: true while Full name / Email field is focused */
-  onWritingChange?: (writing: boolean) => void;
-}) {
-  const writingDepth = useRef(0);
-
-  useEffect(() => {
-    return () => onWritingChange?.(false);
-  }, [onWritingChange]);
-
-  const onContactFocus = () => {
-    writingDepth.current += 1;
-    onWritingChange?.(true);
-  };
-  const onContactBlur = () => {
-    writingDepth.current = Math.max(0, writingDepth.current - 1);
-    window.setTimeout(() => {
-      if (writingDepth.current === 0) onWritingChange?.(false);
-    }, 0);
-  };
-
-  return (
-    <div className="relative overflow-visible">
-      <div className="grid gap-3">
-        <Field label="Trip type" as="div" labelClassName="text-white">
-          <div className="grid grid-cols-2 gap-2">
-            {TRIP_TYPES.map((option) => {
-              const on = tripType === option.id;
-              const thumb =
-                option.id === "multi_day"
-                  ? "/brand/trip-multi-thumb.webp"
-                  : "/brand/trip-single-thumb.webp";
-              const sticker = CHOICE_STICKER[option.id];
-              const StickerIcon = sticker?.Icon;
-              return (
-                <button
-                  key={option.id}
-                  type="button"
-                  aria-pressed={on}
-                  onClick={() => onTripType(option.id)}
-                  className={`group relative overflow-hidden rounded-2xl text-left transition ${
-                    on
-                      ? "border-2 bg-[#F6A724]/10"
-                      : "border border-white/10 bg-[#0D1117]/70 hover:border-white/25"
-                  }`}
-                  style={
-                    on
-                      ? {
-                          borderColor: "#F6A724",
-                          boxShadow: "0 0 25px rgba(246,167,36,0.35)",
-                        }
-                      : undefined
-                  }
-                >
-                  <GoldLight
-                    color="#F6A724"
-                    placement="left-center"
-                    active={on}
-                    className="!z-[1]"
-                  />
-                  {StickerIcon ? (
-                    <StickerIcon
-                      className={`pointer-events-none absolute top-3 right-3 z-20 h-5 w-5 ${sticker.className}`}
-                      strokeWidth={1.75}
-                      aria-hidden
-                    />
-                  ) : null}
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={thumb}
-                    alt=""
-                    aria-hidden
-                    draggable={false}
-                    className="relative z-10 h-14 w-full object-cover sm:h-16"
-                  />
-                  <div className="relative z-10 px-2.5 py-2 pr-10 sm:px-3">
-                    <span className="block text-[0.8rem] font-medium leading-snug text-white sm:text-sm">
-                      {option.id === "multi_day"
-                        ? "Multi-Day Journey"
-                        : "Single-Day Tour"}
-                    </span>
-                    <span className="mt-0.5 block text-[0.65rem] leading-snug text-zinc-300 sm:text-xs">
-                      {option.id === "multi_day"
-                        ? "Hotels, cities & full itinerary."
-                        : "One focused 6–8 hour day trip."}
-                    </span>
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-        </Field>
-        <Field label="Full name" labelClassName="text-white">
-          <input
-            value={fullName}
-            onChange={(e) => onChange({ fullName: e.target.value })}
-            onFocus={onContactFocus}
-            onBlur={onContactBlur}
-            autoComplete="name"
-            className={inputClass}
-          />
-        </Field>
-        <Field label="Email" labelClassName="text-white">
-          <input
-            type="email"
-            value={email}
-            onChange={(e) => onChange({ email: e.target.value })}
-            onFocus={onContactFocus}
-            onBlur={onContactBlur}
-            autoComplete="email"
-            className={inputClass}
-          />
-        </Field>
-        <Field label="Phone" labelClassName="text-white">
-          <PhoneCountryField
-            value={whatsapp}
-            onChange={(full) => onChange({ whatsapp: full })}
-          />
-        </Field>
-        <Field
-          label={
-            tripType === "single_day" ? "Tour date" : "Planned dates or target month"
-          }
-          labelClassName="text-white"
-          as="div"
-        >
-          <TimingSelector
-            value={timing ?? emptyTiming()}
-            tripType={tripType}
-            onChange={(next) => onChange({ timing: normalizeTiming(next) })}
-          />
-        </Field>
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="Adults" as="div" labelClassName="text-white">
-            <GuestStepper
-              value={adults}
-              min={1}
-              max={20}
-              label="Adults"
-              onChange={(n) => onChange({ adults: n })}
-            />
-          </Field>
-          <Field label="Children" labelClassName="text-[#DC6E8A]" as="div">
-            <GuestStepper
-              value={children}
-              min={0}
-              max={20}
-              label="Children"
-              onChange={(n) => onChange({ children: n })}
-            />
-          </Field>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function GuestStepper({
-  value,
-  min,
-  max,
-  label,
-  onChange,
-}: {
-  value: number;
-  min: number;
-  max: number;
-  label: string;
-  onChange: (n: number) => void;
-}) {
-  return (
-    <div className="flex items-center justify-between gap-2 rounded-xl border border-white/10 bg-[#121212] px-2 py-1.5">
-      <button
-        type="button"
-        aria-label={`Decrease ${label}`}
-        disabled={value <= min}
-        onClick={() => onChange(Math.max(min, value - 1))}
-        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/15 text-white transition hover:bg-white/10 disabled:opacity-35"
-      >
-        <Minus className="h-3.5 w-3.5" aria-hidden />
-      </button>
-      <span className="min-w-[1.5rem] text-center text-sm font-semibold text-white">
-        {value}
-      </span>
-      <button
-        type="button"
-        aria-label={`Increase ${label}`}
-        disabled={value >= max}
-        onClick={() => onChange(Math.min(max, value + 1))}
-        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/15 text-white transition hover:bg-white/10 disabled:opacity-35"
-      >
-        <Plus className="h-3.5 w-3.5" aria-hidden />
-      </button>
-    </div>
-  );
-}
-
-function Field({
-  label,
-  hint,
-  children,
-  as = "label",
-  labelClassName,
-}: {
-  label: string;
-  hint?: string;
-  children: ReactNode;
-  as?: "label" | "div";
-  labelClassName?: string;
-}) {
-  const Tag = as;
-  return (
-    <Tag className="block">
-      <span
-        className={`mb-1 flex items-baseline justify-between text-xs tracking-[0.14em] uppercase ${
-          labelClassName ?? "text-[#1BA58A]"
-        }`}
-      >
-        {label}
-        {hint && <span className="tracking-normal text-white/35 normal-case">{hint}</span>}
-      </span>
-      {children}
-    </Tag>
-  );
-}
-
-const inputClass =
-  "w-full rounded-xl border border-white/10 bg-[#121212] px-3 py-2.5 text-sm text-white outline-none placeholder:text-white/30 focus:border-[#075473]";

@@ -9,6 +9,7 @@ import {
   loadRevolutCheckout,
   type RevolutCheckoutMode,
 } from "@/lib/revolutCheckout";
+import { PhoneCountryField } from "@/components/pre-elite/PhoneCountryField";
 
 export type PaymentTypeOption = "deposit" | "partial" | "full";
 
@@ -28,6 +29,12 @@ export interface PaymentModalProps {
   totalAmountMax?: number;
   /** Optional low end for range label only (charge still uses totalAmount) */
   totalAmountMin?: number;
+  /**
+   * When set, skip deposit/partial/full picker and charge this fixed EUR amount
+   * (e.g. €60 concierge fee).
+   */
+  fixedAmount?: number;
+  fixedAmountLabel?: string;
   onPaymentSuccess?: (paymentDetails: {
     bookingRef: string;
     paymentType: PaymentTypeOption;
@@ -70,6 +77,8 @@ export function RevolutCheckoutModal({
   defaultDepositPercent = 10,
   totalAmountMax,
   totalAmountMin,
+  fixedAmount,
+  fixedAmountLabel,
   onPaymentSuccess,
   onPaymentError,
 }: PaymentModalProps) {
@@ -82,6 +91,7 @@ export function RevolutCheckoutModal({
   const [error, setError] = useState<string | null>(null);
 
   const depositPct = Math.min(100, Math.max(1, defaultDepositPercent || 10));
+  const isFixed = fixedAmount != null && fixedAmount > 0;
 
   useEffect(() => {
     setMounted(true);
@@ -89,7 +99,7 @@ export function RevolutCheckoutModal({
 
   useEffect(() => {
     if (!isOpen) return;
-    setPaymentType("deposit");
+    setPaymentType(isFixed ? "full" : "deposit");
     setEmail(customerEmail);
     setName(customerName);
     setPhone(customerPhone);
@@ -100,22 +110,27 @@ export function RevolutCheckoutModal({
     return () => {
       document.body.style.overflow = prev;
     };
-  }, [isOpen, customerEmail, customerName, customerPhone]);
+  }, [isOpen, customerEmail, customerName, customerPhone, isFixed]);
 
   const amounts = useMemo(() => {
+    if (isFixed) {
+      const fixed = roundMoney(fixedAmount!);
+      return { deposit: fixed, partial: fixed, full: fixed };
+    }
     const total = Math.max(0, totalAmount);
     return {
       deposit: roundMoney((total * depositPct) / 100),
       partial: roundMoney((total * PARTIAL_PERCENT) / 100),
       full: roundMoney(total),
     };
-  }, [totalAmount, depositPct]);
+  }, [totalAmount, depositPct, isFixed, fixedAmount]);
 
   const chargeAmount = useMemo(() => {
+    if (isFixed) return amounts.full;
     if (paymentType === "partial") return amounts.partial;
     if (paymentType === "full") return amounts.full;
     return amounts.deposit;
-  }, [paymentType, amounts]);
+  }, [paymentType, amounts, isFixed]);
 
   const contactReady =
     isValidEmail(email.trim()) &&
@@ -161,7 +176,9 @@ export function RevolutCheckoutModal({
           customerName: nameTrim,
           customerPhone: phoneTrim,
           paymentType,
-          description: `TOKIOTOURS · ${bookingRef} · ${paymentType}`,
+          description: isFixed
+            ? `TOKIOTOURS · ${bookingRef} · concierge fee €${chargeAmount}`
+            : `TOKIOTOURS · ${bookingRef} · ${paymentType}`,
         }),
       });
 
@@ -296,13 +313,18 @@ export function RevolutCheckoutModal({
             <div className="space-y-4 px-5 pb-2">
               <div className="rounded-2xl border border-[#E8E2D9] bg-[#FBF8F2] px-4 py-3.5">
                 <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#8A8278]">
-                  Experience Japan Range
+                  {isFixed
+                    ? fixedAmountLabel || "Concierge fee"
+                    : "Experience Japan Range"}
                 </p>
                 <p className="mt-1 font-display text-xl text-[#0B1F3A]">
-                  Est. {rangeLabel}
+                  {isFixed
+                    ? `€${roundMoney(fixedAmount!)}`
+                    : `Est. ${rangeLabel}`}
                 </p>
               </div>
 
+              {!isFixed ? (
               <div>
                 <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-[#075473]">
                   Payment type
@@ -328,6 +350,7 @@ export function RevolutCheckoutModal({
                   />
                 </div>
               </div>
+              ) : null}
 
               <div className="rounded-2xl border border-[#075473]/40 bg-[#FDF7F3] px-4 py-3.5">
                 <div className="flex items-center gap-2">
@@ -374,14 +397,11 @@ export function RevolutCheckoutModal({
                   <span className="text-xs font-medium text-[#5C6570]">
                     Phone Number *
                   </span>
-                  <input
-                    type="tel"
-                    required
-                    autoComplete="tel"
+                  <PhoneCountryField
+                    variant="light"
                     value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    className="mt-1.5 w-full rounded-xl border border-[#E8E2D9] bg-white px-3 py-2.5 text-sm text-[#0B1F3A] outline-none focus:border-[#075473]"
-                    placeholder="e.g. +31 6 12345678"
+                    onChange={setPhone}
+                    className="mt-1.5"
                   />
                 </label>
               </div>

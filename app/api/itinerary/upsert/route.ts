@@ -196,6 +196,9 @@ export async function POST(request: Request) {
             ),
             tourHours: Number(singleDay.tourHours) || 6,
             transitOption: singleDay.transitOption,
+            preferredMovement: singleDay.preferredMovement ?? null,
+            suicaNeeded: Boolean(singleDay.suicaNeeded),
+            suicaValueEur: Number(singleDay.suicaValueEur) || 0,
           }),
         });
       } else {

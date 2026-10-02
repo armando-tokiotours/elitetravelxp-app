@@ -13,6 +13,7 @@ export const STAFF_ROLES = [
   "owner",
   "ops",
   "agent",
+  "accounting",
   "ticketer",
   "guide",
   "driver",
@@ -33,6 +34,7 @@ export function homePathForRole(role: StaffRole | null | undefined): string {
   switch (role) {
     case "owner":
     case "ops":
+    case "accounting":
       return "/ops";
     case "agent":
       return "/ops";
@@ -59,11 +61,16 @@ export function canAccessAdmin(role: StaffRole | null | undefined): boolean {
 
 /** Ops inbox + booking inspector (Ops managers + Concierge agents). */
 export function canAccessOpsBoard(role: StaffRole | null | undefined): boolean {
-  return role === "owner" || role === "ops" || role === "agent";
+  return (
+    role === "owner" ||
+    role === "ops" ||
+    role === "agent" ||
+    role === "accounting"
+  );
 }
 
 export function canAccessMoney(role: StaffRole | null | undefined): boolean {
-  return role === "owner";
+  return role === "owner" || role === "accounting";
 }
 
 export function canAccessAgent(role: StaffRole | null | undefined): boolean {
@@ -92,9 +99,10 @@ export function isVendorRole(role: StaffRole | null | undefined): boolean {
 }
 
 export const ROLE_LABELS: Record<StaffRole, string> = {
-  owner: "Owner (Admin Ops)",
-  ops: "Operations manager",
+  owner: "Owner (Super User)",
+  ops: "Ops Coordinator",
   agent: "Concierge agent",
+  accounting: "Accounting",
   ticketer: "Ticket supplier",
   guide: "Guide",
   driver: "Driver Coordinator",
@@ -127,6 +135,7 @@ export function roleMatchesCredentialTab(
         role === "owner" ||
         role === "ops" ||
         role === "agent" ||
+        role === "accounting" ||
         role === "ticketer" ||
         !role
       );

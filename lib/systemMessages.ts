@@ -29,7 +29,8 @@ export type SystemMessageKey =
   | "builder_m_transit_required"
   | "builder_m_hotel_rooms_required"
   | "sending_again"
-  | "sending_pdf";
+  | "sending_pdf"
+  | "guest_comm_needs_agent";
 
 export type SystemMessageDef = {
   key: SystemMessageKey;
@@ -196,6 +197,13 @@ export const SYSTEM_MESSAGE_CATALOG: readonly SystemMessageDef[] = [
     group: "itinerary",
     defaultText: "Sending your PDF…",
   },
+  {
+    key: "guest_comm_needs_agent",
+    label: "Itinerary · chat needs agent",
+    group: "itinerary",
+    defaultText:
+      "You need an TokioTours agent to talk — We will assign one soon.",
+  },
 ] as const;
 
 const STORAGE_KEY = "system_message_overrides";
@@ -218,7 +226,13 @@ export function writeSystemMessageOverrides(
   overrides: Partial<Record<SystemMessageKey, string>>
 ): void {
   if (typeof window === "undefined") return;
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(overrides));
+  try {
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(overrides));
+  } catch (err) {
+    throw err instanceof Error
+      ? err
+      : new Error("localStorage write failed");
+  }
 }
 
 export function getSystemMessage(key: SystemMessageKey): string {

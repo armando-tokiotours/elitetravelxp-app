@@ -77,16 +77,16 @@ export function ActivityMatchReelModal({
   return createPortal(
     <AnimatePresence>
       {open ? (
-        <motion.div
-          key="match-reel"
-          className="fixed inset-0 z-[130] flex items-center justify-center tokio-modal-backdrop bg-[#05080C]/55 p-3 backdrop-blur-md sm:p-4"
-          role="dialog"
-          aria-modal="true"
-          aria-label="Match Reel"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-        >
+          <motion.div
+            key="match-reel"
+            className="fixed inset-0 z-[130] flex items-center justify-center bg-black/80 backdrop-blur-md p-0 sm:p-4"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Match Reel"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          >
           <style>{`
             @keyframes match-reel-fill {
               from { width: 0%; }
@@ -101,7 +101,7 @@ export function ActivityMatchReelModal({
           />
 
           <motion.div
-            className="relative z-[1] flex aspect-[9/16] w-full max-w-sm flex-col overflow-hidden rounded-3xl border border-zinc-800 bg-zinc-950 shadow-2xl"
+            className="relative z-[1] flex h-full w-full max-w-md flex-col overflow-hidden bg-zinc-950 shadow-2xl sm:h-[92vh] sm:aspect-auto sm:rounded-3xl sm:border sm:border-white/10"
             initial={{ opacity: 0, scale: 0.96, y: 16 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.96, y: 12 }}

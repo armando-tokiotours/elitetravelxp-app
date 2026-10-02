@@ -1,24 +1,25 @@
 /**
  * Isolated Single-Day (Builder S) package pricing — never uses multi-day quote math.
+ *
+ * Money comes from:
+ * - Selected tours / experiences (catalog prices — e.g. City Tour 6h already includes the tour)
+ * - Transit only when chosen (Suica preload, walk €0, private chauffeur package)
+ * - Optional concierge fee
+ *
+ * guidePreference is Ops preference only — NOT a separate invoice charge.
  */
 
 import { ELITE_CONCIERGE_FEE } from "@/lib/eliteConcierge";
-import type { GuidePreference } from "@/store/useSingleDayBuilderStore";
+import type {
+  GuidePreference,
+  IntraCityTransport,
+} from "@/store/useSingleDayBuilderStore";
 
 /** Approx. display FX for Yen companion line (EUR → JPY). */
 export const SINGLE_DAY_EUR_TO_JPY = 160;
 
-const GUIDE_HOURLY_EUR: Record<GuidePreference, number> = {
-  private_guide: 85,
-  local_host: 55,
-  self_paced: 0,
-};
-
-const PRIVATE_TRANSIT_FLAT_EUR: Record<GuidePreference, number> = {
-  private_guide: 160,
-  local_host: 120,
-  self_paced: 90,
-};
+/** Private chauffeur package estimate when movement = private_driver. */
+const PRIVATE_CHAUFFEUR_FLAT_EUR = 160;
 
 export type SingleDayInvoiceLine = {
   id: string;
@@ -29,7 +30,11 @@ export type SingleDayInvoiceLine = {
 export type SingleDayQuote = {
   lines: SingleDayInvoiceLine[];
   experiencesSubtotal: number;
+  /** @deprecated use transitSubtotal — kept for callers */
   transitGuideSubtotal: number;
+  transitSubtotal: number;
+  /** Always 0 — guide is inside tour catalog price */
+  guideSubtotal: number;
   conciergeFee: number;
   totalEur: number;
   totalYen: number;
@@ -37,27 +42,78 @@ export type SingleDayQuote = {
   max: number;
 };
 
+export type SingleDayTransitInput = {
+  preferredMovement?: IntraCityTransport | null;
+  suicaNeeded?: boolean;
+  suicaValueEur?: number;
+  /** Adults + children — Suica preload is per guest. */
+  guests?: number;
+};
+
+function resolveTransitLine(
+  input: SingleDayTransitInput
+): SingleDayInvoiceLine | null {
+  const movement = input.preferredMovement ?? null;
+  const guests = Math.max(1, Math.round(Number(input.guests) || 1));
+
+  if (movement === "walk") {
+    return {
+      id: "transit",
+      label: "Walking / neighborhood pace (no transit fee)",
+      amountEur: 0,
+    };
+  }
+
+  if (movement === "subway") {
+    if (input.suicaNeeded) {
+      const per = Math.max(0, Number(input.suicaValueEur) || 15);
+      const total = Math.round(per * guests);
+      return {
+        id: "transit",
+        label: `Suica / PASMO preload estimate (€${per} × ${guests} guest${guests === 1 ? "" : "s"})`,
+        amountEur: total,
+      };
+    }
+    return {
+      id: "transit",
+      label: "Subway / IC — guest has own card (no Suica fee)",
+      amountEur: 0,
+    };
+  }
+
+  if (movement === "private_driver") {
+    return {
+      id: "transit",
+      label: "Private chauffeur package estimate (1 day)",
+      amountEur: PRIVATE_CHAUFFEUR_FLAT_EUR,
+    };
+  }
+
+  // No movement chosen — omit transit line (don't invent private transit)
+  return null;
+}
+
 export function calculateSingleDayQuote(input: {
   guidePreference: GuidePreference;
   tourHours: number;
   experiencePrices: number[];
   conciergeActive?: boolean;
+  preferredMovement?: IntraCityTransport | null;
+  suicaNeeded?: boolean;
+  suicaValueEur?: number;
+  guests?: number;
 }): SingleDayQuote {
-  const hours = Math.max(1, Number(input.tourHours) || 1);
-  const guide = input.guidePreference || "private_guide";
-  const transitFlat = PRIVATE_TRANSIT_FLAT_EUR[guide] ?? 160;
-  const guideRate = (GUIDE_HOURLY_EUR[guide] ?? 85) * hours;
+  const lines: SingleDayInvoiceLine[] = [];
 
-  const lines: SingleDayInvoiceLine[] = [
-    {
-      id: "transit_guide",
-      label:
-        guide === "self_paced"
-          ? "Base Single-Day Private Transit + Route Brief"
-          : `Base Single-Day Private Transit + Guide (${hours}h)`,
-      amountEur: transitFlat + guideRate,
-    },
-  ];
+  const transitLine = resolveTransitLine({
+    preferredMovement: input.preferredMovement,
+    suicaNeeded: input.suicaNeeded,
+    suicaValueEur: input.suicaValueEur,
+    guests: input.guests,
+  });
+  if (transitLine) {
+    lines.push(transitLine);
+  }
 
   const experiencePrices = (input.experiencePrices || []).filter(
     (n) => Number.isFinite(n) && n > 0
@@ -66,7 +122,7 @@ export function calculateSingleDayQuote(input: {
   if (experiencesSubtotal > 0) {
     lines.push({
       id: "experiences",
-      label: "Selected Experiences & Ticket Fees",
+      label: "Selected tours & experiences",
       amountEur: experiencesSubtotal,
     });
   }
@@ -80,13 +136,17 @@ export function calculateSingleDayQuote(input: {
     });
   }
 
+  const transitSubtotal = transitLine?.amountEur ?? 0;
+  const guideSubtotal = 0;
   const totalEur = lines.reduce((s, l) => s + l.amountEur, 0);
   const totalYen = Math.round(totalEur * SINGLE_DAY_EUR_TO_JPY);
 
   return {
     lines,
     experiencesSubtotal,
-    transitGuideSubtotal: transitFlat + guideRate,
+    transitGuideSubtotal: transitSubtotal,
+    transitSubtotal,
+    guideSubtotal,
     conciergeFee,
     totalEur,
     totalYen,
@@ -101,6 +161,25 @@ export function formatEur(n: number): string {
     currency: "EUR",
     maximumFractionDigits: 0,
   }).format(Math.round(n));
+}
+
+/** Party total → per-person (guests = adults + children, min 1). */
+export function singleDayPerPersonEur(
+  totalEur: number,
+  guests: number
+): number {
+  const pax = Math.max(1, guests);
+  return Math.round(Math.max(0, totalEur) / pax);
+}
+
+/** Per-person hourly for a timed private day (e.g. 6h tour). */
+export function singleDayPerPersonHourEur(
+  totalEur: number,
+  guests: number,
+  tourHours: number
+): number {
+  const hours = Math.max(1, tourHours);
+  return Math.round(singleDayPerPersonEur(totalEur, guests) / hours);
 }
 
 export function formatYen(n: number): string {

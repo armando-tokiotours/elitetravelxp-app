@@ -1,10 +1,10 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
-  calculateSingleDayQuote,
   formatEur,
   guidePreferenceLabel,
+  singleDayPerPersonHourEur,
 } from "@/lib/singleDayPricing";
 import {
   formatSingleDayDisplayDate,
@@ -13,27 +13,32 @@ import {
 import { useBuilderStore } from "@/store/useBuilderStore";
 import { useItineraryStore } from "@/store/useItineraryStore";
 import { usePreBuilderStore } from "@/store/usePreBuilderStore";
+import { formatClock12h } from "@/lib/singleDayTimeSlots";
+import { ItemizedInvoiceTable } from "@/components/invoice/ItemizedInvoiceTable";
+import { buildSingleDayInvoiceItems } from "@/lib/itemizedInvoice";
+import { getConciergeFeeCreditEur } from "@/lib/feeCredit";
+import { ELITE_CONCIERGE_FEE } from "@/lib/eliteConcierge";
+import { activeBookingRef } from "@/utils/pnr";
 import {
-  calculateDayEndTime,
-  calculateTimeSlots,
-  formatClock12h,
-} from "@/lib/singleDayTimeSlots";
-import {
-  SingleDayTimelineInfographic,
-  type TimelineStop,
-} from "@/components/builder-single/SingleDayTimelineInfographic";
+  mergeInvoiceWithAgentServices,
+  type ServiceLineItem,
+} from "@/lib/agentServices";
 
 /**
- * Printable Single-Day invoice — dark glassmorphic TOKIOTOURS ticket theme.
+ * Single-Day INVOICE tab — formal itemized financial estimate (no timeline).
  */
 export function SingleDayInvoicePrint({
   embedded = false,
   showToolbar = true,
   onPrintRequest,
+  feeCreditEur,
+  finalApprovedPrice = null,
 }: {
   embedded?: boolean;
   showToolbar?: boolean;
   onPrintRequest?: () => void;
+  feeCreditEur?: number;
+  finalApprovedPrice?: number | null;
 } = {}) {
   const tourDate = useSingleDayBuilderStore((s) => s.tourDate);
   const adults = useSingleDayBuilderStore((s) => s.adults);
@@ -43,16 +48,19 @@ export function SingleDayInvoicePrint({
   const cityFocus = useSingleDayBuilderStore((s) => s.cityFocus);
   const guidePreference = useSingleDayBuilderStore((s) => s.guidePreference);
   const meetingPoint = useSingleDayBuilderStore((s) => s.meetingPoint);
-  const meetingPointName = useSingleDayBuilderStore((s) => s.meetingPointName);
   const preferredTourLanguage = useSingleDayBuilderStore(
     (s) => s.preferredTourLanguage
   );
   const selectedExperiences = useSingleDayBuilderStore(
     (s) => s.selectedExperiences
   );
+  const preferredMovement = useSingleDayBuilderStore((s) => s.preferredMovement);
+  const suicaNeeded = useSingleDayBuilderStore((s) => s.suicaNeeded);
+  const suicaValueEur = useSingleDayBuilderStore((s) => s.suicaValueEur);
 
   const tempBookingRef = useBuilderStore((s) => s.tempBookingRef);
   const confirmedBookingRef = useBuilderStore((s) => s.confirmedBookingRef);
+  const bookingStatus = useBuilderStore((s) => s.bookingStatus);
   const isEliteConcierge = useBuilderStore((s) => s.isEliteConcierge);
   const experienceService = useBuilderStore((s) => s.experienceService);
   const conciergeActive =
@@ -69,44 +77,100 @@ export function SingleDayInvoicePrint({
   const guestName = (clientName || preName || "").trim() || "Guest";
   const guestEmail = (clientEmail || preEmail || "").trim().toLowerCase();
 
-  const pnr = (confirmedBookingRef || tempBookingRef || "—").toUpperCase();
+  const pnr = activeBookingRef({
+    tempBookingRef,
+    confirmedBookingRef,
+    bookingStatus,
+  });
+  const creditEur =
+    feeCreditEur != null && feeCreditEur > 0
+      ? feeCreditEur
+      : getConciergeFeeCreditEur(pnr);
 
-  const quote = useMemo(
+  const [agentServices, setAgentServices] = useState<ServiceLineItem[]>([]);
+  const [approvedFromServer, setApprovedFromServer] = useState<number | null>(
+    null
+  );
+
+  useEffect(() => {
+    const ref = String(pnr || "").trim();
+    if (!ref || ref.startsWith("TMP-")) {
+      setAgentServices([]);
+      setApprovedFromServer(null);
+      return;
+    }
+    let cancelled = false;
+    const load = () => {
+      void fetch(`/api/bookings/agent-services?pnr=${encodeURIComponent(ref)}`, {
+        cache: "no-store",
+      })
+        .then((r) => (r.ok ? r.json() : null))
+        .then(
+          (data: {
+            services?: ServiceLineItem[];
+            finalApprovedPrice?: number | null;
+          } | null) => {
+            if (cancelled || !data) return;
+            setAgentServices(data.services || []);
+            setApprovedFromServer(
+              data.finalApprovedPrice != null &&
+                Number.isFinite(Number(data.finalApprovedPrice))
+                ? Math.round(Number(data.finalApprovedPrice))
+                : null
+            );
+          }
+        )
+        .catch(() => {
+          /* ignore */
+        });
+    };
+    load();
+    const t = window.setInterval(load, 20_000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(t);
+    };
+  }, [pnr]);
+
+  const baseItems = useMemo(
     () =>
-      calculateSingleDayQuote({
+      buildSingleDayInvoiceItems({
         guidePreference,
         tourHours,
-        experiencePrices: selectedExperiences.map((e) => Number(e.price) || 0),
+        selectedExperiences,
         conciergeActive,
+        preferredMovement,
+        suicaNeeded,
+        suicaValueEur,
+        guests: Math.max(1, adults + children),
       }),
-    [guidePreference, tourHours, selectedExperiences, conciergeActive]
+    [
+      guidePreference,
+      tourHours,
+      selectedExperiences,
+      conciergeActive,
+      preferredMovement,
+      suicaNeeded,
+      suicaValueEur,
+      adults,
+      children,
+    ]
   );
 
-  const timedStops = useMemo(
-    () => calculateTimeSlots(startTime || "09:00", selectedExperiences),
-    [startTime, selectedExperiences]
+  const items = useMemo(
+    () => mergeInvoiceWithAgentServices(baseItems, agentServices),
+    [baseItems, agentServices]
   );
 
-  const printStops: TimelineStop[] = useMemo(
-    () =>
-      timedStops.map((stop) => ({
-        ...stop,
-        vibeLabel: "Experience",
-        ringTone: stop.stopNumber % 2 === 1 ? "red" : "cyan",
-      })),
-    [timedStops]
-  );
+  const lockedApproved =
+    finalApprovedPrice != null && Number.isFinite(finalApprovedPrice)
+      ? Math.round(finalApprovedPrice)
+      : approvedFromServer;
 
-  const endTime = useMemo(
-    () =>
-      timedStops.length > 0
-        ? calculateDayEndTime(startTime || "09:00", selectedExperiences)
-        : calculateDayEndTime(startTime || "09:00", [
-            { duration_hours: tourHours },
-          ]),
-    [timedStops.length, startTime, selectedExperiences, tourHours]
-  );
-
+  const baseTotal = items
+    .filter((i) => i.status === "ACCEPTED")
+    .reduce((s, i) => s + i.basePriceEur, 0);
+  const pax = Math.max(1, adults + children);
   const guests = `${adults} adult${adults === 1 ? "" : "s"}, ${children} child${children === 1 ? "" : "ren"}`;
   const dateLabel = formatSingleDayDisplayDate(tourDate) || "Date TBD";
 
@@ -136,45 +200,8 @@ export function SingleDayInvoicePrint({
         </div>
       ) : null}
 
-      <article className="mx-auto max-w-3xl overflow-hidden rounded-2xl border border-white/10 bg-[#0D1117]/95 px-5 py-8 shadow-2xl backdrop-blur-md sm:px-8">
-        <header className="relative overflow-hidden rounded-2xl border border-[#075473]/40 bg-[#05080C] px-5 py-6">
-          <div
-            className="pointer-events-none absolute inset-0 opacity-30"
-            style={{
-              backgroundImage:
-                "radial-gradient(circle at 20% 20%, #075473 0%, transparent 45%), radial-gradient(circle at 80% 0%, #E60F43 0%, transparent 40%)",
-            }}
-          />
-          <div className="relative flex items-start justify-between gap-4">
-            <div>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src="/images/tokiotours-logo.png"
-                alt="TOKIOTOURS"
-                className="h-12 w-12 rounded-full object-cover"
-              />
-              <p className="mt-3 text-[0.65rem] font-semibold uppercase tracking-[0.35em] text-[#E60F43]">
-                TOKIOTOURS
-              </p>
-              <h1 className="mt-1 font-godiva text-2xl uppercase tracking-wider text-white sm:text-3xl">
-                Single-Day Tour Ticket
-              </h1>
-              <p className="mt-2 text-sm text-white/55">
-                Private day package — transit, guide, and selected experiences.
-              </p>
-            </div>
-            <div className="shrink-0 rounded-xl border border-[#F6A724]/40 bg-black/40 px-3 py-2 text-right">
-              <p className="text-[9px] font-bold uppercase tracking-[0.2em] text-white/45">
-                PNR
-              </p>
-              <p className="mt-1 whitespace-nowrap font-mono text-sm font-bold tracking-wide text-[#F6A724] sm:text-base md:text-lg">
-                {pnr}
-              </p>
-            </div>
-          </div>
-        </header>
-
-        <dl className="mt-6 grid gap-3 text-sm sm:grid-cols-2">
+      <article className="mx-auto max-w-3xl space-y-5 overflow-hidden px-1 py-2 sm:px-2">
+        <dl className="grid gap-3 text-sm sm:grid-cols-2">
           <Meta label="Guest" value={guestName} />
           <Meta label="Email" value={guestEmail || "—"} />
           <Meta label="City Hub" value={cityFocus.trim() || "—"} />
@@ -187,76 +214,23 @@ export function SingleDayInvoicePrint({
           {meetingPoint ? (
             <Meta label="Meeting point" value={meetingPoint} />
           ) : null}
+          <Meta
+            label="Est. / person / hour"
+            value={formatEur(
+              singleDayPerPersonHourEur(baseTotal, pax, tourHours)
+            )}
+          />
         </dl>
 
-        {printStops.length > 0 ? (
-          <section className="sd-timeline-print-section mt-8">
-            <SingleDayTimelineInfographic
-              stops={printStops}
-              startTime={startTime || "09:00"}
-              endTime={endTime}
-              totalHours={tourHours}
-              cityLabel={cityFocus.trim() || undefined}
-              meetingPointName={meetingPointName || null}
-              meetingPointAddress={meetingPoint || null}
-              variant="print"
-            />
-            <ul className="mt-4 space-y-1.5 text-sm">
-              {timedStops.map((stop) => (
-                <li
-                  key={`price-${stop.tourId}-${stop.stopNumber}`}
-                  className="flex justify-between gap-4 border-b border-white/10 pb-1.5"
-                >
-                  <span className="text-white/65">
-                    STOP {String(stop.stopNumber).padStart(2, "0")} ·{" "}
-                    {stop.title}
-                  </span>
-                  <span className="shrink-0 font-semibold tabular-nums text-white">
-                    {stop.price != null && stop.price > 0
-                      ? formatEur(stop.price)
-                      : "Incl."}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </section>
-        ) : null}
-
-        <section className="mt-8">
-          <h2 className="font-godiva text-sm uppercase tracking-wider text-white/50">
-            Itemized Breakdown
-          </h2>
-          <ul className="mt-3 space-y-2.5 text-sm">
-            {quote.lines.map((line) => (
-              <li
-                key={line.id}
-                className="flex items-start justify-between gap-4 border-b border-white/10 pb-2.5"
-              >
-                <span className="text-white/75">{line.label}</span>
-                <span className="shrink-0 font-semibold tabular-nums text-white">
-                  {formatEur(line.amountEur)}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </section>
-
-        <section className="mt-8 rounded-2xl border border-[#075473]/50 bg-[#075473]/20 px-5 py-5">
-          <p className="text-[0.65rem] font-bold uppercase tracking-[0.25em] text-[#00B4D8]">
-            Estimated Single-Day Package
-          </p>
-          <p className="mt-2 font-display text-3xl font-semibold tabular-nums text-white">
-            {formatEur(quote.totalEur)}
-          </p>
-          <p className="mt-3 text-xs leading-relaxed text-white/45">
-            Estimate for planning. Final confirmation may adjust ticket
-            availability, guide language, and seasonal surcharges.
-          </p>
-        </section>
-
-        <p className="mt-8 text-center text-[0.65rem] uppercase tracking-[0.25em] text-white/40">
-          TOKIOTOURS · Single-Day Private Tour
-        </p>
+        <ItemizedInvoiceTable
+          pnr={pnr}
+          guestName={guestName}
+          partySize={pax}
+          items={items}
+          conciergeFeePaid={creditEur > 0}
+          conciergeFeeAmount={creditEur > 0 ? creditEur : ELITE_CONCIERGE_FEE}
+          finalApprovedPrice={lockedApproved}
+        />
       </article>
     </div>
   );

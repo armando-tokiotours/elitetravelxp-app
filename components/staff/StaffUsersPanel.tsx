@@ -121,6 +121,12 @@ export function StaffUsersPanel({
       if (password !== passwordConfirm) {
         throw new Error("Password confirmation does not match.");
       }
+      const accountType =
+        role === "guide"
+          ? "GUIDE"
+          : role === "agency"
+            ? "TRAVEL_AGENT"
+            : "STAFF";
       const created = await getClient().collection("staff").create(
         {
           email: email.trim().toLowerCase(),
@@ -128,6 +134,7 @@ export function StaffUsersPanel({
           passwordConfirm,
           name: name.trim(),
           role,
+          account_type: accountType,
           agency_id: role === "agency" ? agencyId.trim() : "",
           active: true,
           emailVisibility: true,

@@ -32,6 +32,11 @@ export interface SingleDaySelectedExperience {
   price?: number;
   /** tours.access_type — drives Ops ticketer demand */
   access_type?: string;
+  /**
+   * Ticket / place / activity extras sit outside the guide-hour budget.
+   * Guided tour stops keep this false/undefined for capacity checks.
+   */
+  is_extra?: boolean;
 }
 
 export interface SingleDayBuilderState {
@@ -58,6 +63,14 @@ export interface SingleDayBuilderState {
   meetingPointPlaceId?: string;
   /** Preferred intra-city movement for the day. */
   preferredMovement: IntraCityTransport | null;
+  /** Rail / IC answers when Subway is chosen (same as Multi Public). */
+  guestHasJRPass: boolean | null;
+  guestHasICCard: boolean | null;
+  guestNeedsTransitHelp: boolean | null;
+  /** Subway: TokioTours prepares physical Suica (TIX flag). */
+  suicaNeeded: boolean;
+  /** Optional preload estimate € per guest when suicaNeeded. */
+  suicaValueEur: number;
   blocks: DayBlock[];
   selectedExperiences: SingleDaySelectedExperience[];
   /** Transport catalog picks → Ticketer (same as multi). */
@@ -89,6 +102,15 @@ export interface SingleDayBuilderState {
     placeId?: string;
   }) => void;
   setPreferredMovement: (value: IntraCityTransport | null) => void;
+  setGuestTransitPasses: (answers: {
+    guestHasJRPass: boolean;
+    guestHasICCard: boolean;
+    guestNeedsTransitHelp: boolean;
+  }) => void;
+  setSuicaPreference: (opts: {
+    suicaNeeded: boolean;
+    suicaValueEur?: number;
+  }) => void;
   addExperience: (row: SingleDaySelectedExperience) => void;
   removeExperience: (tourId: string) => void;
   reorderExperiences: (fromIndex: number, toIndex: number) => void;
@@ -181,6 +203,11 @@ const initialState = {
   meetingPointLng: null as number | null,
   meetingPointPlaceId: "",
   preferredMovement: null as IntraCityTransport | null,
+  guestHasJRPass: null as boolean | null,
+  guestHasICCard: null as boolean | null,
+  guestNeedsTransitHelp: null as boolean | null,
+  suicaNeeded: false,
+  suicaValueEur: 15,
   blocks: initialBlocks,
   selectedExperiences: [] as SingleDaySelectedExperience[],
   selectedTransportProducts: [] as import("@/lib/transportProducts").TransportTicketLine[],
@@ -247,6 +274,26 @@ export const useSingleDayBuilderStore = create<SingleDayBuilderState>()(
           meetingPointPlaceId: String(placeId || "").trim(),
         }),
       setPreferredMovement: (preferredMovement) => set({ preferredMovement }),
+      setGuestTransitPasses: (answers) =>
+        set({
+          guestHasJRPass: Boolean(answers.guestHasJRPass),
+          guestHasICCard: Boolean(answers.guestHasICCard),
+          guestNeedsTransitHelp: Boolean(answers.guestNeedsTransitHelp),
+          // Help arranging passes / no IC → Suica prepare for Ticketer
+          suicaNeeded:
+            !Boolean(answers.guestHasICCard) ||
+            Boolean(answers.guestNeedsTransitHelp),
+        }),
+      setSuicaPreference: (opts) =>
+        set({
+          suicaNeeded: Boolean(opts.suicaNeeded),
+          suicaValueEur: Math.max(
+            0,
+            Number(opts.suicaValueEur) || get().suicaValueEur || 15
+          ),
+          guestHasICCard: opts.suicaNeeded ? false : true,
+          guestNeedsTransitHelp: Boolean(opts.suicaNeeded),
+        }),
       setExperiencesStepDone: (experiencesStepDone) =>
         set({ experiencesStepDone }),
 
@@ -343,7 +390,7 @@ export const useSingleDayBuilderStore = create<SingleDayBuilderState>()(
     }),
     {
       name: "single-day-builder",
-      version: 8,
+      version: 9,
       migrate: (persisted, version) => {
         const p = (persisted || {}) as Record<string, unknown>;
         if (version < 3) {
@@ -437,6 +484,16 @@ export const useSingleDayBuilderStore = create<SingleDayBuilderState>()(
               typeof p.meetingPointPlaceId === "string"
                 ? p.meetingPointPlaceId
                 : "",
+          };
+        }
+        if (version < 9) {
+          return {
+            ...(p as unknown as SingleDayBuilderState),
+            suicaNeeded: Boolean(p.suicaNeeded),
+            suicaValueEur:
+              typeof p.suicaValueEur === "number" && p.suicaValueEur > 0
+                ? p.suicaValueEur
+                : 15,
           };
         }
         return p as unknown as SingleDayBuilderState;

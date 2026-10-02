@@ -14,6 +14,8 @@ import type { PbTour } from "@/lib/pocketbase/client";
 export type TimelineStop = TimedRouteItem<SingleDaySelectedExperience> & {
   thumbUrl?: string;
   description?: string;
+  /** Tour route / stop sequence from catalog */
+  route?: string;
   address?: string;
   vibeLabel?: string;
   ringTone?: "red" | "cyan";
@@ -75,6 +77,7 @@ export function enrichTimelineStops(
     const item = catalogById.get(stop.tourId);
     const tags = item?.vibe_tags;
     const desc = String(item?.description || "").trim();
+    const route = String(item?.route || "").trim();
     const address =
       typeof item?.google_location?.address === "string"
         ? item.google_location.address.trim()
@@ -87,6 +90,7 @@ export function enrichTimelineStops(
           ? `${desc.slice(0, 157)}…`
           : desc
         : undefined,
+      route: route || undefined,
       address,
       vibeLabel: vibeLabelFromTags(tags),
       ringTone: ringToneFromTags(tags),
@@ -163,29 +167,21 @@ export function SingleDayTimelineInfographic({
     <div
       className={`sd-timeline ${
         isPrint
-          ? "sd-timeline--print text-[#0B1F3A]"
+          ? "sd-timeline--print text-white"
           : "rounded-3xl border border-white/10 bg-[#0A0E14] p-4 text-white shadow-[0_0_40px_rgba(7,84,115,0.15)] sm:p-6 md:p-8"
       }`}
     >
       <header className="mb-6 text-center md:mb-10">
-        <p
-          className={`text-[0.65rem] font-semibold uppercase tracking-[0.28em] ${
-            isPrint ? "text-[#075473]" : "text-cyan-400/80"
-          }`}
-        >
+        <p className="text-[0.65rem] font-semibold uppercase tracking-[0.28em] text-white">
           Day Timeline
         </p>
-        <p
-          className={`mt-2 font-mono text-sm font-bold tracking-wide sm:text-base ${
-            isPrint ? "text-[#0B1F3A]" : "text-[#F6A724]"
-          }`}
-        >
+        <p className="mt-2 font-mono text-sm font-bold tracking-wide text-white sm:text-base">
           {windowLabel}
         </p>
         {cityLabel || placeName ? (
           <p
             className={`mt-1 text-xs ${
-              isPrint ? "text-zinc-500" : "text-white/45"
+              isPrint ? "text-white/60" : "text-white/45"
             }`}
           >
             {routeHint}
@@ -224,6 +220,7 @@ export function SingleDayTimelineInfographic({
 
         {stops.map((stop) => {
           const branchLeft = stop.stopNumber % 2 === 1;
+          const routeText = String(stop.route || "").trim();
 
           return (
             <li
@@ -241,6 +238,32 @@ export function SingleDayTimelineInfographic({
                   isPrint ? "bg-[#075473]" : "bg-cyan-400 shadow-[0_0_10px_rgba(34,211,238,0.55)]"
                 }`}
               />
+
+              {/* Opposite-side route text (desktop) */}
+              {routeText ? (
+                <div
+                  className={`pointer-events-none absolute top-8 hidden max-w-[calc(50%-2rem)] md:block ${
+                    branchLeft
+                      ? "left-[calc(50%+1.75rem)] text-left"
+                      : "right-[calc(50%+1.75rem)] text-right"
+                  }`}
+                >
+                  <p
+                    className={`text-[10px] font-bold uppercase tracking-[0.16em] ${
+                      isPrint ? "text-[#075473]" : "text-cyan-400/80"
+                    }`}
+                  >
+                    Route
+                  </p>
+                  <p
+                    className={`mt-1 whitespace-pre-line text-xs leading-relaxed ${
+                      isPrint ? "text-zinc-600" : "text-white/55"
+                    }`}
+                  >
+                    {routeText}
+                  </p>
+                </div>
+              ) : null}
 
               <div
                 className={`sd-timeline-card pl-6 md:pl-0 ${
@@ -301,6 +324,19 @@ export function SingleDayTimelineInfographic({
                       >
                         <MapPin className="mt-0.5 h-3 w-3 shrink-0" />
                         <span>{stop.address}</span>
+                      </p>
+                    ) : null}
+                    {/* Mobile: route under card */}
+                    {routeText ? (
+                      <p
+                        className={`mt-2 whitespace-pre-line text-[11px] leading-relaxed md:hidden ${
+                          isPrint ? "text-zinc-500" : "text-white/50"
+                        }`}
+                      >
+                        <span className="font-bold uppercase tracking-wider text-cyan-400/80">
+                          Route ·{" "}
+                        </span>
+                        {routeText}
                       </p>
                     ) : null}
                     <div

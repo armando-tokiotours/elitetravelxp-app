@@ -13,7 +13,9 @@ import {
 import { PB_THUMBS } from "@/lib/mediaStandards";
 import {
   formatDurationBadge,
-  selectedHoursTotal,
+  selectedExtraHoursTotal,
+  selectedGuideHoursTotal,
+  countsTowardGuideHours,
 } from "@/lib/experiencesPlaces";
 import { calculateTimeSlots } from "@/lib/singleDayTimeSlots";
 import { resolveSingleDayReelPoster } from "@/config/mediaConfig";
@@ -66,11 +68,12 @@ export function SingleDayRouteModal({
     [startTime, selectedRows]
   );
 
-  const usedHours = selectedHoursTotal(selectedRows);
-  const overBudget = usedHours > tourHours + 0.01;
+  const usedGuideHours = selectedGuideHoursTotal(selectedRows);
+  const extraHours = selectedExtraHoursTotal(selectedRows);
+  const overBudget = usedGuideHours > tourHours + 0.01;
   const budgetPct = Math.min(
     100,
-    tourHours > 0 ? (usedHours / tourHours) * 100 : 0
+    tourHours > 0 ? (usedGuideHours / tourHours) * 100 : 0
   );
 
   const onReorder = (next: SingleDaySelectedExperience[]) => {
@@ -192,6 +195,11 @@ export function SingleDayRouteModal({
                           <div className="min-w-0 flex-1">
                             <p className="truncate text-sm font-semibold text-white">
                               {row.title}
+                              {!countsTowardGuideHours(row) ? (
+                                <span className="ml-1.5 text-[9px] font-bold tracking-wider text-[#DC6E8A] uppercase">
+                                  Extra
+                                </span>
+                              ) : null}
                             </p>
                             <p className="mt-0.5 font-geosans text-[11px] font-semibold uppercase tracking-[0.14em] text-[#1BA58A]">
                               {stop?.timeSlot ?? "—"}
@@ -227,8 +235,10 @@ export function SingleDayRouteModal({
                       : "text-zinc-400"
                   }
                 >
-                  Total Scheduled: {usedHours.toFixed(1)}h / {tourHours}h
-                  available
+                  Guide: {usedGuideHours.toFixed(1)}h / {tourHours}h
+                  {extraHours > 0
+                    ? ` · +${extraHours.toFixed(1)}h extra`
+                    : ""}
                 </span>
                 <span className="text-zinc-500">
                   Ends{" "}

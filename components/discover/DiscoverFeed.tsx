@@ -21,6 +21,11 @@ import {
   TOUR_DAY_PACKED_MESSAGE,
   tourDurationHours,
 } from "@/lib/tourValidator";
+import {
+  isGuideBudgetCatalogItem,
+  selectedGuideHoursTotal,
+  type CatalogItem,
+} from "@/lib/experiencesPlaces";
 import { useBuilderStore } from "@/store/useBuilderStore";
 import {
   formatSingleDayDisplayDate,
@@ -233,13 +238,11 @@ export function DiscoverFeed() {
         setToast("Removed from itinerary");
         return { ok: true as const };
       }
-      const used = sdExperiences.reduce(
-        (sum, e) => sum + (Number(e.duration_hours) || 0),
-        0
-      );
       const hours = tourDurationHours(tour);
       const cap = useSingleDayBuilderStore.getState().tourHours;
-      if (used + hours > cap + 0.01) {
+      const countsTowardGuide = isGuideBudgetCatalogItem(tour as CatalogItem);
+      const usedGuide = selectedGuideHoursTotal(sdExperiences);
+      if (countsTowardGuide && usedGuide + hours > cap + 0.01) {
         return { ok: false as const, message: TOUR_DAY_PACKED_MESSAGE };
       }
       addExperience({
@@ -249,6 +252,7 @@ export function DiscoverFeed() {
         duration_hours: hours,
         price: tourPrice(tour, guests),
         access_type: String(tour.access_type || "").trim() || undefined,
+        is_extra: !countsTowardGuide,
       });
       setToast(`Added · ${tour.title}`);
       return { ok: true as const };
@@ -400,7 +404,7 @@ export function DiscoverFeed() {
 
       <div className={`${APP_SIDEBAR_RAIL_PAD} min-h-[100dvh] bg-transparent`}>
         <header className="sticky top-0 z-40 border-b border-white/10 bg-[#0D1117]/70 text-white backdrop-blur-md lg:hidden">
-          <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
+          <div className="mx-auto flex max-w-lg items-center justify-between px-4 py-3 lg:max-w-xl">
             <div className="flex min-w-0 items-center gap-3">
               <MobileAppNav
                 brandEyebrow="TOKIOTOURS"
@@ -422,27 +426,32 @@ export function DiscoverFeed() {
           </div>
         </header>
 
-        <div
-          className="mx-auto flex max-w-6xl snap-x snap-mandatory gap-4 overflow-x-auto border-b border-white/10 bg-[#0D1117]/50 px-4 py-4 backdrop-blur-md [-ms-overflow-style:none] [scrollbar-width:none] lg:px-8 [&::-webkit-scrollbar]:hidden"
-          role="tablist"
-          aria-label="Cities"
-        >
-        {loading ? (
-          <p className="text-sm text-white/50">Loading cities…</p>
-        ) : cities.length === 0 ? (
-          <p className="text-sm text-white/50">No cities yet.</p>
-        ) : (
-          cities.map((city, i) => (
-            <CityStory
-              key={city.id || `city-${i}`}
-              city={city}
-              active={city.id === selectedCityId}
-              onSelect={() => setSelectedCityId(city.id)}
-              eager={i < 4}
-            />
-          ))
-        )}
-      </div>
+        {/* Full-width city avatar bar — breaks out of content max-width */}
+        <div className="w-full border-b border-white/5 bg-[#0D1117]/50 pb-4 backdrop-blur-md">
+          <div
+            className="w-full overflow-x-auto px-4 pt-4 sm:px-8 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+            role="tablist"
+            aria-label="Cities"
+          >
+            <div className="mx-auto flex min-w-max items-center justify-start gap-4 sm:justify-center">
+              {loading ? (
+                <p className="text-sm text-white/50">Loading cities…</p>
+              ) : cities.length === 0 ? (
+                <p className="text-sm text-white/50">No cities yet.</p>
+              ) : (
+                cities.map((city, i) => (
+                  <CityStory
+                    key={city.id || `city-${i}`}
+                    city={city}
+                    active={city.id === selectedCityId}
+                    onSelect={() => setSelectedCityId(city.id)}
+                    eager={i < 4}
+                  />
+                ))
+              )}
+            </div>
+          </div>
+        </div>
 
       {toast ? (
         <div
@@ -453,7 +462,7 @@ export function DiscoverFeed() {
         </div>
       ) : null}
 
-      <main className="mx-auto max-w-6xl bg-transparent px-4 pb-32 md:pb-12 lg:px-8">
+      <main className="mx-auto max-w-lg bg-transparent px-4 pb-32 md:pb-12 lg:max-w-xl lg:px-8">
         {loading || !selectedCity ? (
           <p className="py-16 text-center text-sm text-zinc-500">
             {loading ? "Loading…" : "Select a city"}
@@ -867,13 +876,13 @@ function CityStory({
       role="tab"
       aria-selected={active}
       onClick={onSelect}
-      className="flex w-[4.5rem] shrink-0 snap-start flex-col items-center gap-1.5"
+      className="group flex w-[4.5rem] shrink-0 flex-col items-center gap-1.5 transition-transform active:scale-95"
     >
       <span
-        className={`rounded-full p-[2px] ${
+        className={`rounded-full p-[2px] transition-colors ${
           active
             ? "bg-gradient-to-tr from-[#075473] via-[#F3D9C4] to-[#075473]"
-            : "bg-white/25"
+            : "bg-white/25 group-hover:bg-[#F6A724]/80"
         }`}
       >
         <span className="block rounded-full bg-[#05080C]/90 p-[2px] backdrop-blur-sm">
@@ -887,18 +896,20 @@ function CityStory({
               loading={eager ? "eager" : "lazy"}
               decoding="async"
               fetchPriority={eager ? "high" : "auto"}
-              className="h-16 w-16 rounded-full object-cover"
+              className="h-14 w-14 rounded-full object-cover transition-transform duration-300 group-hover:scale-110 sm:h-16 sm:w-16"
             />
           ) : (
-            <span className="flex h-16 w-16 items-center justify-center rounded-full bg-[#1a3355] font-display text-lg text-[#075473]">
+            <span className="flex h-14 w-14 items-center justify-center rounded-full bg-[#1a3355] font-display text-lg text-[#075473] sm:h-16 sm:w-16">
               {city.name.slice(0, 1)}
             </span>
           )}
         </span>
       </span>
       <span
-        className={`w-full truncate text-center text-[0.65rem] ${
-          active ? "font-semibold text-white" : "text-white/60"
+        className={`mt-0.5 w-full truncate text-center text-[11px] font-medium transition-colors sm:text-xs ${
+          active
+            ? "font-semibold text-white"
+            : "text-gray-400 group-hover:text-white"
         }`}
       >
         {city.name}

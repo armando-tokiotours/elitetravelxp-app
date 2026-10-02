@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { SystemMessageFox } from "@/components/branding/SystemMessageFox";
 import { showSystemMessage } from "@/store/useSystemMessageStore";
 import {
@@ -11,27 +11,83 @@ import {
   type SystemMessageKey,
 } from "@/lib/systemMessages";
 
+function cleanDrafts(
+  drafts: Partial<Record<SystemMessageKey, string>>
+): Partial<Record<SystemMessageKey, string>> {
+  const cleaned: Partial<Record<SystemMessageKey, string>> = {};
+  for (const m of SYSTEM_MESSAGE_CATALOG) {
+    const v = (drafts[m.key] || "").trim();
+    if (v && v !== m.defaultText) cleaned[m.key] = v;
+  }
+  return cleaned;
+}
+
 export function FoxMessagesEditor() {
   const [drafts, setDrafts] = useState<
     Partial<Record<SystemMessageKey, string>>
-  >(() => readSystemMessageOverrides());
+  >({});
+  const [hydrated, setHydrated] = useState(false);
   const [savedAt, setSavedAt] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [saveCount, setSaveCount] = useState(0);
+  const draftsRef = useRef(drafts);
+  draftsRef.current = drafts;
+
+  useEffect(() => {
+    const loaded = readSystemMessageOverrides();
+    setDrafts(loaded);
+    setSaveCount(Object.keys(loaded).length);
+    setHydrated(true);
+  }, []);
+
+  const persist = (next: Partial<Record<SystemMessageKey, string>>) => {
+    const cleaned = cleanDrafts(next);
+    try {
+      writeSystemMessageOverrides(cleaned);
+      const verified = readSystemMessageOverrides();
+      setDrafts(verified);
+      setSaveCount(Object.keys(verified).length);
+      setSavedAt(new Date().toLocaleTimeString());
+      setError(null);
+      return true;
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Could not save in this browser (storage blocked)."
+      );
+      return false;
+    }
+  };
+
+  // Debounced auto-save so tab switches keep edits.
+  useEffect(() => {
+    if (!hydrated) return;
+    const t = window.setTimeout(() => {
+      persist(draftsRef.current);
+    }, 450);
+    return () => window.clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- persist on drafts only
+  }, [drafts, hydrated]);
 
   const save = () => {
-    const cleaned: Partial<Record<SystemMessageKey, string>> = {};
-    for (const m of SYSTEM_MESSAGE_CATALOG) {
-      const v = (drafts[m.key] || "").trim();
-      if (v && v !== m.defaultText) cleaned[m.key] = v;
-    }
-    writeSystemMessageOverrides(cleaned);
-    setDrafts(cleaned);
-    setSavedAt(new Date().toLocaleTimeString());
+    persist(drafts);
   };
 
   const resetAll = () => {
-    writeSystemMessageOverrides({});
-    setDrafts({});
-    setSavedAt(new Date().toLocaleTimeString());
+    try {
+      writeSystemMessageOverrides({});
+      setDrafts({});
+      setSaveCount(0);
+      setSavedAt(new Date().toLocaleTimeString());
+      setError(null);
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Could not reset (storage blocked)."
+      );
+    }
   };
 
   const groups = ["pre_elite", "builder_m", "builder_s", "itinerary"] as const;
@@ -63,9 +119,17 @@ export function FoxMessagesEditor() {
           {savedAt ? (
             <span className="self-center text-xs text-[#1CA67F]">
               Saved {savedAt}
+              {saveCount > 0
+                ? ` · ${saveCount} override${saveCount === 1 ? "" : "s"}`
+                : " · defaults"}
             </span>
           ) : null}
         </div>
+        {error ? (
+          <p className="mt-2 text-xs text-[#E60F43]" role="alert">
+            {error}
+          </p>
+        ) : null}
       </div>
 
       {groups.map((group) => (
@@ -88,11 +152,12 @@ export function FoxMessagesEditor() {
                   </label>
                   <input
                     id={`sys-${m.key}`}
-                    value={drafts[m.key] ?? m.defaultText}
+                    value={drafts[m.key] ?? ""}
+                    placeholder={m.defaultText}
                     onChange={(e) =>
                       setDrafts((d) => ({ ...d, [m.key]: e.target.value }))
                     }
-                    className="rounded-xl border border-zinc-700 bg-black/40 px-3 py-2 text-sm text-white"
+                    className="rounded-xl border border-zinc-700 bg-black/40 px-3 py-2 text-sm text-white placeholder:text-zinc-600"
                   />
                 </li>
               )

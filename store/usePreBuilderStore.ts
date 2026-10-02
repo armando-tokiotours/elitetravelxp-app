@@ -21,6 +21,11 @@ interface PreBuilderState extends PreEliteDraft {
   lastPayload: PreEliteBookingPayload | null;
   /** True when brief was loaded from Manage / email link (already in DB). */
   isAlreadySaved: boolean;
+  /**
+   * TEMPORARY_UNSAVED = quiz done, no PocketBase contact yet.
+   * SAVED = contact captured / server draft exists.
+   */
+  pnrDraftStatus: "TEMPORARY_UNSAVED" | "SAVED" | null;
   /** Server/local count of boarding-pass emails dispatched for this PNR. */
   emailSentCount: number;
   setStep: (step: number) => void;
@@ -43,6 +48,10 @@ interface PreBuilderState extends PreEliteDraft {
       >
     >
   ) => void;
+  markTemporaryDraft: (payload: {
+    bookingRef: string;
+    itineraryData: string;
+  }) => void;
   markSubmitted: (payload: PreEliteBookingPayload) => void;
   /** Mark session as retrieved from email/Manage — unlocks Trip Builder. */
   markRetrievedFromManage: (opts?: { emailSentCount?: number }) => void;
@@ -61,6 +70,7 @@ export const usePreBuilderStore = create<PreBuilderState>()(
       submittedAt: null,
       lastPayload: null,
       isAlreadySaved: false,
+      pnrDraftStatus: null,
       emailSentCount: 0,
 
       setStep: (step) => set({ step }),
@@ -109,15 +119,47 @@ export const usePreBuilderStore = create<PreBuilderState>()(
         });
       },
 
-      markSubmitted: (payload) =>
+      markTemporaryDraft: ({ bookingRef, itineraryData }) => {
+        try {
+          window.localStorage.setItem("pnr_draft_status", "TEMPORARY_UNSAVED");
+        } catch {
+          /* private mode */
+        }
+        set({
+          bookingRef,
+          submittedAt: new Date().toISOString(),
+          lastPayload: {
+            bookingRef,
+            fullName: get().fullName.trim() || "Guest",
+            email: get().email.trim().toLowerCase(),
+            whatsapp: get().whatsapp.trim(),
+            status: "draft",
+            itineraryData,
+          },
+          isAlreadySaved: false,
+          pnrDraftStatus: "TEMPORARY_UNSAVED",
+          emailSentCount: 0,
+        });
+      },
+
+      markSubmitted: (payload) => {
+        try {
+          window.localStorage.setItem("pnr_draft_status", "SAVED");
+        } catch {
+          /* private mode */
+        }
         set({
           bookingRef: payload.bookingRef,
           submittedAt: new Date().toISOString(),
           lastPayload: payload,
           // Fresh qualification — email not sent until Save & Email
           isAlreadySaved: true,
+          pnrDraftStatus: "SAVED",
           emailSentCount: 0,
-        }),
+          fullName: payload.fullName || get().fullName,
+          email: payload.email || get().email,
+        });
+      },
 
       markRetrievedFromManage: ({ emailSentCount } = {}) =>
         set({
@@ -142,18 +184,20 @@ export const usePreBuilderStore = create<PreBuilderState>()(
           submittedAt: null,
           lastPayload: null,
           isAlreadySaved: false,
+          pnrDraftStatus: null,
           emailSentCount: 0,
         }),
     }),
     {
       name: "pre-elite-builder",
-      version: 4,
+      version: 5,
       migrate: (persisted) => {
         if (!persisted || typeof persisted !== "object") {
           return {
             ...emptyDraft(),
             step: 1,
             isAlreadySaved: false,
+            pnrDraftStatus: null,
             emailSentCount: 0,
           };
         }
@@ -180,6 +224,12 @@ export const usePreBuilderStore = create<PreBuilderState>()(
               : timing,
           tripType,
           isAlreadySaved: Boolean(p.isAlreadySaved),
+          pnrDraftStatus:
+            p.pnrDraftStatus === "TEMPORARY_UNSAVED" || p.pnrDraftStatus === "SAVED"
+              ? p.pnrDraftStatus
+              : p.isAlreadySaved
+                ? "SAVED"
+                : null,
           emailSentCount: Math.max(0, Number(p.emailSentCount) || 0),
         };
       },

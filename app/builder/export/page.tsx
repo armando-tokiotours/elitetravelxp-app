@@ -7,7 +7,6 @@ import {
 } from "@/lib/pocketbase/client";
 import { calculateBuilderQuote, formatUsd } from "@/lib/builder-pricing";
 import { useBuilderStore } from "@/store/useBuilderStore";
-import { BottomNav } from "@/components/builder/BottomNav";
 import {
   PrintRequestModal,
   type PrintRequestResult,
@@ -150,8 +149,6 @@ export default function ExportPage() {
           </div>
         </div>
       ) : null}
-
-      <BottomNav />
     </div>
   );
 }

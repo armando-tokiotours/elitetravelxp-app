@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 420" fill="none" aria-hidden="true">
+  <!-- Transparent portal window between pillars — hero image shows through -->
+  <defs>
+    <linearGradient id="wood" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#E85A2A"/>
+      <stop offset="45%" stop-color="#C93A1A"/>
+      <stop offset="100%" stop-color="#9B2410"/>
+    </linearGradient>
+    <linearGradient id="kasagi" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#F06A35"/>
+      <stop offset="100%" stop-color="#B83212"/>
+    </linearGradient>
+    <filter id="soft" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="8" stdDeviation="10" flood-color="#000" flood-opacity="0.55"/>
+    </filter>
+  </defs>
+
+  <g filter="url(#soft)">
+    <!-- Kasagi (top curved beam) -->
+    <path
+      d="M18 58 C18 42, 38 34, 52 34 L268 34 C282 34, 302 42, 302 58 L292 78 L28 78 Z"
+      fill="url(#kasagi)"
+    />
+    <!-- Red underside accent -->
+    <path d="M28 78 L292 78 L286 88 L34 88 Z" fill="#E60F43"/>
+
+    <!-- Shimaki / second beam -->
+    <rect x="42" y="96" width="236" height="22" rx="3" fill="url(#wood)"/>
+
+    <!-- Gakuzuka (center post under beams) -->
+    <rect x="148" y="78" width="24" height="40" rx="2" fill="#A82A10"/>
+
+    <!-- Left pillar -->
+    <path
+      d="M58 118 L92 118 L98 360 L78 382 L52 382 L48 360 Z"
+      fill="url(#wood)"
+    />
+    <!-- Right pillar -->
+    <path
+      d="M228 118 L262 118 L272 360 L248 382 L222 382 L222 360 Z"
+      fill="url(#wood)"
+    />
+
+    <!-- Nuki (lower crossbeam through pillars) -->
+    <rect x="48" y="210" width="224" height="18" rx="2" fill="#D14A22"/>
+    <rect x="48" y="216" width="224" height="4" fill="#F6A724" opacity="0.35"/>
+
+    <!-- Pillar bases -->
+    <rect x="42" y="372" width="48" height="18" rx="3" fill="#7A1C0C"/>
+    <rect x="230" y="372" width="48" height="18" rx="3" fill="#7A1C0C"/>
+
+    <!-- Subtle edge highlights -->
+    <path d="M62 122 L88 122" stroke="#F6A724" stroke-opacity="0.35" stroke-width="2"/>
+    <path d="M232 122 L258 122" stroke="#F6A724" stroke-opacity="0.35" stroke-width="2"/>
+  </g>
+</svg>

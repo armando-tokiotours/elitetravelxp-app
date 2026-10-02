@@ -438,7 +438,7 @@ export function DriversEditorModal({
       {open ? (
         <motion.div
           key="drivers-editor"
-          className="fixed inset-0 z-50 flex flex-col bg-[#0A1017]"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-[#05080C]/85 p-0 backdrop-blur-md sm:p-4"
           role="dialog"
           aria-modal="true"
           aria-label="Transport selection"
@@ -448,7 +448,7 @@ export function DriversEditorModal({
           transition={{ duration: 0.2 }}
         >
           <motion.div
-            className="relative z-[1] flex h-full w-full flex-col overflow-hidden bg-[#0A1017]"
+            className="relative z-[1] flex h-full w-full max-w-2xl flex-col overflow-hidden bg-[#0A1017] shadow-2xl sm:h-[min(92vh,920px)] sm:rounded-3xl sm:border sm:border-white/10"
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -8 }}

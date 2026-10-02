@@ -3,6 +3,7 @@
  */
 
 import type { PbTour } from "@/lib/pocketbase/client";
+import { experienceNeedsEntryTicket } from "@/lib/accessType";
 import { isBestMatchTour, type ExperienceProfile } from "@/lib/experienceProfiler";
 
 export type ExperiencesPlacesSegment = "tour" | "activity";
@@ -76,10 +77,58 @@ export function formatDurationBadge(hours: number): string {
   return `${rounded}h`;
 }
 
+/**
+ * Guide-hour budget only covers guided / tour stops.
+ * Ticket extras (TeamLab…), places, and Activity-catalog items sit outside the guide clock.
+ */
+export function isGuideBudgetCatalogItem(item: CatalogItem): boolean {
+  if (experienceNeedsEntryTicket(item)) return false;
+  if (isPlaceItem(item)) return false;
+  if (String(item.category || "").toLowerCase() === "activity") return false;
+  return true;
+}
+
+export type GuideBudgetRow = {
+  duration_hours?: number;
+  title?: string;
+  access_type?: string;
+  /** Explicit flag set when adding from catalog */
+  is_extra?: boolean;
+};
+
+/** Whether a selected stop consumes guide hours (tourHours). */
+export function countsTowardGuideHours(row: GuideBudgetRow): boolean {
+  if (row.is_extra === true) return false;
+  if (row.is_extra === false) return true;
+  // Legacy rows without flag — infer from ticket signals
+  return !experienceNeedsEntryTicket({
+    title: row.title,
+    access_type: row.access_type,
+  });
+}
+
 export function selectedHoursTotal(
   rows: { duration_hours?: number }[]
 ): number {
   return rows.reduce((sum, r) => {
+    const n = Number(r.duration_hours);
+    return sum + (Number.isFinite(n) && n > 0 ? n : 0);
+  }, 0);
+}
+
+/** Hours that count against the guide / tourHours budget. */
+export function selectedGuideHoursTotal(rows: GuideBudgetRow[]): number {
+  return rows.reduce((sum, r) => {
+    if (!countsTowardGuideHours(r)) return sum;
+    const n = Number(r.duration_hours);
+    return sum + (Number.isFinite(n) && n > 0 ? n : 0);
+  }, 0);
+}
+
+/** Ticket / place extras — wall-clock only, not guide budget. */
+export function selectedExtraHoursTotal(rows: GuideBudgetRow[]): number {
+  return rows.reduce((sum, r) => {
+    if (countsTowardGuideHours(r)) return sum;
     const n = Number(r.duration_hours);
     return sum + (Number.isFinite(n) && n > 0 ? n : 0);
   }, 0);

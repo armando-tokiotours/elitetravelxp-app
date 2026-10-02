@@ -11,15 +11,9 @@ import { hydrateStoresFromPreEliteBrief } from "@/lib/preEliteHydrate";
 import { useBuilderStore } from "@/store/useBuilderStore";
 import { usePreBuilderStore } from "@/store/usePreBuilderStore";
 import { useItineraryStore } from "@/store/useItineraryStore";
-import {
-  AppSidebar,
-  APP_SIDEBAR_RAIL_PAD,
-} from "@/components/navigation/AppSidebar";
 import { MobileTopChrome } from "@/components/navigation/MobileTopChrome";
-import { ManageBookingModal } from "@/components/modals/ManageBookingModal";
 import { BuilderHero } from "./BuilderHero";
 import { BuilderMView } from "./BuilderMView";
-import { BottomNav } from "./BottomNav";
 import { BookingRefBadge } from "./BookingRefBadge";
 import { NewBookingResetButton } from "./NewBookingResetButton";
 
@@ -225,15 +219,6 @@ export function BuilderApp() {
     };
   }, [addLocation, setArrival, setDeparture, setTransit]);
 
-  const [manageOpen, setManageOpen] = useState(false);
-  const [toast, setToast] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!toast) return;
-    const t = window.setTimeout(() => setToast(null), 3800);
-    return () => window.clearTimeout(t);
-  }, [toast]);
-
   const handleAccommodationsLoaded = useCallback(
     (rows: PbAccommodation[]) => {
       setConfig((prev) => (prev ? { ...prev, accommodations: rows } : prev));
@@ -242,102 +227,77 @@ export function BuilderApp() {
   );
 
   return (
-    <>
-      <AppSidebar
-        brandEyebrow="TOKIOTOURS"
-        brandTitle="Builder"
-        expandOnHover
-      />
-      <div className={`${APP_SIDEBAR_RAIL_PAD} min-h-screen bg-transparent`}>
-        <div className="builder-theme relative min-h-screen bg-transparent text-white [color-scheme:dark]">
-          <MobileTopChrome
-            brandTitle="Builder"
-            ctaHref="/builder/itinerary"
-            ctaLabel="Itinerary"
-          />
+    <div className="min-h-screen bg-transparent">
+      <div className="builder-theme relative min-h-screen bg-transparent text-white [color-scheme:dark]">
+        <MobileTopChrome
+          brandTitle="Builder"
+          ctaHref="/builder/itinerary"
+          ctaLabel="Itinerary"
+        />
 
-          <div className="relative bg-transparent">
-            <BuilderHero branding={config?.branding ?? null} />
+        <div className="relative bg-transparent">
+          <BuilderHero branding={config?.branding ?? null} />
 
-            {/* Transparent overlap — sits in the soft gradient (no solid edge / hard cut) */}
-            <div className="relative z-20 -mt-20 w-full bg-transparent sm:-mt-28">
-              <div className="px-3 pb-8 sm:px-4">
-                <div className="tokio-glass-sheet mx-auto max-w-3xl overflow-visible rounded-t-3xl border border-white/10">
-                  <div className="overflow-hidden rounded-t-3xl px-5 py-5 sm:px-6">
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="min-w-0">
-                        <p className="text-[10px] font-bold uppercase tracking-wider text-[#F29727]">
-                          Your Trip To
-                        </p>
-                        <h2 className="-mt-0.5 font-display text-[1.93rem] font-black text-white sm:text-[2.21rem]">
-                          JAPAN
-                        </h2>
-                      </div>
-                      <div className="shrink-0 space-y-0.5 text-right">
-                        <p className="text-sm font-bold tracking-wide text-white sm:text-base">
-                          {guestBadge.name}
-                        </p>
-                        {guestBadge.email ? (
-                          <p className="max-w-[14rem] truncate text-xs font-semibold text-[#075473] sm:max-w-[18rem]">
-                            {guestBadge.email}
-                          </p>
-                        ) : null}
-                      </div>
-                    </div>
-                    <div className="mt-3 flex w-full items-stretch gap-2">
-                      <div className="min-w-0 flex-1">
-                        <BookingRefBadge
-                          tempBookingRef={state.tempBookingRef}
-                          confirmedBookingRef={state.confirmedBookingRef}
-                          bookingStatus={state.bookingStatus}
-                        />
-                      </div>
-                      <NewBookingResetButton />
-                    </div>
-                  </div>
-
-                  <div className="px-0 pb-40 pt-0">
-                    {loading ? (
-                      <p className="mx-4 rounded-2xl border border-[#2C2C2E] bg-[#121212]/70 p-8 text-center text-sm text-zinc-400 sm:mx-6">
-                        Loading your trip builder…
+          {/* Transparent overlap — sits in the soft gradient (no solid edge / hard cut) */}
+          <div className="relative z-20 -mt-20 w-full bg-transparent sm:-mt-28">
+            <div className="px-3 pb-8 sm:px-4">
+              <div className="tokio-glass-sheet mx-auto max-w-3xl overflow-visible rounded-t-3xl border border-white/10">
+                <div className="overflow-hidden rounded-t-3xl px-5 py-5 sm:px-6">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="min-w-0">
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-[#F29727]">
+                        Your Trip To
                       </p>
-                    ) : error ? (
-                      <div className="mx-4 rounded-2xl border border-red-900/60 bg-[#121212] p-6 text-sm text-red-300 sm:mx-6">
-                        <p className="font-semibold">PocketBase unavailable</p>
-                        <p className="mt-2 text-zinc-400">{error}</p>
-                      </div>
-                    ) : config ? (
-                      <BuilderMView
-                        key={state.tempBookingRef || "draft"}
-                        config={config}
-                        onAccommodationsLoaded={handleAccommodationsLoaded}
-                      />
-                    ) : null}
+                      <h2 className="-mt-0.5 font-display text-[1.93rem] font-black text-white sm:text-[2.21rem]">
+                        JAPAN
+                      </h2>
+                    </div>
+                    <div className="shrink-0 space-y-0.5 text-right">
+                      <p className="text-sm font-bold tracking-wide text-white sm:text-base">
+                        {guestBadge.name}
+                      </p>
+                      {guestBadge.email ? (
+                        <p className="max-w-[14rem] truncate text-xs font-semibold text-[#075473] sm:max-w-[18rem]">
+                          {guestBadge.email}
+                        </p>
+                      ) : null}
+                    </div>
                   </div>
+                  <div className="mt-3 flex w-full items-stretch gap-2">
+                    <div className="min-w-0 flex-1">
+                      <BookingRefBadge
+                        tempBookingRef={state.tempBookingRef}
+                        confirmedBookingRef={state.confirmedBookingRef}
+                        bookingStatus={state.bookingStatus}
+                      />
+                    </div>
+                    <NewBookingResetButton />
+                  </div>
+                </div>
+
+                <div className="px-0 pb-40 pt-0">
+                  {loading ? (
+                    <p className="mx-4 rounded-2xl border border-[#2C2C2E] bg-[#121212]/70 p-8 text-center text-sm text-zinc-400 sm:mx-6">
+                      Loading your trip builder…
+                    </p>
+                  ) : error ? (
+                    <div className="mx-4 rounded-2xl border border-red-900/60 bg-[#121212] p-6 text-sm text-red-300 sm:mx-6">
+                      <p className="font-semibold">PocketBase unavailable</p>
+                      <p className="mt-2 text-zinc-400">{error}</p>
+                    </div>
+                  ) : config ? (
+                    <BuilderMView
+                      key={state.tempBookingRef || "draft"}
+                      config={config}
+                      onAccommodationsLoaded={handleAccommodationsLoaded}
+                    />
+                  ) : null}
                 </div>
               </div>
             </div>
-
-            <BottomNav />
           </div>
-
-          <ManageBookingModal
-            open={manageOpen}
-            onClose={() => setManageOpen(false)}
-            onSuccess={(ref) => {
-              setToast(`Itinerary ${ref} loaded successfully`);
-            }}
-          />
-          {toast ? (
-            <div
-              role="status"
-              className="fixed bottom-[7.5rem] left-1/2 z-[110] w-[min(92vw,28rem)] -translate-x-1/2 rounded-xl border border-[#075473]/50 bg-[#1a1510] px-4 py-3 text-center text-sm text-[#F3D9C4] shadow-lg md:bottom-28"
-            >
-              {toast}
-            </div>
-          ) : null}
         </div>
       </div>
-    </>
+    </div>
   );
 }

@@ -79,6 +79,7 @@ export function CityFocusModal({
         onClose={onClose}
         title="City Focus"
         mounted={mounted}
+        maxWidth="max-w-2xl"
       >
         <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
           {cities.map((city) => {

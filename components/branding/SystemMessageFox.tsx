@@ -2,6 +2,7 @@
 
 import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   useSystemMessageStore,
   type SystemMessageTone,
@@ -10,8 +11,9 @@ import {
 const CHAR_SPLIT = 48;
 
 /**
- * Fox-peek + comic speech bubble(s) — sharp pointy tail toward the fox.
- * Long copy splits into two bubbles; duration stays readable.
+ * Fox-peek + stroked speech text (no comic bubble).
+ * Long copy splits into two pops; duration stays readable.
+ * Portaled to body so desktop AppNavDock (z-40) cannot cover it.
  */
 const FOX_SRC_LEFT = "/brand/fox-peek.webp";
 const FOX_SRC_RIGHT = "/brand/fox-peek-right.png";
@@ -19,6 +21,7 @@ const FOX_SRC_RIGHT = "/brand/fox-peek-right.png";
 export function SystemMessageFox() {
   const message = useSystemMessageStore((s) => s.message);
   const dismiss = useSystemMessageStore((s) => s.dismiss);
+  const [mounted, setMounted] = useState(false);
 
   const parts = useMemo(
     () => (message ? splitSpeech(message.text) : []),
@@ -30,6 +33,10 @@ export function SystemMessageFox() {
     message?.foxSrc ||
     (message?.side === "right" ? FOX_SRC_RIGHT : FOX_SRC_LEFT);
   const side = message?.side ?? "left";
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Warm fox images as soon as the shell mounts (don't wait for first tip)
   useEffect(() => {
@@ -45,26 +52,32 @@ export function SystemMessageFox() {
 
   useEffect(() => {
     if (!message || parts.length === 0) return;
-    const sliceMs = Math.max(
+    // Second bubble pops in quickly; last bubble still holds long enough to read
+    const betweenBubblesMs = 500;
+    const holdLastMs = Math.max(
       3000,
       Math.floor(message.durationMs / parts.length)
     );
     if (partIndex < parts.length - 1) {
-      const t = window.setTimeout(() => setPartIndex((i) => i + 1), sliceMs);
+      const t = window.setTimeout(
+        () => setPartIndex((i) => i + 1),
+        betweenBubblesMs
+      );
       return () => window.clearTimeout(t);
     }
-    const t = window.setTimeout(() => dismiss(), sliceMs);
+    const t = window.setTimeout(() => dismiss(), holdLastMs);
     return () => window.clearTimeout(t);
   }, [message, parts.length, partIndex, dismiss]);
 
   const visibleParts = parts.slice(0, partIndex + 1);
   const tone = message?.tone ?? "info";
+  // Clear AppNavDock w-16 on sm+ (left); keep flush on mobile
   const shellClass =
     side === "right"
       ? "pointer-events-none fixed bottom-[5.75rem] right-0 z-[95] w-[min(62vw,18.85rem)] max-w-[18.85rem] sm:bottom-28 sm:w-[min(55vw,19.5rem)]"
-      : "pointer-events-none fixed bottom-[5.75rem] left-0 z-[95] w-[min(62vw,18.85rem)] max-w-[18.85rem] sm:bottom-28 sm:w-[min(55vw,19.5rem)]";
+      : "pointer-events-none fixed bottom-[5.75rem] left-0 z-[95] w-[min(62vw,18.85rem)] max-w-[18.85rem] sm:bottom-28 sm:left-16 sm:w-[min(55vw,19.5rem)]";
 
-  return (
+  const node = (
     <div className={shellClass} aria-live="polite">
       <AnimatePresence mode="wait">
         {message ? (
@@ -87,7 +100,6 @@ export function SystemMessageFox() {
             >
               <AnimatePresence initial={false}>
                 {visibleParts.map((text, i) => {
-                  const isLast = i === visibleParts.length - 1;
                   return (
                     <motion.button
                       key={`${message.id}-p${i}`}
@@ -105,9 +117,7 @@ export function SystemMessageFox() {
                       className="pointer-events-auto relative max-w-full cursor-pointer text-left"
                       aria-label={text}
                     >
-                      <ComicBubble tone={tone} showTail={isLast} side={side}>
-                        {text}
-                      </ComicBubble>
+                      <FoxStrokeSpeech tone={tone}>{text}</FoxStrokeSpeech>
                     </motion.button>
                   );
                 })}
@@ -142,79 +152,42 @@ export function SystemMessageFox() {
       </AnimatePresence>
     </div>
   );
+
+  if (!mounted || typeof document === "undefined") return null;
+  return createPortal(node, document.body);
 }
 
-function ComicBubble({
+function FoxStrokeSpeech({
   children,
   tone,
-  showTail,
-  side = "left",
 }: {
   children: string;
   tone: SystemMessageTone;
-  showTail: boolean;
-  side?: "left" | "right";
 }) {
-  const { fill, stroke, ring } = toneColors(tone);
+  const fill = toneFill(tone);
   const lines = wrapWordsPerLine(children, 4);
 
   return (
-    <div className="relative inline-block max-w-full drop-shadow-[0_8px_18px_rgba(0,0,0,0.45)]">
-      {/* Angular comic body — tight padding, hugs text */}
-      <div
-        className="relative px-3.5 py-2"
-        style={{
-          backgroundColor: fill,
-          border: `2px solid ${stroke}`,
-          borderRadius: "2px",
-          boxShadow: `inset 0 0 0 0.75px ${ring}`,
-        }}
-      >
-        <p className="whitespace-pre-line text-[1rem] font-bold leading-snug tracking-wide text-[#1a1510]">
-          {lines.join("\n")}
-        </p>
-      </div>
-
-      {/* Separate pointy tip — gap below the box, not attached to the border */}
-      {showTail ? (
-        <div
-          className={`mt-2 flex ${
-            side === "right" ? "justify-end pr-5" : "justify-start pl-5"
-          }`}
-          aria-hidden
-        >
-          <svg className="h-[14px] w-[21px]" viewBox="0 0 22 16">
-            <path
-              d={
-                side === "right"
-                  ? "M19 0 L21 15 L4 2.5 Z"
-                  : "M3 0 L1 15 L18 2.5 Z"
-              }
-              fill={fill}
-              stroke={stroke}
-              strokeWidth="1.6"
-              strokeLinejoin="miter"
-              strokeMiterlimit={8}
-            />
-          </svg>
-        </div>
-      ) : null}
-    </div>
+    <p
+      className="relative max-w-full whitespace-pre-line text-left text-[1.05rem] font-black leading-snug tracking-wide"
+      style={{
+        fontFamily: 'Verdana, Geneva, sans-serif',
+        color: fill,
+        WebkitTextStroke: "8px #ffffff",
+        paintOrder: "stroke fill",
+        textShadow:
+          "0 2px 0 rgba(255,255,255,0.95), 0 4px 12px rgba(0,0,0,0.45)",
+      }}
+    >
+      {lines.join("\n")}
+    </p>
   );
 }
 
-function toneColors(tone: SystemMessageTone): {
-  fill: string;
-  stroke: string;
-  ring: string;
-} {
-  if (tone === "error") {
-    return { fill: "#FFF5F7", stroke: "#E60F43", ring: "rgba(230,15,67,0.35)" };
-  }
-  if (tone === "tip") {
-    return { fill: "#FFFBF0", stroke: "#F6A724", ring: "rgba(246,167,36,0.4)" };
-  }
-  return { fill: "#FFFFFF", stroke: "#1a1510", ring: "rgba(26,21,16,0.28)" };
+function toneFill(tone: SystemMessageTone): string {
+  if (tone === "error") return "#E60F43";
+  if (tone === "tip") return "#075473";
+  return "#1a1510";
 }
 
 /** Max 3–4 words per visual line inside a bubble. */

@@ -141,6 +141,8 @@ export function demandFromSingleDay(
     | "guidePreference"
     | "selectedTransportProducts"
     | "tourHours"
+    | "suicaNeeded"
+    | "guestHasICCard"
   >
 ): OpsDemandFlags {
   const transit = String(state.preferredMovement || "").toLowerCase();
@@ -156,15 +158,11 @@ export function demandFromSingleDay(
   );
   if (expLines.length > 0) ticketLines.push(...expLines);
 
-  const ticketsNeeded =
-    ticketLines.length > 0 ||
-    transit.includes("suica") ||
-    transit.includes("pasmo") ||
-    transit.includes("ticket") ||
-    transit.includes("public") ||
-    transit.includes("rail") ||
-    transit.includes("train") ||
-    transit.includes("subway");
+  const prepareSuica =
+    Boolean(state.suicaNeeded) ||
+    (transit.includes("subway") && state.guestHasICCard === false);
+
+  const ticketsNeeded = ticketLines.length > 0 || prepareSuica;
 
   const driverNeeded =
     transit.includes("private") ||

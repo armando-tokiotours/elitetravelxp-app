@@ -4,40 +4,85 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, RotateCcw } from "lucide-react";
 import { useBuilderStore } from "@/store/useBuilderStore";
+import { useBuilderEStore } from "@/store/useBuilderEStore";
+import { useItineraryStore } from "@/store/useItineraryStore";
+import { usePreBuilderStore } from "@/store/usePreBuilderStore";
 import { activeBookingRef } from "@/utils/pnr";
 import { ResetBookingModal } from "@/components/builder/modals/ResetBookingModal";
 import { performFullBookingReset } from "@/lib/useBookingSync";
+import { showSystemMessage } from "@/store/useSystemMessageStore";
 
 type NewBookingResetVariant = "icon" | "nav";
+type NewBookingResetScope = "full" | "builder-e";
 
 /**
- * Restart control: purge booking state, mint a fresh JPN- PNR,
- * email Manage Booking access link (when email known), then return home.
+ * Restart control: purge booking state, mint a fresh JPN- PNR.
  *
- * - `icon` — compact square (builder headers)
- * - `nav` — Section 1 hero action bar (“New Booking”)
+ * - `full` — Multiday / Single-Day wipe + return home
+ * - `builder-e` — clear Builder E cart/draft; optionally keep guest
  */
 export function NewBookingResetButton({
   variant = "icon",
+  scope = "full",
 }: {
   variant?: NewBookingResetVariant;
+  scope?: NewBookingResetScope;
 }) {
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const router = useRouter();
+
   const tempBookingRef = useBuilderStore((s) => s.tempBookingRef);
   const confirmedBookingRef = useBuilderStore((s) => s.confirmedBookingRef);
   const bookingStatus = useBuilderStore((s) => s.bookingStatus);
 
-  const bookingRef = activeBookingRef({
-    tempBookingRef,
-    confirmedBookingRef,
-    bookingStatus,
-  });
+  const builderERef = useBuilderEStore((s) => s.bookingRef);
+  const builderEName = useBuilderEStore((s) => s.guestName);
+  const builderEEmail = useBuilderEStore((s) => s.guestEmail);
+  const resetBuilderE = useBuilderEStore((s) => s.reset);
 
-  const handleConfirm = async () => {
+  const itName = useItineraryStore((s) => s.clientName);
+  const itEmail = useItineraryStore((s) => s.clientEmail);
+  const preName = usePreBuilderStore((s) => s.fullName);
+  const preEmail = usePreBuilderStore((s) => s.email);
+
+  const bookingRef =
+    scope === "builder-e"
+      ? builderERef
+      : activeBookingRef({
+          tempBookingRef,
+          confirmedBookingRef,
+          bookingStatus,
+        });
+
+  const guestName =
+    scope === "builder-e"
+      ? builderEName || itName || preName || ""
+      : itName || preName || "";
+  const guestEmail =
+    scope === "builder-e"
+      ? builderEEmail || itEmail || preEmail || ""
+      : itEmail || preEmail || "";
+
+  const handleConfirm = async (keepSameGuest: boolean) => {
     setBusy(true);
     try {
+      if (scope === "builder-e") {
+        const prev = builderERef || "draft";
+        resetBuilderE({ keepGuest: keepSameGuest });
+        setOpen(false);
+        showSystemMessage({
+          text: keepSameGuest
+            ? `New request started · previous draft ${prev} deleted (not saved). Same guest kept.`
+            : `New request started · previous draft ${prev} deleted (not saved).`,
+          tone: "info",
+        });
+        if (typeof window !== "undefined") {
+          window.scrollTo({ top: 0, behavior: "smooth" });
+        }
+        return;
+      }
+
       await performFullBookingReset();
       setOpen(false);
       if (typeof window !== "undefined") {
@@ -59,8 +104,8 @@ export function NewBookingResetButton({
     <>
       <button
         type="button"
-        aria-label="New booking"
-        title="New booking"
+        aria-label="New request"
+        title="New request"
         disabled={busy}
         onClick={() => setOpen(true)}
         className={variant === "nav" ? navBtn : iconBtn}
@@ -82,8 +127,10 @@ export function NewBookingResetButton({
         open={open}
         bookingRef={bookingRef}
         busy={busy}
+        guestName={guestName}
+        guestEmail={guestEmail}
         onClose={() => (!busy ? setOpen(false) : undefined)}
-        onConfirm={() => void handleConfirm()}
+        onConfirm={(keepSameGuest) => void handleConfirm(keepSameGuest)}
       />
     </>
   );

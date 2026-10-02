@@ -13,7 +13,7 @@ import type { BuilderState } from "@/store/useBuilderStore";
 import type { SingleDayBuilderState } from "@/store/useSingleDayBuilderStore";
 import { calculateCityDateRanges } from "@/lib/dateCascade";
 
-export type BookingLeadType = "multi_day" | "single_day";
+export type BookingLeadType = "multi_day" | "single_day" | "experience_only";
 
 export type BookingLeadStatus =
   | "draft"
@@ -86,6 +86,10 @@ export interface MultiDaySelections {
   guestHasJRPass?: boolean | null;
   guestHasICCard?: boolean | null;
   guestNeedsTransitHelp?: boolean | null;
+  /** Pre-quiz travel style id (vip_bespoke / premium_comfort / classic_explorer) */
+  preEliteTravelStyle?: string | null;
+  /** Pre-quiz interest ids */
+  preEliteInterests?: string[];
   /** In-city transport mode per stay city */
   localTransitByCity?: Array<{
     cityId: string;
@@ -113,6 +117,9 @@ export interface SingleDaySelections {
   guidePreference?: string;
   selectedExperienceIds: string[];
   transitOption?: string;
+  /** subway Suica prepare + preload € / guest */
+  suicaNeeded?: boolean;
+  suicaValueEur?: number;
   tourHours?: number;
   meetingPointName?: string;
   meetingPointAddress?: string;
@@ -122,9 +129,18 @@ export interface SingleDaySelections {
   preferredTourLanguage?: string;
 }
 
+/** Builder E micro-service payload (DRIVER / EXPERIENCE / TRANSIT). */
+export type ExperienceOnlySelections = Record<string, unknown> & {
+  _v?: number;
+  source?: string;
+  booking_type?: string;
+  category?: string | null;
+};
+
 export type BookingLeadSelections =
   | MultiDaySelections
-  | SingleDaySelections;
+  | SingleDaySelections
+  | ExperienceOnlySelections;
 
 export interface BookingsAndLeadsUpsertInput {
   bookingRef: string;
@@ -197,7 +213,32 @@ function syncOpsHubFromBal(opts: {
   tourDate?: string | null;
   durationDays?: number | null;
   guests?: BookingLeadGuests | null;
+  estimatedTotalEur?: number | null;
+  selections?: BookingLeadSelections | null;
 }): void {
+  const fromSel =
+    opts.selections && typeof opts.selections === "object"
+      ? (() => {
+          const s = opts.selections as Record<string, unknown>;
+          const quote =
+            s.quote && typeof s.quote === "object"
+              ? (s.quote as Record<string, unknown>)
+              : null;
+          const n = Number(
+            s.quote_max ??
+              s.quoteMax ??
+              s.estimated_total ??
+              s.estimatedTotal ??
+              quote?.max ??
+              quote?.totalEur ??
+              0
+          );
+          return Number.isFinite(n) && n > 0 ? Math.round(n) : 0;
+        })()
+      : 0;
+  const estimated =
+    Math.max(0, Math.round(Number(opts.estimatedTotalEur) || 0)) || fromSel;
+
   void import("@/lib/opsHub")
     .then(({ upsertOpsHubFromDirect, formatGuestSummary }) =>
       upsertOpsHubFromDirect({
@@ -208,6 +249,7 @@ function syncOpsHubFromBal(opts: {
         tourDate: opts.tourDate,
         durationDays: opts.durationDays,
         guestSummary: formatGuestSummary(opts.guests),
+        estimatedTotalEur: estimated > 0 ? estimated : null,
         markUnread: true,
       })
     )
@@ -240,6 +282,8 @@ export function buildMultiDaySelections(
     | "guestHasJRPass"
     | "guestHasICCard"
     | "guestNeedsTransitHelp"
+    | "preEliteTravelStyle"
+    | "preEliteInterests"
     | "chauffeurSelections"
     | "selectedTransportProducts"
   >,
@@ -429,6 +473,10 @@ export function buildMultiDaySelections(
     guestHasJRPass: state.guestHasJRPass ?? null,
     guestHasICCard: state.guestHasICCard ?? null,
     guestNeedsTransitHelp: state.guestNeedsTransitHelp ?? null,
+    preEliteTravelStyle: state.preEliteTravelStyle ?? null,
+    preEliteInterests: Array.isArray(state.preEliteInterests)
+      ? [...state.preEliteInterests]
+      : [],
   };
 }
 
@@ -442,6 +490,8 @@ export function buildSingleDaySelections(
     | "guidePreference"
     | "selectedExperiences"
     | "tourHours"
+    | "suicaNeeded"
+    | "suicaValueEur"
   > & {
     cityId?: string;
     transitOption?: string;
@@ -467,6 +517,8 @@ export function buildSingleDaySelections(
       state.transitOption ||
       state.preferredMovement ||
       state.guidePreference,
+    suicaNeeded: Boolean(state.suicaNeeded),
+    suicaValueEur: Math.max(0, Number(state.suicaValueEur) || 0),
     tourHours: state.tourHours,
     meetingPointName:
       state.meetingPointName || state.meetingPoint || undefined,
@@ -670,6 +722,7 @@ export async function upsertBookingsAndLeads(
         tourDate: tourDateRaw || null,
         durationDays: durationNum || null,
         guests,
+        selections: selectionsPayload,
       });
       return { ok: true, id: updated.id, created: false };
     }
@@ -695,6 +748,7 @@ export async function upsertBookingsAndLeads(
       tourDate: tourDateRaw || null,
       durationDays: durationNum || null,
       guests,
+      selections: selectionsPayload,
     });
     return { ok: true, id: created.id, created: true };
   } catch (err) {
@@ -1019,6 +1073,17 @@ export function expandSingleDaySelectionsToState(
     tourHours: sel.tourHours || record.duration_value || 6,
     travelPace: sel.pace ?? null,
     guidePreference: sel.guidePreference || "private_guide",
+    preferredMovement:
+      sel.transitOption === "walk" ||
+      sel.transitOption === "subway" ||
+      sel.transitOption === "private_driver"
+        ? sel.transitOption
+        : null,
+    suicaNeeded: Boolean(sel.suicaNeeded),
+    suicaValueEur:
+      typeof sel.suicaValueEur === "number" && sel.suicaValueEur > 0
+        ? sel.suicaValueEur
+        : 15,
     selectedExperiences: (sel.selectedExperienceIds || []).map((tourId) => ({
       tourId,
       title: "",

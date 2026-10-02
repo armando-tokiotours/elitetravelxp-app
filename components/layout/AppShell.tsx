@@ -3,19 +3,8 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
-import { Ticket } from "lucide-react";
 import { ManageBookingModal } from "@/components/modals/ManageBookingModal";
 import { BRAND_LOGO_ICON } from "@/lib/brand";
-
-const LINKS = [
-  { href: "/", label: "Home" },
-  { href: "/pre-elite-builder", label: "Pre-Elite Qualification" },
-  { href: "/builder", label: "Trip Builder" },
-  { href: "/discover", label: "Discover Experiences" },
-  { href: "/builder/itinerary", label: "My Saved Itineraries" },
-  { href: "/faq", label: "FAQ" },
-  { href: "/policies", label: "Terms & Policies" },
-] as const;
 
 export function AppShell({
   children,
@@ -223,6 +212,26 @@ export function AppShell({
             </button>
           </div>
           <nav className="flex flex-1 flex-col gap-1 p-3">
+            <Link
+              href="/"
+              className={`rounded-xl px-4 py-3.5 text-sm tracking-wide transition ${
+                pathname === "/"
+                  ? "bg-[#075473]/20 text-[#075473]"
+                  : "text-white/85 hover:bg-white/8"
+              }`}
+            >
+              Home
+            </Link>
+            <Link
+              href="/builder-e"
+              className={`rounded-xl px-4 py-3.5 text-sm tracking-wide transition ${
+                pathname.startsWith("/builder-e")
+                  ? "bg-[#075473]/20 text-[#075473]"
+                  : "text-white/85 hover:bg-white/8"
+              }`}
+            >
+              Builder E
+            </Link>
             <button
               type="button"
               onClick={() => {
@@ -233,25 +242,27 @@ export function AppShell({
             >
               Manage Booking
             </button>
-            {LINKS.map((link) => {
-              const active =
-                link.href === "/builder"
-                  ? pathname === "/builder"
-                  : pathname.startsWith(link.href);
-              return (
-                <Link
-                  key={link.href}
-                  href={link.href}
-                  className={`rounded-xl px-4 py-3.5 text-sm tracking-wide transition ${
-                    active
-                      ? "bg-[#075473]/20 text-[#075473]"
-                      : "text-white/85 hover:bg-white/8"
-                  }`}
-                >
-                  {link.label}
-                </Link>
-              );
-            })}
+            <Link
+              href="/builder/itinerary"
+              className={`rounded-xl px-4 py-3.5 text-sm tracking-wide transition ${
+                pathname.startsWith("/builder/itinerary") ||
+                pathname.startsWith("/builder-single/itinerary")
+                  ? "bg-[#075473]/20 text-[#075473]"
+                  : "text-white/85 hover:bg-white/8"
+              }`}
+            >
+              Itinerary
+            </Link>
+            <Link
+              href="/faq"
+              className={`rounded-xl px-4 py-3.5 text-sm tracking-wide transition ${
+                pathname.startsWith("/faq")
+                  ? "bg-[#075473]/20 text-[#075473]"
+                  : "text-white/85 hover:bg-white/8"
+              }`}
+            >
+              FAQ &amp; Transport Guide
+            </Link>
           </nav>
           <p className="border-t border-white/10 px-5 py-4 text-xs text-white/40">
             tokiotours-app.com

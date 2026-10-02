@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type PocketBase from "pocketbase";
 import { formatPbError } from "@/lib/pocketbase/admin-schema";
 import {
@@ -23,15 +23,20 @@ import {
   loadOpsGuestRequirements,
   type OpsGuestRequirements,
 } from "@/lib/opsGuestRequirements";
-import { CANONICAL_STATUSES } from "@/lib/bookingStatus";
 import {
   assertStatusAllowedWithPayment,
   coerceStatusWithPayment,
   statusRequiresPayment,
 } from "@/lib/paymentGate";
-import { GuideAssignPayoutPanel } from "@/components/staff/GuideAssignPayoutPanel";
+import { GuideDispatchTab } from "@/components/staff/GuideDispatchTab";
 import { OpsActivityLogPanel } from "@/components/staff/OpsActivityLogPanel";
-import { OpsVendorDispatchPanel } from "@/components/staff/OpsVendorDispatchPanel";
+import { OpsPaymentStatusBadges } from "@/components/staff/OpsPaymentStatusBadges";
+import { GuestRequirementsTab } from "@/components/staff/GuestRequirementsTab";
+import {
+  BookingStatusTab,
+  type BookingStatusSavePayload,
+} from "@/components/staff/BookingStatusTab";
+import { TicketVoucherUploadPanel } from "@/components/staff/TicketVoucherUploadPanel";
 import {
   OpsStatusBadge,
   type OpsHubRow,
@@ -166,34 +171,6 @@ function StatusPill({
   );
 }
 
-function Field({
-  label,
-  value,
-}: {
-  label: string;
-  value: string;
-}) {
-  return (
-    <div>
-      <p className="text-[10px] font-bold tracking-wider text-zinc-600 uppercase">
-        {label}
-      </p>
-      <p className="mt-0.5 text-sm text-zinc-200">{value || "—"}</p>
-    </div>
-  );
-}
-
-function PassBadge({ value }: { value: boolean | null }) {
-  if (value === true) {
-    return <span className="font-semibold text-emerald-400">✓ Yes</span>;
-  }
-  if (value === false) {
-    return <span className="font-semibold text-zinc-400">✗ No</span>;
-  }
-  return <span className="font-semibold text-zinc-500">Unset</span>;
-}
-
-/** Format PB datetime for inspector meta (local-ish, compact). */
 function formatLastModified(raw: string | undefined | null): string {
   if (!raw) return "—";
   const d = new Date(raw);
@@ -218,7 +195,7 @@ function TabPanel({
 }) {
   return (
     <div className="space-y-4">
-      <h3 className="text-[11px] font-bold tracking-[0.14em] text-zinc-500 uppercase">
+      <h3 className="font-sans text-[11px] font-semibold tracking-[0.14em] text-zinc-500 uppercase">
         {title}
       </h3>
       {children}
@@ -286,6 +263,9 @@ export function OpsBookingInspector({
   const [reqsError, setReqsError] = useState<string | null>(null);
   const [saveVersion, setSaveVersion] = useState<number | null>(null);
   const [balUpdated, setBalUpdated] = useState<string | null>(null);
+  const rowRef = useRef(row);
+  rowRef.current = row;
+  const reqsPnrRef = useRef<string>("");
 
   useEffect(() => {
     setActiveTab("requirements");
@@ -344,47 +324,56 @@ export function OpsBookingInspector({
     setPickupNotes(row.pickup_notes || "");
   }, [row, dispatch, tickets]);
 
+  // Guest requirements — key on PNR only so ops_hub realtime/heal updates
+  // do not wipe the tab back to "Loading booking context…"
   useEffect(() => {
     let cancelled = false;
-    setReqs(null);
-    setReqsError(null);
+    const pnr = String(row.pnr || "")
+      .trim()
+      .toUpperCase();
+    if (!pnr) {
+      setReqs(null);
+      setReqsError(null);
+      reqsPnrRef.current = "";
+      return;
+    }
+    const pnrChanged = reqsPnrRef.current !== pnr;
+    reqsPnrRef.current = pnr;
+    if (pnrChanged) {
+      setReqs(null);
+      setReqsError(null);
+    }
     void (async () => {
       try {
-        const data = await loadOpsGuestRequirements(pb, row);
-        if (!cancelled) {
-          setReqs(data);
-          if (
-            data.ticketsNeededFromCatalog &&
-            row.tickets_needed !== true
-          ) {
-            await onReloadPockets();
-          }
+        const data = await loadOpsGuestRequirements(pb, rowRef.current);
+        if (cancelled) return;
+        setReqs(data);
+        setReqsError(null);
+        if (
+          data.ticketsNeededFromCatalog &&
+          rowRef.current.tickets_needed !== true
+        ) {
+          // Fire-and-forget — do not block or clear reqs
+          void onReloadPockets();
         }
       } catch (e) {
-        if (!cancelled) setReqsError(formatPbError(e));
+        if (!cancelled) {
+          setReqsError(formatPbError(e));
+          setReqs(null);
+        }
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [pb, row, onReloadPockets]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- row snapshot via rowRef
+  }, [pb, row.pnr, onReloadPockets]);
 
   const guideStatus = normalizeGuideConfirmStatus(dispatch?.guide_mode, {
     boardVisible: Boolean(dispatch?.guide_board_visible),
     assignedGuideId: dispatch?.assigned_guide_id,
     guideResponse: dispatch?.guide_response,
   });
-  const guideLockedPending = guideStatus === "pending_guide_acceptance";
-  const guideConfirmed = guideStatus === "guide_confirmed";
-  const guideRefused = guideStatus === "refused";
-  const canSendGuide =
-    Boolean(guideId) &&
-    !guideLockedPending &&
-    !guideConfirmed &&
-    (!dispatch?.assigned_guide_id ||
-      guideRefused ||
-      guideId !== dispatch?.assigned_guide_id ||
-      guideStatus === "unassigned");
 
   const ticketBadge = useMemo(() => {
     const lines = Array.isArray(tickets?.ticket_lines)
@@ -482,19 +471,42 @@ export function OpsBookingInspector({
   const driverMode = String(dispatch?.driver_mode || "unassigned");
   const driverApplies = driverNeeded;
 
-  const saveGeneralStatus = () =>
+  const saveGeneralStatus = (payload?: BookingStatusSavePayload) =>
     onSave(
       `${row.id}:status`,
       async () => {
-        assertStatusAllowedWithPayment(status, paymentConfirmed);
-        const agent = agents.find((x) => x.id === agentId);
-        const nextStatus = coerceStatusWithPayment(status, paymentConfirmed);
+        const nextPayment =
+          payload?.paymentConfirmed ?? paymentConfirmed;
+        const nextStatusRaw = payload?.status ?? status;
+        const nextAgentId = payload?.assignedAgentId ?? agentId;
+        const nextTourPay =
+          payload?.tourPaymentStatus ??
+          (nextPayment
+            ? "FULLY_PAID"
+            : Boolean(row.concierge_fee_paid)
+              ? "FEE_PAID"
+              : "UNPAID");
+
+        assertStatusAllowedWithPayment(nextStatusRaw, nextPayment);
+        const agent = agents.find((x) => x.id === nextAgentId);
+        const nextStatus = coerceStatusWithPayment(
+          nextStatusRaw,
+          nextPayment
+        );
+
+        if (payload) {
+          setStatus(nextStatusRaw);
+          setPaymentConfirmed(nextPayment);
+          setAgentId(nextAgentId);
+        }
+
         await pb.collection("ops_hub").update(
           row.id,
           {
             status: nextStatus,
-            payment_confirmed: paymentConfirmed,
-            assigned_agent_id: agentId,
+            payment_confirmed: nextPayment,
+            tour_payment_status: nextTourPay,
+            assigned_agent_id: nextAgentId,
             assigned_agent:
               agent?.name || agent?.email || row.assigned_agent || "",
           },
@@ -511,18 +523,20 @@ export function OpsBookingInspector({
           );
         }
       },
-      "Booking status saved"
+      "Booking status & agent saved"
     );
 
-  const assignAndRequestGuide = () =>
+  const assignAndRequestGuide = (nextGuideId?: string) =>
     onSave(
       `${row.id}:guide-assign`,
       async () => {
-        if (!guideId) throw new Error("Select a guide first");
-        const g = guides.find((x) => x.id === guideId);
+        const id = String(nextGuideId || guideId || "").trim();
+        if (!id) throw new Error("Select a guide first");
+        const g = guides.find((x) => x.id === id);
+        setGuideId(id);
         await assignGuide(pb, {
           pnr: row.pnr,
-          staffId: guideId,
+          staffId: id,
           staffName: g?.name || g?.email || "",
           byStaffId: staffId || undefined,
         });
@@ -543,6 +557,20 @@ export function OpsBookingInspector({
         await onReloadPockets();
       },
       "Posted to open guide board"
+    );
+
+  const clearGuide = () =>
+    onSave(
+      `${row.id}:guide-clear`,
+      async () => {
+        await clearGuideAssignment(pb, {
+          pnr: row.pnr,
+          byStaffId: staffId || undefined,
+        });
+        setGuideId("");
+        await onReloadPockets();
+      },
+      "Guide cleared — pick another or post board"
     );
 
   const saveLogistics = () =>
@@ -642,11 +670,7 @@ export function OpsBookingInspector({
           {!headerCollapsed ? (
             <div className="mt-2.5 flex flex-wrap gap-2">
               <StatusPill label="Booking" value={bookingStatusLabel} tone="info" />
-              <StatusPill
-                label="Payment"
-                value={paymentConfirmed ? "Yes" : "No"}
-                tone={paymentConfirmed ? "ok" : "warn"}
-              />
+              <OpsPaymentStatusBadges row={row} className="gap-2" />
               <StatusPill
                 label="Guide"
                 value={guideConfirmStaffLabel(guideStatus)}
@@ -667,6 +691,7 @@ export function OpsBookingInspector({
           ) : (
             <div className="mt-2 flex flex-wrap gap-1.5">
               <OpsStatusBadge status={effectiveStatus} />
+              <OpsPaymentStatusBadges row={row} />
               <span className="rounded-md border border-amber-500/30 bg-amber-500/10 px-1.5 py-0.5 text-[9px] text-amber-300">
                 Guide: {guideConfirmStaffLabel(guideStatus)}
               </span>
@@ -713,552 +738,49 @@ export function OpsBookingInspector({
             ) : !reqs ? (
               <p className="text-xs text-zinc-500">Loading booking context…</p>
             ) : (
-              <div className="space-y-6">
-                {/* Itinerary overview — from already-loaded BAL selections */}
-                <div className="rounded-lg border border-white/10 bg-black/40 p-4">
-                  <h4 className="mb-3 font-godiva text-sm text-[#F6A724]">
-                    Itinerary Overview
-                  </h4>
-                  <div className="mb-4 grid grid-cols-3 gap-4 border-b border-white/10 pb-4">
-                    <div>
-                      <p className="text-[10px] font-bold tracking-wider text-zinc-600 uppercase">
-                        Total days
-                      </p>
-                      <p className="mt-0.5 text-sm font-semibold text-white">
-                        {reqs.totalDaysLabel}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-[10px] font-bold tracking-wider text-zinc-600 uppercase">
-                        Start date
-                      </p>
-                      <p className="mt-0.5 text-sm font-semibold text-white">
-                        {reqs.arrivalDateLabel}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-[10px] font-bold tracking-wider text-zinc-600 uppercase">
-                        Travel pace
-                      </p>
-                      <p className="mt-0.5 text-sm font-semibold capitalize text-white">
-                        {reqs.travelPaceLabel}
-                      </p>
-                    </div>
-                  </div>
-
-                  <p className="mb-4 text-[10px] font-bold tracking-[0.18em] text-zinc-500 uppercase">
-                    Route, Tours &amp; Daily Transport
-                  </p>
-                  <div className="relative ml-3 space-y-8 border-l-2 border-white/10 pl-6">
-                    {/* Arrival hub */}
-                    <div className="relative">
-                      <div className="absolute -left-[31px] top-1 h-3 w-3 rounded-full border-2 border-[#0A1017] bg-white" />
-                      <h4 className="mb-1 text-sm font-bold uppercase text-white">
-                        {reqs.routeTimeline.arrivalHubLabel} Arrival waypoint
-                      </h4>
-                      <p className="text-sm text-zinc-400">
-                        VIP Arrival Pickup: {reqs.routeTimeline.arrivalVipLabel}
-                      </p>
-                    </div>
-
-                    {/* City stays */}
-                    {reqs.routeTimeline.stays.length > 0 ? (
-                      reqs.routeTimeline.stays.map((loc, idx) => (
-                        <div
-                          key={`${loc.cityId}-${idx}-${loc.startDate || idx}`}
-                          className="relative"
-                        >
-                          <div className="absolute -left-[31px] top-1 h-3 w-3 rounded-full border-2 border-[#0A1017] bg-[#075473]" />
-                          <h4 className="text-lg font-bold text-white">
-                            {loc.cityName}{" "}
-                            <span className="ml-2 text-sm font-normal text-zinc-400">
-                              · {loc.nights} Night
-                              {loc.nights === 1 ? "" : "s"}
-                            </span>
-                          </h4>
-                          <p className="mb-1 text-sm text-[#F6A724]">
-                            {loc.dateLabel}
-                          </p>
-                          <p
-                            className={`mb-1 text-xs font-semibold ${
-                              loc.hotelArrangement === "tokiotours"
-                                ? "text-[#F6A724]"
-                                : loc.hotelArrangement === "self"
-                                  ? "text-zinc-300"
-                                  : "text-zinc-500"
-                            }`}
-                          >
-                            Hotel: {loc.hotelLabel}
-                          </p>
-                          <p className="mb-3 text-[11px] text-[#7ec8e3]">
-                            {loc.localTransitLabel}
-                          </p>
-                          <div className="rounded-md border border-white/5 bg-black/40 p-3 text-sm">
-                            <p className="mb-1 font-semibold text-zinc-300">
-                              {loc.incomingTitle}
-                            </p>
-                            <ul className="list-disc space-y-1 pl-4 text-zinc-500">
-                              {loc.incomingBullets.map((b) => (
-                                <li key={b}>{b}</li>
-                              ))}
-                            </ul>
-                          </div>
-
-                          {/* Day-by-day services & tours */}
-                          {loc.days?.length ? (
-                            <div className="mt-3 space-y-2">
-                              <p className="text-[10px] font-bold tracking-[0.14em] text-zinc-500 uppercase">
-                                Day services
-                              </p>
-                              {loc.days.map((day) => (
-                                <div
-                                  key={`${loc.cityId}-${day.dayIndex}-${day.date || "tbd"}`}
-                                  className="rounded-lg border border-white/5 bg-[#0D1117] p-3"
-                                >
-                                  <div className="mb-2 flex items-center justify-between gap-2">
-                                    <span className="text-xs font-bold text-zinc-400">
-                                      DAY {day.dayIndex}
-                                      {day.dateLabel ? ` · ${day.dateLabel}` : ""}
-                                    </span>
-                                    <div className="flex flex-wrap gap-1">
-                                      {day.hasCar ? (
-                                        <span className="rounded bg-white/10 px-2 py-0.5 text-[10px] text-zinc-300">
-                                          CAR
-                                        </span>
-                                      ) : null}
-                                      {day.hasGuide ? (
-                                        <span className="rounded bg-white/10 px-2 py-0.5 text-[10px] text-zinc-300">
-                                          GUIDE
-                                        </span>
-                                      ) : null}
-                                      {day.hasTickets ? (
-                                        <span className="rounded bg-[#F6A724]/20 px-2 py-0.5 text-[10px] font-bold text-[#F6A724]">
-                                          TICKETS
-                                        </span>
-                                      ) : null}
-                                    </div>
-                                  </div>
-                                  {day.tours.map((t) => (
-                                    <div
-                                      key={`${t.tourId}-${t.title}`}
-                                      className="mt-1 rounded border border-white/5 bg-black/40 px-2 py-1.5 text-xs text-white"
-                                    >
-                                      <p className="font-semibold">{t.title}</p>
-                                      <p className="text-[10px] text-zinc-500">
-                                        {[
-                                          t.language
-                                            ? `Lang ${t.language}`
-                                            : null,
-                                          t.hours
-                                            ? `${t.hours}h`
-                                            : null,
-                                        ]
-                                          .filter(Boolean)
-                                          .join(" · ") || "Booked experience"}
-                                      </p>
-                                    </div>
-                                  ))}
-                                  {day.tickets.map((t, i) => (
-                                    <div
-                                      key={`${t.title}-${i}`}
-                                      className="mt-1 rounded border border-dashed border-[#F6A724]/40 bg-black/40 p-2 text-xs"
-                                    >
-                                      <p className="font-bold text-white">
-                                        {t.title}
-                                      </p>
-                                      <p className="text-[10px] text-zinc-400">
-                                        {t.type}
-                                      </p>
-                                    </div>
-                                  ))}
-                                  {!day.tours.length &&
-                                  !day.tickets.length &&
-                                  !day.hasCar ? (
-                                    <p className="text-[11px] text-zinc-600 italic">
-                                      No activities flagged this day
-                                    </p>
-                                  ) : null}
-                                </div>
-                              ))}
-                            </div>
-                          ) : null}
-
-                          {loc.outgoingTitle ? (
-                            <div className="mt-3 rounded-md border border-[#075473]/40 bg-[#075473]/15 p-3 text-sm">
-                              <p className="mb-1 font-semibold text-[#7ec8e3]">
-                                {loc.outgoingTitle}
-                              </p>
-                              <ul className="list-disc space-y-1 pl-4 text-zinc-400">
-                                {(loc.outgoingBullets || []).map((b) => (
-                                  <li key={b}>{b}</li>
-                                ))}
-                              </ul>
-                            </div>
-                          ) : null}
-                        </div>
-                      ))
-                    ) : (
-                      <p className="text-sm italic text-zinc-500">
-                        No stay cities selected yet.
-                      </p>
-                    )}
-
-                    {/* Departure hub */}
-                    <div className="relative">
-                      <div className="absolute -left-[31px] top-1 h-3 w-3 rounded-full border-2 border-[#0A1017] bg-white" />
-                      <h4 className="mb-1 text-sm font-bold uppercase text-white">
-                        {reqs.routeTimeline.departureHubLabel} Departure
-                        waypoint
-                      </h4>
-                      <p className="text-sm text-zinc-400">
-                        Departure Drop-off:{" "}
-                        {reqs.routeTimeline.departureDropoffLabel}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Guest profile & contact */}
-                <div className="grid grid-cols-2 gap-4 rounded-lg border border-white/10 bg-black/40 p-4 md:grid-cols-4">
-                  <Field label="Guest name" value={reqs.guestName} />
-                  <Field label="Guest email" value={reqs.guestEmail} />
-                  <Field label="Phone / WhatsApp" value={reqs.guestPhone} />
-                  <div>
-                    <p className="text-[10px] font-bold tracking-wider text-zinc-600 uppercase">
-                      Party size
-                    </p>
-                    <p className="mt-0.5 text-sm font-semibold text-[#F6A724]">
-                      {reqs.adults} Adult{reqs.adults === 1 ? "" : "s"}
-                      {reqs.children > 0
-                        ? `, ${reqs.children} Child${
-                            reqs.children === 1 ? "" : "ren"
-                          }`
-                        : ""}
-                    </p>
-                  </div>
-                  <Field
-                    label="Language"
-                    value={
-                      langFlag
-                        ? `${langFlag} ${reqs.tourLanguage}`
-                        : reqs.tourLanguage
-                    }
-                  />
-                </div>
-
-                {/* Transit & passes */}
-                <div className="grid grid-cols-2 gap-4 rounded-lg border border-white/10 bg-black/40 p-4 md:grid-cols-4">
-                  <div>
-                    <p className="text-[10px] font-bold tracking-wider text-zinc-600 uppercase">
-                      JR Rail Pass
-                    </p>
-                    <p className="mt-0.5 text-sm">
-                      <PassBadge value={reqs.guestHasJRPass} />
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-[10px] font-bold tracking-wider text-zinc-600 uppercase">
-                      Suica / IC Card
-                    </p>
-                    <p className="mt-0.5 text-sm">
-                      <PassBadge value={reqs.guestHasICCard} />
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-[10px] font-bold tracking-wider text-zinc-600 uppercase">
-                      Transit assistance
-                    </p>
-                    <p className="mt-0.5 text-sm font-semibold text-white">
-                      {reqs.guestNeedsTransitHelp === true
-                        ? "Requested"
-                        : reqs.guestNeedsTransitHelp === false
-                          ? "None"
-                          : "Unset"}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-[10px] font-bold tracking-wider text-zinc-600 uppercase">
-                      Transport strategy
-                    </p>
-                    <p className="mt-0.5 text-sm font-semibold text-[#7ec8e3]">
-                      {reqs.transportStrategy || "Unset"}
-                    </p>
-                  </div>
-                </div>
-
-                {/* Existing tour / meeting / access */}
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <Field
-                    label="Tour / Experience"
-                    value={
-                      reqs.tourCode &&
-                      reqs.tourCode !== "—" &&
-                      !reqs.tourTitle.includes(reqs.tourCode)
-                        ? `${reqs.tourTitle} · ${reqs.tourCode}`
-                        : reqs.tourTitle
-                    }
-                  />
-                  <Field
-                    label="Tour language"
-                    value={
-                      langFlag
-                        ? `${langFlag} ${reqs.tourLanguage}`
-                        : reqs.tourLanguage
-                    }
-                  />
-                  <Field
-                    label="Meeting point"
-                    value={reqs.meetingPointName}
-                  />
-                  <Field
-                    label="Address"
-                    value={reqs.meetingPointAddress}
-                  />
-                  <Field label="Start time" value={reqs.startTime} />
-                  <Field label="Duration" value={reqs.durationLabel} />
-                  <Field
-                    label="Special mobility"
-                    value={reqs.specialMobility}
-                  />
-                  <Field label="Special notes" value={reqs.specialNotes} />
-                  {reqs.accessLines.length > 0 ? (
-                    <div className="sm:col-span-2">
-                      <p className="text-[10px] font-bold tracking-wider text-zinc-600 uppercase">
-                        Access / tickets required
-                      </p>
-                      <ul className="mt-1 space-y-1 text-sm text-zinc-200">
-                        {reqs.accessLines.map((line) => (
-                          <li key={line.tourId}>
-                            · {line.title} —{" "}
-                            <span className="text-[#7ec8e3]">{line.label}</span>
-                          </li>
-                        ))}
-                      </ul>
-                      {reqs.guestNeedsTransitHelp === true ? (
-                        <p className="mt-2 text-[11px] text-amber-300/90">
-                          Transit assistance requested — confirm passes &amp;
-                          day tickets above.
-                        </p>
-                      ) : null}
-                    </div>
-                  ) : (
-                    <Field
-                      label="Access / tickets required"
-                      value={
-                        reqs.guestNeedsTransitHelp === true
-                          ? "Transit assistance requested — list tickets with guest"
-                          : "None flagged"
-                      }
-                    />
-                  )}
-                </div>
-              </div>
+              <GuestRequirementsTab reqs={reqs} langFlag={langFlag} />
             )}
           </TabPanel>
         ) : null}
 
         {activeTab === "status" ? (
           <TabPanel title="Booking status">
-            <div className="grid gap-3 sm:grid-cols-2">
-              <label className="block text-[10px] font-bold tracking-wider text-zinc-500 uppercase">
-                Overall booking status
-                <select
-                  className="mt-1 w-full rounded-lg border border-zinc-700 bg-zinc-900 px-2 py-1.5 text-xs text-white"
-                  value={status}
-                  disabled={saving}
-                  onChange={(e) => setStatus(e.target.value)}
-                >
-                  {CANONICAL_STATUSES.map((s) => (
-                    <option
-                      key={s}
-                      value={s}
-                      disabled={
-                        !paymentConfirmed && statusRequiresPayment(s)
-                      }
-                    >
-                      {s}
-                      {!paymentConfirmed && statusRequiresPayment(s)
-                        ? " (needs payment)"
-                        : ""}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="block text-[10px] font-bold tracking-wider text-zinc-500 uppercase">
-                Payment confirmed
-                <select
-                  className="mt-1 w-full rounded-lg border border-zinc-700 bg-zinc-900 px-2 py-1.5 text-xs text-white"
-                  value={paymentConfirmed ? "yes" : "no"}
-                  disabled={saving}
-                  onChange={(e) =>
-                    setPaymentConfirmed(e.target.value === "yes")
-                  }
-                >
-                  <option value="no">No</option>
-                  <option value="yes">Yes</option>
-                </select>
-              </label>
-              {row.source === "agency" ? (
-                <p className="text-[10px] tracking-wider text-zinc-600 uppercase sm:col-span-2">
-                  Concierge · Ops (agency)
-                </p>
-              ) : (
-                <label className="block text-[10px] font-bold tracking-wider text-zinc-500 uppercase sm:col-span-2">
-                  Concierge agent
-                  <select
-                    className="mt-1 w-full rounded-lg border border-zinc-700 bg-zinc-900 px-2 py-1.5 text-xs text-white"
-                    value={agentId}
-                    disabled={saving}
-                    onChange={(e) => setAgentId(e.target.value)}
-                  >
-                    <option value="">—</option>
-                    {agents.map((a) => (
-                      <option key={a.id} value={a.id}>
-                        {a.name || a.email}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              )}
-            </div>
-            {!paymentConfirmed ? (
-              <p className="text-[11px] text-amber-400/90">
-                Golden rule: guest Day Services only show confirmed guide /
-                driver / ticket purchase after Payment = Yes. Ticketer cannot
-                mark purchased until then.
-              </p>
-            ) : null}
-            <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                disabled={saving}
-                className="rounded-lg bg-[#075473] px-3 py-1.5 text-[11px] font-semibold text-white disabled:opacity-40"
-                onClick={() => void saveGeneralStatus()}
-              >
-                {saving ? "Saving…" : "Save Booking Status"}
-              </button>
-            </div>
+            <BookingStatusTab
+              pb={pb}
+              row={row}
+              agents={agents}
+              saving={saving}
+              isAgency={row.source === "agency"}
+              onSave={(payload) => void saveGeneralStatus(payload)}
+            />
           </TabPanel>
         ) : null}
 
         {activeTab === "guide" ? (
           <TabPanel title="Guide dispatch & payout">
             <div
-              className={`mb-1 rounded-lg border p-3 text-center text-xs font-bold tracking-wide uppercase ${dispatchStrategy.style}`}
+              className={`mb-3 rounded-lg border p-3 text-center text-xs font-bold tracking-wide uppercase ${dispatchStrategy.style}`}
             >
               {dispatchStrategy.label}
             </div>
-            <p className="text-xs text-zinc-500">
-              Status:{" "}
-              <span className="text-zinc-300">
-                {guideConfirmStaffLabel(guideStatus)}
-              </span>
-              {dispatch?.assigned_guide
-                ? ` · ${dispatch.assigned_guide}`
-                : ""}
-            </p>
-            <div className="flex flex-wrap gap-2">
-              <select
-                className="min-w-[12rem] flex-1 rounded-lg border border-zinc-700 bg-zinc-950 px-2 py-1.5 text-xs"
-                value={guideId}
-                disabled={saving || guideLockedPending || guideConfirmed}
-                onChange={(e) => setGuideId(e.target.value)}
-              >
-                <option value="">Select guide…</option>
-                {guides.map((g) => (
-                  <option key={g.id} value={g.id}>
-                    {g.name || g.email}
-                  </option>
-                ))}
-              </select>
-              <button
-                type="button"
-                disabled={saving || !canSendGuide}
-                className="rounded-lg border border-[#075473]/50 bg-[#075473]/20 px-3 py-1.5 text-[11px] font-semibold text-[#7ec8e3] disabled:opacity-40"
-                onClick={() => void assignAndRequestGuide()}
-              >
-                Assign & Request Guide
-              </button>
-              <button
-                type="button"
-                disabled={saving || guideConfirmed}
-                className="rounded-lg border border-zinc-600 px-3 py-1.5 text-[11px] text-zinc-300 hover:text-white disabled:opacity-40"
-                onClick={() => void savePostGuideBoard()}
-              >
-                Save & Post to Open Board
-              </button>
-              {(guideLockedPending || guideRefused || guideConfirmed) && (
-                <button
-                  type="button"
-                  disabled={saving}
-                  className="rounded-lg border border-amber-600/50 px-3 py-1.5 text-[11px] text-amber-300 disabled:opacity-40"
-                  onClick={() =>
-                    void onSave(
-                      `${row.id}:guide-clear`,
-                      async () => {
-                        await clearGuideAssignment(pb, {
-                          pnr: row.pnr,
-                          byStaffId: staffId || undefined,
-                        });
-                        setGuideId("");
-                        await onReloadPockets();
-                      },
-                      "Guide cleared — pick another or post board"
-                    )
-                  }
-                >
-                  Clear / Reassign
-                </button>
-              )}
-            </div>
-            <p className="text-[11px] text-zinc-600">
-              1) Select guide · 2) Assign & Request Guide. While pending, Ops
-              waits for Accept/Refuse in /guide. If refused, Clear/Reassign or
-              post to open board.
-            </p>
-            <div className="border-t border-zinc-800 pt-4">
-              <p className="mb-2 text-[10px] font-bold tracking-wider text-zinc-500 uppercase">
-                Vendor dispatch links
-              </p>
-              <OpsVendorDispatchPanel
-                pb={pb}
-                row={row}
-                dispatch={dispatch}
-                tickets={tickets}
-                staffId={staffId}
-                staffName={staffName}
-                paymentConfirmed={paymentConfirmed}
-                onPaymentToggle={setPaymentConfirmed}
-                onHubPatched={(patch) => {
-                  if (patch.status) setStatus(String(patch.status));
-                  if (patch.payment_confirmed != null) {
-                    setPaymentConfirmed(Boolean(patch.payment_confirmed));
-                  }
-                }}
-              />
-            </div>
-            <div className="border-t border-zinc-800 pt-4">
-              <p className="mb-2 text-[10px] font-bold tracking-wider text-zinc-500 uppercase">
-                Guide payout snapshot
-              </p>
-              {showPayoutPanel && guideId ? (
-                <GuideAssignPayoutPanel
-                  pb={pb}
-                  pnr={row.pnr}
-                  staffGuideId={guideId}
-                />
-              ) : showPayoutPanel ? (
-                <p className="text-xs text-zinc-500">
-                  Select a guide above to set payout terms (fee source, hours,
-                  currency, margin).
-                </p>
-              ) : (
-                <p className="text-xs text-zinc-500">
-                  Payout / margin fields are owner-only. Use dispatch links above
-                  for vendors.
-                </p>
-              )}
-            </div>
+            <GuideDispatchTab
+              pb={pb}
+              row={row}
+              dispatch={dispatch}
+              guides={guides}
+              reqs={reqs}
+              saving={saving}
+              showPayoutPanel={showPayoutPanel}
+              onAssignGuide={async (id) => {
+                await assignAndRequestGuide(id);
+              }}
+              onPostToOpenBoard={async () => {
+                await savePostGuideBoard();
+              }}
+              onClearGuide={async () => {
+                await clearGuide();
+              }}
+            />
           </TabPanel>
         ) : null}
 
@@ -1417,6 +939,13 @@ export function OpsBookingInspector({
               </button>
               <OpsStatusBadge status={ticketStatus} />
             </div>
+
+            <TicketVoucherUploadPanel
+              pnr={row.pnr}
+              tourDate={row.tour_date}
+              tickets={tickets}
+              onReload={() => void onReloadPockets()}
+            />
           </TabPanel>
         ) : null}
 

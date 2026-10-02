@@ -128,8 +128,16 @@ export function experienceNeedsEntryTicket(input: {
     hay.includes("team lab") ||
     hay.includes("ghibli") ||
     hay.includes("disney") ||
+    hay.includes("universal") ||
+    hay.includes("shibuya sky") ||
+    hay.includes("skytree") ||
+    hay.includes("tokyo tower") ||
+    hay.includes("go-kart") ||
+    hay.includes("gokart") ||
     hay.includes("timed entry") ||
-    hay.includes("admission")
+    hay.includes("admission") ||
+    hay.includes("skip the line") ||
+    hay.includes("vip")
   ) {
     return true;
   }

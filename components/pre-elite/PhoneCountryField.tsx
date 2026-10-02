@@ -14,13 +14,20 @@ type Props = {
   value: string;
   onChange: (full: string) => void;
   className?: string;
+  /** dark = glass builders; light = cream checkout / Revolut */
+  variant?: "dark" | "light";
 };
 
 /**
  * Phone input: country dial code (search + scroll) + national number.
  * Emits a single string like "+81 9012345678".
  */
-export function PhoneCountryField({ value, onChange, className = "" }: Props) {
+export function PhoneCountryField({
+  value,
+  onChange,
+  className = "",
+  variant = "dark",
+}: Props) {
   const parsed = useMemo(() => parsePhoneValue(value), [value]);
   const [country, setCountry] = useState<DialCode>(parsed.country);
   const [national, setNational] = useState(parsed.national);
@@ -28,6 +35,8 @@ export function PhoneCountryField({ value, onChange, className = "" }: Props) {
   const [query, setQuery] = useState("");
   const searchRef = useRef<HTMLInputElement>(null);
   const rootRef = useRef<HTMLDivElement>(null);
+
+  const light = variant === "light";
 
   // Sync inward when parent value changes from outside
   useEffect(() => {
@@ -62,6 +71,26 @@ export function PhoneCountryField({ value, onChange, className = "" }: Props) {
     emit(c, national);
   };
 
+  const triggerCls = light
+    ? "inline-flex shrink-0 items-center gap-1 rounded-xl border border-[#E8E2D9] bg-white px-2.5 py-2.5 text-sm text-[#0B1F3A] transition hover:border-[#075473]"
+    : "inline-flex shrink-0 items-center gap-1 rounded-xl border border-white/10 bg-[#121212] px-2.5 py-2.5 text-sm text-white transition hover:border-white/25";
+
+  const inputCls = light
+    ? "min-w-0 flex-1 rounded-xl border border-[#E8E2D9] bg-white px-3 py-2.5 text-sm text-[#0B1F3A] outline-none placeholder:text-[#5C6570]/50 focus:border-[#075473]"
+    : "min-w-0 flex-1 rounded-xl border border-white/10 bg-[#121212] px-3 py-2.5 text-sm text-white outline-none placeholder:text-white/30 focus:border-[#075473]";
+
+  const panelCls = light
+    ? "absolute left-0 right-0 top-[calc(100%+0.35rem)] z-40 overflow-hidden rounded-2xl border border-[#E8E2D9] bg-white shadow-2xl"
+    : "absolute left-0 right-0 top-[calc(100%+0.35rem)] z-40 overflow-hidden rounded-2xl border border-white/10 bg-[#0D1117] shadow-2xl";
+
+  const searchWrapCls = light
+    ? "flex items-center gap-2 border-b border-[#E8E2D9] px-3 py-2"
+    : "flex items-center gap-2 border-b border-white/10 px-3 py-2";
+
+  const searchInputCls = light
+    ? "min-w-0 flex-1 bg-transparent text-sm text-[#0B1F3A] outline-none placeholder:text-[#5C6570]/55"
+    : "min-w-0 flex-1 bg-transparent text-sm text-white outline-none placeholder:text-white/35";
+
   return (
     <div ref={rootRef} className={`relative ${className}`}>
       <div className="flex gap-2">
@@ -70,14 +99,16 @@ export function PhoneCountryField({ value, onChange, className = "" }: Props) {
           aria-label="Country dial code"
           aria-expanded={open}
           onClick={() => setOpen((o) => !o)}
-          className="inline-flex shrink-0 items-center gap-1 rounded-xl border border-white/10 bg-[#121212] px-2.5 py-2.5 text-sm text-white transition hover:border-white/25"
+          className={triggerCls}
         >
           <span aria-hidden className="text-base leading-none">
             {country.flag}
           </span>
           <span className="font-medium tabular-nums">+{country.dial}</span>
           <ChevronDown
-            className={`h-3.5 w-3.5 text-white/50 transition ${open ? "rotate-180" : ""}`}
+            className={`h-3.5 w-3.5 transition ${
+              open ? "rotate-180" : ""
+            } ${light ? "text-[#5C6570]" : "text-white/50"}`}
             aria-hidden
           />
         </button>
@@ -93,27 +124,36 @@ export function PhoneCountryField({ value, onChange, className = "" }: Props) {
             setNational(next);
             emit(country, next);
           }}
-          className="min-w-0 flex-1 rounded-xl border border-white/10 bg-[#121212] px-3 py-2.5 text-sm text-white outline-none placeholder:text-white/30 focus:border-[#075473]"
+          className={inputCls}
         />
       </div>
 
       {open ? (
-        <div className="absolute left-0 right-0 top-[calc(100%+0.35rem)] z-40 overflow-hidden rounded-2xl border border-white/10 bg-[#0D1117] shadow-2xl">
-          <div className="flex items-center gap-2 border-b border-white/10 px-3 py-2">
-            <Search className="h-3.5 w-3.5 shrink-0 text-white/40" aria-hidden />
+        <div className={panelCls}>
+          <div className={searchWrapCls}>
+            <Search
+              className={`h-3.5 w-3.5 shrink-0 ${
+                light ? "text-[#5C6570]/70" : "text-white/40"
+              }`}
+              aria-hidden
+            />
             <input
               ref={searchRef}
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search country or code…"
-              className="min-w-0 flex-1 bg-transparent text-sm text-white outline-none placeholder:text-white/35"
+              className={searchInputCls}
             />
             {query ? (
               <button
                 type="button"
                 aria-label="Clear search"
                 onClick={() => setQuery("")}
-                className="rounded-full p-1 text-white/40 hover:text-white"
+                className={`rounded-full p-1 ${
+                  light
+                    ? "text-[#5C6570] hover:text-[#0B1F3A]"
+                    : "text-white/40 hover:text-white"
+                }`}
               >
                 <X className="h-3.5 w-3.5" />
               </button>
@@ -124,12 +164,17 @@ export function PhoneCountryField({ value, onChange, className = "" }: Props) {
             role="listbox"
           >
             {options.length === 0 ? (
-              <li className="px-3 py-3 text-center text-xs text-white/40">
+              <li
+                className={`px-3 py-3 text-center text-xs ${
+                  light ? "text-[#5C6570]" : "text-white/40"
+                }`}
+              >
                 No countries match
               </li>
             ) : (
               options.map((c) => {
-                const selected = c.iso === country.iso && c.dial === country.dial;
+                const selected =
+                  c.iso === country.iso && c.dial === country.dial;
                 return (
                   <li key={`${c.iso}-${c.dial}`}>
                     <button
@@ -137,15 +182,25 @@ export function PhoneCountryField({ value, onChange, className = "" }: Props) {
                       role="option"
                       aria-selected={selected}
                       onClick={() => pick(c)}
-                      className={`flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm transition hover:bg-white/5 ${
-                        selected ? "bg-[#075473]/25 text-white" : "text-white/85"
+                      className={`flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm transition ${
+                        light
+                          ? selected
+                            ? "bg-[#075473]/12 text-[#0B1F3A]"
+                            : "text-[#0B1F3A]/90 hover:bg-[#F7F3EB]"
+                          : selected
+                            ? "bg-[#075473]/25 text-white"
+                            : "text-white/85 hover:bg-white/5"
                       }`}
                     >
                       <span aria-hidden className="text-base">
                         {c.flag}
                       </span>
                       <span className="min-w-0 flex-1 truncate">{c.name}</span>
-                      <span className="shrink-0 tabular-nums text-white/55">
+                      <span
+                        className={`shrink-0 tabular-nums ${
+                          light ? "text-[#5C6570]" : "text-white/55"
+                        }`}
+                      >
                         +{c.dial}
                       </span>
                     </button>
@@ -154,7 +209,13 @@ export function PhoneCountryField({ value, onChange, className = "" }: Props) {
               })
             )}
           </ul>
-          <p className="border-t border-white/10 px-3 py-1.5 text-[10px] text-white/35">
+          <p
+            className={`border-t px-3 py-1.5 text-[10px] ${
+              light
+                ? "border-[#E8E2D9] text-[#5C6570]/80"
+                : "border-white/10 text-white/35"
+            }`}
+          >
             {DIAL_CODES.length} countries · scroll or type to find
           </p>
         </div>

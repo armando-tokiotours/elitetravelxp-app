@@ -108,6 +108,14 @@ export function BrandingUiCardsAdmin({
         if (r.category === "pre_elite" || r.key.startsWith("pre_elite_"))
           return false;
         if (hasElite && r.key === "concierge_preview") return false;
+        // Edited under Site Branding → Transport / Travel Pace / Explanations
+        if (r.category === "pace" || r.key.startsWith("pace_")) return false;
+        if (
+          r.key === "transit_walk" ||
+          r.key === "transit_subway" ||
+          r.key === "transit_private_driver"
+        )
+          return false;
         return true;
       });
       setRows(visible);
@@ -193,8 +201,9 @@ export function BrandingUiCardsAdmin({
       </h2>
       <p className="mt-1 text-sm text-[#8A8278]">
         Edit Value Proposition messaging, Discover Activity Matcher banner,
-        Budget Planner hero, Elite Concierge modal, Travel Pace cards, and Style
-        Quiz options. Empty fields fall back to built-in copy and media.
+        Budget Planner hero, Elite Concierge modal, and Style Quiz options.
+        Travel Pace and Transport cards are under Site Branding tabs. Empty
+        fields fall back to built-in copy and media.
       </p>
 
       {error ? (

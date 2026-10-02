@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent as ReactMouseEvent } from "react";
 import { Check, Trash2 } from "lucide-react";
 import type PocketBase from "pocketbase";
 import {
@@ -26,6 +26,7 @@ import { useTeamAuth } from "@/store/useTeamAuth";
 import { StaffPortalShell, STAFF_PORTAL_REFRESH_EVENT } from "@/components/staff/StaffPortalShell";
 import { OpsBookingInspector } from "@/components/staff/OpsBookingInspector";
 import { OpsCommsHub } from "@/components/staff/OpsCommsHub";
+import { OpsPaymentStatusBadges } from "@/components/staff/OpsPaymentStatusBadges";
 import {
   OpsStatusBadge,
   loadStaffByRole,
@@ -86,7 +87,6 @@ function ListRowBadges({
     row.status,
     Boolean(row.payment_confirmed)
   );
-  const paymentPending = !Boolean(row.payment_confirmed);
   const guideApprovalPending =
     Boolean(dispatch?.assigned_guide_id) &&
     guideStatus === "pending_guide_acceptance";
@@ -98,15 +98,7 @@ function ListRowBadges({
   return (
     <div className="mt-1 flex flex-wrap gap-1">
       <OpsStatusBadge status={listStatus} />
-      {paymentPending ? (
-        <span className="rounded-md border border-red-500/40 bg-red-500/15 px-1.5 py-0.5 text-[9px] font-semibold tracking-wider text-red-300 uppercase">
-          Payment pending
-        </span>
-      ) : (
-        <span className="rounded-md border border-emerald-500/30 bg-emerald-500/10 px-1.5 py-0.5 text-[9px] tracking-wider text-emerald-300 uppercase">
-          Pay ✓
-        </span>
-      )}
+      <OpsPaymentStatusBadges row={row} />
       {guideApprovalPending ? (
         <span className="rounded-md border border-orange-500/40 bg-orange-500/15 px-1.5 py-0.5 text-[9px] font-semibold tracking-wider text-orange-300 uppercase">
           Guide approval pending
@@ -216,6 +208,71 @@ function OpsInquiryInner() {
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("incoming");
   const [isCompactView, setIsCompactView] = useState(false);
+  const [sidebarWidth, setSidebarWidth] = useState(380);
+  const sidebarWidthRef = useRef(380);
+  const isResizing = useRef(false);
+  const resizeStartX = useRef(0);
+  const resizeStartW = useRef(380);
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("ops_sidebar_width");
+      const n = saved ? Number(saved) : NaN;
+      if (Number.isFinite(n)) {
+        const clamped = Math.min(550, Math.max(280, n));
+        setSidebarWidth(clamped);
+        sidebarWidthRef.current = clamped;
+      }
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  useEffect(() => {
+    sidebarWidthRef.current = sidebarWidth;
+  }, [sidebarWidth]);
+
+  useEffect(() => {
+    const onMove = (e: MouseEvent) => {
+      if (!isResizing.current) return;
+      const delta = e.clientX - resizeStartX.current;
+      const next = Math.min(
+        550,
+        Math.max(280, resizeStartW.current + delta)
+      );
+      sidebarWidthRef.current = next;
+      setSidebarWidth(next);
+    };
+    const onUp = () => {
+      if (!isResizing.current) return;
+      isResizing.current = false;
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+      try {
+        localStorage.setItem(
+          "ops_sidebar_width",
+          String(sidebarWidthRef.current)
+        );
+      } catch {
+        /* ignore */
+      }
+    };
+    document.addEventListener("mousemove", onMove);
+    document.addEventListener("mouseup", onUp);
+    return () => {
+      document.removeEventListener("mousemove", onMove);
+      document.removeEventListener("mouseup", onUp);
+    };
+  }, []);
+
+  const handleSplitterMouseDown = (e: ReactMouseEvent) => {
+    e.preventDefault();
+    isResizing.current = true;
+    resizeStartX.current = e.clientX;
+    resizeStartW.current = sidebarWidthRef.current;
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+  };
 
   const reloadPockets = useCallback(async () => {
     const pb = getClient();
@@ -486,9 +543,16 @@ function OpsInquiryInner() {
           No ops_hub rows yet — create a builder booking first.
         </p>
       ) : (
-        <div className="grid min-h-0 flex-1 grid-cols-1 overflow-hidden rounded-xl border border-zinc-800 bg-zinc-950/60 lg:grid-cols-[minmax(16rem,30%)_1fr]">
-          {/* Left pane — inquiry list */}
-          <aside className="flex min-h-0 flex-col border-b border-zinc-800 lg:border-r lg:border-b-0">
+        <div className="flex min-h-0 flex-1 overflow-hidden rounded-xl border border-zinc-800 bg-zinc-950/60">
+          {/* Left pane — inquiry list (resizable on lg+) */}
+          <aside
+            style={
+              {
+                ["--ops-sidebar-w"]: `${sidebarWidth}px`,
+              } as CSSProperties
+            }
+            className="flex min-h-0 w-full flex-col border-b border-zinc-800 lg:w-[var(--ops-sidebar-w)] lg:shrink-0 lg:border-r lg:border-b-0"
+          >
             <div className="shrink-0 space-y-2 border-b border-zinc-800 px-3 py-2">
               <div className="flex items-center gap-2">
                 <input
@@ -775,8 +839,22 @@ function OpsInquiryInner() {
             </ul>
           </aside>
 
+          {/* Draggable vertical splitter — desktop only */}
+          <div
+            role="separator"
+            aria-orientation="vertical"
+            aria-label="Resize inquiry list"
+            aria-valuemin={280}
+            aria-valuemax={550}
+            aria-valuenow={sidebarWidth}
+            onMouseDown={handleSplitterMouseDown}
+            className="group relative z-30 hidden w-1.5 shrink-0 cursor-col-resize items-center justify-center bg-white/5 transition-colors hover:bg-[#075473] active:bg-[#F6A724] lg:flex"
+          >
+            <div className="h-8 w-0.5 rounded-full bg-gray-500 group-hover:bg-white" />
+          </div>
+
           {/* Right pane — inspector */}
-          <div className="min-h-0 overflow-hidden">
+          <div className="min-h-0 min-w-0 flex-1 overflow-hidden">
             {selected ? (
               <OpsBookingInspector
                 row={selected}
@@ -809,6 +887,21 @@ function OpsInquiryInner() {
         opsHubId={selected?.id}
         staffId={staffId}
         staffName={staffName}
+        assignedAgentName={
+          selected?.assigned_agent ||
+          agents.find((a) => a.id === selected?.assigned_agent_id)?.name ||
+          null
+        }
+        assignedAgentId={selected?.assigned_agent_id || null}
+        assignedAgentEmail={
+          agents.find((a) => a.id === selected?.assigned_agent_id)?.email ||
+          null
+        }
+        staffRole={role}
+        ticketerDirectChatEnabled={Boolean(
+          selected?.ticketer_direct_chat_enabled
+        )}
+        driverDirectChatEnabled={Boolean(selected?.driver_direct_chat_enabled)}
       />
     </div>
   );

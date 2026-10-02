@@ -6,14 +6,11 @@ import { useEffect, useState } from "react";
 import {
   Bookmark,
   CircleHelp,
-  ClipboardList,
-  Compass,
   Home,
   LogOut,
-  ScrollText,
+  Sparkles,
   Ticket,
   User,
-  Wrench,
 } from "lucide-react";
 import {
   brandingLogoUrl,
@@ -29,6 +26,7 @@ export type AppNavId =
   | "home"
   | "preElite"
   | "builder"
+  | "builderE"
   | "discover"
   | "manage"
   | "itinerary"
@@ -54,22 +52,10 @@ export const APP_SIDEBAR_FULL_PAD = "lg:pl-16";
 export const APP_NAV_ITEMS: AppNavItem[] = [
   { id: "home", href: "/", label: "Home", icon: Home },
   {
-    id: "preElite",
-    href: "/pre-elite-builder",
-    label: "Pre-Elite Qualification",
-    icon: ClipboardList,
-  },
-  {
-    id: "builder",
-    href: "/builder",
-    label: "Trip Builder",
-    icon: Wrench,
-  },
-  {
-    id: "discover",
-    href: "/discover",
-    label: "Discover Experiences",
-    icon: Compass,
+    id: "builderE",
+    href: "/builder-e",
+    label: "Builder E",
+    icon: Sparkles,
   },
   {
     id: "manage",
@@ -80,20 +66,14 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
   {
     id: "itinerary",
     href: "/builder/itinerary",
-    label: "My Saved Itineraries",
+    label: "Itinerary",
     icon: Bookmark,
   },
   {
     id: "faq",
     href: "/faq",
-    label: "FAQ",
+    label: "FAQ & Transport Guide",
     icon: CircleHelp,
-  },
-  {
-    id: "policies",
-    href: "/policies",
-    label: "Terms & Policies",
-    icon: ScrollText,
   },
 ];
 
@@ -106,10 +86,17 @@ function isNavActive(pathname: string, item: AppNavItem): boolean {
       (pathname.startsWith("/builder-single") &&
         !pathname.startsWith("/builder-single/itinerary"))
     );
+  if (item.id === "builderE")
+    return (
+      pathname === "/builder-e" ||
+      (pathname.startsWith("/builder-e/") &&
+        !pathname.startsWith("/builder-e/dossier"))
+    );
   if (item.id === "itinerary")
     return (
       pathname.startsWith("/builder/itinerary") ||
-      pathname.startsWith("/builder-single/itinerary")
+      pathname.startsWith("/builder-single/itinerary") ||
+      pathname.startsWith("/builder-e/dossier")
     );
   if (item.id === "preElite")
     return pathname.startsWith("/pre-elite-builder");

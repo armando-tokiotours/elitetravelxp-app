@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
-import { ArrowLeft, Car, CreditCard, Play, TrainFront } from "lucide-react";
+import { ArrowLeft, CreditCard, Play } from "lucide-react";
 import type { ChauffeurDayOption } from "@/lib/dateCascade";
 import {
   isBillableChauffeurDay,
@@ -14,6 +14,12 @@ import type { SelectedTour } from "@/lib/selectedTours";
 import { ExplainerModal } from "../ExplainerModal";
 import { useBuilderStore } from "@/store/useBuilderStore";
 import { travelStyleTierRules } from "@/lib/preEliteHydrate";
+import {
+  fetchUiTransportCards,
+  resolveTransportCards,
+  TRANSPORT_CARD_FALLBACKS,
+  type ResolvedTransportCard,
+} from "@/lib/uiTransportCards";
 
 export function CityTransportModal({
   open,
@@ -49,6 +55,10 @@ export function CityTransportModal({
   const [explainerType, setExplainerType] = useState<
     "public" | "private" | null
   >(null);
+  const [modeCards, setModeCards] = useState<ResolvedTransportCard[]>([
+    TRANSPORT_CARD_FALLBACKS.public,
+    TRANSPORT_CARD_FALLBACKS.private,
+  ]);
   const preEliteTravelStyle = useBuilderStore((s) => s.preEliteTravelStyle);
   const tierRules = travelStyleTierRules(preEliteTravelStyle);
   const allowPrivate = tierRules.allowPrivateChauffeur;
@@ -64,6 +74,17 @@ export function CityTransportModal({
       return;
     }
     document.body.style.overflow = "hidden";
+    void (async () => {
+      try {
+        const rows = await fetchUiTransportCards();
+        const all = resolveTransportCards(rows);
+        setModeCards(
+          all.filter((c) => c.mode === "public" || c.mode === "private")
+        );
+      } catch {
+        /* keep fallbacks */
+      }
+    })();
   }, [open]);
 
   useEffect(() => {
@@ -94,7 +115,7 @@ export function CityTransportModal({
       {open ? (
         <motion.div
           key={`city-transport-${cityId}`}
-          className="fixed inset-0 z-[60] flex flex-col bg-[#0A1017]"
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-[#05080C]/85 p-0 backdrop-blur-md sm:p-4"
           role="dialog"
           aria-modal="true"
           aria-label={`${cityName} transport`}
@@ -104,7 +125,7 @@ export function CityTransportModal({
           transition={{ duration: 0.2 }}
         >
           <motion.div
-            className="relative flex h-full w-full flex-col overflow-hidden bg-[#0A1017]"
+            className="relative flex h-full w-full max-w-lg flex-col overflow-hidden bg-[#0A1017] shadow-2xl sm:h-[min(92vh,920px)] sm:rounded-3xl sm:border sm:border-white/10"
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -8 }}
@@ -139,58 +160,64 @@ export function CityTransportModal({
                   </p>
                 ) : null}
                 <div
-                  className={`grid gap-3 ${allowPrivate ? "grid-cols-2" : "grid-cols-1"}`}
+                  className={`-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 sm:mx-0 sm:grid sm:gap-3 sm:overflow-visible sm:px-0 sm:pb-0 ${
+                    allowPrivate ? "sm:grid-cols-2" : "sm:grid-cols-1"
+                  }`}
                 >
-                  <button
-                    type="button"
-                    onClick={() => setExplainerType("public")}
-                    className="rounded-2xl border border-zinc-800 bg-zinc-900 p-4 text-left transition hover:border-zinc-600 hover:bg-zinc-800"
-                  >
-                    <span className="flex h-9 w-9 items-center justify-center rounded-full bg-zinc-800 text-zinc-300">
-                      <TrainFront className="h-4 w-4" aria-hidden />
-                    </span>
-                    <h4 className="mt-3 text-sm font-bold text-white">
-                      Public Transport
-                    </h4>
-                    <p className="mt-1.5 line-clamp-3 text-xs leading-relaxed text-zinc-400">
-                      Complex subway systems, walking between stations — best
-                      for light travel days.
-                    </p>
-                    <p className="mt-3 inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-[#075473]">
-                      <Play className="h-3 w-3" aria-hidden />
-                      Watch explainer
-                    </p>
-                  </button>
-
-                  {allowPrivate ? (
-                    <button
-                      type="button"
-                      onClick={() => setExplainerType("private")}
-                      className={`rounded-2xl border p-4 text-left transition hover:bg-zinc-800 ${
-                        tierRules.vipHighlight
-                          ? "border-[#075473]/60 bg-[#075473]/10 hover:border-[#075473]"
-                          : "border-[#075473]/40 bg-zinc-900 hover:border-[#075473]"
-                      }`}
-                    >
-                      <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#075473]/15 text-[#075473]">
-                        <Car className="h-4 w-4" aria-hidden />
-                      </span>
-                      <h4 className="mt-3 text-sm font-bold text-white">
-                        {tierRules.vipHighlight
+                  {modeCards
+                    .filter((c) => allowPrivate || c.mode === "public")
+                    .map((card) => {
+                      const isPrivate = card.mode === "private";
+                      const title =
+                        isPrivate && tierRules.vipHighlight
                           ? "VIP Luxury Chauffeur"
-                          : "Private Chauffeur"}
-                      </h4>
-                      <p className="mt-1.5 line-clamp-3 text-xs leading-relaxed text-zinc-400">
-                        {tierRules.vipHighlight
+                          : card.title;
+                      const description =
+                        isPrivate && tierRules.vipHighlight
                           ? "High-end chauffeur, VIP lounge meets, and exclusive door-to-door timing."
-                          : "Door-to-door luxury with luggage handled and direct point-to-point service."}
-                      </p>
-                      <p className="mt-3 inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-[#075473]">
-                        <Play className="h-3 w-3" aria-hidden />
-                        Watch explainer
-                      </p>
-                    </button>
-                  ) : null}
+                          : card.description;
+                      return (
+                        <button
+                          key={card.mode}
+                          type="button"
+                          onClick={() =>
+                            setExplainerType(
+                              isPrivate ? "private" : "public"
+                            )
+                          }
+                          className={`group relative w-[9.5rem] shrink-0 overflow-hidden rounded-2xl border text-left transition sm:w-auto ${
+                            isPrivate
+                              ? "border-[#075473]/50 hover:border-[#075473]"
+                              : "border-zinc-800 hover:border-zinc-600"
+                          }`}
+                        >
+                          <span className="relative block aspect-[3/4] w-full bg-zinc-900">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={card.image}
+                              alt=""
+                              className="h-full w-full object-cover"
+                            />
+                            <span
+                              className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-transparent"
+                              aria-hidden
+                            />
+                            <span className="absolute inset-x-0 bottom-0 p-2.5 sm:p-3">
+                              <span className="block font-display text-sm text-white sm:text-base">
+                                {title}
+                              </span>
+                              <span className="mt-0.5 block text-[10px] leading-snug text-zinc-300 sm:text-[11px]">
+                                {description}
+                              </span>
+                              <span className="mt-2 inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-[#F6A724]">
+                                <Play className="h-3 w-3" aria-hidden />
+                                Open explainer
+                              </span>
+                            </span>
+                          </span>
+                        </button>
+                      );
+                    })}
                 </div>
               </section>
 

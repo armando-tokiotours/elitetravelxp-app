@@ -2,12 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import {
-  APP_SIDEBAR_RAIL_PAD,
-  AppSidebar,
-} from "@/components/navigation/AppSidebar";
 import { MobileTopChrome } from "@/components/navigation/MobileTopChrome";
-import { BottomNav } from "@/components/builder/BottomNav";
 import { BookingRefBadge } from "@/components/builder/BookingRefBadge";
 import {
   fetchBuilderConfig,
@@ -185,123 +180,112 @@ export function SingleDayBuilderView() {
   }
 
   return (
-    <>
-      <AppSidebar
-        brandEyebrow="TOKIOTOURS"
-        brandTitle="Builders"
-        expandOnHover
-      />
-      <div
-        className={`${APP_SIDEBAR_RAIL_PAD} min-h-screen overflow-x-clip overflow-y-visible bg-[#04080C]`}
-      >
-        <div className="builder-theme relative min-h-screen overflow-x-clip overflow-y-visible bg-[#04080C] text-white [color-scheme:dark]">
-          <MobileTopChrome
-            brandTitle="Builders"
-            ctaHref="/builder-single/itinerary"
-            ctaLabel="Itinerary"
-          />
+    <div className="min-h-screen overflow-x-clip overflow-y-visible bg-[#04080C]">
+      <div className="builder-theme relative min-h-screen overflow-x-clip overflow-y-visible bg-[#04080C] text-white [color-scheme:dark]">
+        <MobileTopChrome
+          brandTitle="Builders"
+          ctaHref="/builder-single/itinerary"
+          ctaLabel="Itinerary"
+        />
 
-          <div className="relative bg-[#04080C]">
-            <SingleDayBuilderHero />
+        <div className="relative bg-[#04080C]">
+          <SingleDayBuilderHero />
 
-            <div className="relative z-20 -mt-20 w-full bg-transparent sm:-mt-28">
-              <div className="mx-auto w-full max-w-2xl px-4 pb-8 sm:max-w-3xl">
-                <div className="tokio-glass-sheet w-full overflow-visible rounded-t-3xl border border-white/10 bg-[#0A1017]/95 text-left shadow-2xl backdrop-blur-md">
-                  <div className="rounded-t-3xl px-5 pb-5 pt-6 sm:px-6">
-                    <div className="flex items-start justify-between gap-4 pt-1">
-                      <div className="min-w-0">
-                        <p className="text-[10px] font-bold uppercase tracking-wider text-amber-400">
-                          {heroCopy.mainTitlePrefix}
-                        </p>
-                        <h2 className="font-godiva text-2xl font-bold uppercase tracking-wide text-white md:text-3xl">
-                          {displayCity}
-                        </h2>
-                        <p className="mt-2 text-xs text-zinc-400">
-                          {dayTagline}
-                        </p>
-                      </div>
-                      <div className="shrink-0 space-y-0.5 text-right">
-                        <p className="text-xs font-bold text-white">
-                          {guestBadge.name}
-                        </p>
-                        {guestBadge.email ? (
-                          <p className="max-w-[14rem] truncate font-mono text-[10px] text-cyan-400 sm:max-w-[18rem]">
-                            {guestBadge.email}
-                          </p>
-                        ) : null}
-                      </div>
+          <div className="relative z-20 -mt-20 w-full bg-transparent sm:-mt-28">
+            <div className="mx-auto w-full max-w-2xl px-4 pb-8 sm:max-w-3xl">
+              <div className="tokio-glass-sheet w-full overflow-visible rounded-t-3xl border border-white/10 bg-[#0A1017]/95 text-left shadow-2xl backdrop-blur-md">
+                <div className="rounded-t-3xl px-5 pb-5 pt-6 sm:px-6">
+                  <div className="flex items-start justify-between gap-4 pt-1">
+                    <div className="min-w-0">
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-amber-400">
+                        {heroCopy.mainTitlePrefix}
+                      </p>
+                      <h2 className="font-godiva text-2xl font-bold uppercase tracking-wide text-white md:text-3xl">
+                        {displayCity}
+                      </h2>
+                      <p className="mt-2 text-xs text-zinc-400">
+                        {dayTagline}
+                      </p>
                     </div>
-                    <div className="mt-3 flex w-full items-stretch gap-2">
-                      <div className="min-w-0 flex-1">
-                        <BookingRefBadge
-                          tempBookingRef={tempBookingRef}
-                          confirmedBookingRef={confirmedBookingRef}
-                          bookingStatus={bookingStatus}
-                        />
-                      </div>
-                      <NewBookingResetButton />
+                    <div className="shrink-0 space-y-0.5 text-right">
+                      <p className="text-xs font-bold text-white">
+                        {guestBadge.name}
+                      </p>
+                      {guestBadge.email ? (
+                        <p className="max-w-[14rem] truncate font-mono text-[10px] text-cyan-400 sm:max-w-[18rem]">
+                          {guestBadge.email}
+                        </p>
+                      ) : null}
                     </div>
                   </div>
-
-                  <div className="px-0 pb-40 pt-0">
-                    <BuilderSView
-                      config={config}
-                      catalog={experiencesCatalog}
-                      selectedCity={selectedCity}
-                      onSelectCity={handleSelectCity}
-                      onActivePulsarStepChange={(step) => {
-                        setSavePulsarActive(step === "save");
-                      }}
-                    />
-
-                    <div className="mt-2 flex flex-col gap-3 px-4 sm:flex-row sm:px-6">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const email =
-                            guestBadge.email ||
-                            useItineraryStore.getState().clientEmail ||
-                            "";
-                          const ref =
-                            confirmedBookingRef || tempBookingRef || "";
-                          if (email && ref) {
-                            void import("@/lib/syncBookingLead").then(
-                              ({ syncSingleDayBookingLead }) =>
-                                syncSingleDayBookingLead({
-                                  bookingRef: ref,
-                                  email,
-                                  state: useSingleDayBuilderStore.getState(),
-                                  cityId: selectedCity?.id,
-                                  status: "lead",
-                                })
-                            );
-                          }
-                          window.location.href = "/builder-single/itinerary";
-                        }}
-                        className={`relative flex flex-1 items-center justify-center overflow-visible rounded-full bg-[#054F70] py-3.5 text-sm font-semibold text-white transition hover:bg-[#043d57] ${
-                          savePulsarActive
-                            ? getWidgetPulsarClass("save", "save")
-                            : ""
-                        }`}
-                      >
-                        <WidgetCallingPulse
-                          active={savePulsarActive}
-                          roundedClass="rounded-full"
-                        />
-                        <span className="relative z-[1]">
-                          Save &amp; View Itinerary
-                        </span>
-                      </button>
+                  <div className="mt-3 flex w-full items-stretch gap-2">
+                    <div className="min-w-0 flex-1">
+                      <BookingRefBadge
+                        tempBookingRef={tempBookingRef}
+                        confirmedBookingRef={confirmedBookingRef}
+                        bookingStatus={bookingStatus}
+                      />
                     </div>
+                    <NewBookingResetButton />
+                  </div>
+                </div>
+
+                <div className="px-0 pb-40 pt-0">
+                  <BuilderSView
+                    config={config}
+                    catalog={experiencesCatalog}
+                    selectedCity={selectedCity}
+                    onSelectCity={handleSelectCity}
+                    onActivePulsarStepChange={(step) => {
+                      setSavePulsarActive(step === "save");
+                    }}
+                  />
+
+                  <div className="mt-2 flex flex-col gap-3 px-4 sm:flex-row sm:px-6">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const email =
+                          guestBadge.email ||
+                          useItineraryStore.getState().clientEmail ||
+                          "";
+                        const ref =
+                          confirmedBookingRef || tempBookingRef || "";
+                        if (email && ref) {
+                          void import("@/lib/syncBookingLead").then(
+                            ({ syncSingleDayBookingLead }) =>
+                              syncSingleDayBookingLead({
+                                bookingRef: ref,
+                                email,
+                                state: useSingleDayBuilderStore.getState(),
+                                cityId: selectedCity?.id,
+                                status: "lead",
+                              })
+                          );
+                        }
+                        window.location.href = "/builder-single/itinerary";
+                      }}
+                      className={`relative flex flex-1 items-center justify-center overflow-visible rounded-full bg-[#054F70] py-3.5 text-sm font-semibold text-white transition hover:bg-[#043d57] ${
+                        savePulsarActive
+                          ? getWidgetPulsarClass("save", "save")
+                          : ""
+                      }`}
+                    >
+                      <WidgetCallingPulse
+                        active={savePulsarActive}
+                        roundedClass="rounded-full"
+                      />
+                      <span className="relative z-[1]">
+                        Save &amp; View Itinerary
+                      </span>
+                    </button>
                   </div>
                 </div>
               </div>
             </div>
           </div>
-
-          <BottomNav />
         </div>
       </div>
-    </>
+    </div>
   );
 }

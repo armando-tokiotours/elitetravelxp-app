@@ -57,9 +57,13 @@ export async function POST(request: Request) {
         { status: 400 }
       );
     }
-    if (type !== "multi_day" && type !== "single_day") {
+    if (
+      type !== "multi_day" &&
+      type !== "single_day" &&
+      type !== "experience_only"
+    ) {
       return NextResponse.json(
-        { error: "type must be multi_day or single_day." },
+        { error: "type must be multi_day, single_day, or experience_only." },
         { status: 400 }
       );
     }

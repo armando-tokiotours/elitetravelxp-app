@@ -23,7 +23,10 @@ import {
   filterCatalogBySegment,
   filterCatalogByTab,
   formatDurationBadge,
-  selectedHoursTotal,
+  isGuideBudgetCatalogItem,
+  selectedExtraHoursTotal,
+  selectedGuideHoursTotal,
+  countsTowardGuideHours,
   type CatalogItem,
   type ExperiencesPlacesSegment,
   type ExperiencesPlacesTab,
@@ -120,15 +123,16 @@ export function ExperiencesPlacesModal({
     return filterCatalogByTab(bySegment, tab, experienceProfile);
   }, [cityItems, segment, tab, experienceProfile]);
 
-  const usedHours = selectedHoursTotal(selectedRows);
+  const usedGuideHours = selectedGuideHoursTotal(selectedRows);
+  const extraHours = selectedExtraHoursTotal(selectedRows);
   const timedStops = useMemo(
     () => calculateTimeSlots(startTime || "09:00", selectedRows),
     [startTime, selectedRows]
   );
-  const overBudget = usedHours > tourHours + 0.01;
+  const overBudget = usedGuideHours > tourHours + 0.01;
   const budgetPct = Math.min(
     100,
-    tourHours > 0 ? (usedHours / tourHours) * 100 : 0
+    tourHours > 0 ? (usedGuideHours / tourHours) * 100 : 0
   );
 
   const toggleItem = (item: CatalogItem, selectedLanguage?: string) => {
@@ -139,9 +143,10 @@ export function ExperiencesPlacesModal({
       return;
     }
     const hours = tourDurationHours(item);
-    if (usedHours + hours > tourHours + 0.25) {
+    const countsTowardGuide = isGuideBudgetCatalogItem(item);
+    if (countsTowardGuide && usedGuideHours + hours > tourHours + 0.25) {
       setToast(
-        `Only ${(tourHours - usedHours).toFixed(1)}h left in your ${tourHours}h day.`
+        `Only ${(tourHours - usedGuideHours).toFixed(1)}h left in your ${tourHours}h guide day. Replace a tour stop, or add ticket extras (Activity) — they sit outside guide hours.`
       );
       return;
     }
@@ -161,9 +166,14 @@ export function ExperiencesPlacesModal({
       duration_hours: hours,
       price: tourPrice(item, guests),
       access_type: String(item.access_type || "").trim() || undefined,
+      is_extra: !countsTowardGuide,
     };
     addExperience(row);
-    setToast(`Added · ${item.title}`);
+    setToast(
+      countsTowardGuide
+        ? `Added · ${item.title}`
+        : `Added extra · ${item.title} (outside guide hours)`
+    );
   };
 
   const onDragStart = (index: number) => setDragIndex(index);
@@ -186,7 +196,7 @@ export function ExperiencesPlacesModal({
       {open ? (
         <motion.div
           key="experiences-places-modal"
-          className="fixed inset-0 z-[110] flex flex-col bg-[#0A1017]"
+          className="fixed inset-0 z-[110] flex items-center justify-center bg-[#05080C]/85 p-0 backdrop-blur-md sm:p-4"
           role="dialog"
           aria-modal="true"
           aria-label="Experiences and Places"
@@ -202,7 +212,7 @@ export function ExperiencesPlacesModal({
             onClick={onClose}
           />
           <motion.div
-            className="relative z-[1] flex h-full w-full flex-col overflow-hidden bg-[#0A1017]"
+            className="relative z-[1] flex h-full w-full max-w-2xl flex-col overflow-hidden bg-[#0A1017] shadow-2xl sm:h-[min(92vh,920px)] sm:rounded-3xl sm:border sm:border-white/10"
             initial={{ opacity: 0, y: 24 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 24 }}
@@ -233,23 +243,28 @@ export function ExperiencesPlacesModal({
               </button>
             </div>
 
-            {/* Time budget */}
+            {/* Guide-hour budget (ticket extras sit outside) */}
             <div className="shrink-0 border-b border-white/10 px-4 py-2.5">
               <div className="flex items-center justify-between gap-2">
-                <p className="flex items-center gap-1.5 text-[11px] text-white/70">
+                <p className="flex flex-wrap items-center gap-1.5 text-[11px] text-white/70">
                   <Clock className="h-3 w-3 text-[#F6A724]" />
-                  Selected:{" "}
+                  Guide:{" "}
                   <span
                     className={`font-semibold ${
                       overBudget ? "text-[#E60F43]" : "text-white"
                     }`}
                   >
-                    {formatDurationBadge(usedHours)}
+                    {formatDurationBadge(usedGuideHours)}
                   </span>
                   <span className="text-white/40">/</span>
                   <span className="font-semibold text-white">
-                    {formatDurationBadge(tourHours)} Available
+                    {formatDurationBadge(tourHours)}
                   </span>
+                  {extraHours > 0 ? (
+                    <span className="text-white/45">
+                      · +{formatDurationBadge(extraHours)} extra
+                    </span>
+                  ) : null}
                 </p>
                 <span className="text-[9px] font-medium uppercase tracking-wider text-white/40">
                   {selectedRows.length} stop
@@ -266,6 +281,10 @@ export function ExperiencesPlacesModal({
                   style={{ width: `${budgetPct}%` }}
                 />
               </div>
+              <p className="mt-1 text-[9px] text-white/35">
+                Ticket extras (TeamLab…) don&apos;t use guide hours — add after
+                the tour or swap stops inside it.
+              </p>
             </div>
 
             {/* Day timeline accordion (reorderable + live times) */}
@@ -320,6 +339,7 @@ export function ExperiencesPlacesModal({
                     >
                       {selectedRows.map((row, index) => {
                         const slot = timedStops[index];
+                        const isExtra = !countsTowardGuideHours(row);
                         return (
                           <li
                             key={
@@ -344,6 +364,11 @@ export function ExperiencesPlacesModal({
                               </span>
                               <span className="min-w-0 flex-1 truncate text-xs font-medium text-white">
                                 {row.title}
+                                {isExtra ? (
+                                  <span className="ml-1.5 text-[9px] font-bold tracking-wider text-[#DC6E8A] uppercase">
+                                    Extra
+                                  </span>
+                                ) : null}
                               </span>
                               <span className="shrink-0 font-geosans text-[10px] font-semibold text-[#1BA58A]">
                                 {slot?.timeSlot ?? "—"}

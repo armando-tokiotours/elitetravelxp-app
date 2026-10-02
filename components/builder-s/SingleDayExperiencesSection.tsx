@@ -8,7 +8,7 @@ import { SectionBlock } from "@/components/builder/ui";
 import { useLazyModalMount } from "@/components/builder/modals/useLazyModalMount";
 import { useSingleDayBuilderStore } from "@/store/useSingleDayBuilderStore";
 import { useBuilderAccordionOptional } from "@/components/builder/BuilderAccordion";
-import { formatDurationBadge, selectedHoursTotal } from "@/lib/experiencesPlaces";
+import { formatDurationBadge, selectedExtraHoursTotal, selectedGuideHoursTotal } from "@/lib/experiencesPlaces";
 import { QUIZ_VIBE } from "@/lib/experienceProfiler";
 import { useQuizStore } from "@/store/useQuizStore";
 
@@ -57,7 +57,8 @@ export function SingleDayExperiencesSection({
 
   const selectedRows = useSingleDayBuilderStore((s) => s.selectedExperiences);
   const tourHours = useSingleDayBuilderStore((s) => s.tourHours);
-  const used = selectedHoursTotal(selectedRows);
+  const guideUsed = selectedGuideHoursTotal(selectedRows);
+  const extraHours = selectedExtraHoursTotal(selectedRows);
 
   const isQuizCompleted = useQuizStore((s) => s.isQuizCompleted);
   const travelProfile = useQuizStore((s) => s.travelProfile);
@@ -72,7 +73,10 @@ export function SingleDayExperiencesSection({
     return `${selectedRows[0].title} +${selectedRows.length - 1}`;
   }, [selectedRows]);
 
-  const catalogSub = `${formatDurationBadge(used)} selected of ${formatDurationBadge(tourHours)}`;
+  const catalogSub =
+    extraHours > 0
+      ? `Guide ${formatDurationBadge(guideUsed)} / ${formatDurationBadge(tourHours)} · +${formatDurationBadge(extraHours)} extra`
+      : `Guide ${formatDurationBadge(guideUsed)} of ${formatDurationBadge(tourHours)}`;
 
   const stopCount = selectedRows.length;
   const routeSub =
@@ -91,7 +95,9 @@ export function SingleDayExperiencesSection({
   const summary =
     selectedRows.length === 0
       ? "Pick experiences & places"
-      : `${selectedRows.length} stop${selectedRows.length === 1 ? "" : "s"} · ${formatDurationBadge(used)} / ${formatDurationBadge(tourHours)}`;
+      : extraHours > 0
+        ? `${selectedRows.length} stop${selectedRows.length === 1 ? "" : "s"} · guide ${formatDurationBadge(guideUsed)} / ${formatDurationBadge(tourHours)} · +${formatDurationBadge(extraHours)} extra`
+        : `${selectedRows.length} stop${selectedRows.length === 1 ? "" : "s"} · guide ${formatDurationBadge(guideUsed)} / ${formatDurationBadge(tourHours)}`;
 
   const requireCity = () => {
     if (!selectedCity) {

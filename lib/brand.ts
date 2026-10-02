@@ -1,4 +1,7 @@
-/** Canonical TOKIOTOURS brand strings — use instead of hardcoding. */
+/** Canonical TOKIOTOURS brand strings — use instead of hardcoding.
+ * Browser tab title/description can be overridden in Team → Site Branding
+ * (`document_title` / `document_description` on site_branding).
+ */
 export const BRAND_NAME = "TOKIOTOURS";
 
 export const BRAND_DOMAIN = "tokiotours-app.com";

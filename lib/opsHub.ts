@@ -30,6 +30,8 @@ export interface UpsertOpsHubFromDirectInput {
   /** Used to derive endDate when endDate is missing (multi-day nights/days). */
   durationDays?: number | null;
   guestSummary?: string | null;
+  /** Cached package estimate for Ops financial audit / balance settlement */
+  estimatedTotalEur?: number | null;
   /**
    * When true (default on guest save), mark inbox unread so Ops re-reviews.
    * Pass false for silent admin syncs.
@@ -110,6 +112,8 @@ export async function upsertOpsHubFromDirect(
   if (tourDateRaw) fields.tour_date = tourDateRaw;
   if (endDateRaw) fields.end_date = endDateRaw;
   if (markUnread) fields.is_read = false;
+  const estimated = Math.max(0, Math.round(Number(input.estimatedTotalEur) || 0));
+  if (estimated > 0) fields.estimated_total_eur = estimated;
 
   try {
     const pb = await getAdminPocketBase();

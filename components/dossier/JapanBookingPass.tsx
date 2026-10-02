@@ -9,7 +9,6 @@ import {
   WalletPassFallbackError,
 } from "@/lib/wallet/downloadApplePass";
 import type { BookingPassProps } from "./JapanBookingPass.types";
-import { GoldLight } from "@/components/branding/GoldLight";
 
 export type { BookingPassProps, RouteBreakdownItem } from "./JapanBookingPass.types";
 
@@ -210,7 +209,7 @@ export function JapanBookingPass({
                 TOKIOTOURS
               </span>
             </div>
-            <div className="relative flex flex-col items-end gap-1.5">
+            <div className="relative flex flex-col items-end gap-1">
               {(() => {
                 const st = String(status || "DRAFT").toUpperCase();
                 const isDraft = st === "DRAFT";
@@ -222,35 +221,25 @@ export function JapanBookingPass({
                   st === "IN_PROGRESS" ||
                   st === "QUOTED" ||
                   st === "REVIEW";
-                const spot = confirmed
-                  ? "#1BA58A"
-                  : cancelled
-                    ? "#E60F43"
-                    : isDraft
-                      ? "#71717A"
-                      : "#F6A724";
                 return (
                   <span
-                    className={`group relative overflow-hidden rounded-full border px-[0.9rem] py-[0.4rem] text-[16px] font-bold tracking-widest uppercase shadow-lg ${
+                    className={`border border-dotted px-2 py-0.5 text-[12px] font-bold tracking-[0.18em] uppercase ${
                       isDraft
-                        ? "border-gray-500/30 bg-gray-500/20 text-gray-400"
+                        ? "border-zinc-500/60 text-zinc-500"
                         : confirmed
-                          ? "border-emerald-400/50 bg-emerald-500/20 text-emerald-200"
+                          ? "border-emerald-300/70 text-emerald-300"
                           : cancelled
-                            ? "border-red-500/50 bg-red-500/20 text-red-200"
+                            ? "border-[#E60F43]/70 text-[#E60F43]"
                             : incoming
-                              ? "border-amber-400/50 bg-amber-500/20 text-amber-200"
-                              : "border-amber-400/50 bg-amber-500/20 text-amber-200"
+                              ? "border-[#F6A724]/70 text-[#F6A724]"
+                              : "border-[#F6A724]/70 text-[#F6A724]"
                     }`}
                   >
-                    {isDraft ? null : (
-                      <GoldLight color={spot} placement="top-center" active />
-                    )}
-                    <span className="relative z-10">{st}</span>
+                    {st}
                   </span>
                 );
               })()}
-              <span className="rounded-full border border-cyan-500/30 bg-cyan-500/10 px-3 py-1 text-[10px] font-bold tracking-widest text-cyan-400 uppercase">
+              <span className="text-[10px] font-semibold tracking-[0.16em] text-white uppercase">
                 {tripType === "multi"
                   ? "JAPAN MULTI-DAY PASS"
                   : "JAPAN DAY TOUR PASS"}

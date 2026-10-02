@@ -13,6 +13,8 @@ export type CommMessage = {
   author_name?: string;
   body: string;
   created?: string;
+  attachmentUrl?: string;
+  senderRole?: string;
 };
 
 export type CommThread = {
@@ -37,11 +39,14 @@ async function mirrorToBookingMessages(opts: {
   authorName?: string;
   authorId?: string | null;
   body: string;
-}): Promise<void> {
+  topic?: string | null;
+  attachment?: File | Blob | null;
+  attachmentName?: string;
+}): Promise<{ id: string; attachmentUrl?: string } | null> {
   const pnr = safePnr(opts.pnr);
   const text = String(opts.body || "").trim().slice(0, 4000);
-  if (!pnr || !text) return;
-  const isGuest = opts.authorRole === "guest";
+  const hasFile = Boolean(opts.attachment);
+  if (!pnr || (!text && !hasFile)) return null;
   try {
     const pb = await getAdminPocketBase();
     let opsHubId = "";
@@ -55,8 +60,63 @@ async function mirrorToBookingMessages(opts: {
     } catch {
       /* optional */
     }
-    await pb.collection("booking_messages").create(
-      {
+    const isGuest = opts.authorRole === "guest";
+    const messageBody = text || (hasFile ? "(image attachment)" : "");
+    const topic = String(opts.topic || "")
+      .trim()
+      .toUpperCase();
+
+    const form = new FormData();
+    form.append("pnr", pnr);
+    form.append("ops_hub_id", opsHubId);
+    form.append("channel", "CUSTOMER");
+    form.append("sender_id", String(opts.authorId || "").trim() || "");
+    form.append(
+      "sender_name",
+      String(opts.authorName || "").trim() ||
+        (isGuest ? "Client" : "Concierge")
+    );
+    form.append("sender_role", isGuest ? "CUSTOMER" : "CONCIERGE");
+    form.append("message", messageBody);
+    form.append("is_read", isGuest ? "false" : "true");
+    if (
+      topic === "DRIVER" ||
+      topic === "TOUR" ||
+      topic === "TICKETS" ||
+      topic === "PAYMENT" ||
+      topic === "GENERAL"
+    ) {
+      form.append("topic", topic);
+    }
+    if (opts.attachment) {
+      const name =
+        opts.attachmentName ||
+        (opts.attachment instanceof File
+          ? opts.attachment.name
+          : "attachment.jpg");
+      form.append("attachment", opts.attachment, name);
+    }
+
+    try {
+      const created = (await pb
+        .collection("booking_messages")
+        .create(form, { requestKey: null })) as {
+        id: string;
+        attachment?: string;
+      };
+      let attachmentUrl: string | undefined;
+      const file = String(created.attachment || "").trim();
+      if (file) {
+        try {
+          attachmentUrl = pb.files.getURL(created as never, file);
+        } catch {
+          attachmentUrl = undefined;
+        }
+      }
+      return { id: created.id, attachmentUrl };
+    } catch {
+      // Schema may lag before attachment migration — JSON fallback
+      const payload: Record<string, unknown> = {
         pnr,
         ops_hub_id: opsHubId,
         channel: "CUSTOMER",
@@ -65,13 +125,34 @@ async function mirrorToBookingMessages(opts: {
           String(opts.authorName || "").trim() ||
           (isGuest ? "Client" : "Concierge"),
         sender_role: isGuest ? "CUSTOMER" : "CONCIERGE",
-        message: text,
+        message: messageBody,
         is_read: !isGuest,
-      },
-      { requestKey: null }
-    );
+      };
+      if (
+        topic === "DRIVER" ||
+        topic === "TOUR" ||
+        topic === "TICKETS" ||
+        topic === "PAYMENT" ||
+        topic === "GENERAL"
+      ) {
+        payload.topic = topic;
+      }
+      try {
+        const created = (await pb
+          .collection("booking_messages")
+          .create(payload, { requestKey: null })) as { id: string };
+        return { id: created.id };
+      } catch {
+        delete payload.topic;
+        const created = (await pb
+          .collection("booking_messages")
+          .create(payload, { requestKey: null })) as { id: string };
+        return { id: created.id };
+      }
+    }
   } catch (err) {
     console.warn("[comm→booking_messages]", err);
+    return null;
   }
 }
 
@@ -120,17 +201,20 @@ export async function listCommMessages(pnrRaw: string): Promise<CommMessage[]> {
   const pnr = safePnr(pnrRaw);
   if (!pnr) return [];
   const pb = await getAdminPocketBase();
-  // Prefer classic guest thread; fall back to Ops booking_messages CUSTOMER channel
+
+  const classic: CommMessage[] = [];
   try {
-    const classic = await pb.collection("comm_messages").getFullList<CommMessage>({
+    const rows = await pb.collection("comm_messages").getFullList<CommMessage>({
       filter: `pnr="${pnr}"`,
       sort: "created",
       requestKey: null,
     });
-    if (classic.length > 0) return classic;
+    classic.push(...rows);
   } catch {
     /* collection may be missing */
   }
+
+  const fromBooking: CommMessage[] = [];
   try {
     const rows = await pb.collection("booking_messages").getFullList<{
       id: string;
@@ -138,27 +222,82 @@ export async function listCommMessages(pnrRaw: string): Promise<CommMessage[]> {
       sender_role?: string;
       sender_name?: string;
       message?: string;
+      attachment?: string;
       created?: string;
     }>({
       filter: `pnr="${pnr}" && channel="CUSTOMER"`,
       sort: "created",
       requestKey: null,
     });
-    return rows.map((r) => ({
-      id: r.id,
-      thread_id: "",
-      pnr: r.pnr,
-      author_role:
-        String(r.sender_role || "").toUpperCase() === "CUSTOMER"
-          ? "guest"
-          : "ops",
-      author_name: r.sender_name || "",
-      body: String(r.message || ""),
-      created: r.created,
-    }));
+    for (const r of rows) {
+      const file = String(r.attachment || "").trim();
+      let attachmentUrl: string | undefined;
+      if (file) {
+        try {
+          attachmentUrl = pb.files.getURL(r as never, file);
+        } catch {
+          attachmentUrl = undefined;
+        }
+      }
+      fromBooking.push({
+        id: r.id,
+        thread_id: "",
+        pnr: r.pnr,
+        author_role:
+          String(r.sender_role || "").toUpperCase() === "CUSTOMER"
+            ? "guest"
+            : String(r.sender_role || "ops").toLowerCase(),
+        author_name: r.sender_name || "",
+        body: String(r.message || ""),
+        created: r.created,
+        attachmentUrl,
+        senderRole: r.sender_role,
+      });
+    }
   } catch {
-    return [];
+    /* ignore */
   }
+
+  // Merge both sources (Ops may write booking_messages; guest classic thread too)
+  const byId = new Map<string, CommMessage>();
+  for (const m of [...classic, ...fromBooking]) {
+    if (m?.id) byId.set(m.id, m);
+  }
+  const sorted = [...byId.values()].sort((a, b) => {
+    const ta = new Date(a.created || 0).getTime();
+    const tb = new Date(b.created || 0).getTime();
+    return ta - tb;
+  });
+
+  // Drop near-duplicate dual-writes (same body + role within 12s).
+  // Prefer the booking_messages copy when it has an attachment URL.
+  const out: CommMessage[] = [];
+  for (const m of sorted) {
+    const body = String(m.body || "").trim();
+    const role = String(m.author_role || "").toLowerCase();
+    const t = new Date(m.created || 0).getTime();
+    const dupIdx = out.findIndex((o) => {
+      if (String(o.body || "").trim() !== body) return false;
+      if (String(o.author_role || "").toLowerCase() !== role) return false;
+      const ot = new Date(o.created || 0).getTime();
+      return Math.abs(ot - t) < 12_000;
+    });
+    if (dupIdx < 0) {
+      out.push(m);
+      continue;
+    }
+    const existing = out[dupIdx];
+    if (!existing.attachmentUrl && m.attachmentUrl) {
+      out[dupIdx] = {
+        ...existing,
+        ...m,
+        senderRole: m.senderRole || existing.senderRole,
+      };
+    } else if (m.senderRole && !existing.senderRole) {
+      out[dupIdx] = { ...existing, senderRole: m.senderRole };
+    }
+  }
+  return out;
 }
 
 export async function postCommMessage(opts: {
@@ -170,11 +309,16 @@ export async function postCommMessage(opts: {
   agentId?: string | null;
   agentName?: string | null;
   guestEmail?: string | null;
+  topic?: string | null;
+  attachment?: File | Blob | null;
+  attachmentName?: string;
   /** Skip dual-write when caller already wrote booking_messages */
   skipBookingMirror?: boolean;
 }): Promise<CommMessage | null> {
   const body = String(opts.body || "").trim();
-  if (!body) return null;
+  const hasFile = Boolean(opts.attachment);
+  if (!body && !hasFile) return null;
+  const messageBody = body || (hasFile ? "(image attachment)" : "");
   const thread = await ensureCommThread({
     pnr: opts.pnr,
     agentId: opts.agentId,
@@ -189,22 +333,38 @@ export async function postCommMessage(opts: {
       pnr: thread.pnr,
       author_role: opts.authorRole,
       author_name: opts.authorName || "",
-      body,
+      body: messageBody,
     },
     { requestKey: null }
   )) as CommMessage;
 
+  let attachmentUrl: string | undefined;
+  let bookingId: string | undefined;
   if (!opts.skipBookingMirror) {
-    void mirrorToBookingMessages({
+    const mirrored = await mirrorToBookingMessages({
       pnr: thread.pnr,
       authorRole: opts.authorRole,
       authorName: opts.authorName,
       authorId: opts.authorId,
-      body,
+      body: messageBody,
+      topic: opts.topic,
+      attachment: opts.attachment,
+      attachmentName: opts.attachmentName,
     });
+    attachmentUrl = mirrored?.attachmentUrl;
+    bookingId = mirrored?.id;
   }
 
-  return created;
+  return {
+    ...created,
+    // Prefer booking_messages id when attachment lives there so guest feed
+    // dedupes cleanly against realtime booking_messages creates.
+    id: bookingId || created.id,
+    body: messageBody,
+    attachmentUrl,
+    senderRole:
+      opts.authorRole === "guest" ? "CUSTOMER" : "CONCIERGE",
+  };
 }
 
 export async function listThreadsForAgent(

@@ -16,10 +16,14 @@ import {
   type PbSiteBranding,
   type PublicBrandAssets,
 } from "@/lib/pocketbase/client";
+import { DEFAULT_CONCIERGE_ESTIMATE_COPY } from "@/lib/conciergeEstimateFlow";
 import { BrandingUiCardsAdmin } from "@/components/team/BrandingUiCardsAdmin";
+import { HomepageHeroCardsAdminStudio } from "@/components/team/HomepageHeroCardsAdminStudio";
 import { PreBuilderQuizBrandingAdmin } from "@/components/team/PreBuilderQuizBrandingAdmin";
 import { TransportCardsBrandingAdmin } from "@/components/team/TransportCardsBrandingAdmin";
-import { BRAND_LOGO, LOCAL_FONTS } from "@/lib/brand";
+import { BrandingUiKeysAdmin } from "@/components/team/BrandingUiKeysAdmin";
+import { MultiTransportExplainersAdmin } from "@/components/team/MultiTransportExplainersAdmin";
+import { BRAND_LOGO, BRAND_DESCRIPTION, BRAND_TITLE, LOCAL_FONTS } from "@/lib/brand";
 import {
   SINGLE_DAY_BUILDER_CONFIG,
   SINGLE_DAY_BUILDER_HERO_KEY,
@@ -65,10 +69,31 @@ export function SiteBrandingPanel({ getClient }: { getClient: () => PbClient }) 
   const [subtitle, setSubtitle] = useState<string>(
     DEFAULT_SITE_BRANDING.hero_subtitle
   );
+  const [documentTitle, setDocumentTitle] = useState<string>(
+    DEFAULT_SITE_BRANDING.document_title
+  );
+  const [documentDescription, setDocumentDescription] = useState<string>(
+    DEFAULT_SITE_BRANDING.document_description
+  );
   const [fontH1, setFontH1] = useState<string>(DEFAULT_SITE_BRANDING.font_h1);
   const [fontH2, setFontH2] = useState<string>(DEFAULT_SITE_BRANDING.font_h2);
   const [fontBody, setFontBody] = useState<string>(
     DEFAULT_SITE_BRANDING.font_body
+  );
+  const [estimateTitle, setEstimateTitle] = useState(
+    DEFAULT_CONCIERGE_ESTIMATE_COPY.estimateModalTitle
+  );
+  const [estimateSub, setEstimateSub] = useState(
+    DEFAULT_CONCIERGE_ESTIMATE_COPY.estimatePerDaySubtext
+  );
+  const [feeAmount, setFeeAmount] = useState(
+    String(DEFAULT_CONCIERGE_ESTIMATE_COPY.feeAmountEur)
+  );
+  const [feePolicy, setFeePolicy] = useState(
+    DEFAULT_CONCIERGE_ESTIMATE_COPY.feePolicyText
+  );
+  const [feeModalTitle, setFeeModalTitle] = useState(
+    DEFAULT_CONCIERGE_ESTIMATE_COPY.feeModalTitle
   );
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [heroFile, setHeroFile] = useState<File | null>(null);
@@ -103,9 +128,9 @@ export function SiteBrandingPanel({ getClient }: { getClient: () => PbClient }) 
   const [sdSaving, setSdSaving] = useState(false);
   const [sdMsg, setSdMsg] = useState<string | null>(null);
   const [sdError, setSdError] = useState<string | null>(null);
-  const [brandingTab, setBrandingTab] = useState<"heroes" | "prebuilder">(
-    "heroes"
-  );
+  const [brandingTab, setBrandingTab] = useState<
+    "heroes" | "torii" | "prebuilder" | "transport" | "pace" | "explanations"
+  >("heroes");
 
   const load = async () => {
     setLoading(true);
@@ -131,9 +156,39 @@ export function SiteBrandingPanel({ getClient }: { getClient: () => PbClient }) 
         row.hero_title_highlight || DEFAULT_SITE_BRANDING.hero_title_highlight
       );
       setSubtitle(row.hero_subtitle || DEFAULT_SITE_BRANDING.hero_subtitle);
+      setDocumentTitle(
+        row.document_title?.trim() ||
+          DEFAULT_SITE_BRANDING.document_title ||
+          BRAND_TITLE
+      );
+      setDocumentDescription(
+        row.document_description?.trim() ||
+          DEFAULT_SITE_BRANDING.document_description ||
+          BRAND_DESCRIPTION
+      );
       setFontH1(coerceLocal("h1", row.font_h1));
       setFontH2(coerceLocal("h2", row.font_h2));
       setFontBody(coerceLocal("body", row.font_body));
+      setEstimateTitle(
+        row.estimate_modal_title ||
+          DEFAULT_CONCIERGE_ESTIMATE_COPY.estimateModalTitle
+      );
+      setEstimateSub(
+        row.estimate_per_day_subtext ||
+          DEFAULT_CONCIERGE_ESTIMATE_COPY.estimatePerDaySubtext
+      );
+      setFeeAmount(
+        row.concierge_fee_amount ||
+          String(DEFAULT_CONCIERGE_ESTIMATE_COPY.feeAmountEur)
+      );
+      setFeePolicy(
+        row.concierge_fee_policy_text ||
+          DEFAULT_CONCIERGE_ESTIMATE_COPY.feePolicyText
+      );
+      setFeeModalTitle(
+        row.concierge_fee_modal_title ||
+          DEFAULT_CONCIERGE_ESTIMATE_COPY.feeModalTitle
+      );
       setLogoPreview(brandingLogoUrl(row, assets));
       setHeroPreview(brandingHeroUrl(row, assets));
       setFaviconPreview(assets.favicon || "/brand/favicon.png");
@@ -240,10 +295,24 @@ export function SiteBrandingPanel({ getClient }: { getClient: () => PbClient }) 
       fd.append("hero_title_main", main);
       fd.append("hero_title_highlight", highlight);
       fd.append("hero_subtitle", subtitle);
+      fd.append(
+        "document_title",
+        documentTitle.trim() || DEFAULT_SITE_BRANDING.document_title
+      );
+      fd.append(
+        "document_description",
+        documentDescription.trim() ||
+          DEFAULT_SITE_BRANDING.document_description
+      );
       fd.append("font_h1", coerceLocal("h1", fontH1));
       fd.append("font_h2", coerceLocal("h2", fontH2));
       fd.append("font_body", coerceLocal("body", fontBody));
       fd.append("google_fonts_url", "");
+      fd.append("estimate_modal_title", estimateTitle);
+      fd.append("estimate_per_day_subtext", estimateSub);
+      fd.append("concierge_fee_amount", feeAmount);
+      fd.append("concierge_fee_policy_text", feePolicy);
+      fd.append("concierge_fee_modal_title", feeModalTitle);
       if (logoFile) fd.append("logo_image", logoFile);
       if (heroFile) fd.append("hero_background_image", heroFile);
 
@@ -291,9 +360,14 @@ export function SiteBrandingPanel({ getClient }: { getClient: () => PbClient }) 
       setLogoFile(null);
       setHeroFile(null);
       setFaviconFile(null);
+      if (typeof document !== "undefined") {
+        const nextTitle =
+          documentTitle.trim() || DEFAULT_SITE_BRANDING.document_title;
+        document.title = nextTitle;
+      }
       setMsg(
         [
-          "Branding saved. Refresh the site to see typography updates.",
+          "Branding saved. Tab title updates immediately; refresh for other live pages.",
           ...notes,
         ].join(" ")
       );
@@ -409,33 +483,116 @@ export function SiteBrandingPanel({ getClient }: { getClient: () => PbClient }) 
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap gap-2 border-b border-zinc-800 pb-4">
-        <button
-          type="button"
-          onClick={() => setBrandingTab("heroes")}
-          className={
-            brandingTab === "heroes"
+      <div className="flex flex-wrap gap-2 overflow-x-auto border-b border-zinc-800 pb-4">
+        {(
+          [
+            ["heroes", "Global & Heroes"],
+            ["torii", "Main Intro"],
+            ["prebuilder", "Pre-Builder Match Quiz"],
+            ["transport", "Transport"],
+            ["pace", "Travel Pace"],
+            ["explanations", "Explanations"],
+          ] as const
+        ).map(([id, label]) => {
+          const active = brandingTab === id;
+          const activeClass =
+            id === "heroes"
               ? "rounded-full border border-[#1CA67F]/60 bg-[#1CA67F]/20 px-4 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-[#6ee7b7]"
-              : "rounded-full border border-zinc-700 bg-zinc-950 px-4 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-zinc-400 hover:border-zinc-500"
-          }
-        >
-          Global &amp; Heroes
-        </button>
-        <button
-          type="button"
-          onClick={() => setBrandingTab("prebuilder")}
-          className={
-            brandingTab === "prebuilder"
-              ? "rounded-full border border-[#075473] bg-[#075473]/25 px-4 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-[#7dd3fc]"
-              : "rounded-full border border-zinc-700 bg-zinc-950 px-4 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-zinc-400 hover:border-zinc-500"
-          }
-        >
-          Pre-Builder Match Quiz
-        </button>
+              : id === "torii"
+                ? "rounded-full border border-cyan-400 bg-[#075473] px-4 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-white"
+                : id === "transport"
+                  ? "rounded-full border border-[#F6A724]/70 bg-[#F6A724]/15 px-4 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-[#F6A724]"
+                  : id === "pace"
+                    ? "rounded-full border border-[#DC6E8A]/70 bg-[#DC6E8A]/15 px-4 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-[#f9a8c0]"
+                    : id === "explanations"
+                      ? "rounded-full border border-white/30 bg-white/10 px-4 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-white"
+                      : "rounded-full border border-[#075473] bg-[#075473]/25 px-4 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-[#7dd3fc]";
+          return (
+            <button
+              key={id}
+              type="button"
+              onClick={() => setBrandingTab(id)}
+              className={
+                active
+                  ? activeClass
+                  : "rounded-full border border-zinc-700 bg-zinc-950 px-4 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-zinc-400 hover:border-zinc-500"
+              }
+            >
+              {label}
+            </button>
+          );
+        })}
       </div>
 
       {brandingTab === "prebuilder" ? (
         <PreBuilderQuizBrandingAdmin getClient={getClient} />
+      ) : brandingTab === "torii" ? (
+        <HomepageHeroCardsAdminStudio getClient={getClient} />
+      ) : brandingTab === "transport" ? (
+        <div className="space-y-6">
+          <div className="rounded-2xl border border-zinc-800/80 bg-zinc-900/60 p-5">
+            <h2 className="font-display text-2xl text-zinc-100">Transport</h2>
+            <p className="mt-1 text-sm text-zinc-400">
+              Photos and titles for Multi-city arrangement cards (Self / Public /
+              Private) and Single-day Preferred Movement (Walking / Subway /
+              Private Driver).
+            </p>
+          </div>
+          <TransportCardsBrandingAdmin getClient={getClient} />
+          <BrandingUiKeysAdmin
+            getClient={getClient}
+            keys={["transit_walk", "transit_subway", "transit_private_driver"]}
+            title="Single-day · Preferred movement"
+            description="Photo, title, and subtitle on the three boxes in Builder S Transport. Detail-page copy is under Explanations."
+            fieldMode="card"
+            accent="#075473"
+          />
+        </div>
+      ) : brandingTab === "pace" ? (
+        <div className="space-y-6">
+          <div className="rounded-2xl border border-zinc-800/80 bg-zinc-900/60 p-5">
+            <h2 className="font-display text-2xl text-zinc-100">Travel Pace</h2>
+            <p className="mt-1 text-sm text-zinc-400">
+              Control the photo, title, and subtitle for each pace box (Fast /
+              Moderate / Relaxed) used in Multi and Single Party &amp; Pace.
+            </p>
+          </div>
+          <BrandingUiKeysAdmin
+            getClient={getClient}
+            keys={["pace_fast", "pace_moderate", "pace_relaxed"]}
+            title="Pace boxes"
+            description="One card per pace. Explanations (detail page body) live in the Explanations tab."
+            fieldMode="card"
+            accent="#DC6E8A"
+          />
+        </div>
+      ) : brandingTab === "explanations" ? (
+        <div className="space-y-6">
+          <div className="rounded-2xl border border-zinc-800/80 bg-zinc-900/60 p-5">
+            <h2 className="font-display text-2xl text-zinc-100">Explanations</h2>
+            <p className="mt-1 text-sm text-zinc-400">
+              Longer copy shown when a guest opens a transport or pace detail
+              page. Keep card photos/titles in Transport and Travel Pace tabs.
+            </p>
+          </div>
+          <BrandingUiKeysAdmin
+            getClient={getClient}
+            keys={["transit_walk", "transit_subway", "transit_private_driver"]}
+            title="Single-day · Movement detail pages"
+            description="Body text on Walking / Subway / Private Driver detail modals."
+            fieldMode="explanation"
+            accent="#075473"
+          />
+          <BrandingUiKeysAdmin
+            getClient={getClient}
+            keys={["pace_fast", "pace_moderate", "pace_relaxed"]}
+            title="Travel Pace · Detail pages"
+            description="Body text on Fast / Moderate / Relaxed pace detail modals."
+            fieldMode="explanation"
+            accent="#DC6E8A"
+          />
+          <MultiTransportExplainersAdmin getClient={getClient} />
+        </div>
       ) : (
         <>
       <div className="rounded-2xl border border-zinc-800/80 bg-zinc-900/60 p-5 sm:p-6">
@@ -482,6 +639,80 @@ export function SiteBrandingPanel({ getClient }: { getClient: () => PbClient }) 
                 : "Saves a copy to public/brand/site-logo.*",
             }}
           />
+          <div className="mt-6 space-y-3 rounded-xl border border-[#F6A724]/25 bg-[#F6A724]/5 p-4">
+            <p className="text-[10px] font-bold tracking-wider text-[#F6A724] uppercase">
+              Estimate &amp; €60 Deposit copy
+            </p>
+            <label className="block text-xs text-zinc-400">
+              Estimate modal title
+              <input
+                value={estimateTitle}
+                onChange={(e) => setEstimateTitle(e.target.value)}
+                className="mt-1 w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-white"
+              />
+            </label>
+            <label className="block text-xs text-zinc-400">
+              Per-day subtext (use {"{pax}"}, {"{days}"}, {"{total}"})
+              <input
+                value={estimateSub}
+                onChange={(e) => setEstimateSub(e.target.value)}
+                className="mt-1 w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-white"
+              />
+            </label>
+            <label className="block text-xs text-zinc-400">
+              Concierge fee amount (EUR)
+              <input
+                value={feeAmount}
+                onChange={(e) => setFeeAmount(e.target.value)}
+                className="mt-1 w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-white"
+              />
+            </label>
+            <label className="block text-xs text-zinc-400">
+              Fee modal title
+              <input
+                value={feeModalTitle}
+                onChange={(e) => setFeeModalTitle(e.target.value)}
+                className="mt-1 w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-white"
+              />
+            </label>
+            <label className="block text-xs text-zinc-400">
+              Fee policy text
+              <textarea
+                value={feePolicy}
+                onChange={(e) => setFeePolicy(e.target.value)}
+                rows={4}
+                className="mt-1 w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-white"
+              />
+            </label>
+          </div>
+          <div className="mt-6 space-y-3 rounded-xl border border-white/10 bg-black/20 p-4">
+            <p className="text-[10px] font-bold tracking-wider text-zinc-400 uppercase">
+              Browser tab title
+            </p>
+            <p className="text-xs text-zinc-500">
+              Shown in the browser tab and social previews. Empty fields use the
+              defaults.
+            </p>
+            <label className="block text-xs text-zinc-400">
+              Tab title
+              <input
+                value={documentTitle}
+                onChange={(e) => setDocumentTitle(e.target.value)}
+                placeholder={BRAND_TITLE}
+                className="mt-1 w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-white placeholder:text-zinc-600"
+              />
+            </label>
+            <label className="block text-xs text-zinc-400">
+              Meta description
+              <textarea
+                value={documentDescription}
+                onChange={(e) => setDocumentDescription(e.target.value)}
+                placeholder={BRAND_DESCRIPTION}
+                rows={3}
+                className="mt-1 w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-white placeholder:text-zinc-600"
+              />
+            </label>
+          </div>
           <div className="mt-6">
             <UploadField
               label="Tab icon (favicon)"
@@ -791,8 +1022,6 @@ export function SiteBrandingPanel({ getClient }: { getClient: () => PbClient }) 
           . Link this page from campaigns when guests have a fixed spend limit.
         </p>
       </div>
-
-      <TransportCardsBrandingAdmin getClient={getClient} />
 
       <BrandingUiCardsAdmin getClient={getClient} />
         </>

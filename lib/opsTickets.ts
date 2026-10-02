@@ -16,6 +16,11 @@ export type OpsTicketsRow = {
   assigned_ticketer_id?: string;
   /** Catalog picks (Suica, Shinkansen…) — same idea as experience lines. */
   ticket_lines?: unknown;
+  /** Uploaded PDF voucher filename in PB storage */
+  voucher_pdf?: string;
+  voucher_filename?: string;
+  /** ISO date — purge cron clears voucher 2 days after this */
+  tour_end_date?: string;
 };
 
 function safePnr(pnr: string): string {

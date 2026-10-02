@@ -1,36 +1,57 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowRight, Printer, Receipt, Save, Send, Wallet } from "lucide-react";
+import { Wallet } from "lucide-react";
 import { submitBookingRequest } from "@/lib/bookingRequest";
-import { calculateSingleDayQuote, formatEur } from "@/lib/singleDayPricing";
+import {
+  calculateSingleDayQuote,
+  formatEur,
+  singleDayPerPersonEur,
+  singleDayPerPersonHourEur,
+} from "@/lib/singleDayPricing";
 import { useBuilderStore } from "@/store/useBuilderStore";
 import {
   useSingleDayBuilderStore,
 } from "@/store/useSingleDayBuilderStore";
-import { BottomNav } from "@/components/builder/BottomNav";
 import { RevolutCheckoutModal } from "@/components/checkout/RevolutCheckoutModal";
 import {
   PrintRequestModal,
   type PrintRequestResult,
 } from "@/components/checkout/PrintRequestModal";
-import { BookingTermsModal } from "@/components/checkout/BookingTermsModal";
 import { SingleDayItineraryView } from "@/components/builder-single/SingleDayItineraryView";
+import { GuestTalkBubble } from "@/components/dossier/GuestTalkBubble";
+import { ThankYouPassMascot } from "@/components/branding/PandaFlexibleMascot";
+import { FeePaidRibbon } from "@/components/dossier/FeeCreditRibbon";
+import { DossierActionToolbar } from "@/components/dossier/DossierActionToolbar";
+import { TicketVoucherDownloadBanner } from "@/components/dossier/TicketVoucherDownloadBanner";
+import { ActionPillButton } from "@/components/ui/ActionPillButton";
+import {
+  ConciergeCommitmentFlow,
+  ConciergeFeeModal,
+  type ConciergePathOption,
+} from "@/components/checkout/ConciergeCommitmentFlow";
+import { SaveForLaterOptionsModal } from "@/components/checkout/SaveForLaterOptionsModal";
+import { BalancePaymentModal } from "@/components/checkout/BalancePaymentModal";
+import type { BalancePayOption } from "@/lib/balanceSettlement";
+import {
+  DEFAULT_CONCIERGE_FEE_EUR,
+  loadConciergeEstimateCopy,
+} from "@/lib/conciergeEstimateFlow";
 import { SingleDayInvoicePrint } from "@/components/builder-single/SingleDayInvoicePrint";
 import { SingleDayBudgetModal } from "@/components/builder-s/SingleDayBudgetModal";
-import {
-  AppSidebar,
-  APP_SIDEBAR_RAIL_PAD,
-} from "@/components/navigation/AppSidebar";
+import { SaveRequiredContactModal } from "@/components/builder/SaveRequiredContactModal";
 import { MobileTopChrome } from "@/components/navigation/MobileTopChrome";
-import { NewBookingResetButton } from "@/components/builder/NewBookingResetButton";
 import { IdleHeroMascot } from "@/components/branding/IdleHeroMascot";
 import { GoldLight } from "@/components/branding/GoldLight";
 import { SystemMessageFox } from "@/components/branding/SystemMessageFox";
 import { showSystemMessage } from "@/store/useSystemMessageStore";
 import { getSystemMessage } from "@/lib/systemMessages";
+import { dossierPrimaryCtaLabel } from "@/lib/tourPaymentStatus";
+import {
+  hasGuestContact,
+  saveContactAndCreateDraft,
+} from "@/lib/saveContactGate";
 import {
   fetchPaymentConfigured,
   isSingleDayBuilderComplete,
@@ -73,6 +94,9 @@ export default function SingleDayItineraryPageClient() {
   const selectedExperiences = useSingleDayBuilderStore(
     (s) => s.selectedExperiences
   );
+  const preferredMovement = useSingleDayBuilderStore((s) => s.preferredMovement);
+  const suicaNeeded = useSingleDayBuilderStore((s) => s.suicaNeeded);
+  const suicaValueEur = useSingleDayBuilderStore((s) => s.suicaValueEur);
   const tourDate = useSingleDayBuilderStore((s) => s.tourDate);
   const cityFocus = useSingleDayBuilderStore((s) => s.cityFocus);
   const experiencesStepDone = useSingleDayBuilderStore(
@@ -87,14 +111,35 @@ export default function SingleDayItineraryPageClient() {
   const [printSkipTerms, setPrintSkipTerms] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submittedRef, setSubmittedRef] = useState<string | null>(null);
+  const [feeCreditEur, setFeeCreditEur] = useState(0);
   const [printResult, setPrintResult] = useState<PrintRequestResult | null>(
     null
   );
-  const [termsOpen, setTermsOpen] = useState(false);
-  const [termsIntent, setTermsIntent] = useState<"invoice" | "print" | null>(
+  /** Pulsar on Send until guest opens the send flow once */
+  const [sendPulsarDone, setSendPulsarDone] = useState(false);
+  const [costPulsarDone, setCostPulsarDone] = useState(false);
+  const [saveLaterOpen, setSaveLaterOpen] = useState(false);
+  const [budgetOpen, setBudgetOpen] = useState(false);
+  const [showEstimateModal, setShowEstimateModal] = useState(false);
+  const [saveContactOpen, setSaveContactOpen] = useState(false);
+  const [pendingAfterSave, setPendingAfterSave] = useState<
+    "estimate" | "budget" | null
+  >(null);
+  const [showFeeModal, setShowFeeModal] = useState(false);
+  const [selectedPath, setSelectedPath] = useState<ConciergePathOption | null>(
     null
   );
-  const [budgetOpen, setBudgetOpen] = useState(false);
+  const [conciergeFeeEur, setConciergeFeeEur] = useState(
+    DEFAULT_CONCIERGE_FEE_EUR
+  );
+  const [checkoutMode, setCheckoutMode] = useState<
+    "deposit" | "concierge_fee" | "balance"
+  >("deposit");
+  const [balanceOpen, setBalanceOpen] = useState(false);
+  const [balanceAmount, setBalanceAmount] = useState(0);
+  const [balanceOption, setBalanceOption] =
+    useState<BalancePayOption>("30_PERCENT");
+  const [totalPaidEur, setTotalPaidEur] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -112,6 +157,21 @@ export default function SingleDayItineraryPageClient() {
   }, [ensureTempBookingRef, setTripMode]);
 
   useEffect(() => {
+    if (!hydrated) return;
+    const ref = activeBookingRef({
+      tempBookingRef,
+      confirmedBookingRef,
+      bookingStatus,
+    });
+    void import("@/lib/feeCredit").then(({ hydrateConciergeFeeCredit }) => {
+      void hydrateConciergeFeeCredit(ref).then((eur) => {
+        setFeeCreditEur(eur);
+        if (eur > 0) setTotalPaidEur((prev) => (prev > 0 ? prev : eur));
+      });
+    });
+  }, [hydrated, tempBookingRef, confirmedBookingRef, bookingStatus]);
+
+  useEffect(() => {
     const v = searchParams.get("view");
     if (v === "invoice" || v === "print") setActiveView("invoice");
     if (v === "dossier") setActiveView("dossier");
@@ -127,12 +187,232 @@ export default function SingleDayItineraryPageClient() {
         tourHours,
         experiencePrices: selectedExperiences.map((e) => Number(e.price) || 0),
         conciergeActive,
+        preferredMovement,
+        suicaNeeded,
+        suicaValueEur,
+        guests: Math.max(1, adults + children),
       }),
-    [guidePreference, tourHours, selectedExperiences, conciergeActive]
+    [
+      guidePreference,
+      tourHours,
+      selectedExperiences,
+      conciergeActive,
+      preferredMovement,
+      suicaNeeded,
+      suicaValueEur,
+      adults,
+      children,
+    ]
+  );
+
+  const preDraftStatus = usePreBuilderStore((s) => s.pnrDraftStatus);
+  const preWhatsapp = usePreBuilderStore((s) => s.whatsapp);
+  const contactReady = Boolean(
+    (clientName || preName || "").trim() &&
+      /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(
+        (clientEmail || preEmail || "").trim().toLowerCase()
+      ) &&
+      String(preWhatsapp || "").replace(/\D/g, "").length >= 7 &&
+      (preDraftStatus === "SAVED" ||
+        Boolean(
+          String(usePreBuilderStore.getState().lastPayload?.bookingRef || "").trim()
+        ))
   );
 
   const totalGuests = Math.max(1, adults + children);
-  void totalGuests;
+
+  const requireContactOr = (next: "estimate" | "budget", proceed: () => void) => {
+    if (hasGuestContact()) {
+      proceed();
+      return;
+    }
+    setPendingAfterSave(next);
+    setSaveContactOpen(true);
+  };
+
+  const handleRequestPay = () => {
+    setSubmitError(null);
+    setCostPulsarDone(true);
+    if (feeCreditEur > 0) {
+      void requestInvoiceView();
+      setBalanceOpen(true);
+      return;
+    }
+    requireContactOr("estimate", () => setShowEstimateModal(true));
+  };
+
+  const handleBalanceConfirm = (option: BalancePayOption, amountEur: number) => {
+    setBalanceOption(option);
+    setBalanceAmount(amountEur);
+    setBalanceOpen(false);
+    setCheckoutMode("balance");
+    setCheckoutRef(officialBookingRef());
+    setIsCheckoutModalOpen(true);
+  };
+
+  const handleBalancePaymentSuccess = async (paymentDetails: {
+    bookingRef: string;
+    amountPaid: number;
+    orderId: string | null;
+  }) => {
+    try {
+      void import("@/lib/recordPayment").then(({ recordPaymentSuccess }) =>
+        recordPaymentSuccess({
+          pnr: paymentDetails.bookingRef,
+          kind: balanceOption === "FULL" ? "tour_full" : "tour_partial",
+          amountEur: paymentDetails.amountPaid,
+          orderId: paymentDetails.orderId,
+          guestEmail,
+          guestName: customerName,
+          builder: "single",
+          estimatedTotalEur: quote.totalEur || quote.max,
+          notes:
+            balanceOption === "FULL"
+              ? "Full tour balance settlement"
+              : "30% progress payment on pending balance",
+        })
+      );
+      setTotalPaidEur((prev) => prev + paymentDetails.amountPaid);
+      setSubmittedRef(paymentDetails.bookingRef);
+      setIsCheckoutModalOpen(false);
+      setCheckoutMode("deposit");
+      showSystemMessage({
+        text:
+          balanceOption === "FULL"
+            ? "Full tour balance received — thank you."
+            : "Progress payment received — remaining balance due before travel.",
+        tone: "info",
+      });
+    } catch (err) {
+      setSubmitError(
+        err instanceof Error ? err.message : "Could not record balance payment."
+      );
+    }
+  };
+
+
+
+  const openBudget = () => {
+    requireContactOr("budget", () => setBudgetOpen(true));
+  };
+
+  const handleSelectEstimatePath = (path: ConciergePathOption) => {
+    setSelectedPath(path);
+    setShowEstimateModal(false);
+    void loadConciergeEstimateCopy().then((c) => {
+      setConciergeFeeEur(c.feeAmountEur);
+    });
+    // Persist draft before deposit so Ops sees FULL vs PARTIAL intent
+    void requestSaveOnly();
+    setShowFeeModal(true);
+  };
+
+  const handleSaveForLater = async () => {
+    setShowEstimateModal(false);
+    const ref = activeBookingRef({
+      tempBookingRef,
+      confirmedBookingRef,
+      bookingStatus,
+    });
+    try {
+      await fetch("/api/bookings/concierge-fee", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "save_later",
+          pnr: ref,
+          tourDate,
+        }),
+      });
+      showSystemMessage({
+        text: "Saved as draft — open Send to get your email copy, or we’ll follow up closer to your trip.",
+        tone: "info",
+      });
+    } catch {
+      showSystemMessage({
+        text: "Could not save follow-up. Your draft is still local.",
+        tone: "error",
+      });
+    }
+  };
+
+  const handleSaveDraftAndEmail = async () => {
+    setShowEstimateModal(false);
+    await handleSaveForLater();
+    setPrintSkipTerms(true);
+    setPrintOpen(true);
+  };
+
+  const handleConciergeFeePay = () => {
+    setShowFeeModal(false);
+    setCheckoutMode("concierge_fee");
+    setCheckoutRef(officialBookingRef());
+    setIsCheckoutModalOpen(true);
+  };
+
+  const handleConciergeFeeSuccess = async (paymentDetails: {
+    bookingRef: string;
+    amountPaid: number;
+    orderId: string | null;
+  }) => {
+    try {
+      await fetch("/api/bookings/concierge-fee", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "fee_paid",
+          pnr: paymentDetails.bookingRef,
+          amount: paymentDetails.amountPaid,
+          orderId: paymentDetails.orderId,
+          path: selectedPath || "FULL",
+        }),
+      });
+      void import("@/lib/recordPayment").then(({ recordPaymentSuccess }) =>
+        recordPaymentSuccess({
+          pnr: paymentDetails.bookingRef,
+          kind: "concierge_deposit",
+          amountEur: paymentDetails.amountPaid,
+          orderId: paymentDetails.orderId,
+          path: selectedPath || "FULL",
+          guestEmail,
+          guestName: customerName,
+          builder: "single",
+        })
+      );
+      void import("@/lib/feeCredit").then(({ markConciergeFeePaid }) =>
+        markConciergeFeePaid(
+          paymentDetails.bookingRef,
+          paymentDetails.amountPaid
+        )
+      );
+      confirmBookingRef(paymentDetails.bookingRef, "in_progress");
+      setSubmittedRef(paymentDetails.bookingRef);
+      setFeeCreditEur(paymentDetails.amountPaid);
+      if (guestEmail) {
+        void import("@/lib/syncBookingLead").then(({ syncSingleDayBookingLead }) =>
+          syncSingleDayBookingLead({
+            bookingRef: paymentDetails.bookingRef,
+            email: guestEmail,
+            state: useSingleDayBuilderStore.getState(),
+            status: "in_progress",
+            quote: { min: quote.min, max: quote.max },
+          })
+        );
+      }
+      showSystemMessage({
+        text: "Deposit received — your dates are held. An agent will contact you soon.",
+        tone: "info",
+      });
+    } catch {
+      setSubmitError(
+        "Payment succeeded but status update failed. Contact concierge with your booking ref."
+      );
+      setSubmittedRef(paymentDetails.bookingRef);
+    } finally {
+      setCheckoutMode("deposit");
+      setSelectedPath(null);
+    }
+  };
 
   const setMode = (mode: ViewMode) => {
     setActiveView(mode);
@@ -176,8 +456,7 @@ export default function SingleDayItineraryPageClient() {
       });
       return;
     }
-    setTermsIntent("invoice");
-    setTermsOpen(true);
+    setMode("invoice");
   };
 
   const requestSendPdf = async () => {
@@ -212,8 +491,9 @@ export default function SingleDayItineraryPageClient() {
       });
       return;
     }
-    setTermsIntent("print");
-    setTermsOpen(true);
+    setSendPulsarDone(true);
+    setPrintSkipTerms(true);
+    setPrintOpen(true);
   };
 
   const requestSaveOnly = async () => {
@@ -247,31 +527,6 @@ export default function SingleDayItineraryPageClient() {
 
   const requestPrintOnly = () => {
     window.print();
-  };
-
-  const handleTermsConfirm = () => {
-    const intent = termsIntent;
-    setTermsOpen(false);
-    setTermsIntent(null);
-    if (intent === "invoice") {
-      setMode("invoice");
-      return;
-    }
-    if (intent === "print") {
-      setPrintSkipTerms(true);
-      setPrintOpen(true);
-    }
-  };
-
-  const handleTermsCancel = () => {
-    setTermsOpen(false);
-    setTermsIntent(null);
-  };
-
-  const handleRequestPay = () => {
-    setSubmitError(null);
-    setCheckoutRef(officialBookingRef());
-    setIsCheckoutModalOpen(true);
   };
 
   const handlePaymentSuccess = async (paymentDetails: {
@@ -317,6 +572,23 @@ export default function SingleDayItineraryPageClient() {
       });
       confirmBookingRef(result.reference, "in_progress");
       setSubmittedRef(result.reference);
+      void import("@/lib/recordPayment").then(({ recordPaymentSuccess }) =>
+        recordPaymentSuccess({
+          pnr: result.reference,
+          kind:
+            paymentDetails.paymentType === "full"
+              ? "tour_full"
+              : paymentDetails.paymentType === "partial"
+                ? "tour_partial"
+                : "tour_deposit",
+          amountEur: paymentDetails.amountPaid,
+          currency: paymentDetails.currency,
+          orderId: paymentDetails.orderId,
+          guestEmail: paymentDetails.customerEmail,
+          guestName: paymentDetails.customerName,
+          builder: "single",
+        })
+      );
 
       const email = String(paymentDetails.customerEmail || "")
         .trim()
@@ -354,19 +626,12 @@ export default function SingleDayItineraryPageClient() {
   return (
     <div className="builder-theme relative z-10 min-h-screen overflow-x-hidden bg-transparent pb-44 text-white md:pb-36">
       <SystemMessageFox />
-      <AppSidebar
-        brandEyebrow="TOKIOTOURS"
+      <MobileTopChrome
         brandTitle="Itinerary"
-        expandOnHover
+        ctaHref="/builder-single"
+        ctaLabel="Builder"
       />
-
-      <div className={APP_SIDEBAR_RAIL_PAD}>
-        <MobileTopChrome
-          brandTitle="Itinerary"
-          ctaHref="/builder-single"
-          ctaLabel="Builder"
-        />
-        <div className="mx-auto mt-4 max-w-3xl px-4 sm:px-5">
+      <div className="mx-auto mt-4 max-w-3xl px-4 sm:px-5">
           <header className="group no-print relative overflow-visible rounded-2xl border border-white/10 bg-[#0A1017]/80 px-4 py-5 shadow-2xl backdrop-blur-md sm:px-5">
             <div
               className="pointer-events-none absolute inset-0 z-0 overflow-hidden rounded-2xl"
@@ -378,13 +643,13 @@ export default function SingleDayItineraryPageClient() {
           <div className="relative grid grid-cols-3 items-end gap-2">
             <div className="col-span-2 min-w-0">
               <p className="text-[0.65rem] font-semibold uppercase tracking-[0.35em] text-[#F6A724]">
-                Builder S · Itinerary
+                Single day · Itinerary
               </p>
               <h1 className="mt-1 break-words font-godiva text-2xl uppercase leading-tight tracking-wide text-white sm:text-3xl">
                 {customerName}
               </h1>
               <h2 className="mt-0.5 font-godiva text-[1.125rem] uppercase tracking-wider text-white/90">
-                Single Day Tour Dossier
+                Dossier
               </h2>
               <p className="mt-1 text-sm text-white/55">
                 Hour-by-hour day plan and private single-day quotation.
@@ -400,61 +665,35 @@ export default function SingleDayItineraryPageClient() {
             </div>
           </div>
 
-          <div
-            className="mt-4 flex flex-col gap-2.5 border-t border-white/10 pt-3"
-            role="toolbar"
-            aria-label="Single-day itinerary actions"
-          >
-            <div className="mx-auto grid w-full max-w-lg grid-cols-4 gap-2.5">
-              <ToggleBtn
-                active={activeView === "invoice"}
-                onClick={() => {
-                  if (activeView === "invoice") setMode("dossier");
-                  else void requestInvoiceView();
-                }}
-                icon={<Receipt className="h-3.5 w-3.5" />}
-                label="Invoice"
-                className="w-full justify-center"
-              />
-              <button
-                type="button"
-                onClick={() => void requestSaveOnly()}
-                aria-label="Save document"
-                title="Save"
-                className="inline-flex items-center justify-center rounded-xl border border-white/10 bg-white/5 p-2.5 text-white transition-colors hover:bg-white/10"
-              >
-                <Save className="h-4 w-4" aria-hidden />
-              </button>
-              <button
-                type="button"
-                onClick={() => void requestSendPdf()}
-                aria-label="Send / Share"
-                title="Send / Share"
-                className="inline-flex items-center justify-center rounded-xl border border-white/10 bg-white/5 p-2.5 text-white transition-colors hover:bg-white/10"
-              >
-                <Send className="h-4 w-4" aria-hidden />
-              </button>
-              <button
-                type="button"
-                onClick={requestPrintOnly}
-                aria-label="Print dossier"
-                title="Print"
-                className="inline-flex items-center justify-center rounded-xl border border-white/10 bg-white/5 p-2.5 text-white transition-colors hover:bg-white/10"
-              >
-                <Printer className="h-4 w-4" aria-hidden />
-              </button>
-            </div>
-            <div className="mx-auto grid w-full max-w-lg grid-cols-2 gap-3">
-              <Link
-                href="/builder-single"
-                className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-white/20 bg-transparent px-3.5 py-3 text-[11px] font-bold tracking-wider text-zinc-300 uppercase transition-all hover:bg-white/5"
-              >
-                ← Continue editing
-              </Link>
-              <div className="flex w-full [&_button]:w-full">
-                <NewBookingResetButton variant="nav" />
-              </div>
-            </div>
+          <div className="mt-4 border-t border-white/10 pt-3">
+            {feeCreditEur > 0 ? (
+              <FeePaidRibbon feeEur={feeCreditEur} className="mb-3" />
+            ) : null}
+            <TicketVoucherDownloadBanner
+              pnr={activeBookingRef({
+                tempBookingRef,
+                confirmedBookingRef,
+                bookingStatus,
+              })}
+              className="mb-3"
+            />
+            <DossierActionToolbar
+              contactReady={contactReady}
+              costPulsarDone={costPulsarDone}
+              continueHref="/builder-single"
+              howMuchLabel={dossierPrimaryCtaLabel(feeCreditEur)}
+              conciergeFeePaid={feeCreditEur > 0}
+              onHowMuchCost={handleRequestPay}
+              onSave={() => void requestSaveOnly()}
+              onSend={() => void requestSendPdf()}
+              onPrint={requestPrintOnly}
+              onItinerary={() => setMode("dossier")}
+              onInvoice={() => {
+                if (activeView === "invoice") setMode("dossier");
+                else void requestInvoiceView();
+              }}
+              invoiceActive={activeView === "invoice"}
+            />
           </div>
           </div>
         </header>
@@ -484,39 +723,60 @@ export default function SingleDayItineraryPageClient() {
               embedded
               showToolbar={false}
               onPrintRequest={requestSendPdf}
+              feeCreditEur={feeCreditEur}
             />
           </div>
         </main>
-      </div>
 
-      {/* Compact dual-action bar: Request/Pay + Target Budget */}
-      <div className="no-print sticky-action-bar fixed inset-x-0 bottom-16 z-30 mb-2 w-full overflow-x-hidden md:bottom-4 lg:left-16 lg:pl-0">
+      {/* Compact dual-action bar — clear of mobile chat + bottom nav */}
+      {contactReady ? (
+      <div className="no-print sticky-action-bar fixed inset-x-0 bottom-28 z-30 mb-2 w-full overflow-x-hidden pr-[4.75rem] sm:bottom-6 sm:left-20 sm:pr-24 sm:pl-0">
         <div className="mx-auto flex w-full max-w-5xl px-2 sm:px-4">
-          <div className="flex w-full items-center gap-2 rounded-2xl border border-white/10 bg-[#0D1117]/95 p-2 shadow-2xl backdrop-blur-md sm:gap-3 sm:p-2.5">
-            <div className="min-w-0 flex-1 pl-1 sm:pl-2">
+          <div className="flex w-full flex-col gap-2 rounded-2xl border border-white/10 bg-[#0D1117]/95 p-2 shadow-2xl backdrop-blur-md sm:flex-row sm:items-center sm:gap-3 sm:p-2.5">
+            {/* Mobile: buttons on top; desktop: buttons on the right */}
+            <div className="flex w-full items-center justify-end gap-2 sm:order-2 sm:w-auto sm:shrink-0">
+              <button
+                type="button"
+                onClick={openBudget}
+                className="inline-flex min-w-0 flex-1 items-center justify-center gap-1.5 rounded-xl border border-white/15 bg-white/5 px-2.5 py-2.5 text-[10px] font-bold uppercase tracking-wide text-white transition hover:bg-white/10 sm:flex-none sm:px-4 sm:text-xs"
+              >
+                <Wallet className="h-3.5 w-3.5 shrink-0" />
+                Price Composition
+              </button>
+              <ActionPillButton
+                conciergeFeePaid={feeCreditEur > 0}
+                onClick={handleRequestPay}
+                pulse={!costPulsarDone}
+                className="shrink-0"
+              />
+            </div>
+            <div className="min-w-0 flex-1 pl-1 sm:order-1 sm:pl-2">
               <p className="text-[9px] font-bold uppercase tracking-wider text-[#00B4D8]">
-                Single-Day Package
+                Est. range · per person
               </p>
               <p className="truncate text-sm font-extrabold text-white sm:text-base">
-                {formatEur(quote.totalEur)}
+                {formatEur(
+                  singleDayPerPersonEur(quote.totalEur, totalGuests)
+                )}
+                <span className="ml-1 text-[10px] font-semibold text-white/50">
+                  /pp
+                </span>
+              </p>
+              <p className="truncate text-[9px] text-zinc-500">
+                {tourHours}h ·{" "}
+                {formatEur(
+                  singleDayPerPersonHourEur(
+                    quote.totalEur,
+                    totalGuests,
+                    tourHours
+                  )
+                )}
+                /pp/h
+                <span className="ml-1.5 text-zinc-600">
+                  · party {formatEur(quote.totalEur)}
+                </span>
               </p>
             </div>
-            <button
-              type="button"
-              onClick={() => setBudgetOpen(true)}
-              className="inline-flex shrink-0 items-center gap-1.5 rounded-xl border border-white/15 bg-white/5 px-3 py-2.5 text-[10px] font-bold uppercase tracking-wide text-white transition hover:bg-white/10 sm:px-4 sm:text-xs"
-            >
-              <Wallet className="h-3.5 w-3.5" />
-              Target Budget
-            </button>
-            <button
-              type="button"
-              onClick={handleRequestPay}
-              className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-[#075473] px-3 py-2.5 text-[10px] font-bold uppercase tracking-wide text-white transition hover:bg-[#05384c] sm:px-4 sm:text-xs"
-            >
-              Request / Pay
-              <ArrowRight className="h-3.5 w-3.5" aria-hidden />
-            </button>
           </div>
         </div>
         {submitError ? (
@@ -530,28 +790,140 @@ export default function SingleDayItineraryPageClient() {
           </p>
         ) : null}
       </div>
+      ) : null}
 
       <SingleDayBudgetModal
         open={budgetOpen}
         onClose={() => setBudgetOpen(false)}
       />
 
+      <SaveRequiredContactModal
+        open={saveContactOpen}
+        initialName={customerName !== "Guest" ? customerName : ""}
+        initialEmail={guestEmail}
+        initialWhatsapp={
+          usePreBuilderStore.getState().whatsapp ||
+          usePreBuilderStore.getState().lastPayload?.whatsapp ||
+          ""
+        }
+        onClose={() => {
+          setSaveContactOpen(false);
+          setPendingAfterSave(null);
+        }}
+        onSaved={async (contact) => {
+          await saveContactAndCreateDraft(contact);
+          setSaveContactOpen(false);
+          const next = pendingAfterSave;
+          setPendingAfterSave(null);
+          showSystemMessage({
+            text: "Draft saved — quotation unlocked.",
+            tone: "info",
+          });
+          if (next === "estimate") setShowEstimateModal(true);
+          if (next === "budget") setBudgetOpen(true);
+        }}
+      />
+
+      <BalancePaymentModal
+        open={balanceOpen}
+        onClose={() => setBalanceOpen(false)}
+        pnr={officialBookingRef()}
+        guestName={customerName}
+        totalPackageEur={quote.totalEur || quote.max}
+        conciergeCreditEur={feeCreditEur}
+        totalPaidEur={totalPaidEur || feeCreditEur}
+        onConfirm={handleBalanceConfirm}
+      />
+
       <RevolutCheckoutModal
         isOpen={isCheckoutModalOpen}
-        onClose={() => setIsCheckoutModalOpen(false)}
+        onClose={() => {
+          setIsCheckoutModalOpen(false);
+          setCheckoutMode("deposit");
+        }}
         bookingRef={checkoutRef}
-        totalAmount={quote.max}
-        totalAmountMin={quote.min}
+        totalAmount={
+          checkoutMode === "concierge_fee"
+            ? conciergeFeeEur
+            : checkoutMode === "balance"
+              ? balanceAmount
+              : quote.max
+        }
+        totalAmountMin={
+          checkoutMode === "concierge_fee" || checkoutMode === "balance"
+            ? undefined
+            : quote.min
+        }
         currency="EUR"
-        defaultDepositPercent={10}
-        onPaymentSuccess={handlePaymentSuccess}
+        defaultDepositPercent={
+          checkoutMode === "concierge_fee" || checkoutMode === "balance"
+            ? 100
+            : 10
+        }
+        fixedAmount={
+          checkoutMode === "concierge_fee"
+            ? conciergeFeeEur
+            : checkoutMode === "balance"
+              ? balanceAmount
+              : undefined
+        }
+        fixedAmountLabel={
+          checkoutMode === "balance"
+            ? `€${balanceAmount} Tour balance`
+            : "€60 Deposit (100% credited)"
+        }
+        customerEmail={guestEmail}
+        customerName={customerName}
+        onPaymentSuccess={(details) => {
+          if (checkoutMode === "concierge_fee") {
+            void handleConciergeFeeSuccess(details);
+          } else if (checkoutMode === "balance") {
+            void handleBalancePaymentSuccess(details);
+          } else {
+            void handlePaymentSuccess(details);
+          }
+        }}
         onPaymentError={setSubmitError}
       />
 
-      <BookingTermsModal
-        open={termsOpen}
-        onConfirm={handleTermsConfirm}
-        onCancel={handleTermsCancel}
+      <ConciergeCommitmentFlow
+        openEstimate={showEstimateModal}
+        onCloseEstimate={() => setShowEstimateModal(false)}
+        totalPrice={quote.totalEur || quote.max}
+        paxCount={totalGuests}
+        totalDays={1}
+        onSelectPath={handleSelectEstimatePath}
+        onSaveForLater={() => {
+          void handleSaveDraftAndEmail();
+        }}
+        onSeeDetails={() => {
+          // Keep estimate open; Price Composition stacks above (z-120)
+          setBudgetOpen(true);
+        }}
+      />
+
+      {/* Legacy entry — budget / 1:1 flip cards (not estimate Option 3) */}
+      <SaveForLaterOptionsModal
+        open={saveLaterOpen}
+        onClose={() => setSaveLaterOpen(false)}
+        feeAmountEur={conciergeFeeEur}
+        onPayFee={() => {
+          void loadConciergeEstimateCopy().then((c) => {
+            setConciergeFeeEur(c.feeAmountEur);
+          });
+          setShowFeeModal(true);
+        }}
+        onContinueEditing={() => {
+          setSaveLaterOpen(false);
+          window.location.href = "/builder-single";
+        }}
+      />
+
+      <ConciergeFeeModal
+        open={showFeeModal}
+        onClose={() => setShowFeeModal(false)}
+        onPay={handleConciergeFeePay}
+        feeAmountEur={conciergeFeeEur}
       />
 
       <PrintRequestModal
@@ -604,6 +976,7 @@ export default function SingleDayItineraryPageClient() {
       {submittedRef ? (
         <div className="no-print fixed inset-0 z-[80] flex items-end justify-center bg-black/45 p-4 sm:items-center">
           <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
+            <ThankYouPassMascot size="md" className="mb-3" />
             <p className="text-[0.65rem] font-semibold uppercase tracking-[0.3em] text-[#075473]">
               Payment received
             </p>
@@ -626,7 +999,16 @@ export default function SingleDayItineraryPageClient() {
       ) : null}
 
       <div className="no-print">
-        <BottomNav />
+        <GuestTalkBubble
+          pnr={activeBookingRef({
+            tempBookingRef,
+            confirmedBookingRef,
+            bookingStatus,
+          })}
+          guestEmail={guestEmail}
+          guestName={customerName}
+          tripPath="/builder-single/itinerary"
+        />
       </div>
     </div>
   );

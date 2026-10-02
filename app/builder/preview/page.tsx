@@ -11,7 +11,6 @@ import {
 import { calculateBuilderQuote, formatUsd } from "@/lib/builder-pricing";
 import { requestAdvanceBookingInProgress } from "@/lib/bookingLifecycle";
 import { useBuilderStore } from "@/store/useBuilderStore";
-import { BottomNav } from "@/components/builder/BottomNav";
 
 export default function PreviewPage() {
   const state = useBuilderStore();
@@ -122,7 +121,6 @@ export default function PreviewPage() {
           Continue Editing
         </Link>
       </main>
-      <BottomNav />
     </div>
   );
 }

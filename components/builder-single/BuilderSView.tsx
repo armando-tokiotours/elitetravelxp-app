@@ -27,6 +27,8 @@ import { MeetingPointPlacesPicker } from "@/components/builder/MeetingPointPlace
 import { LazyVideo } from "@/components/ui/LazyVideo";
 import { useSiteBrandingStore } from "@/store/useSiteBrandingStore";
 import { SelfArrangeMicroTable } from "@/components/builder/SelfArrangeMicroTable";
+import { TripRangeMiniCalendar } from "@/components/builder/TripRangeMiniCalendar";
+import { TransitPassQuestionnaire } from "@/components/builder/TransitPassQuestionnaire";
 import type { GeoapifyPlace } from "@/lib/geoapify";
 import { languageFlag, languageToCode } from "@/lib/tourLanguages";
 import {
@@ -155,6 +157,7 @@ export function BuilderSView({
   const [activeEditModal, setActiveEditModal] = useState<SEditId>(null);
   const [movementModal, setMovementModal] =
     useState<IntraCityTransport | null>(null);
+  const [transitPassOpen, setTransitPassOpen] = useState(false);
   /** After city change confirm, force guided pulsar onto Hours & Date. */
   const [pulsarOverride, setPulsarOverride] = useState<GlowStep | null>(null);
   const [activePulsarStep, setActivePulsarStep] = useState<PulsarStep | null>(
@@ -185,6 +188,20 @@ export function BuilderSView({
   const preferredMovement = useSingleDayBuilderStore(
     (s) => s.preferredMovement
   );
+  const guestHasJRPass = useSingleDayBuilderStore((s) => s.guestHasJRPass);
+  const guestHasICCard = useSingleDayBuilderStore((s) => s.guestHasICCard);
+  const suicaNeeded = useSingleDayBuilderStore((s) => s.suicaNeeded);
+  const suicaValueEur = useSingleDayBuilderStore((s) => s.suicaValueEur);
+  const guestNeedsTransitHelp = useSingleDayBuilderStore(
+    (s) => s.guestNeedsTransitHelp
+  );
+  const setGuestTransitPasses = useSingleDayBuilderStore(
+    (s) => s.setGuestTransitPasses
+  );
+  const setSuicaPreference = useSingleDayBuilderStore(
+    (s) => s.setSuicaPreference
+  );
+  const setBuilderTransitPasses = useBuilderStore((s) => s.setGuestTransitPasses);
   const preferredTourLanguage = useSingleDayBuilderStore(
     (s) => s.preferredTourLanguage
   );
@@ -399,24 +416,21 @@ export function BuilderSView({
           <WidgetLabel>City</WidgetLabel>
         </div>
 
-        <div className="grid grid-cols-2 gap-3.5 overflow-visible">
+        <div className="grid grid-cols-2 items-start gap-3.5 overflow-visible">
           <div className="overflow-visible">
             <button
               type="button"
               onClick={() => openEditModal("duration")}
-              className={`${HALF} ${getWidgetPulsarClass(activePulsarStep, "duration")}`}
+              className={`${WIDGET_SHELL} ${getWidgetPulsarClass(activePulsarStep, "duration")} min-h-[11.5rem] p-3.5`}
             >
-            <WidgetCallingPulse active={activePulsarStep === "duration"} />
-              <div className="relative z-10 flex items-center justify-between">
-                <span className="text-xl" aria-hidden>
-                  📅
-                </span>
+              <WidgetCallingPulse active={activePulsarStep === "duration"} />
+              <div className="relative z-10 flex justify-end">
                 <span className="rounded-full bg-amber-500/10 px-2 py-0.5 font-mono text-[10px] font-bold uppercase tracking-widest text-amber-400">
                   DAY
                 </span>
               </div>
-              <div className="relative z-10 mt-3">
-                <h3 className="font-godiva text-lg font-black leading-none text-white">
+              <div className="relative z-10 mt-1">
+                <h3 className="font-godiva text-lg font-black leading-none text-white sm:text-xl">
                   {tourHours}H TOUR
                 </h3>
                 <p className="mt-1 font-mono text-[11px] text-zinc-300">
@@ -424,6 +438,7 @@ export function BuilderSView({
                     ? `${dateText} · ${startTime || "09:00"}`
                     : "Set Tour Date"}
                 </p>
+                <TripRangeMiniCalendar arrivalDate={tourDate} tripDays={1} />
               </div>
             </button>
             <WidgetLabel>Hours &amp; Date</WidgetLabel>
@@ -433,9 +448,9 @@ export function BuilderSView({
             <button
               type="button"
               onClick={() => openEditModal("guests")}
-              className={`${HALF} ${getWidgetPulsarClass(activePulsarStep, "guests")}`}
+              className={`${WIDGET_SHELL} ${getWidgetPulsarClass(activePulsarStep, "guests")} min-h-[11.5rem] p-4`}
             >
-            <WidgetCallingPulse active={activePulsarStep === "guests"} />
+              <WidgetCallingPulse active={activePulsarStep === "guests"} />
               <div className="relative z-10 flex items-center justify-between">
                 <span className="text-xl" aria-hidden>
                   👥
@@ -671,7 +686,19 @@ export function BuilderSView({
           onClose={() => setActiveEditModal(null)}
           startTime={startTime}
           preferredMovement={preferredMovement}
-          onOpenMovement={setMovementModal}
+          onOpenMovement={(id) => {
+            if (id === "subway") {
+              const needPass =
+                guestHasJRPass == null ||
+                guestHasICCard == null ||
+                guestNeedsTransitHelp == null;
+              if (needPass) {
+                setTransitPassOpen(true);
+                return;
+              }
+            }
+            setMovementModal(id);
+          }}
           scheduled={scheduled}
           tourHours={tourHours}
           city={selectedCity}
@@ -694,11 +721,42 @@ export function BuilderSView({
       <MovementDetailModal
         movementId={movementModal}
         selected={preferredMovement}
+        partySize={Math.max(1, adults + children)}
+        initialNeedsSuica={suicaNeeded}
+        initialSuicaValueEur={suicaValueEur}
         onClose={() => setMovementModal(null)}
-        onSelect={(id) => {
+        onSelect={(id, extras) => {
           setPreferredMovement(id);
+          if (id === "subway" && extras) {
+            setSuicaPreference({
+              suicaNeeded: Boolean(extras.needsSuica),
+              suicaValueEur: extras.suicaValueEur,
+            });
+          }
+          if (id === "walk" || id === "private_driver") {
+            setSuicaPreference({ suicaNeeded: false, suicaValueEur: 0 });
+          }
+          // Stay on Logistics 3-option screen — only clear detail layer
           setMovementModal(null);
-          setActiveEditModal(null);
+          setPulsarOverride("save");
+        }}
+      />
+
+      <TransitPassQuestionnaire
+        open={transitPassOpen}
+        onClose={() => setTransitPassOpen(false)}
+        initial={{
+          guestHasJRPass,
+          guestHasICCard,
+          guestNeedsTransitHelp,
+        }}
+        confirmLabel="Continue with Subway"
+        onSave={(answers) => {
+          setGuestTransitPasses(answers);
+          setBuilderTransitPasses(answers);
+          setPreferredMovement("subway");
+          setTransitPassOpen(false);
+          setMovementModal("subway");
           setPulsarOverride("save");
         }}
       />
@@ -929,23 +987,27 @@ function LogisticsModal({
                 <p className="mb-2 text-[10px] font-bold uppercase tracking-widest text-white">
                   Preferred movement
                 </p>
-                <div className="grid grid-cols-2 gap-2.5">
+                <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 sm:mx-0 sm:grid sm:grid-cols-3 sm:gap-2.5 sm:overflow-visible sm:px-0 sm:pb-0">
                   {TRANSPORT_OPTIONS.map((opt) => {
                     const item = getItem(opt.brandingKey);
                     const on = preferredMovement === opt.id;
+                    const otherSelected =
+                      preferredMovement != null && !on;
                     const media = item.mediaUrl || item.posterUrl;
                     return (
                       <button
                         key={opt.id}
                         type="button"
                         onClick={() => onOpenMovement(opt.id)}
-                        className={`group relative overflow-hidden rounded-2xl border text-left transition ${
+                        className={`group relative w-[9.5rem] shrink-0 overflow-hidden rounded-2xl border text-left transition duration-300 sm:w-auto ${
                           on
-                            ? "border-[#075473] ring-2 ring-[#075473]"
-                            : "border-white/10"
+                            ? "scale-[1.02] border-[#075473] opacity-100 shadow-lg ring-2 ring-[#075473]"
+                            : otherSelected
+                              ? "border-white/5 opacity-40 grayscale-[30%]"
+                              : "border-white/10 opacity-100"
                         }`}
                       >
-                        <span className="relative block aspect-[4/5] w-full bg-zinc-900">
+                        <span className="relative block aspect-[3/4] w-full bg-zinc-900">
                           {item.isVideo && item.mediaUrl ? (
                             <LazyVideo
                               src={item.mediaUrl}

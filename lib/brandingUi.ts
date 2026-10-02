@@ -197,6 +197,18 @@ export const BRANDING_UI_FALLBACKS: Record<string, BrandingUiFallback> = {
     ctaPrimary: "Watch Your Activity Match Reel",
     ctaSecondary: "Take 30-Sec Style Quiz",
   },
+  builder_e_attractions_widget: {
+    key: "builder_e_attractions_widget",
+    category: "builder",
+    title: "Tours, Tickets & Cultural Activities",
+    subtitle: "Explore All Experiences",
+    description:
+      "Filter by City (Tokyo, Kyoto, Osaka) & Style (Food, Anime, Nature)",
+    mediaFallback: "/brand/hero-background.jpg",
+    sortOrder: 1,
+    ctaPrimary: "Explore",
+    ctaSecondary: "",
+  },
   budget_planner: {
     key: "budget_planner",
     category: "planner",

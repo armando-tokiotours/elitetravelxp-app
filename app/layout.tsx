@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
 import { DynamicTypography } from "@/components/layout/DynamicTypography";
+import { BrandDocumentMeta } from "@/components/branding/BrandDocumentMeta";
 import { SeasonalParticlesHost } from "@/components/branding/SeasonalParticles";
 import { BrandCharacterPreloader } from "@/components/branding/BrandCharacterPreloader";
 import { BRAND_DESCRIPTION, BRAND_TITLE, BRAND_URL } from "@/lib/brand";
@@ -146,6 +147,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       <body className="tokio-ambient-bg flex min-h-full flex-col font-futura text-tokio-ice">
         <BrandCharacterPreloader />
         <DynamicTypography />
+        <BrandDocumentMeta />
         <SeasonalParticlesHost />
         {children}
       </body>

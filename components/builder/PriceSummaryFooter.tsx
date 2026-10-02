@@ -19,6 +19,7 @@ export function PriceSummaryFooter({
   requestDisabled,
   /** sticky disabled — use placement="inline" in dossier; floating bar overlaps nav */
   placement = "inline",
+  reserveLabel = "Secure dates · €60 deposit",
 }: {
   quoteMin: number | null;
   quoteMax: number | null;
@@ -29,6 +30,7 @@ export function PriceSummaryFooter({
   requestDisabled?: boolean;
   /** sticky = fixed above bottom nav (hidden by default); inline = in-document glass cards */
   placement?: "sticky" | "inline";
+  reserveLabel?: string;
 }) {
   const [conciergeVideoOpen, setConciergeVideoOpen] = useState(false);
   const customBudgetTarget = useBuilderStore((s) => s.customBudgetTarget);
@@ -130,7 +132,7 @@ export function PriceSummaryFooter({
           onClick={onRequestPay}
           className="mt-2 flex w-full shrink-0 items-center justify-center gap-1 rounded-xl bg-[#075473] px-2 py-2 text-center text-[10px] font-bold text-white transition hover:bg-[#096a91] disabled:opacity-60 sm:py-2.5 sm:text-xs"
         >
-          Request & Pay
+          {reserveLabel}
           <ArrowRight className="h-3 w-3 sm:h-3.5 sm:w-3.5" aria-hidden />
         </button>
       </div>

@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { FileText, Luggage, Printer, Receipt, Save, Send } from "lucide-react";
+import { FileText } from "lucide-react";
 import { buildCityMap, getCityName } from "@/lib/cityLabels";
 import { activeBookingRef } from "@/utils/pnr";
 import { syncMultiDayBookingLead } from "@/lib/syncBookingLead";
@@ -18,28 +18,44 @@ import { allocateFleet } from "@/lib/vehicleAllocator";
 import { useBuilderStore } from "@/store/useBuilderStore";
 import { useItineraryStore } from "@/store/useItineraryStore";
 import { usePreBuilderStore } from "@/store/usePreBuilderStore";
-import { BottomNav } from "@/components/builder/BottomNav";
 import { RevolutCheckoutModal } from "@/components/checkout/RevolutCheckoutModal";
+import {
+  ConciergeCommitmentFlow,
+  ConciergeFeeModal,
+  type ConciergePathOption,
+} from "@/components/checkout/ConciergeCommitmentFlow";
+import { SaveForLaterOptionsModal } from "@/components/checkout/SaveForLaterOptionsModal";
+import { BalancePaymentModal } from "@/components/checkout/BalancePaymentModal";
+import type { BalancePayOption } from "@/lib/balanceSettlement";
+import {
+  DEFAULT_CONCIERGE_FEE_EUR,
+  loadConciergeEstimateCopy,
+} from "@/lib/conciergeEstimateFlow";
 import {
   PrintRequestModal,
   type PrintRequestResult,
 } from "@/components/checkout/PrintRequestModal";
-import { BookingTermsModal } from "@/components/checkout/BookingTermsModal";
 import { PrintItineraryDocument } from "@/components/builder/PrintItineraryDocument";
 import {
   TravelDossierView,
   resolveHub,
 } from "@/components/builder/TravelDossierView";
-import {
-  AppSidebar,
-  APP_SIDEBAR_RAIL_PAD,
-} from "@/components/navigation/AppSidebar";
+import { GuestTalkBubble } from "@/components/dossier/GuestTalkBubble";
+import { ThankYouPassMascot } from "@/components/branding/PandaFlexibleMascot";
+import { FeePaidRibbon } from "@/components/dossier/FeeCreditRibbon";
+import { DossierActionToolbar } from "@/components/dossier/DossierActionToolbar";
+import { TicketVoucherDownloadBanner } from "@/components/dossier/TicketVoucherDownloadBanner";
 import { MobileTopChrome } from "@/components/navigation/MobileTopChrome";
-import { NewBookingResetButton } from "@/components/builder/NewBookingResetButton";
+import { SaveRequiredContactModal } from "@/components/builder/SaveRequiredContactModal";
 import { IdleHeroMascot } from "@/components/branding/IdleHeroMascot";
 import { GoldLight } from "@/components/branding/GoldLight";
 import { showSystemMessage } from "@/store/useSystemMessageStore";
 import { getSystemMessage } from "@/lib/systemMessages";
+import { dossierPrimaryCtaLabel } from "@/lib/tourPaymentStatus";
+import {
+  hasGuestContact,
+  saveContactAndCreateDraft,
+} from "@/lib/saveContactGate";
 import {
   fetchPaymentConfigured,
   isMultiDayBuilderComplete,
@@ -78,12 +94,41 @@ export default function ItineraryPageClient() {
   const [printSkipTerms, setPrintSkipTerms] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submittedRef, setSubmittedRef] = useState<string | null>(null);
+  const [feeCreditEur, setFeeCreditEur] = useState(0);
   const [printResult, setPrintResult] = useState<PrintRequestResult | null>(
     null
   );
-  const [termsOpen, setTermsOpen] = useState(false);
-  const [termsIntent, setTermsIntent] = useState<"invoice" | "print" | null>(
+  const [sendPulsarDone, setSendPulsarDone] = useState(false);
+  const [costPulsarDone, setCostPulsarDone] = useState(false);
+  const [saveContactOpen, setSaveContactOpen] = useState(false);
+  const [pendingAfterSave, setPendingAfterSave] = useState<
+    "save" | "pay" | "estimate" | null
+  >(null);
+  const [showEstimateModal, setShowEstimateModal] = useState(false);
+  const [saveLaterOpen, setSaveLaterOpen] = useState(false);
+  const [showFeeModal, setShowFeeModal] = useState(false);
+  const [conciergeFeeEur, setConciergeFeeEur] = useState(DEFAULT_CONCIERGE_FEE_EUR);
+  const [checkoutMode, setCheckoutMode] = useState<
+    "deposit" | "concierge_fee" | "balance"
+  >("deposit");
+  const [balanceOpen, setBalanceOpen] = useState(false);
+  const [balanceAmount, setBalanceAmount] = useState(0);
+  const [balanceOption, setBalanceOption] =
+    useState<BalancePayOption>("30_PERCENT");
+  const [totalPaidEur, setTotalPaidEur] = useState(0);
+  const [selectedPath, setSelectedPath] = useState<ConciergePathOption | null>(
     null
+  );
+  const preDraftStatus = usePreBuilderStore((s) => s.pnrDraftStatus);
+  const preWhatsapp = usePreBuilderStore((s) => s.whatsapp);
+  const contactReady = Boolean(
+    (clientName || preName || "").trim() &&
+      /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(guestEmail) &&
+      String(preWhatsapp || "").replace(/\D/g, "").length >= 7 &&
+      (preDraftStatus === "SAVED" ||
+        Boolean(
+          String(usePreBuilderStore.getState().lastPayload?.bookingRef || "").trim()
+        ))
   );
 
   useEffect(() => {
@@ -115,6 +160,24 @@ export default function ItineraryPageClient() {
     if (v === "invoice" || v === "print") setActiveView("invoice");
     if (v === "dossier") setActiveView("dossier");
   }, [searchParams]);
+
+  useEffect(() => {
+    const ref = activeBookingRef({
+      tempBookingRef: state.tempBookingRef,
+      confirmedBookingRef: state.confirmedBookingRef,
+      bookingStatus: state.bookingStatus,
+    });
+    void import("@/lib/feeCredit").then(({ hydrateConciergeFeeCredit }) => {
+      void hydrateConciergeFeeCredit(ref).then((eur) => {
+        setFeeCreditEur(eur);
+        if (eur > 0) setTotalPaidEur((prev) => (prev > 0 ? prev : eur));
+      });
+    });
+  }, [
+    state.tempBookingRef,
+    state.confirmedBookingRef,
+    state.bookingStatus,
+  ]);
 
   // Keep multi-day itinerary isolated — send Builder S traffic to its own dossier.
   useEffect(() => {
@@ -208,8 +271,7 @@ export default function ItineraryPageClient() {
       });
       return;
     }
-    setTermsIntent("invoice");
-    setTermsOpen(true);
+    setMode("invoice");
   };
 
   const requestSendPdf = async () => {
@@ -249,70 +311,231 @@ export default function ItineraryPageClient() {
       });
       return;
     }
-    setTermsIntent("print");
-    setTermsOpen(true);
+    setSendPulsarDone(true);
+    setPrintSkipTerms(true);
+    setPrintOpen(true);
+  };
+
+  const requireContactOr = (
+    next: "save" | "pay" | "estimate",
+    proceed: () => void | Promise<void>
+  ) => {
+    if (hasGuestContact()) {
+      void proceed();
+      return;
+    }
+    setPendingAfterSave(next);
+    setSaveContactOpen(true);
   };
 
   const requestSaveOnly = async () => {
-    const ref = activeBookingRef({
-      tempBookingRef: state.tempBookingRef,
-      confirmedBookingRef: state.confirmedBookingRef,
-      bookingStatus: state.bookingStatus,
-    });
-    if (!guestEmail) {
-      showSystemMessage({
-        text: "Add your email in Pre-Elite / booking details before saving.",
-        tone: "error",
+    const run = async () => {
+      const ref = activeBookingRef({
+        tempBookingRef: state.tempBookingRef,
+        confirmedBookingRef: state.confirmedBookingRef,
+        bookingStatus: state.bookingStatus,
       });
-      return;
-    }
-    const cityMap = buildCityMap(config?.cities);
-    const cityNames: Record<string, string> = {};
-    for (const loc of state.locations) {
-      cityNames[loc.cityId] = getCityName(loc.cityId, cityMap);
-    }
-    const ok = await syncMultiDayBookingLead({
-      bookingRef: ref,
-      email: guestEmail,
-      state,
-      cityNames,
-      // Autosave stays draft (BAL "lead") until Save & Email / submit
-      status: "lead",
-      quote: quote ? { min: quote.min, max: quote.max } : undefined,
-    });
-    showSystemMessage({
-      text: ok ? "Itinerary saved." : "Could not save itinerary.",
-      tone: ok ? "info" : "error",
-    });
+      const email = (
+        useItineraryStore.getState().clientEmail ||
+        usePreBuilderStore.getState().email ||
+        ""
+      )
+        .trim()
+        .toLowerCase();
+      if (!email) {
+        showSystemMessage({
+          text: "Add your email before saving.",
+          tone: "error",
+        });
+        return;
+      }
+      const cityMap = buildCityMap(config?.cities);
+      const cityNames: Record<string, string> = {};
+      for (const loc of state.locations) {
+        cityNames[loc.cityId] = getCityName(loc.cityId, cityMap);
+      }
+      const ok = await syncMultiDayBookingLead({
+        bookingRef: ref,
+        email,
+        state,
+        cityNames,
+        status: "lead",
+        quote: quote ? { min: quote.min, max: quote.max } : undefined,
+      });
+      showSystemMessage({
+        text: ok ? "Itinerary saved." : "Could not save itinerary.",
+        tone: ok ? "info" : "error",
+      });
+    };
+    requireContactOr("save", run);
   };
 
   const requestPrintOnly = () => {
     window.print();
   };
 
-  const handleTermsConfirm = () => {
-    const intent = termsIntent;
-    setTermsOpen(false);
-    setTermsIntent(null);
-    if (intent === "invoice") {
-      setMode("invoice");
-      return;
-    }
-    if (intent === "print") {
-      setPrintSkipTerms(true);
-      setPrintOpen(true);
-    }
-  };
-
-  const handleTermsCancel = () => {
-    setTermsOpen(false);
-    setTermsIntent(null);
-  };
-
   const handleRequestPay = () => {
     setSubmitError(null);
+    setCostPulsarDone(true);
+    if (feeCreditEur > 0) {
+      void requestInvoiceView();
+      setBalanceOpen(true);
+      return;
+    }
+    requireContactOr("estimate", () => setShowEstimateModal(true));
+  };
+
+  const handleBalanceConfirm = (option: BalancePayOption, amountEur: number) => {
+    setBalanceOption(option);
+    setBalanceAmount(amountEur);
+    setBalanceOpen(false);
+    setCheckoutMode("balance");
+    setCheckoutRef(
+      activeBookingRef({
+        tempBookingRef: state.tempBookingRef,
+        confirmedBookingRef: state.confirmedBookingRef,
+        bookingStatus: state.bookingStatus,
+      })
+    );
+    setIsCheckoutModalOpen(true);
+  };
+
+  const handleBalancePaymentSuccess = async (paymentDetails: {
+    bookingRef: string;
+    amountPaid: number;
+    orderId: string | null;
+  }) => {
+    try {
+      void import("@/lib/recordPayment").then(({ recordPaymentSuccess }) =>
+        recordPaymentSuccess({
+          pnr: paymentDetails.bookingRef,
+          kind: balanceOption === "FULL" ? "tour_full" : "tour_partial",
+          amountEur: paymentDetails.amountPaid,
+          orderId: paymentDetails.orderId,
+          builder: "multi",
+          estimatedTotalEur: quote?.max ?? 0,
+          notes:
+            balanceOption === "FULL"
+              ? "Full tour balance settlement"
+              : "30% progress payment on pending balance",
+        })
+      );
+      setTotalPaidEur((prev) => prev + paymentDetails.amountPaid);
+      setSubmittedRef(paymentDetails.bookingRef);
+      setIsCheckoutModalOpen(false);
+      setCheckoutMode("deposit");
+      showSystemMessage({
+        text:
+          balanceOption === "FULL"
+            ? "Full tour balance received — thank you."
+            : "Progress payment received — remaining balance due before travel.",
+        tone: "info",
+      });
+    } catch (err) {
+      setSubmitError(
+        err instanceof Error ? err.message : "Could not record balance payment."
+      );
+    }
+  };
+
+  const handleSelectEstimatePath = (path: ConciergePathOption) => {
+    setSelectedPath(path);
+    setShowEstimateModal(false);
+    void loadConciergeEstimateCopy().then((c) => {
+      setConciergeFeeEur(c.feeAmountEur);
+    });
+    void requestSaveOnly();
+    setShowFeeModal(true);
+  };
+
+  const handleSaveDraftAndEmail = async () => {
+    setShowEstimateModal(false);
+    const ref = activeBookingRef({
+      tempBookingRef: state.tempBookingRef,
+      confirmedBookingRef: state.confirmedBookingRef,
+      bookingStatus: state.bookingStatus,
+    });
+    try {
+      await fetch("/api/bookings/concierge-fee", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "save_later",
+          pnr: ref,
+          tourDate: state.arrivalDate,
+        }),
+      });
+      await requestSaveOnly();
+      showSystemMessage({
+        text: "Draft saved — send yourself an email copy next.",
+        tone: "info",
+      });
+      setPrintSkipTerms(true);
+      setPrintOpen(true);
+    } catch {
+      showSystemMessage({
+        text: "Could not save draft. Try Save from the toolbar.",
+        tone: "error",
+      });
+    }
+  };
+
+  const handleConciergeFeePay = () => {
+    setShowFeeModal(false);
+    setCheckoutMode("concierge_fee");
     setCheckoutRef(officialBookingRef());
     setIsCheckoutModalOpen(true);
+  };
+
+  const handleConciergeFeeSuccess = async (paymentDetails: {
+    bookingRef: string;
+    amountPaid: number;
+    orderId: string | null;
+  }) => {
+    try {
+      await fetch("/api/bookings/concierge-fee", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "fee_paid",
+          pnr: paymentDetails.bookingRef,
+          amount: paymentDetails.amountPaid,
+          orderId: paymentDetails.orderId,
+          path: selectedPath || "FULL",
+        }),
+      });
+      void import("@/lib/recordPayment").then(({ recordPaymentSuccess }) =>
+        recordPaymentSuccess({
+          pnr: paymentDetails.bookingRef,
+          kind: "concierge_deposit",
+          amountEur: paymentDetails.amountPaid,
+          orderId: paymentDetails.orderId,
+          path: selectedPath || "FULL",
+          builder: "multi",
+        })
+      );
+      void import("@/lib/feeCredit").then(({ markConciergeFeePaid }) =>
+        markConciergeFeePaid(
+          paymentDetails.bookingRef,
+          paymentDetails.amountPaid
+        )
+      );
+      confirmBookingRef(paymentDetails.bookingRef, "in_progress");
+      setSubmittedRef(paymentDetails.bookingRef);
+      setFeeCreditEur(paymentDetails.amountPaid);
+      showSystemMessage({
+        text: "Deposit received — your dates are held. An agent will contact you soon.",
+        tone: "info",
+      });
+    } catch {
+      showSystemMessage({
+        text: "Payment succeeded, but updating the booking failed. Contact concierge with your ref.",
+        tone: "error",
+      });
+    } finally {
+      setCheckoutMode("deposit");
+      setSelectedPath(null);
+    }
   };
 
   const handlePaymentSuccess = async (paymentDetails: {
@@ -353,6 +576,23 @@ export default function ItineraryPageClient() {
       });
       confirmBookingRef(result.reference, "in_progress");
       setSubmittedRef(result.reference);
+      void import("@/lib/recordPayment").then(({ recordPaymentSuccess }) =>
+        recordPaymentSuccess({
+          pnr: result.reference,
+          kind:
+            paymentDetails.paymentType === "full"
+              ? "tour_full"
+              : paymentDetails.paymentType === "partial"
+                ? "tour_partial"
+                : "tour_deposit",
+          amountEur: paymentDetails.amountPaid,
+          currency: paymentDetails.currency,
+          orderId: paymentDetails.orderId,
+          guestEmail: paymentDetails.customerEmail,
+          guestName: paymentDetails.customerName,
+          builder: "multi",
+        })
+      );
 
       const email = String(paymentDetails.customerEmail || "")
         .trim()
@@ -397,19 +637,12 @@ export default function ItineraryPageClient() {
   return (
     <div className="builder-theme relative z-10 min-h-screen w-full overflow-x-hidden bg-transparent pb-28 text-white md:pb-20">
       <SystemMessageFox />
-      <AppSidebar
-        brandEyebrow="TOKIOTOURS"
+      <MobileTopChrome
         brandTitle="Itinerary"
-        expandOnHover
+        ctaHref="/builder"
+        ctaLabel="Builder"
       />
-
-      <div className={APP_SIDEBAR_RAIL_PAD}>
-        <MobileTopChrome
-          brandTitle="Itinerary"
-          ctaHref="/builder"
-          ctaLabel="Builder"
-        />
-        <div className="mx-auto w-full max-w-md px-4 py-6 md:max-w-lg lg:max-w-2xl">
+      <div className="mx-auto w-full max-w-md px-4 py-6 md:max-w-lg lg:max-w-2xl">
           {/* Section 1 — Hero header + navigation actions */}
           <DossierSectionOutline
             label="Section 1: Hero & Nav"
@@ -427,13 +660,13 @@ export default function ItineraryPageClient() {
               <div className="relative grid grid-cols-3 items-end gap-2">
                 <div className="col-span-2 min-w-0">
                   <p className="text-[0.65rem] font-semibold uppercase tracking-[0.35em] text-[#F6A724]">
-                    Builder M · Itinerary
+                    Multi day · Itinerary
                   </p>
                   <h1 className="mt-1 break-words font-godiva text-2xl uppercase leading-tight tracking-wide text-white sm:text-3xl">
                     {customerName}
                   </h1>
                   <h2 className="mt-0.5 font-godiva text-[1.125rem] uppercase tracking-wider text-white/90">
-                    Multi Day Tour Dossier
+                    Dossier
                   </h2>
                   <p className="mt-1 text-sm text-white/55">
                     Day-by-day Japan route and private multi-day quotation.
@@ -449,70 +682,35 @@ export default function ItineraryPageClient() {
                 </div>
               </div>
 
-              <div
-                className="flex flex-col gap-2 border-t border-white/10 pt-2"
-                role="tablist"
-                aria-label="Itinerary view"
-              >
-                <div className="grid grid-cols-2 gap-2">
-                  <ToggleBtn
-                    active={activeView === "dossier"}
-                    onClick={() => setMode("dossier")}
-                    icon={<Luggage className="h-3.5 w-3.5" />}
-                    label="Travel Dossier"
-                    className="w-full justify-center"
-                  />
-                  <ToggleBtn
-                    active={activeView === "invoice"}
-                    onClick={requestInvoiceView}
-                    icon={<Receipt className="h-3.5 w-3.5" />}
-                    label="Invoice"
-                    className="w-full justify-center"
-                  />
-                </div>
-                <div className="grid grid-cols-5 items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => void requestSaveOnly()}
-                    aria-label="Save"
-                    title="Save"
-                    className="col-span-1 inline-flex items-center justify-center rounded-xl border border-white/10 bg-black/40 p-2.5 text-zinc-200 hover:text-white"
-                  >
-                    <Save className="h-4 w-4" aria-hidden />
-                  </button>
-                  <span className="col-span-1" aria-hidden />
-                  <button
-                    type="button"
-                    onClick={() => void requestSendPdf()}
-                    aria-label="Send"
-                    title="Send"
-                    className="col-span-1 inline-flex items-center justify-center rounded-xl border border-white/15 bg-transparent p-2.5 text-white hover:border-white/30 hover:bg-white/5"
-                  >
-                    <Send className="h-4 w-4" aria-hidden />
-                  </button>
-                  <span className="col-span-1" aria-hidden />
-                  <button
-                    type="button"
-                    onClick={requestPrintOnly}
-                    aria-label="Print"
-                    title="Print"
-                    className="col-span-1 inline-flex items-center justify-center rounded-xl border border-white/10 bg-black/40 p-2.5 text-zinc-200 hover:text-white"
-                  >
-                    <Printer className="h-4 w-4" aria-hidden />
-                  </button>
-                </div>
-                <div className="grid grid-cols-5 items-center gap-2">
-                  <Link
-                    href="/builder"
-                    className="col-span-3 inline-flex items-center justify-center gap-1.5 rounded-xl border border-zinc-700 bg-black/30 px-3.5 py-2 text-[11px] font-bold tracking-wider text-zinc-300 uppercase transition-all hover:bg-black/60"
-                  >
-                    ← Continue editing
-                  </Link>
-                  <span className="col-span-1" aria-hidden />
-                  <div className="col-span-1 flex justify-end">
-                    <NewBookingResetButton variant="nav" />
-                  </div>
-                </div>
+              <div className="border-t border-white/10 pt-2">
+                {feeCreditEur > 0 ? (
+                  <FeePaidRibbon feeEur={feeCreditEur} className="mb-3" />
+                ) : null}
+                <TicketVoucherDownloadBanner
+                  pnr={activeBookingRef({
+                    tempBookingRef: state.tempBookingRef,
+                    confirmedBookingRef: state.confirmedBookingRef,
+                    bookingStatus: state.bookingStatus,
+                  })}
+                  className="mb-3"
+                />
+                <DossierActionToolbar
+                  contactReady={contactReady}
+                  costPulsarDone={costPulsarDone}
+                  continueHref="/builder"
+                  howMuchLabel={dossierPrimaryCtaLabel(feeCreditEur)}
+                  conciergeFeePaid={feeCreditEur > 0}
+                  onHowMuchCost={handleRequestPay}
+                  onSave={() => void requestSaveOnly()}
+                  onSend={() => void requestSendPdf()}
+                  onPrint={requestPrintOnly}
+                  onItinerary={() => setMode("dossier")}
+                  onInvoice={() => {
+                    if (activeView === "invoice") setMode("dossier");
+                    else void requestInvoiceView();
+                  }}
+                  invoiceActive={activeView === "invoice"}
+                />
               </div>
               </div>
             </header>
@@ -546,6 +744,7 @@ export default function ItineraryPageClient() {
                       totalGuests={totalGuests}
                       onRequestPay={handleRequestPay}
                       requestDisabled={!quote}
+                      reserveLabel={dossierPrimaryCtaLabel(feeCreditEur)}
                     />
                   ) : null
                 }
@@ -565,6 +764,7 @@ export default function ItineraryPageClient() {
                 embedded
                 showToolbar={false}
                 onPrintRequest={requestSendPdf}
+                feeCreditEur={feeCreditEur}
               />
             </div>
 
@@ -579,29 +779,151 @@ export default function ItineraryPageClient() {
                   totalGuests={totalGuests}
                   onRequestPay={handleRequestPay}
                   requestDisabled={!quote}
+                  reserveLabel={dossierPrimaryCtaLabel(feeCreditEur)}
                 />
               </div>
             ) : null}
           </main>
         </div>
-      </div>
+
+      <BalancePaymentModal
+        open={balanceOpen}
+        onClose={() => setBalanceOpen(false)}
+        pnr={activeBookingRef({
+          tempBookingRef: state.tempBookingRef,
+          confirmedBookingRef: state.confirmedBookingRef,
+          bookingStatus: state.bookingStatus,
+        })}
+        guestName={customerName}
+        totalPackageEur={quote?.max ?? 0}
+        conciergeCreditEur={feeCreditEur}
+        totalPaidEur={totalPaidEur || feeCreditEur}
+        onConfirm={handleBalanceConfirm}
+      />
 
       <RevolutCheckoutModal
         isOpen={isCheckoutModalOpen}
-        onClose={() => setIsCheckoutModalOpen(false)}
+        onClose={() => {
+          setIsCheckoutModalOpen(false);
+          setCheckoutMode("deposit");
+        }}
         bookingRef={checkoutRef}
-        totalAmount={quote?.max ?? 0}
-        totalAmountMin={quote?.min}
+        totalAmount={
+          checkoutMode === "concierge_fee"
+            ? conciergeFeeEur
+            : checkoutMode === "balance"
+              ? balanceAmount
+              : quote?.max ?? 0
+        }
+        totalAmountMin={
+          checkoutMode === "concierge_fee" || checkoutMode === "balance"
+            ? undefined
+            : quote?.min
+        }
+        fixedAmount={
+          checkoutMode === "concierge_fee"
+            ? conciergeFeeEur
+            : checkoutMode === "balance"
+              ? balanceAmount
+              : undefined
+        }
+        fixedAmountLabel={
+          checkoutMode === "balance"
+            ? `€${balanceAmount} Tour balance`
+            : "€60 Deposit (100% credited)"
+        }
         currency="EUR"
-        defaultDepositPercent={10}
-        onPaymentSuccess={handlePaymentSuccess}
+        defaultDepositPercent={
+          checkoutMode === "concierge_fee" || checkoutMode === "balance"
+            ? 100
+            : 10
+        }
+        onPaymentSuccess={(details) => {
+          if (checkoutMode === "concierge_fee") {
+            void handleConciergeFeeSuccess(details);
+          } else if (checkoutMode === "balance") {
+            void handleBalancePaymentSuccess(details);
+          } else {
+            void handlePaymentSuccess(details);
+          }
+        }}
         onPaymentError={setSubmitError}
       />
 
-      <BookingTermsModal
-        open={termsOpen}
-        onConfirm={handleTermsConfirm}
-        onCancel={handleTermsCancel}
+      <SaveRequiredContactModal
+        open={saveContactOpen}
+        initialName={(
+          useItineraryStore.getState().clientName ||
+          usePreBuilderStore.getState().fullName ||
+          ""
+        ).trim()}
+        initialEmail={guestEmail}
+        initialWhatsapp={
+          usePreBuilderStore.getState().whatsapp ||
+          usePreBuilderStore.getState().lastPayload?.whatsapp ||
+          ""
+        }
+        onClose={() => {
+          setSaveContactOpen(false);
+          setPendingAfterSave(null);
+        }}
+        onSaved={async (contact) => {
+          await saveContactAndCreateDraft(contact);
+          setSaveContactOpen(false);
+          const next = pendingAfterSave;
+          setPendingAfterSave(null);
+          showSystemMessage({
+            text: "Draft saved — quotation unlocked.",
+            tone: "info",
+          });
+          if (next === "estimate") setShowEstimateModal(true);
+          if (next === "pay") {
+            setCheckoutRef(officialBookingRef());
+            setIsCheckoutModalOpen(true);
+          }
+          if (next === "save") {
+            void requestSaveOnly();
+          }
+        }}
+      />
+
+      <ConciergeCommitmentFlow
+        openEstimate={showEstimateModal}
+        onCloseEstimate={() => setShowEstimateModal(false)}
+        totalPrice={quote?.max ?? quote?.min ?? 0}
+        paxCount={totalGuests}
+        totalDays={Math.max(1, state.durationDays || 1)}
+        onSelectPath={handleSelectEstimatePath}
+        onSaveForLater={() => {
+          void handleSaveDraftAndEmail();
+        }}
+        onSeeDetails={() => {
+          setShowEstimateModal(false);
+          void requestInvoiceView();
+        }}
+      />
+
+      <SaveForLaterOptionsModal
+        open={saveLaterOpen}
+        onClose={() => setSaveLaterOpen(false)}
+        feeAmountEur={conciergeFeeEur}
+        onPayFee={() => {
+          void loadConciergeEstimateCopy().then((c) =>
+            setConciergeFeeEur(c.feeAmountEur)
+          );
+          setShowFeeModal(true);
+        }}
+        onContinueEditing={() => {
+          setSaveLaterOpen(false);
+          window.location.href = "/builder";
+        }}
+      />
+
+      <ConciergeFeeModal
+        open={showFeeModal}
+        onClose={() => setShowFeeModal(false)}
+        onPay={handleConciergeFeePay}
+        feeAmountEur={conciergeFeeEur}
       />
 
       <PrintRequestModal
@@ -656,6 +978,7 @@ export default function ItineraryPageClient() {
       {submittedRef ? (
         <div className="no-print fixed inset-0 z-[80] flex items-end justify-center bg-[#05080C]/75 p-4 backdrop-blur-sm sm:items-center">
           <div className="w-full max-w-md rounded-2xl border border-white/10 bg-[#0A1017]/80 p-6 shadow-2xl backdrop-blur-md">
+            <ThankYouPassMascot size="md" className="mb-3" />
             <p className="text-[0.65rem] font-semibold uppercase tracking-[0.3em] text-[#F6A724]">
               Payment received
             </p>
@@ -690,39 +1013,17 @@ export default function ItineraryPageClient() {
       ) : null}
 
       <div className="no-print">
-        <BottomNav />
+        <GuestTalkBubble
+          pnr={activeBookingRef({
+            tempBookingRef: state.tempBookingRef,
+            confirmedBookingRef: state.confirmedBookingRef,
+            bookingStatus: state.bookingStatus,
+          })}
+          guestEmail={guestEmail}
+          guestName={customerName}
+          tripPath="/builder/itinerary"
+        />
       </div>
     </div>
-  );
-}
-
-function ToggleBtn({
-  active,
-  onClick,
-  icon,
-  label,
-  className = "",
-}: {
-  active: boolean;
-  onClick: () => void;
-  icon: React.ReactNode;
-  label: string;
-  className?: string;
-}) {
-  return (
-    <button
-      type="button"
-      role="tab"
-      aria-selected={active}
-      onClick={onClick}
-      className={`inline-flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-[11px] font-bold tracking-wider uppercase transition-all ${
-        active
-          ? "border border-cyan-400/30 bg-[#075473] text-white shadow-md"
-          : "border border-white/10 bg-black/40 text-zinc-400 hover:text-white"
-      } ${className}`}
-    >
-      {icon}
-      {label}
-    </button>
   );
 }

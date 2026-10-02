@@ -12,6 +12,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { ArrowLeft, X } from "lucide-react";
 import type { PbTour } from "@/lib/pocketbase/client";
 import { TourDetailPanel } from "./TourDetailPanel";
+import { DesktopSafeViewport } from "@/components/layout/DesktopSafeViewport";
 
 /**
  * Discover experience feed — full-viewport vertical scroll (Reels-style).
@@ -133,15 +134,21 @@ export function TourDetailModal({
   return createPortal(
     <AnimatePresence>
       {open ? (
-        <motion.div
-          className="fixed inset-0 z-[110] flex h-[100dvh] min-h-[100dvh] w-full flex-col bg-[#05080C]"
-          role="dialog"
-          aria-modal="true"
-          aria-label={activeTour?.title ?? "Tour details"}
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
+        <DesktopSafeViewport
+          onClose={onClose}
+          maxWidth="max-w-md"
+          zIndexClass="z-[210]"
+          backdropClassName="bg-black/85 backdrop-blur-md"
         >
+          <motion.div
+            className="relative flex h-full min-h-0 w-full max-w-md flex-col overflow-hidden bg-[#05080C]"
+            role="dialog"
+            aria-modal="true"
+            aria-label={activeTour?.title ?? "Tour details"}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          >
           <div className="pointer-events-none absolute left-3 right-3 top-[max(0.75rem,env(safe-area-inset-top))] z-30 flex items-center justify-between">
             <button
               type="button"
@@ -168,10 +175,10 @@ export function TourDetailModal({
             </button>
           </div>
 
-          {/* Vertical feed: one full-viewport slide per experience */}
+          {/* Vertical feed: one full-frame slide per experience */}
           <div
             ref={trackRef}
-            className="h-[100dvh] min-h-[100dvh] w-full touch-pan-y snap-y snap-mandatory overflow-x-hidden overflow-y-auto overscroll-y-contain"
+            className="h-full min-h-0 w-full touch-pan-y snap-y snap-mandatory overflow-x-hidden overflow-y-auto overscroll-y-contain"
             style={{ WebkitOverflowScrolling: "touch" }}
           >
             {tours.map((tour, index) => (
@@ -181,7 +188,7 @@ export function TourDetailModal({
                   slideRefs.current[index] = node;
                 }}
                 aria-label={tour.title}
-                className="box-border h-[100dvh] min-h-[100dvh] w-full snap-start snap-always overflow-hidden"
+                className="box-border h-full min-h-full w-full snap-start snap-always overflow-hidden"
               >
                 <TourDetailPanel
                   tour={tour}
@@ -204,7 +211,8 @@ export function TourDetailModal({
               </section>
             ))}
           </div>
-        </motion.div>
+          </motion.div>
+        </DesktopSafeViewport>
       ) : null}
     </AnimatePresence>,
     document.body

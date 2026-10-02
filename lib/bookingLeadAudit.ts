@@ -8,6 +8,7 @@ export function formatDurationLabel(
   type: BookingLeadType | string | undefined,
   value: number | null | undefined
 ): string {
+  if (type === "experience_only") return "Micro-service";
   const n = Number(value);
   if (!Number.isFinite(n) || n <= 0) {
     return type === "single_day" ? "1 Day" : "";

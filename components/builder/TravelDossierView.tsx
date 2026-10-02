@@ -41,6 +41,7 @@ import { DossierSectionOutline } from "@/components/builder/DossierSectionOutlin
 import { BoardingPassCard } from "@/components/builder/BoardingPassCard";
 import { JapanBookingPass } from "@/components/dossier/JapanBookingPass";
 import { CoordinationTeamSection } from "@/components/dossier/CoordinationTeamSection";
+import { DossierTermsFooterSection } from "@/components/dossier/DossierTermsFooterSection";
 import {
   DayServiceIcons,
   StaffIdentityCard,
@@ -298,6 +299,8 @@ export function TravelDossierView({
           />
         </div>
       </DossierSectionOutline>
+
+      <DossierTermsFooterSection />
 
       <InterCityTransitModal
         open={transitLeg != null}

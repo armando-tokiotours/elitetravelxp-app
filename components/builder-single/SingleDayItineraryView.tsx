@@ -27,6 +27,7 @@ import { useItineraryStore } from "@/store/useItineraryStore";
 import { usePreBuilderStore } from "@/store/usePreBuilderStore";
 import { JapanBookingPass } from "@/components/dossier/JapanBookingPass";
 import { CoordinationTeamSection } from "@/components/dossier/CoordinationTeamSection";
+import { DossierTermsFooterSection } from "@/components/dossier/DossierTermsFooterSection";
 import {
   StaffIdentityCard,
   TicketStubCard,
@@ -344,6 +345,8 @@ export function SingleDayItineraryView() {
         meetingPointAddress={meetingPoint || null}
         variant="screen"
       />
+
+      <DossierTermsFooterSection />
     </div>
   );
 }

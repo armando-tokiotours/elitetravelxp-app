@@ -1,23 +1,34 @@
 "use client";
 
 import { useEffect } from "react";
+import { WidgetCallingPulse } from "@/components/branding/WidgetCallingPulse";
 
 /**
  * How booking & deposits work — shown before Invoice / Print or Send / Save PDF.
+ * `variant="send"` uses the short draft-share copy + fox-a.
  */
 export function BookingTermsModal({
   open,
   onConfirm,
   onCancel,
-  confirmLabel = "I Understand — Proceed to Invoice / Download PDF →",
+  variant = "invoice",
+  confirmLabel,
   cancelLabel = "Back to Builder",
 }: {
   open: boolean;
   onConfirm: () => void;
   onCancel: () => void;
+  variant?: "invoice" | "send";
   confirmLabel?: string;
   cancelLabel?: string;
 }) {
+  const isSend = variant === "send";
+  const resolvedConfirm =
+    confirmLabel ||
+    (isSend
+      ? "I Understand — send to my email and tokiotours"
+      : "I Understand — Proceed to Invoice / Download PDF →");
+
   useEffect(() => {
     if (!open) return;
     const prev = document.body.style.overflow;
@@ -48,63 +59,94 @@ export function BookingTermsModal({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center gap-3 border-b border-zinc-800 pb-3">
-          <div
-            className="flex h-10 w-10 items-center justify-center rounded-xl border border-[#075473]/40 bg-[#075473]/20 text-xl"
-            aria-hidden
-          >
-            📜
-          </div>
+          {isSend ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src="/brand/fox-a.png"
+              alt=""
+              className="h-12 w-12 shrink-0 rounded-xl object-contain"
+            />
+          ) : (
+            <div
+              className="flex h-10 w-10 items-center justify-center rounded-xl border border-[#075473]/40 bg-[#075473]/20 text-xl"
+              aria-hidden
+            >
+              📜
+            </div>
+          )}
           <div>
-            <span className="block text-[10px] font-bold uppercase tracking-wider text-[#E60F43]">
+            <span className="block text-[10px] font-bold tracking-wider text-[#E60F43] uppercase">
               TOKIOTOURS
             </span>
             <h3
               id="booking-terms-title"
               className="text-base font-black text-white"
             >
-              How Your Itinerary & Booking Works
+              {isSend
+                ? "Send your draft itinerary"
+                : "How Your Itinerary & Booking Works"}
             </h3>
           </div>
         </div>
 
-        <div className="space-y-3 text-xs leading-relaxed text-zinc-300">
-          <p>
-            <strong className="text-[#F6A724]">1. Estimated Quotes:</strong>{" "}
-            This builder provides realistic price estimates for your
-            personalized Japan route, hotels, tours, and transport choices. You
-            can request our team to arrange everything turnkey, or use this
-            dossier as your private guide.
-          </p>
-
-          <p>
-            <strong className="text-[#F6A724]">
-              2. Lock Dates & Secure Booking:
-            </strong>{" "}
-            To confirm exact travel dates and issue your official itinerary
-            dossier, a small design deposit fee is required.
-          </p>
-
-          <div className="rounded-2xl border border-[#DC6E8A]/30 bg-[#DC6E8A]/10 p-3 text-[11px] font-medium text-[#DC6E8A]">
-            💡 <strong>100% Deposit Credit:</strong> Your fee is 100% applied
-            as a credit toward your confirmed tour packages and travel
-            arrangements. Terms &amp; Conditions apply.
+        {isSend ? (
+          <div className="space-y-3 text-sm leading-relaxed text-zinc-300">
+            <p>
+              Send this draft to TokioTours — one of our agents will contact you
+              as soon as possible so you can start talking about the best way
+              for your trip.
+            </p>
+            <p className="text-xs text-zinc-500">
+              We’ll email you a copy and notify the Ops team at the same time.
+            </p>
           </div>
+        ) : (
+          <div className="space-y-3 text-xs leading-relaxed text-zinc-300">
+            <p>
+              <strong className="text-[#F6A724]">1. Estimated Quotes:</strong>{" "}
+              This builder provides realistic price estimates for your
+              personalized Japan route, hotels, tours, and transport choices. You
+              can request our team to arrange everything turnkey, or use this
+              dossier as your private guide.
+            </p>
 
-          <p className="text-[11px] text-zinc-400">
-            *Note: Hotel and chauffeur reservations are officially secured once
-            the deposit is received. A dedicated TOKIOTOURS consultant will
-            reach out via WhatsApp/Email immediately after payment to review
-            every detail.
-          </p>
-        </div>
+            <p>
+              <strong className="text-[#F6A724]">
+                2. Lock Dates & Secure Booking:
+              </strong>{" "}
+              To confirm exact travel dates and issue your official itinerary
+              dossier, a small design deposit fee is required.
+            </p>
 
-        <div className="flex flex-col gap-2 pt-2">
+            <div className="rounded-2xl border border-[#DC6E8A]/30 bg-[#DC6E8A]/10 p-3 text-[11px] font-medium text-[#DC6E8A]">
+              💡 <strong>100% Deposit Credit:</strong> Your fee is 100% applied
+              as a credit toward your confirmed tour packages and travel
+              arrangements. Terms &amp; Conditions apply.
+            </div>
+
+            <p className="text-[11px] text-zinc-400">
+              *Note: Hotel and chauffeur reservations are officially secured once
+              the deposit is received. A dedicated TOKIOTOURS consultant will
+              reach out via WhatsApp/Email immediately after payment to review
+              every detail.
+            </p>
+          </div>
+        )}
+
+        <div className="relative flex flex-col gap-2 pt-2">
           <button
             type="button"
             onClick={onConfirm}
-            className="w-full rounded-xl bg-[#075473] py-3 text-xs font-bold text-white shadow-lg transition hover:bg-[#a04602]"
+            className={`relative w-full overflow-hidden rounded-xl py-3 text-xs font-bold text-white shadow-lg transition ${
+              isSend
+                ? "border border-white/70 bg-[#075473] animate-widget-call-glow hover:bg-[#054F70]"
+                : "bg-[#075473] hover:bg-[#a04602]"
+            }`}
           >
-            {confirmLabel}
+            {isSend ? (
+              <WidgetCallingPulse active roundedClass="rounded-xl" />
+            ) : null}
+            <span className="relative z-10">{resolvedConfirm}</span>
           </button>
           <button
             type="button"

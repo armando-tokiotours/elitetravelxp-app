@@ -84,6 +84,7 @@ export type OpsGuestRequirements = {
   guestPhone: string;
   adults: number;
   children: number;
+  infants: number;
   /** JR / Suica questionnaire + transport mix */
   guestHasJRPass: boolean | null;
   guestHasICCard: boolean | null;
@@ -93,6 +94,20 @@ export type OpsGuestRequirements = {
   totalDaysLabel: string;
   arrivalDateLabel: string;
   travelPaceLabel: string;
+  /** Pre-quiz / builder vibe (VIP, Premium, Classic, Concierge…) */
+  travelVibeLabel: string;
+  interestsLabel: string;
+  experienceTierLabel: string;
+  /** Flight / hub logistics */
+  arrivalHubLabel: string;
+  arrivalVipLabel: string;
+  departureHubLabel: string;
+  departureDropoffLabel: string;
+  arrivalFlightLabel: string;
+  departureFlightLabel: string;
+  shinkansenLabel: string;
+  icCardsLabel: string;
+  chauffeurPickupLabel: string;
   itineraryStops: OpsItineraryStop[];
   routeTimeline: OpsRouteTimeline;
   tourTitle: string;
@@ -107,6 +122,8 @@ export type OpsGuestRequirements = {
   /** Ticket / Admission / VIP / Time-sensitive lines for Ops */
   accessLines: OpsAccessLine[];
   ticketsNeededFromCatalog: boolean;
+  /** Total booked tour/experience lines across days */
+  serviceCount: number;
 };
 
 type BalRow = BookingsAndLeadsRecord & {
@@ -242,6 +259,63 @@ function formatPaceLabel(pace: unknown): string {
   if (p === "moderate") return "Moderate";
   if (p === "relaxed") return "Relaxed";
   return "—";
+}
+
+function formatTravelVibe(opts: {
+  experienceService?: string | null;
+  travelStyle?: unknown;
+}): string {
+  const style = String(opts.travelStyle || "")
+    .trim()
+    .toLowerCase();
+  if (style === "vip_bespoke") return "VIP Bespoke · Luxury";
+  if (style === "premium_comfort") return "Premium Comfort";
+  if (style === "classic_explorer") return "Classic Explorer · Authentic";
+  const svc = String(opts.experienceService || "")
+    .trim()
+    .toLowerCase();
+  if (svc === "concierge") return "Elite Concierge · Luxury";
+  if (svc === "tailored") return "Tailored Experiences";
+  return "—";
+}
+
+function formatExperienceTier(experienceService?: string | null): string {
+  const svc = String(experienceService || "")
+    .trim()
+    .toLowerCase();
+  if (svc === "concierge") return "Concierge";
+  if (svc === "tailored") return "Tailored";
+  return "Hybrid / Unset";
+}
+
+function formatInterestsLabel(raw: unknown): string {
+  if (!Array.isArray(raw) || raw.length === 0) return "—";
+  return raw
+    .map((n) =>
+      String(n)
+        .replace(/_/g, " ")
+        .replace(/\b\w/g, (c) => c.toUpperCase())
+    )
+    .join(", ");
+}
+
+function pickFlightLabel(
+  sel: Record<string, unknown>,
+  keys: string[]
+): string {
+  for (const k of keys) {
+    const v = String(sel[k] || "").trim();
+    if (v) return v;
+  }
+  const driver =
+    sel.driver && typeof sel.driver === "object"
+      ? (sel.driver as Record<string, unknown>)
+      : null;
+  if (driver) {
+    const fn = String(driver.flightNumber || "").trim();
+    if (fn) return `Flight ${fn}`;
+  }
+  return "Pending";
 }
 
 function formatArrivalDate(raw: string | null | undefined): string {
@@ -901,6 +975,12 @@ export async function loadOpsGuestRequirements(
   const guests = bal?.guests || { adults: 0, kids: 0 };
   const adults = Math.max(0, Number(guests.adults) || 0);
   const children = Math.max(0, Number(guests.kids) || 0);
+  const infants = Math.max(
+    0,
+    Number((guests as { infants?: number }).infants) ||
+      Number(selObj.infants) ||
+      0
+  );
 
   const guestHasJRPass =
     coerceTriBool(multi?.guestHasJRPass) ??
@@ -934,6 +1014,27 @@ export async function loadOpsGuestRequirements(
   const travelPaceLabel = formatPaceLabel(
     multi?.pace ?? single?.pace ?? selObj.pace
   );
+  const experienceService =
+    multi?.experienceService ??
+    (typeof selObj.experienceService === "string"
+      ? selObj.experienceService
+      : null);
+  const travelStyle =
+    multi?.preEliteTravelStyle ??
+    selObj.preEliteTravelStyle ??
+    selObj.travelStyle ??
+    null;
+  const travelVibeLabel = formatTravelVibe({
+    experienceService,
+    travelStyle,
+  });
+  const experienceTierLabel = formatExperienceTier(experienceService);
+  const interestsLabel = formatInterestsLabel(
+    multi?.preEliteInterests ??
+      selObj.preEliteInterests ??
+      selObj.interests
+  );
+
   const routeTimeline = buildRouteTimeline(
     bal,
     multi,
@@ -941,6 +1042,49 @@ export async function loadOpsGuestRequirements(
     resolvedTitles
   );
   const itineraryStops = routeTimeline.stays;
+
+  const arrivalFlightLabel = pickFlightLabel(selObj, [
+    "arrivalFlight",
+    "arrivalFlightNumber",
+    "flightNumber",
+  ]);
+  const departureFlightLabel = pickFlightLabel(selObj, [
+    "departureFlight",
+    "departureFlightNumber",
+  ]);
+
+  const hasShinkansen = Boolean(
+    multi?.transitByLeg?.some((l) =>
+      /public|shinkansen|rail/i.test(String(l.transitType || ""))
+    ) ||
+      multi?.transportTickets?.some((t) =>
+        /shinkansen|rail/i.test(
+          `${t.transportType || ""} ${t.name || ""}`
+        )
+      ) ||
+      multi?.locationStops?.some((s) => s.needsTicket && s.ticketType === "shinkansen_reserved")
+  );
+  const shinkansenLabel = hasShinkansen
+    ? "VIP / reserved Shinkansen seats requested"
+    : "Standard subway / train (no reserved Shinkansen flagged)";
+
+  const icCardsLabel =
+    guestHasICCard === false || guestNeedsTransitHelp === true
+      ? "Suica / PASMO assistance needed"
+      : guestHasICCard === true
+        ? "Guest already has IC card"
+        : "No IC cards requested";
+
+  const chauffeurPickupLabel = multi?.airportPickup
+    ? "Airport chauffeur pickup SET"
+    : "Airport chauffeur pickup unset";
+
+  const serviceCount = itineraryStops.reduce(
+    (sum, stop) =>
+      sum +
+      stop.days.reduce((dSum, day) => dSum + day.tours.length, 0),
+    0
+  );
 
   if (!meetingPointName || meetingPointName === "—") {
     meetingPointName = "Hotel Lobby (To be confirmed by Concierge)";
@@ -983,6 +1127,7 @@ export async function loadOpsGuestRequirements(
     guestPhone,
     adults,
     children,
+    infants,
     guestHasJRPass,
     guestHasICCard,
     guestNeedsTransitHelp,
@@ -990,6 +1135,18 @@ export async function loadOpsGuestRequirements(
     totalDaysLabel,
     arrivalDateLabel,
     travelPaceLabel,
+    travelVibeLabel,
+    interestsLabel,
+    experienceTierLabel,
+    arrivalHubLabel: routeTimeline.arrivalHubLabel,
+    arrivalVipLabel: routeTimeline.arrivalVipLabel,
+    departureHubLabel: routeTimeline.departureHubLabel,
+    departureDropoffLabel: routeTimeline.departureDropoffLabel,
+    arrivalFlightLabel,
+    departureFlightLabel,
+    shinkansenLabel,
+    icCardsLabel,
+    chauffeurPickupLabel,
     itineraryStops,
     routeTimeline,
     tourTitle,
@@ -1003,5 +1160,6 @@ export async function loadOpsGuestRequirements(
     specialNotes,
     accessLines,
     ticketsNeededFromCatalog,
+    serviceCount,
   };
 }

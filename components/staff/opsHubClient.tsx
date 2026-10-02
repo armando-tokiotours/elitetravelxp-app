@@ -36,6 +36,25 @@ export type OpsHubRow = {
   payment_confirmed?: boolean;
   /** Ops inbox: false/undefined = unread (blue dot) */
   is_read?: boolean;
+  /** €60 concierge commitment fee settled */
+  concierge_fee_paid?: boolean;
+  /** Amount of concierge fee credited (€) */
+  concierge_fee_amount?: number;
+  /** UNPAID | FEE_PAID | PARTIALLY_PAID | FULLY_PAID */
+  tour_payment_status?: string;
+  /** Cumulative EUR paid (fee + progress + full) */
+  total_paid_eur?: number;
+  /** Cached package estimate for pending balance */
+  estimated_total_eur?: number;
+  /** Scheduled draft follow-up (YYYY-MM-DD) */
+  followup_date?: string;
+  /** Temporary ticketer → guest direct chat */
+  ticketer_direct_chat_enabled?: boolean;
+  /** Temporary driver → guest direct chat */
+  driver_direct_chat_enabled?: boolean;
+  /** Agent custom services / bonuses / approved price JSON */
+  extras?: unknown;
+  deposit_amount?: number;
   /** Staff id of last CRM touch */
   last_action_by?: string;
   /** ISO date of last CRM touch */

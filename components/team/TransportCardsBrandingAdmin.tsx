@@ -144,11 +144,12 @@ export function TransportCardsBrandingAdmin({
     <section className="space-y-4 rounded-2xl border border-zinc-800 bg-zinc-950/60 p-5">
       <div>
         <h3 className="font-display text-lg text-zinc-100">
-          Transport Selection Cards
+          Multi-city · Transport arrangement cards
         </h3>
         <p className="mt-1 text-sm text-zinc-500">
-          Images, titles, and copy for Self-arranged / Public / Private in the
-          builder transport step. Layout and lock rules stay in code.
+          Images, titles, and subtext for Self-arranged / Public / Private in
+          Builder M (in-city &amp; inter-city pickers). Layout and lock rules
+          stay in code.
         </p>
       </div>
 

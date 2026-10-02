@@ -162,6 +162,7 @@ export interface PreEliteBookingPayload {
   bookingRef: string;
   fullName: string;
   email: string;
+  whatsapp?: string;
   status: "draft";
   itineraryData: string;
 }
@@ -359,18 +360,15 @@ export function stepError(step: number, draft: PreEliteDraft): string | null {
 
 export function contactError(draft: PreEliteDraft): string | null {
   if (!draft.tripType) {
-    return "Choose Multi-Day or Single-Day.";
+    return "Trip type missing — use START TRIP and choose Single-Day or Multi-Day.";
   }
   if (!draft.fullName.trim()) return "Enter your full name.";
   if (!EMAIL_RE.test(draft.email.trim())) {
     return "Enter a valid email.";
   }
   const phone = draft.whatsapp.trim();
-  if (!phone || phone === "+" || /^\+\d+\s*$/.test(phone)) {
-    return "Enter your phone number.";
-  }
-  // National part should have enough digits (country code alone is not enough)
-  {
+  // Phone optional when email is present (gated builder save uses email only)
+  if (phone && phone !== "+") {
     const digits = phone.replace(/\D/g, "");
     const dialMatch = phone.match(/^\+(\d{1,4})/);
     const dialLen = dialMatch?.[1]?.length ?? 0;
@@ -379,15 +377,13 @@ export function contactError(draft: PreEliteDraft): string | null {
       return "Enter a valid phone number.";
     }
   }
-  if (!draft.timing.formattedString.trim()) {
-    return "Select your travel dates.";
-  }
   const maxDays = draft.tripType === "single_day" ? 1 : 45;
-  if (
-    !Number.isInteger(draft.timing.totalDays) ||
-    draft.timing.totalDays < 1 ||
-    draft.timing.totalDays > maxDays
-  ) {
+  const days = Number.isInteger(draft.timing.totalDays)
+    ? draft.timing.totalDays
+    : draft.tripType === "single_day"
+      ? 1
+      : 14;
+  if (days < 1 || days > maxDays) {
     return draft.tripType === "single_day"
       ? "Single-day tours are one day only."
       : "Trip length must be between 1 and 45 days.";
@@ -405,17 +401,24 @@ export function contactError(draft: PreEliteDraft): string | null {
   return null;
 }
 
-export function toItineraryData(draft: PreEliteDraft): PreEliteItineraryData | null {
+export function toItineraryData(
+  draft: PreEliteDraft,
+  opts?: { requireContact?: boolean }
+): PreEliteItineraryData | null {
+  const requireContact = opts?.requireContact !== false;
   if (
     !draft.travelStyle ||
     !draft.tripMotivation ||
     draft.interests.length === 0 ||
     draft.painPoints.length === 0 ||
-    contactError(draft)
+    !draft.tripType
   ) {
     return null;
   }
-  const tripType = draft.tripType!;
+  if (requireContact && contactError(draft)) {
+    return null;
+  }
+  const tripType = draft.tripType;
   const timing =
     tripType === "single_day"
       ? normalizeTiming({ ...draft.timing, totalDays: 1 })
@@ -426,10 +429,13 @@ export function toItineraryData(draft: PreEliteDraft): PreEliteItineraryData | n
     tripMotivation: draft.tripMotivation,
     painPoints: draft.painPoints,
     tripType,
-    dates: timing.formattedString.trim() || draft.timing.formattedString.trim(),
+    dates: timing.formattedString.trim() || "Dates TBD",
     timing,
     whatsapp: draft.whatsapp.trim(),
-    groupSize: { adults: draft.adults, children: draft.children },
+    groupSize: {
+      adults: Math.max(1, draft.adults || 1),
+      children: Math.max(0, draft.children || 0),
+    },
   };
 }
 
@@ -443,6 +449,7 @@ export function buildBookingPayload(
     bookingRef,
     fullName: draft.fullName.trim(),
     email: draft.email.trim().toLowerCase(),
+    whatsapp: draft.whatsapp.trim(),
     status: "draft",
     itineraryData: JSON.stringify(itinerary),
   };

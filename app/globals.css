@@ -383,6 +383,23 @@ h3,
   text-transform: uppercase;
 }
 
+/* Ops dashboard: Anton/Hanson only on page h1 — section headers use body (Futura) */
+.ops-dashboard h2,
+.ops-dashboard h3,
+.ops-dashboard h4,
+.ops-dashboard .text-h2,
+.ops-dashboard .text-h3 {
+  font-family: var(--font-body) !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+.ops-dashboard h1,
+.ops-dashboard .font-display,
+.ops-dashboard .font-godiva {
+  font-family: var(--font-h1) !important;
+}
+
 .font-geosans {
   font-family: var(--font-caption);
   font-weight: 300;
@@ -724,6 +741,14 @@ select:-webkit-autofill:focus {
     background-image: none !important;
   }
 
+  /* Paper print: restore navy/teal on light page (screen invoice stays white) */
+  .sd-timeline--print > header p {
+    color: #0b1f3a !important;
+  }
+  .sd-timeline--print > header p:first-child {
+    color: #075473 !important;
+  }
+
   .sd-timeline--print [class*="text-[#F6A724]"],
   .sd-timeline--print [class*="text-[#B45309]"],
   .sd-timeline--print .font-mono {
@@ -794,4 +819,113 @@ body.print-capturing #itinerary-dossier-view .accent-title,
 body.print-capturing #itinerary-invoice-content [class*="text-[#075473]"],
 body.print-capturing #itinerary-dossier-view [class*="text-[#075473]"] {
   color: #075473 !important;
+}
+
+/* Homepage Torii portal zoom + white flash */
+@keyframes portalZoom {
+  0% {
+    transform: scale(1);
+    opacity: 0.2;
+  }
+  50% {
+    transform: scale(8);
+    opacity: 0.8;
+  }
+  100% {
+    transform: scale(25);
+    opacity: 1;
+  }
+}
+
+@keyframes flashFade {
+  0% {
+    opacity: 0;
+  }
+  70% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+@keyframes cameraFlash {
+  0% {
+    opacity: 0;
+    background: radial-gradient(
+      circle at center,
+      rgba(217, 17, 71, 0.55) 0%,
+      rgba(5, 8, 12, 0.92) 55%,
+      rgba(5, 8, 12, 1) 100%
+    );
+    box-shadow: inset 0 0 0 rgba(217, 17, 71, 0);
+  }
+  25% {
+    opacity: 1;
+    background: radial-gradient(
+      circle at center,
+      rgba(217, 17, 71, 0.85) 0%,
+      rgba(5, 8, 12, 0.95) 50%,
+      rgba(5, 8, 12, 1) 100%
+    );
+    box-shadow: inset 0 0 120px rgba(217, 17, 71, 0.55);
+  }
+  100% {
+    opacity: 0.97;
+    background: radial-gradient(
+      circle at center,
+      rgba(217, 17, 71, 0.45) 0%,
+      rgba(5, 8, 12, 0.98) 60%,
+      rgba(5, 8, 12, 1) 100%
+    );
+    box-shadow: inset 0 0 80px rgba(217, 17, 71, 0.35);
+  }
+}
+
+.animate-portal-zoom {
+  animation: portalZoom 0.6s cubic-bezier(0.7, 0, 0.3, 1) forwards;
+}
+
+.animate-flash-fade {
+  animation: flashFade 0.6s ease-in forwards;
+}
+
+.animate-camera-flash {
+  animation: cameraFlash 0.35s cubic-bezier(0.1, 0.9, 0.2, 1) forwards;
+  background-color: #05080c;
+}
+
+@keyframes pulsarGlow {
+  0% {
+    opacity: 0.45;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+.animate-pulsar-glow {
+  animation: pulsarGlow 2s ease-in-out infinite alternate;
+}
+
+@keyframes callingPulsar {
+  0% {
+    opacity: 0.3;
+    transform: scale(0.98);
+    filter: hue-rotate(0deg);
+  }
+  50% {
+    opacity: 0.85;
+    transform: scale(1.03);
+    filter: hue-rotate(20deg);
+  }
+  100% {
+    opacity: 0.3;
+    transform: scale(0.98);
+    filter: hue-rotate(0deg);
+  }
+}
+
+.animate-calling-pulsar {
+  animation: callingPulsar 2.5s ease-in-out infinite alternate;
 }

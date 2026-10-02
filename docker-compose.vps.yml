@@ -41,9 +41,12 @@ services:
       # Used by backend/docker-entrypoint.sh on every container start
       PB_ADMIN_EMAIL: ${PB_ADMIN_EMAIL:-admin@tokiotours-app.com}
       PB_ADMIN_PASSWORD: ${PB_ADMIN_PASSWORD:-EliteTravelAdmin2026!}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
     volumes:
       - pb_data:/pb/pb_data
       - ./backend/pb_migrations:/pb/pb_migrations:ro
+      - ./backend/pb_hooks:/pb/pb_hooks:ro
     ports:
       - "8091:8090"
     networks:
