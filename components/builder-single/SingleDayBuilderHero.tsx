@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Image from "next/image";
 import {
   BUILDER_S_HERO_CONFIG,
   resolveBuilderSHeroCopy,
@@ -104,6 +105,12 @@ export function SingleDayBuilderHero() {
       SINGLE_DAY_BUILDER_CONFIG.hero.fallbackImage
   );
 
+  const stillSrc = mediaUrl || posterUrl;
+  const stillIsLocal =
+    Boolean(stillSrc) &&
+    stillSrc!.startsWith("/") &&
+    !stillSrc!.startsWith("//");
+
   return (
     <section
       className="builder-hero relative z-10 h-[65vh] w-full min-h-[280px] overflow-hidden bg-[#05080C] sm:h-[80vh] md:min-h-[420px]"
@@ -119,11 +126,22 @@ export function SingleDayBuilderHero() {
           playsInline
           autoPlay
         />
-      ) : mediaUrl || posterUrl ? (
+      ) : stillSrc && stillIsLocal ? (
+        <Image
+          src={stillSrc}
+          alt=""
+          fill
+          priority
+          sizes="100vw"
+          className="absolute inset-0 z-0 object-cover"
+        />
+      ) : stillSrc ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
-          src={mediaUrl || posterUrl}
+          src={stillSrc}
           alt=""
+          width={1600}
+          height={900}
           className="absolute inset-0 z-0 h-full w-full object-cover"
         />
       ) : (
@@ -135,10 +153,13 @@ export function SingleDayBuilderHero() {
         className="pointer-events-none absolute inset-0 z-10 bg-gradient-to-t from-[#05080C] via-[#05080C]/55 to-[#05080C]/25"
       />
 
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
+      <Image
         src={HERO_CHARACTER_SRC}
         alt=""
+        width={280}
+        height={300}
+        priority
+        sizes="(max-width: 640px) 180px, 280px"
         aria-hidden
         className="pointer-events-none absolute bottom-0 left-0 z-20 h-[230px] w-auto select-none object-contain object-left-bottom drop-shadow-[0_8px_24px_rgba(0,0,0,0.55)] sm:h-[300px]"
       />

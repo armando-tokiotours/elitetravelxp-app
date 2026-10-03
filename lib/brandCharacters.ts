@@ -296,13 +296,17 @@ export const BRAND_CHARACTERS: BrandCharacterDef[] = [
 ];
 
 /**
- * Lightweight WebP characters to warm-cache on app start (~0.7 MB total).
+ * Critical characters to warm on app start.
+ * Guest-party animals load only when Step 5 mounts (avoid LCP competition).
  * Skips heavy hero JPGs — those load with their builders.
  */
 export const BRAND_CHARACTER_PRELOAD_PATHS: readonly string[] = [
-  ...BRAND_CHARACTERS.filter((c) => c.category !== "hero" && c.path).map(
-    (c) => c.path
-  ),
+  ...BRAND_CHARACTERS.filter(
+    (c) =>
+      c.path &&
+      c.category !== "hero" &&
+      c.category !== "guest_party"
+  ).map((c) => c.path),
   "/brand/trip-multi-thumb.webp",
   "/brand/trip-single-thumb.webp",
 ];

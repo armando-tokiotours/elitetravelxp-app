@@ -76,7 +76,7 @@ export function PlanInvoiceToggleSwitch({
         className={`relative z-10 flex-1 pr-1 text-center font-godiva text-[10px] tracking-widest uppercase transition-colors duration-300 sm:text-xs ${
           !isInvoice
             ? "font-bold text-white drop-shadow-[0_1px_1px_rgba(0,0,0,0.8)]"
-            : "text-gray-500"
+            : "text-zinc-300"
         }`}
       >
         PLAN
@@ -94,7 +94,7 @@ export function PlanInvoiceToggleSwitch({
         className={`relative z-10 flex-1 pl-1 text-center font-godiva text-[10px] tracking-widest uppercase transition-colors duration-300 sm:text-xs ${
           isInvoice
             ? "font-bold text-[#F6A724] drop-shadow-[0_1px_1px_rgba(0,0,0,0.8)]"
-            : "text-gray-500"
+            : "text-zinc-300"
         }`}
       >
         INVOICE

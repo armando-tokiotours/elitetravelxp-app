@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
@@ -37,7 +38,6 @@ import {
   type PainPointId,
   type TravelStyleId,
 } from "@/lib/preEliteBuilder";
-import { BRAND_LOGO_ICON } from "@/lib/brand";
 import {
   type StoryExplanation,
 } from "@/lib/preEliteStories";
@@ -49,10 +49,18 @@ import {
   PRE_ELITE_QUIZ_LOCAL_KEY,
 } from "@/lib/preEliteBranding";
 import { isVideoFilename } from "@/lib/brandingUi";
-import { StoryExplanationModal } from "@/components/pre-elite/StoryExplanationModal";
 import { SystemMessageFox } from "@/components/branding/SystemMessageFox";
 import { BrandCharacterPreloader } from "@/components/branding/BrandCharacterPreloader";
+import { BrandLogoIcon } from "@/components/branding/BrandLogoIcon";
 import { HoldUntilReadyMascot } from "@/components/branding/HoldUntilReadyMascot";
+
+const StoryExplanationModal = dynamic(
+  () =>
+    import("@/components/pre-elite/StoryExplanationModal").then((m) => ({
+      default: m.StoryExplanationModal,
+    })),
+  { ssr: false }
+);
 import {
   HiBubble,
   MascotHiZoom,
@@ -373,22 +381,23 @@ export function PreEliteBuilderClient() {
       <BrandCharacterPreloader />
       <SystemMessageFox />
       <header className="shrink-0 border-b border-white/10">
-        <div className="mx-auto flex max-w-3xl items-center justify-between px-5 py-3 sm:py-5">
+        <nav
+          className="mx-auto flex max-w-3xl items-center justify-between px-5 py-3 sm:py-5"
+          aria-label="Pre-builder"
+        >
           <Link href="/" className="inline-flex items-center gap-2">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={BRAND_LOGO_ICON}
-              alt=""
+            <BrandLogoIcon
+              priority
               className="h-8 w-8 rounded-full object-cover"
             />
-            <span className="font-godiva text-sm tracking-[0.22em] text-[#D91147] uppercase">
+            <span className="font-godiva text-sm tracking-[0.22em] text-[#FF4D6D] uppercase">
               TOKIOTOURS
             </span>
           </Link>
-          <p className="text-xs tracking-[0.18em] text-white/50 uppercase">
+          <p className="text-xs tracking-[0.18em] text-white/70 uppercase">
             PRE-BUILDER
           </p>
-        </div>
+        </nav>
       </header>
 
       {!hydrated || hasSavedContact || hasTempDraft ? (
@@ -396,18 +405,14 @@ export function PreEliteBuilderClient() {
           <div className="h-80 rounded-3xl border border-zinc-800/80 bg-[#0D1117]/80 backdrop-blur-md" />
         </main>
       ) : (
-        <div className="flex min-h-0 flex-1 flex-col justify-start overflow-x-visible overflow-y-visible sm:justify-center">
+        <main className="flex min-h-0 flex-1 flex-col justify-start overflow-x-visible overflow-y-visible sm:justify-center">
           <div className="relative z-40 mx-auto w-full max-w-3xl shrink-0 px-5 pt-4 sm:pt-2">
             <div className="relative min-h-[6.5rem] overflow-visible sm:min-h-[8.5rem]">
-              <span
-                role="button"
-                tabIndex={0}
+              <button
+                type="button"
                 aria-label="Say hi"
                 onClick={triggerHi}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") triggerHi(e);
-                }}
-                className="absolute -right-2 top-0 z-30 cursor-pointer overflow-visible sm:-right-4 sm:-top-6"
+                className="absolute -right-2 top-0 z-30 cursor-pointer overflow-visible border-0 bg-transparent p-0 sm:-right-4 sm:-top-6"
               >
                 <HiBubble
                   show={showHi}
@@ -420,7 +425,7 @@ export function PreEliteBuilderClient() {
                     imgClassName="h-28 w-auto select-none object-contain sm:h-44 md:h-48"
                   />
                 </MascotHiZoom>
-              </span>
+              </button>
               <div className="relative z-10">
                 <p className="text-[10px] tracking-[0.22em] text-[#1CA67F] uppercase sm:text-xs">
                   Step {step} of {QUIZ_STEP_COUNT}
@@ -428,7 +433,7 @@ export function PreEliteBuilderClient() {
                 <h1 className="mt-1 max-w-[70%] font-display text-2xl leading-tight text-white sm:mt-3 sm:max-w-none sm:text-4xl">
                   {STEP_TITLES[step - 1]}
                 </h1>
-                <p className="mt-1 max-w-xl pr-20 text-xs leading-snug text-white/60 sm:mt-2 sm:pr-32 sm:text-sm sm:leading-relaxed">
+                <p className="mt-1 max-w-xl pr-20 text-xs leading-snug text-white/75 sm:mt-2 sm:pr-32 sm:text-sm sm:leading-relaxed">
                   {stepBlurb}
                 </p>
               </div>
@@ -557,7 +562,7 @@ export function PreEliteBuilderClient() {
                     type="button"
                     onClick={goBack}
                     disabled={step === 1}
-                    className="inline-flex items-center gap-2 rounded-full px-4 py-2.5 text-sm text-white/70 disabled:opacity-30"
+                    className="inline-flex items-center gap-2 rounded-full px-4 py-2.5 text-sm text-white/80 disabled:opacity-30"
                   >
                     <ArrowLeft className="h-4 w-4" />
                     Back
@@ -574,7 +579,7 @@ export function PreEliteBuilderClient() {
               </div>
             </div>
           </div>
-        </div>
+        </main>
       )}
 
       <QuestionnaireCompletionModal
@@ -652,7 +657,7 @@ function ChoiceList({
     Array.isArray(selected) ? selected.includes(id) : selected === id;
 
   return (
-    <div className="grid gap-3">
+    <ul className="m-0 grid list-none gap-3 p-0">
       {options.map((option) => {
         const on = isOn(option.id);
         const story = resolveCopy?.(option.id);
@@ -680,8 +685,8 @@ function ChoiceList({
         const StickerIcon = sticker?.Icon;
 
         return (
+          <li key={option.id} className="m-0 list-none p-0">
           <button
-            key={option.id}
             type="button"
             aria-pressed={on}
             aria-label={`Preview and select ${title}`}
@@ -760,15 +765,16 @@ function ChoiceList({
                 <h3 className="font-godiva text-base font-bold tracking-wide text-white">
                   {title}
                 </h3>
-                <p className="mt-1 text-xs leading-relaxed text-zinc-300">
+                <p className="mt-1 text-xs leading-relaxed text-zinc-200">
                   {description}
                 </p>
               </div>
             </div>
           </button>
+          </li>
         );
       })}
-    </div>
+    </ul>
   );
 }
 

@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
 
 type Props = {
@@ -13,7 +14,7 @@ type Props = {
 /**
  * Stacked mascot poses — never remount/blink.
  * Keeps showing the last ready pose until the wanted one has loaded.
- * Inactive poses forced to opacity 0 via inline style (Tailwind opacity-* clashes).
+ * Active/local poses use next/image; priority on the first paint pose.
  */
 export function HoldUntilReadyMascot({
   pose,
@@ -23,6 +24,7 @@ export function HoldUntilReadyMascot({
 }: Props) {
   const ids = Object.keys(poses);
   const [display, setDisplay] = useState(pose);
+  const [priorityPose] = useState(pose);
   const wantedRef = useRef(pose);
   const displayRef = useRef(pose);
   const loadedRef = useRef<Set<string>>(new Set());
@@ -47,25 +49,45 @@ export function HoldUntilReadyMascot({
     <span className={`relative inline-block ${className}`}>
       {ids.map((id) => {
         const active = id === display;
+        const src = poses[id];
+        const isLocal = src.startsWith("/") && !src.startsWith("//");
         return (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
+          <span
             key={id}
-            src={poses[id]}
-            alt=""
-            aria-hidden
-            draggable={false}
-            onLoad={() => markLoaded(id)}
-            ref={(el) => {
-              if (el?.complete && el.naturalWidth > 0) markLoaded(id);
-            }}
             className={`${imgClassName} transition-opacity duration-500 ease-in-out ${
               active
                 ? "relative z-[1]"
                 : "pointer-events-none absolute inset-0 z-0"
             }`}
             style={{ opacity: active ? 1 : 0 }}
-          />
+          >
+            {isLocal ? (
+              <Image
+                src={src}
+                alt=""
+                width={220}
+                height={280}
+                priority={id === priorityPose}
+                sizes="(max-width: 640px) 7rem, 11rem"
+                aria-hidden
+                draggable={false}
+                onLoad={() => markLoaded(id)}
+                className="h-full w-auto object-contain"
+              />
+            ) : (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={src}
+                alt=""
+                aria-hidden
+                draggable={false}
+                width={220}
+                height={280}
+                onLoad={() => markLoaded(id)}
+                className="h-full w-auto object-contain"
+              />
+            )}
+          </span>
         );
       })}
     </span>

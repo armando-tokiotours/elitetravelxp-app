@@ -41,11 +41,14 @@ export function MobileTopChrome({
           alwaysVisible ? "" : "lg:hidden"
         }`}
       >
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-2 px-3 py-2.5 sm:gap-3 sm:px-6 sm:py-3">
+        <nav
+          className="mx-auto flex max-w-6xl items-center justify-between gap-2 px-3 py-2.5 sm:gap-3 sm:px-6 sm:py-3"
+          aria-label="Builder"
+        >
           <div className="flex min-w-0 items-center gap-2 sm:gap-3">
             <MobileAppNav brandEyebrow="TOKIOTOURS" brandTitle={brandTitle} />
             <div className="min-w-0">
-              <p className="text-[0.6rem] font-semibold uppercase tracking-[0.28em] text-cyan-400">
+              <p className="text-[0.6rem] font-semibold uppercase tracking-[0.28em] text-cyan-300">
                 Tokiotours
               </p>
               <h1 className="truncate font-display text-sm leading-tight uppercase tracking-wider sm:text-xl">
@@ -60,7 +63,7 @@ export function MobileTopChrome({
               <>
                 {bookingRef ? (
                   <span
-                    className="mr-2 hidden font-mono text-xs tracking-wider text-zinc-500 sm:inline-block"
+                    className="mr-2 hidden font-mono text-xs tracking-wider text-zinc-300 sm:inline-block"
                     title="Booking reference"
                   >
                     {bookingRef}
@@ -68,14 +71,14 @@ export function MobileTopChrome({
                 ) : null}
                 <Link
                   href={ctaHref}
-                  className="shrink-0 rounded-full border border-white/20 px-3 py-1.5 text-xs font-semibold text-white/90"
+                  className="shrink-0 rounded-full border border-white/20 px-3 py-1.5 text-xs font-semibold text-white"
                 >
                   {ctaLabel}
                 </Link>
               </>
             )}
           </div>
-        </div>
+        </nav>
       </header>
       {/* Reserve space so content is not hidden under the fixed bar */}
       <div

@@ -1,6 +1,7 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
+import Image from "next/image";
 import { useEffect, useState } from "react";
 import {
   GUEST_PARTY_ADULTS,
@@ -17,12 +18,8 @@ import {
 
 /**
  * Guest-count characters behind the Pre-Elite hero mascot (Step 5).
- * Main kid/mascot is rendered separately — do not replace his animations.
- *
  * Adults (cap 6): Duck-peek → Shiba → Cat → Red Panda → Panda
  * Kids (cap 3 chicks, in front)
- *
- * Positions come from Team Access → Layout Builder (config/guestPartyLayout.json).
  */
 
 export function GuestPartyMascots({
@@ -97,36 +94,53 @@ export function GuestPartyMascots({
       aria-hidden
     >
       <AnimatePresence initial={false}>
-        {adultsShown.map((a) => {
+        {adultsShown.map((a, index) => {
           const slot = layout.adults[a.id];
           return (
-            <motion.img
+            <motion.div
               key={a.id}
-              src={a.src}
-              alt=""
               initial={{ opacity: 0, x: 14, scale: 0.94 }}
               animate={{ opacity: 1, x: 0, scale: 1 }}
               exit={{ opacity: 0, x: 10, scale: 0.92 }}
               transition={{ duration: 0.28, ease: "easeOut" }}
-              className="absolute object-contain object-bottom drop-shadow-[0_8px_16px_rgba(0,0,0,0.45)]"
+              className="absolute"
               style={slotToStyle(slot)}
-            />
+            >
+              <Image
+                src={a.src}
+                alt=""
+                width={280}
+                height={280}
+                priority={index === 0 || a.id === "red"}
+                sizes="(max-width: 640px) 28vw, 200px"
+                className="h-full w-auto object-contain object-bottom drop-shadow-[0_8px_16px_rgba(0,0,0,0.45)]"
+                draggable={false}
+              />
+            </motion.div>
           );
         })}
         {chicks.map((i) => {
           const slot = layout.chicks[i];
           return (
-            <motion.img
+            <motion.div
               key={`chick-${i}`}
-              src={GUEST_PARTY_CHICK_SRC}
-              alt=""
               initial={{ opacity: 0, y: 10, scale: 0.9 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 8, scale: 0.9 }}
               transition={{ duration: 0.25, ease: "easeOut" }}
-              className="absolute object-contain object-bottom drop-shadow-[0_6px_12px_rgba(0,0,0,0.4)]"
+              className="absolute"
               style={slotToStyle(slot)}
-            />
+            >
+              <Image
+                src={GUEST_PARTY_CHICK_SRC}
+                alt=""
+                width={160}
+                height={160}
+                sizes="80px"
+                className="h-full w-auto object-contain object-bottom drop-shadow-[0_6px_12px_rgba(0,0,0,0.4)]"
+                draggable={false}
+              />
+            </motion.div>
           );
         })}
       </AnimatePresence>

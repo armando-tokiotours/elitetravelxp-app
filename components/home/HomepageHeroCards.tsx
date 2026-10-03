@@ -328,7 +328,7 @@ export function HomepageHeroCards() {
         </div>
       </div>
 
-      <footer className="relative z-10 flex shrink-0 flex-wrap items-center justify-center gap-1.5 border-t border-white/10 px-4 py-1.5 pb-[max(0.75rem,calc(env(safe-area-inset-bottom)+0.35rem))] text-center text-[8px] font-medium text-gray-400 sm:gap-6 sm:py-3 sm:pb-[max(0.5rem,env(safe-area-inset-bottom))] sm:text-[11px]">
+      <footer className="relative z-10 flex shrink-0 flex-wrap items-center justify-center gap-1.5 border-t border-white/10 px-4 py-1.5 pb-[max(0.75rem,calc(env(safe-area-inset-bottom)+0.35rem))] text-center text-[8px] font-medium text-zinc-300 sm:gap-6 sm:py-3 sm:pb-[max(0.5rem,env(safe-area-inset-bottom))] sm:text-[11px]">
         <span>🏆 100% Private Guide</span>
         <span>•</span>
         <span>⚡ Instant Itinerary</span>
