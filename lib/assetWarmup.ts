@@ -15,8 +15,8 @@ export const WARM_IMAGE_PATHS: readonly string[] = [
   "/brand/1-day-pass-ico.png",
   "/brand/multy-day-icon.png",
   "/brand/fox-peek.webp",
-  "/images/peek-character-1day.png",
-  "/images/peek-character.png",
+  "/images/peek-character-1day.webp",
+  "/images/peek-character.webp",
 ].filter((p) => Boolean(p) && p.startsWith("/"));
 
 /** Videos disabled for speed test — never block navigation. */

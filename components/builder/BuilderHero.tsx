@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Image from "next/image";
 import {
   DEFAULT_HERO_IMAGE,
   brandingHeroUrl,
@@ -11,7 +12,7 @@ import {
 const HERO_SUBTITLE_DEFAULT =
   "Full Bespoke Vacation across Tokyo, Kyoto & Beyond";
 
-const HERO_CHARACTER_SRC = "/images/peek-character.png";
+const HERO_CHARACTER_SRC = "/images/peek-character.webp";
 
 const HERO_MEDIA_STUBS = new Set([
   "/brand/tokiotours-logo-icon.png",
@@ -76,11 +77,13 @@ export function BuilderHero({ branding }: { branding: PbSiteBranding | null }) {
         className="pointer-events-none absolute inset-0 z-10 bg-gradient-to-t from-[#05080C] via-[#05080C]/55 to-[#05080C]/25"
       />
 
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
+      <Image
         src={HERO_CHARACTER_SRC}
-        alt=""
-        aria-hidden
+        alt="Tokiotours Grand Japan Journey mascot"
+        width={280}
+        height={300}
+        priority
+        sizes="(max-width: 640px) 180px, 280px"
         className="pointer-events-none absolute bottom-0 left-0 z-20 h-[230px] w-auto select-none object-contain object-left-bottom drop-shadow-[0_8px_24px_rgba(0,0,0,0.55)] sm:h-[300px]"
       />
 

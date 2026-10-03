@@ -9,14 +9,16 @@ export const metadata: Metadata = {
 
 export default function DayPassBuilderPage() {
   return (
-    <Suspense
-      fallback={
-        <div className="flex min-h-dvh items-center justify-center bg-black text-sm text-zinc-400">
-          Opening 1-Day Express Pass…
-        </div>
-      }
-    >
-      <SingleDayBuilderView />
-    </Suspense>
+    <main id="day-pass-builder" className="min-h-dvh">
+      <Suspense
+        fallback={
+          <div className="flex min-h-dvh items-center justify-center bg-black text-sm text-zinc-400">
+            Opening 1-Day Express Pass…
+          </div>
+        }
+      >
+        <SingleDayBuilderView />
+      </Suspense>
+    </main>
   );
 }

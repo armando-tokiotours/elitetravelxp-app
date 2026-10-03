@@ -208,7 +208,7 @@ export function SingleDayBuilderView() {
           ctaLabel="Itinerary"
         />
 
-        <main className="relative bg-[#04080C]">
+        <div className="relative bg-[#04080C]">
           <SingleDayBuilderHero />
 
           <div className="relative z-20 -mt-20 w-full bg-transparent sm:-mt-28">
@@ -304,7 +304,7 @@ export function SingleDayBuilderView() {
               </div>
             </div>
           </div>
-        </main>
+        </div>
       </div>
     </div>
   );

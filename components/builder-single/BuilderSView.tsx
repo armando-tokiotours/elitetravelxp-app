@@ -368,6 +368,11 @@ export function BuilderSView({
         <div className="overflow-visible">
           <button
             type="button"
+            aria-label={
+              cityFocus.trim()
+                ? `Edit city focus: ${cityFocus}`
+                : "Choose city focus"
+            }
             onClick={() => openEditModal("locations")}
             className={`${WIDGET_SHELL} ${getWidgetPulsarClass(activePulsarStep, "city")} h-[14.5rem] p-0`}
           >
@@ -377,7 +382,9 @@ export function BuilderSView({
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={cityThumb}
-                  alt=""
+                  alt={cityFocus ? `${cityFocus} city` : "City focus"}
+                  width={600}
+                  height={400}
                   className="absolute inset-0 h-full w-full object-cover"
                 />
                 <div
@@ -420,6 +427,7 @@ export function BuilderSView({
           <div className="overflow-visible">
             <button
               type="button"
+              aria-label="Edit tour hours and date"
               onClick={() => openEditModal("duration")}
               className={`${WIDGET_SHELL} ${getWidgetPulsarClass(activePulsarStep, "duration")} min-h-[11.5rem] p-3.5`}
             >
@@ -447,6 +455,7 @@ export function BuilderSView({
           <div className="overflow-visible">
             <button
               type="button"
+              aria-label="Edit guests and travel pace"
               onClick={() => openEditModal("guests")}
               className={`${WIDGET_SHELL} ${getWidgetPulsarClass(activePulsarStep, "guests")} min-h-[11.5rem] p-4`}
             >
@@ -475,6 +484,7 @@ export function BuilderSView({
         <div className="overflow-visible">
           <button
             type="button"
+            aria-label="Edit meeting point and language"
             onClick={() => openEditModal("meeting")}
             className={`${WIDGET_SHELL} ${getWidgetPulsarClass(activePulsarStep, "meeting")} h-40 p-0`}
           >
@@ -484,7 +494,9 @@ export function BuilderSView({
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
                   src={meetMapBg}
-                  alt=""
+                  alt="Meeting point map"
+                  width={800}
+                  height={400}
                   className="absolute inset-0 h-full w-full object-cover"
                 />
               ) : (
@@ -587,6 +599,7 @@ export function BuilderSView({
           <div className="overflow-visible">
             <button
               type="button"
+              aria-label="Edit transport and logistics"
               onClick={() => openEditModal("logistics")}
               className={`${WIDGET_SHELL} ${getWidgetPulsarClass(activePulsarStep, "transport")} flex min-h-[12rem] flex-col justify-between p-4`}
             >

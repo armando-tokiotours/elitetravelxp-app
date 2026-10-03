@@ -108,10 +108,18 @@ export function GuestPartyMascots({
             >
               <Image
                 src={a.src}
-                alt=""
+                alt={
+                  a.id === "shiba"
+                    ? "Tokiotours Shiba mascot"
+                    : a.id === "red"
+                      ? "Tokiotours red panda mascot"
+                      : a.label
+                        ? `Tokiotours ${a.label}`
+                        : "Tokiotours guest mascot"
+                }
                 width={280}
                 height={280}
-                priority={index === 0 || a.id === "red"}
+                priority={index === 0 || a.id === "shiba" || a.id === "red"}
                 sizes="(max-width: 640px) 28vw, 200px"
                 className="h-full w-auto object-contain object-bottom drop-shadow-[0_8px_16px_rgba(0,0,0,0.45)]"
                 draggable={false}

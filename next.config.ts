@@ -6,6 +6,9 @@ const nextConfig: NextConfig = {
   // Allow opening the local app via 127.0.0.1 as well as localhost
   // (Next 16 blocks cross-origin /_next assets otherwise → stuck "Loading…").
   allowedDevOrigins: ["127.0.0.1"],
+  experimental: {
+    optimizePackageImports: ["lucide-react", "framer-motion"],
+  },
   serverExternalPackages: [
     "pdfkit",
     "nodemailer",
@@ -41,6 +44,15 @@ const nextConfig: NextConfig = {
   },
   async headers() {
     return [
+      {
+        source: "/:path*",
+        headers: [
+          {
+            key: "Strict-Transport-Security",
+            value: "max-age=31536000; includeSubDomains",
+          },
+        ],
+      },
       {
         source: "/api/files/:path*",
         headers: [

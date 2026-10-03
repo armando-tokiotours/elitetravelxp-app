@@ -22,7 +22,7 @@ import {
 } from "@/lib/pocketbase/client";
 
 /** Single-day peek character (1-Day Pass ticket) */
-const HERO_CHARACTER_SRC = "/images/peek-character-1day.png";
+const HERO_CHARACTER_SRC = "/images/peek-character-1day.webp";
 
 /** Logo / ENOENT stubs — never use as full-bleed hero (plain grey instead). */
 const HERO_MEDIA_STUBS = new Set([
@@ -155,12 +155,11 @@ export function SingleDayBuilderHero() {
 
       <Image
         src={HERO_CHARACTER_SRC}
-        alt=""
+        alt="Tokiotours 1-Day Express Pass mascot"
         width={280}
         height={300}
         priority
         sizes="(max-width: 640px) 180px, 280px"
-        aria-hidden
         className="pointer-events-none absolute bottom-0 left-0 z-20 h-[230px] w-auto select-none object-contain object-left-bottom drop-shadow-[0_8px_24px_rgba(0,0,0,0.55)] sm:h-[300px]"
       />
 
