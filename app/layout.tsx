@@ -1,32 +1,17 @@
 import type { Metadata, Viewport } from "next";
-import dynamic from "next/dynamic";
 import localFont from "next/font/local";
 import { DynamicTypography } from "@/components/layout/DynamicTypography";
 import { BrandDocumentMeta } from "@/components/branding/BrandDocumentMeta";
+import { LazySeasonalParticlesHost } from "@/components/branding/LazySeasonalParticlesHost";
 import { BrandCharacterPreloader } from "@/components/branding/BrandCharacterPreloader";
+import { AppLinkInterceptor } from "@/components/navigation/AppLinkInterceptor";
 import { BRAND_DESCRIPTION, BRAND_TITLE, BRAND_URL } from "@/lib/brand";
 import "./globals.css";
-
-const LazySeasonalParticlesHost = dynamic(
-  () =>
-    import("@/components/branding/LazySeasonalParticlesHost").then((m) => ({
-      default: m.LazySeasonalParticlesHost,
-    })),
-  { ssr: false }
-);
-
-const AppLinkInterceptor = dynamic(
-  () =>
-    import("@/components/navigation/AppLinkInterceptor").then((m) => ({
-      default: m.AppLinkInterceptor,
-    })),
-  { ssr: false }
-);
 
 /**
  * TOKIOTOURS type stack — self-hosted via next/font (no CSS @font-face chains).
  * Preload only LCP-critical faces (body + brand display); defer the rest.
- * Beauty uses display:optional so it never blocks First Paint / LCP.
+ * Beauty/Hanson/Geosans use display:optional so they never block First Paint / LCP.
  */
 const godiva = localFont({
   src: "../public/fonts/Godiva-Regular.ttf",
