@@ -77,7 +77,7 @@ export function BuilderEView() {
       <SystemMessageFox />
       <div className="no-print">
         <MobileTopChrome
-          brandTitle="Builder E"
+          brandTitle="VIP Access"
           ctaHref="/builder-e/dossier"
           ctaLabel="Dossier"
         />
@@ -89,15 +89,18 @@ export function BuilderEView() {
           <div className="relative z-10 flex flex-wrap items-start justify-between gap-4">
             <div>
               <p className="text-[10px] font-bold tracking-[0.2em] text-[#F6A724] uppercase">
-                Builder E · Micro-Services
+                VIP Tickets & Local Access
               </p>
               <h1 className="font-godiva mt-1 text-2xl tracking-wide text-white uppercase sm:text-3xl">
-                Experiences
+                VIP Tickets
                 <br />
-                Tickets
+                &amp; Local
                 <br />
-                Services
+                Access
               </h1>
+              <p className="mt-2 max-w-xs text-xs font-light leading-snug text-zinc-400">
+                Hard-to-get tickets, restaurant reservations &amp; local specs
+              </p>
             </div>
             <div className="flex flex-col items-end gap-2">
               <IdleHeroMascot className="h-24 w-auto" />

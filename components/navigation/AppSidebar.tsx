@@ -5,10 +5,12 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import {
   Bookmark,
+  CalendarDays,
   CircleHelp,
   Home,
   LogOut,
   Sparkles,
+  Sun,
   Ticket,
   User,
 } from "lucide-react";
@@ -53,8 +55,8 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
   { id: "home", href: "/", label: "Home", icon: Home },
   {
     id: "builderE",
-    href: "/builder-e",
-    label: "Builder E",
+    href: "/builder/vip-access",
+    label: "VIP Tickets & Local Access",
     icon: Sparkles,
   },
   {
@@ -65,7 +67,7 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
   },
   {
     id: "itinerary",
-    href: "/builder/itinerary",
+    href: "/builder/japan-journey/itinerary",
     label: "Itinerary",
     icon: Bookmark,
   },
@@ -83,20 +85,28 @@ function isNavActive(pathname: string, item: AppNavItem): boolean {
   if (item.id === "builder")
     return (
       pathname === "/builder" ||
+      (pathname.startsWith("/builder/japan-journey") &&
+        !pathname.includes("/itinerary")) ||
+      (pathname.startsWith("/builder/day-pass") &&
+        !pathname.includes("/itinerary")) ||
       (pathname.startsWith("/builder-single") &&
         !pathname.startsWith("/builder-single/itinerary"))
     );
   if (item.id === "builderE")
     return (
+      pathname === "/builder/vip-access" ||
       pathname === "/builder-e" ||
+      (pathname.startsWith("/builder/vip-access/") &&
+        !pathname.startsWith("/builder/vip-access/dossier")) ||
       (pathname.startsWith("/builder-e/") &&
         !pathname.startsWith("/builder-e/dossier"))
     );
   if (item.id === "itinerary")
     return (
-      pathname.startsWith("/builder/itinerary") ||
-      pathname.startsWith("/builder-single/itinerary") ||
-      pathname.startsWith("/builder-e/dossier")
+      pathname.includes("/itinerary") ||
+      pathname.startsWith("/builder/vip-access/dossier") ||
+      pathname.startsWith("/builder-e/dossier") ||
+      pathname.startsWith("/dossier/")
     );
   if (item.id === "preElite")
     return pathname.startsWith("/pre-elite-builder");
@@ -168,35 +178,77 @@ function NavLinkList({
   expanded?: boolean;
 }) {
   const tripMode = useBuilderStore((s) => s.tripMode);
+  const isSingleDay =
+    tripMode === "single_day" ||
+    pathname.startsWith("/builder-single") ||
+    pathname.startsWith("/builder/day-pass");
+  const isBuilderE =
+    pathname.startsWith("/builder-e") ||
+    pathname.startsWith("/builder/vip-access");
+  const isMultiDay =
+    tripMode === "multi_day" ||
+    pathname.startsWith("/builder/japan-journey") ||
+    (pathname.startsWith("/builder") &&
+      !isSingleDay &&
+      !isBuilderE &&
+      !pathname.startsWith("/builder/day-pass") &&
+      !pathname.startsWith("/builder/vip-access"));
+
+  /** Context-isolated menu — never cross-link builders (matches AppNavDock). */
+  const navItems: AppNavItem[] = APP_NAV_ITEMS.flatMap((item) => {
+    if (item.id !== "builderE") return [item];
+    if (isSingleDay) {
+      return [
+        {
+          id: "builder",
+          href: "/builder/day-pass",
+          label: "1-Day Express Pass",
+          icon: Sun,
+        },
+      ];
+    }
+    if (isMultiDay) {
+      return [
+        {
+          id: "builder",
+          href: "/builder/japan-journey",
+          label: labelOverrides?.builder ?? "Grand Japan Journey",
+          icon: CalendarDays,
+        },
+      ];
+    }
+    if (isBuilderE) return [item];
+    // Home / other: keep VIP as a product entry
+    return [item];
+  });
 
   return (
     <nav className="flex flex-1 flex-col gap-1" aria-label="Main">
-      {APP_NAV_ITEMS.map((item) => {
+      {navItems.map((item) => {
         const Icon = item.icon;
         const label =
           item.id === "builder"
-            ? tripMode === "single_day" ||
-              pathname.startsWith("/builder-single")
-              ? "Single-Day Builder"
+            ? isSingleDay
+              ? "1-Day Express Pass"
               : (labelOverrides?.[item.id] ?? item.label)
-            : item.id === "itinerary" &&
-                (tripMode === "single_day" ||
-                  pathname.startsWith("/builder-single"))
-              ? "Single-Day Itinerary"
-              : (labelOverrides?.[item.id] ?? item.label);
+            : item.id === "itinerary" && isSingleDay
+              ? "1-Day Express Pass · Itinerary"
+              : item.id === "itinerary" && isBuilderE
+                ? "VIP Tickets · Dossier"
+                : (labelOverrides?.[item.id] ?? item.label);
         const href =
           item.id === "builder"
-            ? tripMode === "single_day" ||
-              pathname.startsWith("/builder-single")
-              ? "/builder-single"
-              : "/builder"
+            ? isSingleDay
+              ? "/builder/day-pass"
+              : "/builder/japan-journey"
             : item.id === "itinerary"
-              ? tripMode === "single_day" ||
-                pathname.startsWith("/builder-single")
-                ? "/builder-single/itinerary"
-                : "/builder/itinerary"
+              ? isSingleDay
+                ? "/builder/day-pass/itinerary"
+                : isBuilderE
+                  ? "/builder/vip-access/dossier"
+                  : "/builder/japan-journey/itinerary"
               : item.href!;
-        const active = isNavActive(pathname, item);
+        const active = isNavActive(pathname, { ...item, href });
 
         const railItemClass = active
           ? "border-r-2 border-[#075473]/40 bg-[#075473]/15 text-[#075473]"

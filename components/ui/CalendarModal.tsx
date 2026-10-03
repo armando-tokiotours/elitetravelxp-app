@@ -298,6 +298,8 @@ type DatePickerTriggerProps = {
   /** Calendar header — default preserves Multi-Day wording. */
   title?: string;
   disablePast?: boolean;
+  /** Override default zinc micro-label (e.g. Builder S tour date). */
+  labelClassName?: string;
 };
 
 /** Arrival-date trigger + portal calendar for builder configure sheets. */
@@ -307,6 +309,7 @@ export function DatePickerField({
   label = "Arrival date",
   title = "CHOOSE ARRIVAL DATE",
   disablePast = true,
+  labelClassName,
 }: DatePickerTriggerProps) {
   const [open, setOpen] = useState(false);
   const selected = fromIso(value);
@@ -316,7 +319,12 @@ export function DatePickerField({
   return (
     <>
       <div className="flex min-h-[44px] flex-col justify-center rounded-xl border border-zinc-800 bg-zinc-900/80 p-3 backdrop-blur-sm">
-        <p className="text-[10px] font-medium uppercase tracking-[0.14em] text-zinc-500">
+        <p
+          className={
+            labelClassName ??
+            "text-[10px] font-medium uppercase tracking-[0.14em] text-zinc-500"
+          }
+        >
           {label}
         </p>
         <button

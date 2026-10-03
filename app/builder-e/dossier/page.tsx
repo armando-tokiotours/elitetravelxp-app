@@ -3,8 +3,9 @@ import { Suspense } from "react";
 import { BuilderEDossierView } from "@/components/builder-e/BuilderEDossier";
 
 export const metadata: Metadata = {
-  title: "Builder E Dossier",
-  description: "Micro-service booking pass — TOKIOTOURS Builder E.",
+  title: "VIP Tickets & Local Access · Dossier",
+  description:
+    "Hard-to-get tickets, restaurant reservations & local specs",
 };
 
 export default function BuilderEDossierPage() {

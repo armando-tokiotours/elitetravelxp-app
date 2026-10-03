@@ -6,17 +6,16 @@
 
 export const BUILDER_S_HERO_CONFIG = {
   /** Beauty-script accent overlaid on the scenic hero (mirrors Builder M “Japan!”) */
-  scriptAccent: "Japan!",
+  scriptAccent: "Express",
   /** Hanson lines under the script */
-  heroLine1: "DAY",
-  heroLine2: "TOUR",
+  heroLine1: "1-DAY",
+  heroLine2: "PASS",
   mainTitlePrefix: "YOUR DAY IN",
   defaultCity: "TOKYO",
   /** Used when no city is selected; `{city}` is replaced when a city is set */
-  tagline:
-    "Curated 1-day immersive discovery across Japan's finest districts.",
+  tagline: "Custom 1-Day Private Route & Instant Quote",
   taglineWithCity:
-    "Discover {city} in 1 Day — Curated Experiences & Private Transit.",
+    "Discover {city} in 1 Day — Custom Private Route & Instant Quote.",
   bookingStatusLabel: "IN PROGRESS",
   steps: [
     {

@@ -237,9 +237,9 @@ export function StoryExplanationModal({
               onClick={() => go(index + 1)}
             />
 
-            {/* Media */}
+            {/* Media — empty slot = plain grey card (never logo filler) */}
             {slide ? (
-              <div className="absolute inset-0 z-0 bg-black">
+              <div className="absolute inset-0 z-0 bg-[#2C2C2E]">
                 {slide.videoUrl ? (
                   <>
                     {slide.imageUrl ? (
@@ -256,7 +256,7 @@ export function StoryExplanationModal({
                       ref={videoRef}
                       key={slide.id}
                       src={slide.videoUrl}
-                      poster={slide.imageUrl}
+                      poster={slide.imageUrl || undefined}
                       autoPlay
                       muted
                       playsInline
@@ -266,7 +266,7 @@ export function StoryExplanationModal({
                       }`}
                     />
                   </>
-                ) : (
+                ) : slide.imageUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
                     key={slide.id}
@@ -274,8 +274,8 @@ export function StoryExplanationModal({
                     alt=""
                     className="h-full w-full object-cover"
                   />
-                )}
-                <div className="absolute inset-0 bg-gradient-to-t from-black via-black/20 to-black/50" />
+                ) : null}
+                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/25 to-black/40" />
               </div>
             ) : null}
 

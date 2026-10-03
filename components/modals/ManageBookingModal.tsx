@@ -24,8 +24,38 @@ export interface ManageBookingModalProps {
   onSuccess?: (bookingRef: string) => void;
   initialPnr?: string;
   initialEmail?: string;
-  /** Default `/pre-build`. Pass `null` to skip auto-navigation. */
+  /**
+   * Override success navigation. Default: guest dossier for the retrieved trip
+   * (`/builder-single/itinerary`, `/builder/itinerary`, or `/builder-e/dossier`).
+   * Pass `null` to skip auto-navigation.
+   */
   successHref?: string | null;
+}
+
+function dossierHrefForRetrieve(opts: {
+  hasSingleDay: boolean;
+  leadType?: string;
+  bookingRef: string;
+}): string {
+  const ref = encodeURIComponent(opts.bookingRef);
+  const type = String(opts.leadType || "").toLowerCase();
+  if (
+    opts.hasSingleDay ||
+    type === "single_day" ||
+    type === "single-day" ||
+    type === "single"
+  ) {
+    return `/builder-single/itinerary?ref=${ref}&view=dossier`;
+  }
+  if (
+    type === "experience_only" ||
+    type === "builder_e" ||
+    type === "builder-e" ||
+    type === "experience"
+  ) {
+    return `/builder-e/dossier?ref=${ref}`;
+  }
+  return `/builder/itinerary?ref=${ref}&view=dossier`;
 }
 
 const ERROR_MSG =
@@ -214,7 +244,7 @@ export function ManageBookingModal({
   onSuccess,
   initialPnr = "",
   initialEmail = "",
-  successHref = "/pre-build",
+  successHref,
 }: ManageBookingModalProps) {
   const router = useRouter();
   const [mounted, setMounted] = useState(false);
@@ -241,10 +271,21 @@ export function ManageBookingModal({
     };
   }, [open, initialPnr, initialEmail]);
 
-  const finishSuccess = (ref: string) => {
+  const finishSuccess = (
+    ref: string,
+    opts?: { hasSingleDay?: boolean; leadType?: string }
+  ) => {
     onSuccess?.(ref);
     onClose();
-    if (successHref) router.push(successHref);
+    if (successHref === null) return;
+    const href =
+      successHref ??
+      dossierHrefForRetrieve({
+        hasSingleDay: Boolean(opts?.hasSingleDay),
+        leadType: opts?.leadType,
+        bookingRef: ref,
+      });
+    router.push(href);
   };
 
   async function handleRetrieve(e: FormEvent) {
@@ -306,7 +347,9 @@ export function ManageBookingModal({
           ),
         });
 
-        if (data.singleDay && typeof data.singleDay === "object") {
+        const hasSingleDay =
+          Boolean(data.singleDay && typeof data.singleDay === "object");
+        if (hasSingleDay && data.singleDay) {
           const { useSingleDayBuilderStore } = await import(
             "@/store/useSingleDayBuilderStore"
           );
@@ -329,7 +372,15 @@ export function ManageBookingModal({
           });
         }
 
-        finishSuccess(lockedRef);
+        const leadTypeFromState = String(
+          (data.state as { tripMode?: string }).tripMode ||
+            (hasSingleDay ? "single_day" : "multi_day")
+        );
+
+        finishSuccess(lockedRef, {
+          hasSingleDay,
+          leadType: leadTypeFromState,
+        });
         return;
       }
 
@@ -347,7 +398,12 @@ export function ManageBookingModal({
           duration_value: match.duration_value,
           loadSavedItinerary,
         });
-        finishSuccess(cleanPnr);
+        finishSuccess(cleanPnr, {
+          hasSingleDay:
+            String(match.type || "") === "single_day" ||
+            String(match.type || "") === "single",
+          leadType: String(match.type || "multi_day"),
+        });
         return;
       }
 
@@ -368,7 +424,12 @@ export function ManageBookingModal({
             duration_value: match.duration_value,
             loadSavedItinerary,
           });
-          finishSuccess(cleanPnr);
+          finishSuccess(cleanPnr, {
+            hasSingleDay:
+              String(match.type || "") === "single_day" ||
+              String(match.type || "") === "single",
+            leadType: String(match.type || "multi_day"),
+          });
           return;
         } catch {
           /* fall through */

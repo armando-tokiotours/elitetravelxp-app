@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import SingleDayItineraryPageClient from "./SingleDayItineraryPageClient";
 
 export const metadata: Metadata = {
-  title: "Single-Day Tour Dossier",
+  title: "1-Day Express Pass · Itinerary",
 };
 
 export default function SingleDayItineraryPage() {

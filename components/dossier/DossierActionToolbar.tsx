@@ -29,6 +29,8 @@ export function DossierActionToolbar({
   onItinerary,
   invoiceActive = false,
   showInvoice = true,
+  /** When true, Save/Print/Invoice live in top chrome — only CTA row remains */
+  hideUtilityRow = false,
   resetScope = "full",
   howMuchDisabled = false,
   howMuchLabel = "How much cost?",
@@ -46,6 +48,7 @@ export function DossierActionToolbar({
   onItinerary?: () => void;
   invoiceActive?: boolean;
   showInvoice?: boolean;
+  hideUtilityRow?: boolean;
   resetScope?: "full" | "builder-e";
   howMuchDisabled?: boolean;
   howMuchLabel?: string;
@@ -65,61 +68,63 @@ export function DossierActionToolbar({
       aria-label="Dossier actions"
     >
       {/* Row — Plan/Invoice toggle · Save · Send · Print */}
-      <div className="flex items-center gap-1.5">
-        {showInvoice ? (
-          <PlanInvoiceToggleSwitch
-            activeTab={invoiceActive ? "invoice" : "plan"}
-            disabled={locked || !onInvoice}
-            onChange={(tab) => {
-              if (locked) return;
-              if (tab === "invoice") onInvoice?.();
-              else onItinerary?.();
-            }}
-            className="shrink-0"
-          />
-        ) : null}
-        <div className="ml-auto grid flex-1 grid-cols-3 gap-1.5">
-          <button
-            type="button"
-            disabled={locked || !onSave}
-            onClick={() => {
-              if (locked || !onSave) return;
-              onSave();
-            }}
-            aria-label="Save"
-            title={locked ? "Save contact first" : "Save"}
-            className={`${iconBtnBase} ${locked || !onSave ? iconBtnOff : iconBtnOn}`}
-          >
-            <Save className="h-3 w-3" aria-hidden />
-          </button>
-          <button
-            type="button"
-            disabled={locked || !onSend}
-            onClick={() => {
-              if (locked || !onSend) return;
-              onSend();
-            }}
-            aria-label="Send"
-            title={locked ? "Save contact first" : "Send to TokioTours"}
-            className={`${iconBtnBase} ${locked || !onSend ? iconBtnOff : iconBtnOn}`}
-          >
-            <Send className="h-3 w-3" aria-hidden />
-          </button>
-          <button
-            type="button"
-            disabled={locked || !onPrint}
-            onClick={() => {
-              if (locked || !onPrint) return;
-              onPrint();
-            }}
-            aria-label="Print"
-            title={locked ? "Save contact first" : "Print"}
-            className={`${iconBtnBase} ${locked || !onPrint ? iconBtnOff : iconBtnOn}`}
-          >
-            <Printer className="h-3 w-3" aria-hidden />
-          </button>
+      {!hideUtilityRow ? (
+        <div className="flex items-center gap-1.5">
+          {showInvoice ? (
+            <PlanInvoiceToggleSwitch
+              activeTab={invoiceActive ? "invoice" : "plan"}
+              disabled={locked || !onInvoice}
+              onChange={(tab) => {
+                if (locked) return;
+                if (tab === "invoice") onInvoice?.();
+                else onItinerary?.();
+              }}
+              className="shrink-0"
+            />
+          ) : null}
+          <div className="ml-auto grid flex-1 grid-cols-3 gap-1.5">
+            <button
+              type="button"
+              disabled={locked || !onSave}
+              onClick={() => {
+                if (locked || !onSave) return;
+                onSave();
+              }}
+              aria-label="Save"
+              title={locked ? "Save contact first" : "Save"}
+              className={`${iconBtnBase} ${locked || !onSave ? iconBtnOff : iconBtnOn}`}
+            >
+              <Save className="h-3 w-3" aria-hidden />
+            </button>
+            <button
+              type="button"
+              disabled={locked || !onSend}
+              onClick={() => {
+                if (locked || !onSend) return;
+                onSend();
+              }}
+              aria-label="Send"
+              title={locked ? "Save contact first" : "Send to TokioTours"}
+              className={`${iconBtnBase} ${locked || !onSend ? iconBtnOff : iconBtnOn}`}
+            >
+              <Send className="h-3 w-3" aria-hidden />
+            </button>
+            <button
+              type="button"
+              disabled={locked || !onPrint}
+              onClick={() => {
+                if (locked || !onPrint) return;
+                onPrint();
+              }}
+              aria-label="Print"
+              title={locked ? "Save contact first" : "Print"}
+              className={`${iconBtnBase} ${locked || !onPrint ? iconBtnOff : iconBtnOn}`}
+            >
+              <Printer className="h-3 w-3" aria-hidden />
+            </button>
+          </div>
         </div>
-      </div>
+      ) : null}
 
       {/* Main row: CTA 3/6 · Continue 2/6 · New booking 1/6 */}
       <div className="grid grid-cols-6 items-center gap-1.5">
@@ -130,6 +135,7 @@ export function DossierActionToolbar({
             onClick={onHowMuchCost}
             disabled={howMuchDisabled}
             pulse={!costPulsarDone}
+            label={howMuchLabel}
             className="w-full [&_span.relative]:w-full [&_span.relative]:justify-center"
           />
         </div>

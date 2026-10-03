@@ -38,10 +38,12 @@ The hook `backend/pb_hooks/configure_google_oauth.pb.js` loads these into `staff
 
 ## 3) Staff provisioning
 
-`staff` createRule stays empty — Google SSO **does not** auto-create accounts.
-Create each teammate in PocketBase Admin → **staff** with their Workspace email and role first.
+`staff.createRule` must be an **empty string** (`""`) — **not** `null`.
+In PocketBase, `null` means only superusers can create (breaks Google first-login with “Only superusers…”).
 
-Allowed domains (client guard): `@tokiotours.nl`, `@travelexperiencesgroup.com`.
+With `createRule = ""`, Google SSO can mint the staff row on first login; `staff_role_provisioning.pb.js` assigns role / account_type. Core `@tokiotours.nl` emails map to fixed roles; unknown domains are parked `PENDING` + inactive.
+
+Allowed domains (client guard after OAuth): `@tokiotours.nl`, `@travelexperiencesgroup.com`.
 
 ## 4) Login UI
 

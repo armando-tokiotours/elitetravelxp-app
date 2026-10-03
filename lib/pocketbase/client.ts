@@ -771,9 +771,9 @@ export const DEFAULT_SITE_BRANDING = {
   hero_title_main: "Build Your",
   hero_title_highlight: "Perfect Japan Trip",
   hero_subtitle: "Design every detail we'll take care of the rest.",
-  document_title: "TOKIOTOURS — Bespoke Luxury Japan Travel Builder",
+  document_title: "Tokiotours — Japan Journey Architect",
   document_description:
-    "Bespoke luxury Japan itineraries — design your journey with the live Trip Builder.",
+    "Custom 1-Day Highlights & Grand Bespoke Japan Vacation Builder",
   font_h1: "Godiva-Regular",
   font_h2: "Hanson-Bold",
   font_body: "Futura-Medium",
@@ -789,8 +789,8 @@ export function brandingGoogleFontsUrl(b: PbSiteBranding | null): string {
 /** Default navbar logo (used until an admin uploads one in Site Branding). */
 export const DEFAULT_LOGO_IMAGE = "/brand/site-logo.png";
 
-/** Fallback Chureito / Fuji hero when no upload is set (ships in public/brand). */
-export const DEFAULT_HERO_IMAGE = "/brand/hero-background.jpg";
+/** Empty = plain grey hero plane (never logo filler in empty slots). */
+export const DEFAULT_HERO_IMAGE = "";
 
 /** Paths written by Team Access → “save to public/brand”. */
 export type PublicBrandAssets = {
@@ -866,10 +866,10 @@ export function brandingAttractionsWidgetUrl(
         b.collectionId || "site_branding",
         b.id,
         b.attractions_widget_bg
-      ) || "/brand/hero-background.jpg"
+      ) || ""
     );
   }
-  return "/brand/hero-background.jpg";
+  return "";
 }
 
 export type ToriiPortalGateId = "multiday" | "single" | "experience";
@@ -900,9 +900,9 @@ export const DEFAULT_TORII_FRAMES: Record<ToriiPortalGateId, string> = {
 };
 
 export const DEFAULT_TORII_IMAGES: Record<ToriiPortalGateId, string> = {
-  multiday: "/images/hero-multi-day.jpg",
-  single: "/images/hero-single-day.jpg",
-  experience: "/images/hero-builder-e.jpg",
+  multiday: "",
+  single: "",
+  experience: "",
 };
 
 export const DEFAULT_TORII_GATE_LAYOUT: Omit<
@@ -1146,38 +1146,38 @@ const DEFAULT_HERO_CARD_META: Record<
 > = {
   single: {
     id: "single",
-    title: "Single day",
-    subtitle: "1-day private guide & local transport",
+    title: "1-Day Express Pass",
+    subtitle: "Custom 1-Day Private Route & Instant Quote",
     japaneseText: "一日",
     japaneseTextPosition: "top-right",
     overlay: { ...DEFAULT_OVERLAY_BY_CARD.single },
     route: "/pre-elite-builder?type=single",
     order: 1,
     tripType: "single_day",
-    defaultPhoto: "/images/hero-single-day.jpg",
+    defaultPhoto: "",
   },
   experience: {
     id: "experience",
-    title: "Activities, Tickets, VIP",
-    subtitle: "Ghibli, teamLab, Michelin reservations & transfers",
+    title: "VIP Tickets & Local Access",
+    subtitle: "Hard-to-get tickets, restaurant reservations & local specs",
     japaneseText: "体験",
     japaneseTextPosition: "bottom-center",
     overlay: { ...DEFAULT_OVERLAY_BY_CARD.experience },
-    route: "/builder-e",
+    route: "/builder/vip-access",
     order: 2,
-    defaultPhoto: "/images/hero-builder-e.jpg",
+    defaultPhoto: "",
   },
   multiday: {
     id: "multiday",
-    title: "Multi Day",
-    subtitle: "Full-trip itinerary across Tokyo, Kyoto & beyond",
+    title: "Grand Japan Journey",
+    subtitle: "Full Bespoke Vacation across Tokyo, Kyoto & Beyond",
     japaneseText: "旅",
     japaneseTextPosition: "top-left",
     overlay: { ...DEFAULT_OVERLAY_BY_CARD.multiday },
     route: "/pre-elite-builder?type=multiday",
     order: 3,
     tripType: "multi_day",
-    defaultPhoto: "/images/hero-multi-day.jpg",
+    defaultPhoto: "",
   },
 };
 

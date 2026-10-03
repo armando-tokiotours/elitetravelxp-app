@@ -142,7 +142,7 @@ export function BuilderEDossierView() {
   const unlockEstimate = async () => {
     if (state.cart.length === 0) {
       showSystemMessage({
-        text: "Add at least one Builder E service before unlocking the estimate.",
+        text: "Add at least one VIP Access service before unlocking the estimate.",
         tone: "error",
       });
       return;
@@ -312,7 +312,7 @@ export function BuilderEDossierView() {
       <SystemMessageFox />
       <div className="no-print">
         <MobileTopChrome
-          brandTitle="Builder E"
+          brandTitle="VIP Access"
           ctaHref="/builder-e"
           ctaLabel="Edit"
         />

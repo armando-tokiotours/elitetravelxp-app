@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { formatEstimateSummary, formatUsd } from "@/lib/builder-pricing";
 import { ELITE_CONCIERGE_FEE } from "@/lib/eliteConcierge";
+import { CTA_SECURE_DEPOSIT } from "@/lib/tourPaymentStatus";
 import { useBuilderStore } from "@/store/useBuilderStore";
 import { ExplainerModal } from "./ExplainerModal";
 import { DossierSectionOutline } from "@/components/builder/DossierSectionOutline";
@@ -19,7 +20,7 @@ export function PriceSummaryFooter({
   requestDisabled,
   /** sticky disabled — use placement="inline" in dossier; floating bar overlaps nav */
   placement = "inline",
-  reserveLabel = "Secure dates · €60 deposit",
+  reserveLabel = CTA_SECURE_DEPOSIT,
 }: {
   quoteMin: number | null;
   quoteMax: number | null;

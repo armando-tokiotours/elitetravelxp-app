@@ -3,9 +3,8 @@ import { Suspense } from "react";
 import { BuilderApp } from "@/components/builder/BuilderApp";
 
 export const metadata: Metadata = {
-  title: "Build Your Japan Journey",
-  description:
-    "Mobile-first trip builder for TOKIOTOURS — powered by live PocketBase configuration.",
+  title: "Grand Japan Journey",
+  description: "Full Bespoke Vacation across Tokyo, Kyoto & Beyond",
 };
 
 export default function BuilderPage() {

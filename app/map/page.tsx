@@ -22,11 +22,11 @@ const SILO1_LIVE: MapLink[] = [
   { href: "/", label: "Home" },
   { href: "/pre-elite-builder", label: "Pre-Elite Qualification" },
   { href: "/pre-build", label: "Pre-Build" },
-  { href: "/builder", label: "Trip Builder (multi-day)" },
-  { href: "/builder-single", label: "Trip Builder (single-day)" },
+  { href: "/builder", label: "Grand Japan Journey" },
+  { href: "/builder-single", label: "1-Day Express Pass" },
   {
     href: "/builder-e",
-    label: "Builder E (experiences & micro-services)",
+    label: "VIP Tickets & Local Access",
   },
   { href: "/discover", label: "Discover Experiences" },
   { href: "/builder/itinerary", label: "My Saved Itineraries" },
@@ -61,6 +61,7 @@ const SILO2_LIVE: MapLink[] = [
 const SILO2_PLANNED: StubCard[] = [];
 
 const SILO3_LIVE: MapLink[] = [
+  { href: "/login", label: "Google Workspace SSO", note: "/login — staff.oauth2 google" },
   { href: "/admin", label: "Admin / leads" },
   { href: "/team-access", label: "Team Access (content)" },
   {
@@ -88,9 +89,7 @@ const SILO3_LIVE: MapLink[] = [
   { href: "/profile", label: "Staff profile (bio / media / bank)" },
 ];
 
-const SILO3_PLANNED: StubCard[] = [
-  { label: "Google Workspace SSO", note: "Button stubbed — add OAuth client next" },
-];
+const SILO3_PLANNED: StubCard[] = [];
 
 const SILO3_COMM: MapLink[] = [
   {

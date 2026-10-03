@@ -5,13 +5,19 @@ import { useSearchParams } from "next/navigation";
 import { MobileTopChrome } from "@/components/navigation/MobileTopChrome";
 import { BookingRefBadge } from "@/components/builder/BookingRefBadge";
 import {
-  fetchBuilderConfig,
   fetchExperiencesAndPlaces,
   mapEapToTour,
   type BuilderConfig,
   type PbCity,
   type PbTour,
 } from "@/lib/pocketbase/client";
+import {
+  emptyBuilderConfigShell,
+  fetchBuilderConfigShell,
+  getBuilderConfig,
+  peekBuilderConfigCache,
+} from "@/lib/builderConfigCache";
+import { BUILDER_ROUTES } from "@/lib/builderRoutes";
 import { hydrateStoresFromPreEliteBrief } from "@/lib/preEliteHydrate";
 import { useBuilderStore } from "@/store/useBuilderStore";
 import { usePreBuilderStore } from "@/store/usePreBuilderStore";
@@ -37,8 +43,10 @@ import { useSiteBrandingStore } from "@/store/useSiteBrandingStore";
 
 export function SingleDayBuilderView() {
   const searchParams = useSearchParams();
-  const [hydrated, setHydrated] = useState(false);
-  const [config, setConfig] = useState<BuilderConfig | null>(null);
+  /** Never block first paint on catalog — grey shell instantly. */
+  const [config, setConfig] = useState<BuilderConfig | null>(
+    () => peekBuilderConfigCache() ?? emptyBuilderConfigShell()
+  );
   const [extraPlaces, setExtraPlaces] = useState<PbTour[]>([]);
   const [guestBadge, setGuestBadge] = useState({
     name: "Guest Brief",
@@ -100,23 +108,29 @@ export function SingleDayBuilderView() {
     let cancelled = false;
     void (async () => {
       try {
-        const cfg = await fetchBuilderConfig();
+        const cached = peekBuilderConfigCache();
+        if (cached) {
+          setConfig(cached);
+        } else {
+          // Cities-only — does not wait for tours / 15-list catalog.
+          const shell = await fetchBuilderConfigShell();
+          if (cancelled) return;
+          setConfig(shell);
+        }
+
+        const [cfg, eap] = await Promise.all([
+          getBuilderConfig(),
+          fetchExperiencesAndPlaces(),
+        ]);
         if (cancelled) return;
         setConfig(cfg);
-        const eap = await fetchExperiencesAndPlaces();
-        if (cancelled) return;
         setExtraPlaces(
           eap
             .filter((r) => r.is_active !== false)
             .map((r) => mapEapToTour(r, cfg.cities))
         );
       } catch {
-        if (!cancelled) {
-          setConfig(null);
-          setExtraPlaces([]);
-        }
-      } finally {
-        if (!cancelled) setHydrated(true);
+        /* keep painted shell */
       }
     })();
 
@@ -171,20 +185,12 @@ export function SingleDayBuilderView() {
     changeCityFocus(city.name);
   };
 
-  if (!hydrated) {
-    return (
-      <div className="tokio-ambient-bg flex min-h-dvh items-center justify-center text-sm text-zinc-400">
-        Loading single-day builder…
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen overflow-x-clip overflow-y-visible bg-[#04080C]">
       <div className="builder-theme relative min-h-screen overflow-x-clip overflow-y-visible bg-[#04080C] text-white [color-scheme:dark]">
         <MobileTopChrome
-          brandTitle="Builders"
-          ctaHref="/builder-single/itinerary"
+          brandTitle="1-Day Express Pass"
+          ctaHref={BUILDER_ROUTES.dayPassItinerary}
           ctaLabel="Itinerary"
         />
 

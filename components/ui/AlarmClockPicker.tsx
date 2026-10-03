@@ -101,7 +101,7 @@ export function AlarmClockPicker({
 
   return (
     <div className="rounded-2xl border border-white/10 bg-[#0D1117]/80 p-4">
-      <p className="text-[10px] font-bold uppercase tracking-widest text-[#1BA58A]">
+      <p className="text-[10px] font-bold uppercase tracking-widest text-white">
         {label}
       </p>
 

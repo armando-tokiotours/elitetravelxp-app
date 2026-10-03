@@ -56,7 +56,7 @@ export function StartTripGate({
     setBusy(true);
     try {
       await performFullBookingReset();
-      router.push("/builder-e");
+      router.push("/builder/vip-access");
     } finally {
       setBusy(false);
       setMode(null);
@@ -211,16 +211,10 @@ export function StartTripGate({
                         onClick={() => void seedAndGoPreElite("single_day")}
                         className="group relative flex h-32 w-full items-center overflow-hidden rounded-2xl border border-white/20 px-6 text-left shadow-xl transition-all hover:border-[#F6A724] disabled:opacity-50"
                       >
-                        <div
-                          className="absolute inset-0 bg-cover bg-center transition-transform duration-500 group-hover:scale-105 group-active:scale-105"
-                          style={{
-                            backgroundImage:
-                              "url('/brand/hero-single-day.jpg')",
-                          }}
-                        />
+                        <div className="absolute inset-0 bg-[#2C2C2E] transition-transform duration-500 group-hover:scale-105 group-active:scale-105" />
                         <div className="absolute inset-0 bg-gradient-to-r from-black/85 via-black/60 to-black/30 transition-opacity group-hover:via-black/40 group-active:via-black/40" />
                         <div className="relative z-10 flex w-full items-center justify-between text-xl font-bold tracking-wide text-white">
-                          <span>1. Single-Day Tour</span>
+                          <span>1. 1-Day Express Pass</span>
                           <span className="text-2xl text-[#F6A724] transition-transform group-hover:translate-x-1">
                             →
                           </span>
@@ -233,16 +227,10 @@ export function StartTripGate({
                         onClick={() => void seedAndGoPreElite("multi_day")}
                         className="group relative flex h-32 w-full items-center overflow-hidden rounded-2xl border border-white/20 px-6 text-left shadow-xl transition-all hover:border-[#F6A724] disabled:opacity-50"
                       >
-                        <div
-                          className="absolute inset-0 bg-cover bg-center transition-transform duration-500 group-hover:scale-105 group-active:scale-105"
-                          style={{
-                            backgroundImage:
-                              "url('/brand/hero-japan-pagoda.jpg')",
-                          }}
-                        />
+                        <div className="absolute inset-0 bg-[#2C2C2E] transition-transform duration-500 group-hover:scale-105 group-active:scale-105" />
                         <div className="absolute inset-0 bg-gradient-to-r from-black/85 via-black/60 to-black/30 transition-opacity group-hover:via-black/40 group-active:via-black/40" />
                         <div className="relative z-10 flex w-full items-center justify-between text-xl font-bold tracking-wide text-white">
-                          <span>2. Multi-Day Journey</span>
+                          <span>2. Grand Japan Journey</span>
                           <span className="text-2xl text-[#F6A724] transition-transform group-hover:translate-x-1">
                             →
                           </span>
@@ -255,16 +243,10 @@ export function StartTripGate({
                         onClick={() => void goBuilderE()}
                         className="group relative flex h-32 w-full items-center overflow-hidden rounded-2xl border border-white/20 px-6 text-left shadow-xl transition-all hover:border-[#F6A724] disabled:opacity-50"
                       >
-                        <div
-                          className="absolute inset-0 bg-cover bg-center transition-transform duration-500 group-hover:scale-105 group-active:scale-105"
-                          style={{
-                            backgroundImage:
-                              "url('/brand/hero-background.jpg')",
-                          }}
-                        />
+                        <div className="absolute inset-0 bg-[#2C2C2E] transition-transform duration-500 group-hover:scale-105 group-active:scale-105" />
                         <div className="absolute inset-0 bg-gradient-to-r from-black/85 via-black/60 to-black/30 transition-opacity group-hover:via-black/40 group-active:via-black/40" />
                         <div className="relative z-10 flex w-full items-center justify-between text-xl font-bold tracking-wide text-white">
-                          <span>3. Single Activity / Pass / Service</span>
+                          <span>3. VIP Tickets & Local Access</span>
                           <span className="text-2xl text-[#F6A724] transition-transform group-hover:translate-x-1">
                             →
                           </span>

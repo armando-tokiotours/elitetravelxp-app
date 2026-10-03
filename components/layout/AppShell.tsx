@@ -231,7 +231,7 @@ export function AppShell({
                   : "text-white/85 hover:bg-white/8"
               }`}
             >
-              Builder E
+              VIP Tickets & Local Access
             </Link>
             <button
               type="button"

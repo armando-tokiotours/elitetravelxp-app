@@ -15,14 +15,8 @@ migrate((app) => {
         roleField.values = values;
       }
     }
-    // Allow unauthenticated create for OAuth2 first-login (domain gated in hook)
+    // Public create for OAuth2 first-login (empty string). null = superusers-only.
     staff.createRule = "";
-    // Empty string still denies in some PB versions — use null for public create
-    try {
-      staff.createRule = null;
-    } catch (_) {
-      /* ignore */
-    }
     app.save(staff);
   } catch (e) {
     console.log("[1791060000] staff accounting role:", e);

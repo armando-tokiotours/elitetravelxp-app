@@ -112,15 +112,15 @@ export type TripType = "multi_day" | "single_day";
 export const TRIP_TYPES = [
   {
     id: "multi_day" as const,
-    title: "Multi-Day Journey",
+    title: "Grand Japan Journey",
     description:
-      "Overnight stays across cities — hotels, inter-city transit, and a full itinerary.",
+      "Full Bespoke Vacation across Tokyo, Kyoto & Beyond",
   },
   {
     id: "single_day" as const,
-    title: "Single-Day Tour / Day-Trip",
+    title: "1-Day Express Pass",
     description:
-      "A focused 6–8 hour day with hour-by-hour activities and intra-city movement only.",
+      "Custom 1-Day Private Route & Instant Quote",
   },
 ] as const;
 

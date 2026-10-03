@@ -3,10 +3,16 @@
 import { useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import {
-  fetchBuilderConfig,
   type BuilderConfig,
   type PbAccommodation,
 } from "@/lib/pocketbase/client";
+import {
+  emptyBuilderConfigShell,
+  fetchBuilderConfigShell,
+  getBuilderConfig,
+  peekBuilderConfigCache,
+} from "@/lib/builderConfigCache";
+import { BUILDER_ROUTES } from "@/lib/builderRoutes";
 import { hydrateStoresFromPreEliteBrief } from "@/lib/preEliteHydrate";
 import { useBuilderStore } from "@/store/useBuilderStore";
 import { usePreBuilderStore } from "@/store/usePreBuilderStore";
@@ -19,9 +25,11 @@ import { NewBookingResetButton } from "./NewBookingResetButton";
 
 export function BuilderApp() {
   const searchParams = useSearchParams();
-  const [config, setConfig] = useState<BuilderConfig | null>(null);
+  const [config, setConfig] = useState<BuilderConfig | null>(
+    () => peekBuilderConfigCache() ?? emptyBuilderConfigShell()
+  );
   const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
 
   const state = useBuilderStore();
   const [guestBadge, setGuestBadge] = useState({
@@ -154,54 +162,65 @@ export function BuilderApp() {
 
   useEffect(() => {
     let cancelled = false;
-    (async () => {
-      try {
-        const data = await fetchBuilderConfig();
-        if (cancelled) return;
-        setConfig(data);
 
-        const snap = useBuilderStore.getState();
-        if (!snap.arrivalTransferId) {
-          const firstAirport =
-            data.hubs.find((h) => h.type === "Airport") || data.hubs[0];
-          if (firstAirport) setArrival(firstAirport.id);
-          else if (data.transfers[0]) setArrival(data.transfers[0].id);
+    const applyDefaults = (data: BuilderConfig) => {
+      const snap = useBuilderStore.getState();
+      if (!snap.arrivalTransferId) {
+        const firstAirport =
+          data.hubs.find((h) => h.type === "Airport") || data.hubs[0];
+        if (firstAirport) setArrival(firstAirport.id);
+        else if (data.transfers[0]) setArrival(data.transfers[0].id);
+      }
+      if (!snap.departureTransferId) {
+        const airports = data.hubs.filter((h) => h.type === "Airport");
+        const second = airports[1] || airports[0] || data.hubs[0];
+        if (second) setDeparture(second.id);
+        else if (data.transfers[1] || data.transfers[0]) {
+          setDeparture(data.transfers[1]?.id ?? data.transfers[0].id);
         }
-        if (!snap.departureTransferId) {
-          const airports = data.hubs.filter((h) => h.type === "Airport");
-          const second = airports[1] || airports[0] || data.hubs[0];
-          if (second) setDeparture(second.id);
-          else if (data.transfers[1] || data.transfers[0]) {
-            setDeparture(data.transfers[1]?.id ?? data.transfers[0].id);
-          }
-        }
-        if (!snap.transitModeId && data.transitModes[0]) {
-          setTransit(data.transitModes[0].id);
-        }
-        // Seed a single default city only when the route is empty — nights
-        // match Step 1 duration (no hardcoded Tokyo 5 + Kamakura 5).
-        const after = useBuilderStore.getState();
-        const middle = after.locations.filter(
-          (l) =>
-            !l.isTransitHub &&
-            l.key !== "__transit_arrival__" &&
-            l.key !== "__transit_departure__"
-        );
-        if (middle.length === 0 && data.cities[0]) {
-          addLocation(data.cities[0].id);
+      }
+      if (!snap.transitModeId && data.transitModes[0]) {
+        setTransit(data.transitModes[0].id);
+      }
+      const after = useBuilderStore.getState();
+      const middle = after.locations.filter(
+        (l) =>
+          !l.isTransitHub &&
+          l.key !== "__transit_arrival__" &&
+          l.key !== "__transit_departure__"
+      );
+      if (middle.length === 0 && data.cities[0]) {
+        addLocation(data.cities[0].id);
+        useBuilderStore
+          .getState()
+          .redistributeStayNights(useBuilderStore.getState().durationDays);
+      } else if (middle.length > 0) {
+        const assigned = middle.reduce((sum, l) => sum + (l.nights || 0), 0);
+        if (assigned !== after.durationDays) {
           useBuilderStore
             .getState()
-            .redistributeStayNights(
-              useBuilderStore.getState().durationDays
-            );
-        } else if (middle.length > 0) {
-          const assigned = middle.reduce((sum, l) => sum + (l.nights || 0), 0);
-          if (assigned !== after.durationDays) {
-            useBuilderStore
-              .getState()
-              .redistributeStayNights(after.durationDays);
-          }
+            .redistributeStayNights(after.durationDays);
         }
+      }
+    };
+
+    (async () => {
+      try {
+        const cached = peekBuilderConfigCache();
+        if (cached) {
+          setConfig(cached);
+          applyDefaults(cached);
+        } else {
+          const shell = await fetchBuilderConfigShell();
+          if (cancelled) return;
+          setConfig(shell);
+          applyDefaults(shell);
+        }
+
+        const data = await getBuilderConfig();
+        if (cancelled) return;
+        setConfig(data);
+        applyDefaults(data);
       } catch (e) {
         if (!cancelled) {
           setError(
@@ -230,8 +249,8 @@ export function BuilderApp() {
     <div className="min-h-screen bg-transparent">
       <div className="builder-theme relative min-h-screen bg-transparent text-white [color-scheme:dark]">
         <MobileTopChrome
-          brandTitle="Builder"
-          ctaHref="/builder/itinerary"
+          brandTitle="Grand Japan Journey"
+          ctaHref={BUILDER_ROUTES.japanJourneyItinerary}
           ctaLabel="Itinerary"
         />
 

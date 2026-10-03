@@ -272,25 +272,25 @@ export const BRAND_CHARACTERS: BrandCharacterDef[] = [
   {
     id: "hero-background",
     label: "Hero · Multi-Day",
-    path: "/brand/hero-background.jpg",
+    path: "",
     category: "hero",
-    usedOn: ["Builder M hero background"],
+    usedOn: ["Builder M hero background — empty = grey until public upload"],
     optimal: HERO_OPTIMAL,
   },
   {
     id: "hero-single-day",
     label: "Hero · Single-Day",
-    path: "/brand/hero-single-day.jpg",
+    path: "",
     category: "hero",
-    usedOn: ["Builder S hero background"],
+    usedOn: ["Builder S hero background — empty = grey until public upload"],
     optimal: HERO_OPTIMAL,
   },
   {
     id: "hero-japan-pagoda",
     label: "Hero · Japan pagoda",
-    path: "/brand/hero-japan-pagoda.jpg",
+    path: "",
     category: "hero",
-    usedOn: ["Pre-Elite story fallbacks"],
+    usedOn: ["Pre-Elite story fallbacks — empty = grey until public upload"],
     optimal: HERO_OPTIMAL,
   },
 ];
@@ -300,7 +300,9 @@ export const BRAND_CHARACTERS: BrandCharacterDef[] = [
  * Skips heavy hero JPGs — those load with their builders.
  */
 export const BRAND_CHARACTER_PRELOAD_PATHS: readonly string[] = [
-  ...BRAND_CHARACTERS.filter((c) => c.category !== "hero").map((c) => c.path),
+  ...BRAND_CHARACTERS.filter((c) => c.category !== "hero" && c.path).map(
+    (c) => c.path
+  ),
   "/brand/trip-multi-thumb.webp",
   "/brand/trip-single-thumb.webp",
 ];

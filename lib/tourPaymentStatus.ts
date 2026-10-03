@@ -83,7 +83,7 @@ export function isTourPartiallyPaid(input: {
 }
 
 /** Toolbar / sticky CTA when fee not yet paid. */
-export const CTA_SECURE_DEPOSIT = "Secure dates · €60 deposit";
+export const CTA_SECURE_DEPOSIT = "Secure Dates";
 
 /** @deprecated Prefer CTA_PAY_BALANCE after fee */
 export const CTA_VIEW_BALANCE = CTA_PAY_BALANCE;

@@ -28,17 +28,17 @@ const GATE_META: {
   {
     id: "multiday",
     pbKey: "multiday",
-    label: "Door 1: Multi-Day Journey",
+    label: "Door 1: Grand Japan Journey",
   },
   {
     id: "single",
     pbKey: "single",
-    label: "Door 2: Single-Day Tour",
+    label: "Door 2: 1-Day Express Pass",
   },
   {
     id: "experience",
     pbKey: "builder_e",
-    label: "Door 3: Activities & VIP (Builder E)",
+    label: "Door 3: VIP Tickets & Local Access",
   },
 ];
 

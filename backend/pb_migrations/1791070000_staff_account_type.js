@@ -21,12 +21,8 @@ migrate((app) => {
     if (roleField && roleField.values && !roleField.values.includes("accounting")) {
       roleField.values = [...roleField.values, "accounting"];
     }
-    // Allow OAuth / admin creates freely (provisioning hook assigns roles)
-    try {
-      staff.createRule = null;
-    } catch (_) {
-      staff.createRule = "";
-    }
+    // Public create (empty string). null = superusers-only and breaks Google OAuth.
+    staff.createRule = "";
     app.save(staff);
     console.log("[1791070000] staff.account_type ready");
   } catch (e) {

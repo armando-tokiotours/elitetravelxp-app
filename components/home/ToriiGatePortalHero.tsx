@@ -25,23 +25,23 @@ interface GateOption {
 const GATE_META: GateOption[] = [
   {
     id: "multiday",
-    title: "Multi Day",
-    subtitle: "Full-trip itinerary across Tokyo, Kyoto & beyond",
+    title: "Grand Japan Journey",
+    subtitle: "Full Bespoke Vacation across Tokyo, Kyoto & Beyond",
     route: "/pre-elite-builder?type=multiday",
     tripType: "multi_day",
   },
   {
     id: "single",
-    title: "Single day",
-    subtitle: "1-day private guide & local transport",
+    title: "1-Day Express Pass",
+    subtitle: "Custom 1-Day Private Route & Instant Quote",
     route: "/pre-elite-builder?type=single",
     tripType: "single_day",
   },
   {
     id: "experience",
-    title: "Activities, Tickets, VIP",
-    subtitle: "Ghibli, teamLab, Michelin reservations & transfers",
-    route: "/builder-e",
+    title: "VIP Tickets & Local Access",
+    subtitle: "Hard-to-get tickets, restaurant reservations & local specs",
+    route: "/builder/vip-access",
   },
 ];
 
@@ -92,7 +92,7 @@ export function ToriiGatePortalHero() {
 
       window.setTimeout(() => {
         router.push(gate.route);
-      }, 600);
+      }, 120);
 
       try {
         await performFullBookingReset();
@@ -167,11 +167,11 @@ export function ToriiGatePortalHero() {
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={BRAND_LOGO_ICON}
-            alt="TOKIOTOURS"
+            alt="Tokiotours"
             className="h-8 w-8 rounded-full object-cover sm:h-10 sm:w-10"
           />
           <p className="font-godiva text-xs tracking-[0.3em] text-[#D91147] uppercase sm:text-base sm:tracking-[0.35em]">
-            TOKIOTOURS
+            Tokiotours
           </p>
         </div>
         <button
@@ -195,15 +195,6 @@ export function ToriiGatePortalHero() {
           tours, or exclusive VIP tickets.
         </p>
       </div>
-
-      {isZooming ? (
-        <div
-          className="pointer-events-none fixed inset-0 z-50 flex items-center justify-center animate-portal-zoom"
-          aria-hidden
-        >
-          <div className="h-full w-full bg-white animate-flash-fade" />
-        </div>
-      ) : null}
 
       {/* Stage: spotlight + horizontal portals */}
       <div className="relative z-10 mx-auto my-auto flex w-full max-w-5xl flex-1 flex-col items-center justify-center px-2 py-6 sm:px-8 sm:py-10">
@@ -261,7 +252,7 @@ export function ToriiGatePortalHero() {
                 <div className="relative flex h-36 w-28 items-end justify-center sm:h-[17rem] sm:w-52">
                   {isActive ? (
                     <div
-                      className="absolute z-0 overflow-hidden rounded-t-full border border-amber-400/50 shadow-[0_0_35px_rgba(246,167,36,0.6)]"
+                      className="absolute z-0 overflow-hidden rounded-t-full border border-amber-400/50 bg-[#2C2C2E] shadow-[0_0_35px_rgba(246,167,36,0.6)]"
                       style={{
                         width: `${gate.maskWidth}%`,
                         height: `${gate.maskHeight}%`,
@@ -270,13 +261,15 @@ export function ToriiGatePortalHero() {
                         transform: `translate(calc(-50% + ${gate.photoOffsetX}%), ${gate.photoOffsetY}%)`,
                       }}
                     >
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={gate.heroImage}
-                        alt=""
-                        className="h-full w-full object-cover brightness-110 contrast-105"
-                        draggable={false}
-                      />
+                      {gate.heroImage ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={gate.heroImage}
+                          alt=""
+                          className="h-full w-full object-cover brightness-110 contrast-105"
+                          draggable={false}
+                        />
+                      ) : null}
                       {/* Glossy glass reflection */}
                       <div
                         aria-hidden
@@ -287,6 +280,13 @@ export function ToriiGatePortalHero() {
                         aria-hidden
                         className="animate-calling-pulsar pointer-events-none absolute inset-0 bg-gradient-to-t from-black/80 via-cyan-500/10 to-amber-500/30"
                       />
+                      {/* White flash only inside the portal photo box */}
+                      {isZooming ? (
+                        <div
+                          aria-hidden
+                          className="animate-box-camera-flash pointer-events-none absolute inset-0 z-20 bg-white"
+                        />
+                      ) : null}
                     </div>
                   ) : (
                     <div

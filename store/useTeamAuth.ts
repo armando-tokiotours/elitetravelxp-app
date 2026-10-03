@@ -9,6 +9,10 @@ import {
   type StaffRole,
 } from "@/lib/staffRoles";
 import { resolveStaffRoleForEmail } from "@/lib/staffRoleProvisioning";
+import {
+  isAuthorizedStaffEmail,
+  staffGoogleSsoDeniedMessage,
+} from "@/lib/staffGoogleAuth";
 import type PocketBase from "pocketbase";
 import type { RecordModel } from "pocketbase";
 
@@ -90,22 +94,40 @@ export const useTeamAuth = create<TeamAuthState>()(
         try {
           authData = (await pb.collection("staff").authWithOAuth2({
             provider: "google",
+            // role is required on staff — OAuth create fails without createData
+            createData: {
+              role: "agent",
+              account_type: "STAFF",
+              active: true,
+            },
           })) as typeof authData;
         } catch (err) {
-          const msg = err instanceof Error ? err.message : String(err || "");
-          if (/provider|not enabled|oauth|404|400/i.test(msg)) {
+          const anyErr = err as {
+            message?: string;
+            status?: number;
+            response?: { message?: string; data?: unknown };
+          };
+          const msg = String(
+            anyErr?.response?.message || anyErr?.message || err || ""
+          );
+          const detail = anyErr?.response?.data
+            ? ` ${JSON.stringify(anyErr.response.data)}`
+            : "";
+          if (/provider|not enabled|oauth2|404/i.test(msg) && anyErr?.status === 404) {
             throw new Error(
               "Google Workspace SSO is not configured on PocketBase yet. Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET on the PocketBase process and restart it. Also add redirect URI: {PB_URL}/api/oauth2-redirect"
             );
           }
-          if (/create|failed to create|403/i.test(msg)) {
+          if (/create|failed to create|403|Only superusers|role/i.test(msg + detail)) {
             throw new Error(
-              "No staff account exists for this Google email. Ask an Owner/Ops admin to provision your @tokiotours.nl user in PocketBase → staff first."
+              `Google sign-in could not create your staff account (${msg}).${detail}`
             );
           }
-          throw err instanceof Error
-            ? err
-            : new Error("Google Workspace authentication failed.");
+          throw new Error(
+            msg
+              ? `Google Workspace authentication failed: ${msg}${detail}`
+              : "Google Workspace authentication failed."
+          );
         }
 
         const record = authData.record || pb.authStore.record;
@@ -119,6 +141,12 @@ export const useTeamAuth = create<TeamAuthState>()(
           pb.authStore.clear();
           clearAuth(set);
           throw new Error("Google did not return an email address.");
+        }
+
+        if (!isAuthorizedStaffEmail(email)) {
+          pb.authStore.clear();
+          clearAuth(set);
+          throw new Error(staffGoogleSsoDeniedMessage());
         }
 
         if (record && record.active === false) {

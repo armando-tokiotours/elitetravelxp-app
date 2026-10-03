@@ -9,13 +9,27 @@ import {
 } from "@/lib/pocketbase/client";
 
 const HERO_SUBTITLE_DEFAULT =
-  "Design every detail we'll take care of the rest";
+  "Full Bespoke Vacation across Tokyo, Kyoto & Beyond";
 
 const HERO_CHARACTER_SRC = "/images/peek-character.png";
 
+const HERO_MEDIA_STUBS = new Set([
+  "/brand/tokiotours-logo-icon.png",
+  "/brand/hero-single-day.jpg",
+  "/brand/hero-background.jpg",
+  "/brand/hero-japan-pagoda.jpg",
+  "/brand/site-logo.png",
+]);
+
+function realHeroMedia(url: string): string {
+  const u = (url || "").trim();
+  if (!u || HERO_MEDIA_STUBS.has(u)) return "";
+  return u;
+}
+
 /**
  * Multi-day builder hero — admin still (or public brand fallback) + character + copy.
- * Video/scrim removed so first paint stays instant; image is the Team Branding upload.
+ * Empty media → plain grey (never logo stub filler).
  */
 export function BuilderHero({ branding }: { branding: PbSiteBranding | null }) {
   const [subtitle, setSubtitle] = useState(
@@ -23,7 +37,7 @@ export function BuilderHero({ branding }: { branding: PbSiteBranding | null }) {
       branding?.hero_subtitle?.trim() ||
       HERO_SUBTITLE_DEFAULT
   );
-  const [heroSrc, setHeroSrc] = useState(DEFAULT_HERO_IMAGE);
+  const [heroSrc, setHeroSrc] = useState(() => realHeroMedia(DEFAULT_HERO_IMAGE));
 
   useEffect(() => {
     setSubtitle(
@@ -35,7 +49,7 @@ export function BuilderHero({ branding }: { branding: PbSiteBranding | null }) {
     let cancelled = false;
     void fetchPublicBrandAssets().then((assets) => {
       if (cancelled) return;
-      setHeroSrc(brandingHeroUrl(branding, assets));
+      setHeroSrc(realHeroMedia(brandingHeroUrl(branding, assets)));
     });
     return () => {
       cancelled = true;
@@ -47,12 +61,16 @@ export function BuilderHero({ branding }: { branding: PbSiteBranding | null }) {
       className="builder-hero relative z-10 h-[65vh] w-full min-h-[280px] overflow-hidden bg-[#05080C] sm:h-[80vh] md:min-h-[420px]"
       aria-label="Hero"
     >
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src={heroSrc}
-        alt=""
-        className="absolute inset-0 z-0 h-full w-full object-cover"
-      />
+      {heroSrc ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={heroSrc}
+          alt=""
+          className="absolute inset-0 z-0 h-full w-full object-cover"
+        />
+      ) : (
+        <div aria-hidden className="absolute inset-0 z-0 bg-[#2C2C2E]" />
+      )}
       <div
         aria-hidden
         className="pointer-events-none absolute inset-0 z-10 bg-gradient-to-t from-[#05080C] via-[#05080C]/55 to-[#05080C]/25"
@@ -69,13 +87,13 @@ export function BuilderHero({ branding }: { branding: PbSiteBranding | null }) {
       <div className="absolute top-1/2 left-4 z-30 flex max-w-[85%] -translate-y-1/2 flex-col items-start text-left sm:left-12 sm:max-w-md">
         <h1 className="flex flex-col items-start text-left leading-tight">
           <span className="relative z-10 -mb-6 translate-y-1 font-beauty text-[3.3rem] font-normal leading-none text-[#E11D48] drop-shadow-[0_2px_12px_rgba(0,0,0,0.65)] sm:-mb-9 sm:translate-y-1.5 sm:text-[5.28rem]">
-            Japan!
+            Grand
           </span>
           <span className="font-hanson text-[1.95rem] font-black tracking-wider text-white uppercase drop-shadow-[0_2px_10px_rgba(0,0,0,0.55)] sm:text-[2.925rem]">
-            TRIP
+            Japan
           </span>
           <span className="-mt-3 font-hanson text-2xl font-black leading-none tracking-wider text-white uppercase drop-shadow-[0_2px_10px_rgba(0,0,0,0.55)] sm:-mt-3.5 sm:text-4xl">
-            BUILDER
+            Journey
           </span>
         </h1>
         <p className="-mt-1 max-w-[16rem] font-futura text-xs font-medium leading-snug text-zinc-300 opacity-90 sm:max-w-sm sm:text-sm">

@@ -60,6 +60,7 @@ import {
 } from "@/components/branding/MascotHiTap";
 import { QuestionnaireCompletionModal } from "@/components/builder/QuestionnaireCompletionModal";
 import { hydrateStoresFromPreEliteBrief } from "@/lib/preEliteHydrate";
+import { prefetchBuilderConfig } from "@/lib/builderConfigCache";
 import { useBuilderStore } from "@/store/useBuilderStore";
 import { usePreBuilderStore } from "@/store/usePreBuilderStore";
 import { showSystemMessage } from "@/store/useSystemMessageStore";
@@ -214,6 +215,11 @@ export function PreEliteBuilderClient() {
   useEffect(() => {
     void ensureBranding();
   }, [ensureBranding]);
+
+  // Warm builder catalog while guest answers quiz — open feels instant.
+  useEffect(() => {
+    prefetchBuilderConfig();
+  }, []);
 
   useEffect(() => {
     setLocalQuiz(readPreEliteQuizLocalCache());

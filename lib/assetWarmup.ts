@@ -1,44 +1,34 @@
 /**
- * Eager asset warmup — characters + story stills + key videos.
- * Call from home gate + root preloader so swaps never wait on first paint.
+ * Speed-test warm — icons + characters only.
+ * Heroes / story photos / posters / videos intentionally excluded
+ * so home + builder handoff stay near-instant on VPS.
  */
 
 import { BRAND_CHARACTER_PRELOAD_PATHS } from "@/lib/brandCharacters";
 import { BRAND_LOGO_ICON } from "@/lib/brand";
-import { STORY_WARM_IMAGE_PATHS } from "@/lib/preEliteStories";
 
-/** Light UI images that must be in cache before trip flow feels snappy. */
+/** Characters + tiny brand marks only — no photos, heroes, or posters. */
 export const WARM_IMAGE_PATHS: readonly string[] = [
   ...BRAND_CHARACTER_PRELOAD_PATHS,
-  ...STORY_WARM_IMAGE_PATHS,
   BRAND_LOGO_ICON,
+  "/brand/favicon.png",
+  "/brand/1-day-pass-ico.png",
+  "/brand/multy-day-icon.png",
+  "/brand/fox-peek.webp",
   "/images/peek-character-1day.png",
   "/images/peek-character.png",
-  "/images/matcher-poster.webp",
-  "/images/matcher-poster-card.webp",
-  "/images/matcher-poster-hero.webp",
-  "/images/concierge-poster.webp",
-  "/images/concierge-poster-card.webp",
-  "/images/concierge-poster-hero.webp",
-];
+].filter((p) => Boolean(p) && p.startsWith("/"));
 
-/** Key explainer reels — start download on home, not when a modal opens. */
-export const WARM_VIDEO_PATHS: readonly string[] = [
-  "/videos/elite-concierge-preview.mp4",
-  "/videos/activity-matcher-guide.mp4",
-];
+/** Videos disabled for speed test — never block navigation. */
+export const WARM_VIDEO_PATHS: readonly string[] = [];
 
-/** Extra assets for Pre-Build → Builder handoff (heroes + peek characters). */
-export const BUILDER_ENTRY_IMAGE_PATHS: readonly string[] = [
-  ...WARM_IMAGE_PATHS,
-  "/brand/hero-background.jpg",
-  "/brand/hero-single-day.jpg",
-  "/images/tokyo-day-hero.jpg",
-];
+const BG_WARM_SESSION_KEY = "tokio-assets-warmed-v2";
+let bgWarmStarted = false;
 
-export const BUILDER_ENTRY_VIDEO_PATHS: readonly string[] = [
-  ...WARM_VIDEO_PATHS,
-];
+/** Builder entry = same light set (no hero JPGs). */
+export const BUILDER_ENTRY_IMAGE_PATHS: readonly string[] = [...WARM_IMAGE_PATHS];
+
+export const BUILDER_ENTRY_VIDEO_PATHS: readonly string[] = [];
 
 export type WarmProgress = {
   loaded: number;
@@ -48,11 +38,17 @@ export type WarmProgress = {
   done: boolean;
 };
 
+const warmedImageSrcs = new Set<string>();
+
 function loadImage(src: string): Promise<void> {
+  if (warmedImageSrcs.has(src)) return Promise.resolve();
   return new Promise((resolve) => {
     const img = new window.Image();
     img.decoding = "async";
-    const finish = () => resolve();
+    const finish = () => {
+      warmedImageSrcs.add(src);
+      resolve();
+    };
     img.onload = finish;
     img.onerror = finish;
     img.src = src;
@@ -61,7 +57,7 @@ function loadImage(src: string): Promise<void> {
 }
 
 /** Kick browser cache for a video without blocking forever on huge files. */
-function warmVideo(src: string, timeoutMs = 12_000): Promise<void> {
+function warmVideo(src: string, timeoutMs = 6_000): Promise<void> {
   return new Promise((resolve) => {
     const video = document.createElement("video");
     video.preload = "auto";
@@ -76,22 +72,7 @@ function warmVideo(src: string, timeoutMs = 12_000): Promise<void> {
       resolve();
     };
     const t = window.setTimeout(finish, timeoutMs);
-    video.addEventListener(
-      "canplaythrough",
-      () => {
-        window.clearTimeout(t);
-        finish();
-      },
-      { once: true }
-    );
-    video.addEventListener(
-      "error",
-      () => {
-        window.clearTimeout(t);
-        finish();
-      },
-      { once: true }
-    );
+    video.addEventListener("error", finish, { once: true });
     video.addEventListener(
       "loadeddata",
       () => {
@@ -105,9 +86,8 @@ function warmVideo(src: string, timeoutMs = 12_000): Promise<void> {
 }
 
 /**
- * Warm all critical assets. Reports progress via `onProgress`.
- * Images are required; videos count toward progress but time out so
- * a dead CDN cannot trap the home gate forever.
+ * Warm critical assets. Reports progress via `onProgress`.
+ * Speed test: images only (characters/icons); videos list is empty.
  */
 export async function warmCriticalAssets(
   onProgress?: (p: WarmProgress) => void
@@ -115,7 +95,7 @@ export async function warmCriticalAssets(
   return warmAssetLists(WARM_IMAGE_PATHS, WARM_VIDEO_PATHS, onProgress);
 }
 
-/** Pre-Build → Builder: warm characters + hero stills + key reels. */
+/** Pre-Build → Builder: same light character/icon set. */
 export async function warmBuilderEntryAssets(
   onProgress?: (p: WarmProgress) => void
 ): Promise<void> {
@@ -149,14 +129,38 @@ async function warmAssetLists(
 
   onProgress?.({ loaded: 0, total, percent: 0, done: total === 0 });
 
+  if (total === 0) return;
+
   await Promise.all([
     ...images.map((src) => loadImage(src).then(tick)),
     ...videos.map((src) => warmVideo(src).then(tick)),
   ]);
 }
 
-/** Fire-and-forget warm (root layout) — no UI gate. */
-export function startBackgroundWarm(): void {
+/**
+ * Fire-and-forget warm (root layout) — no UI gate.
+ * Idle path: images only; does not mark session fully warm.
+ */
+export function startBackgroundWarm(opts?: { idleOnly?: boolean }): void {
   if (typeof window === "undefined") return;
-  void warmCriticalAssets();
+  if (bgWarmStarted) return;
+  try {
+    if (sessionStorage.getItem(BG_WARM_SESSION_KEY) === "1") return;
+  } catch {
+    /* private mode */
+  }
+  bgWarmStarted = true;
+
+  const imagesOnly = Boolean(opts?.idleOnly);
+  void warmAssetLists(
+    WARM_IMAGE_PATHS,
+    imagesOnly ? [] : WARM_VIDEO_PATHS
+  ).finally(() => {
+    if (imagesOnly) return;
+    try {
+      sessionStorage.setItem(BG_WARM_SESSION_KEY, "1");
+    } catch {
+      /* ignore */
+    }
+  });
 }

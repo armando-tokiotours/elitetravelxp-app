@@ -97,7 +97,7 @@ export const SUB_SERVICES: SubServiceItem[] = [
     heroMediaUrl: "/brand/widgets/transport-private.jpg",
     galleryUrls: [
       "/brand/widgets/transport-private.jpg",
-      "/brand/hero-single-day.jpg",
+      "",
       "/brand/widgets/hotel-tokiotours.jpg",
     ],
     description:
@@ -127,11 +127,11 @@ export const SUB_SERVICES: SubServiceItem[] = [
     category: "DRIVER",
     title: "Inter-City Transfer",
     icon: "🛣️",
-    heroMediaUrl: "/brand/hero-japan-pagoda.jpg",
+    heroMediaUrl: "",
     galleryUrls: [
-      "/brand/hero-japan-pagoda.jpg",
+      "",
       "/brand/widgets/transport-private.jpg",
-      "/brand/hero-background.jpg",
+      "",
     ],
     description:
       "Private highway chauffeur transfer between Tokyo, Fuji, Kyoto, or Osaka.",
@@ -147,9 +147,9 @@ export const SUB_SERVICES: SubServiceItem[] = [
     category: "EXPERIENCE",
     title: "Bicycle Tour",
     icon: "🚲",
-    heroMediaUrl: "/brand/hero-single-day.jpg",
+    heroMediaUrl: "",
     galleryUrls: [
-      "/brand/hero-single-day.jpg",
+      "",
       "/brand/icons/bike.png",
       "/brand/trip-single-thumb.webp",
     ],
@@ -165,10 +165,10 @@ export const SUB_SERVICES: SubServiceItem[] = [
     category: "EXPERIENCE",
     title: "teamLab Planets",
     icon: "✨",
-    heroMediaUrl: "/brand/hero-background.jpg",
+    heroMediaUrl: "",
     galleryUrls: [
-      "/brand/hero-background.jpg",
-      "/brand/hero-japan-pagoda.jpg",
+      "",
+      "",
     ],
     description:
       "Immersive digital art exhibition entry pass & reserved time slot.",
@@ -184,7 +184,7 @@ export const SUB_SERVICES: SubServiceItem[] = [
     heroMediaUrl: "/brand/trip-multi-thumb.webp",
     galleryUrls: [
       "/brand/trip-multi-thumb.webp",
-      "/brand/hero-single-day.jpg",
+      "",
     ],
     description:
       "1-Day passport tickets with direct transfer add-on options.",
@@ -214,7 +214,7 @@ export const SUB_SERVICES: SubServiceItem[] = [
     heroMediaUrl: "/brand/widgets/transport-self.jpg",
     galleryUrls: [
       "/brand/widgets/transport-self.jpg",
-      "/brand/hero-japan-pagoda.jpg",
+      "",
     ],
     description:
       "Reserved seat tickets for Tokaido Shinkansen (Tokyo → Kyoto/Osaka).",

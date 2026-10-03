@@ -58,8 +58,8 @@ function PhotoLineCard({
       }`}
     >
       <div
-        className="absolute inset-0 bg-cover bg-center transition-transform duration-500 group-hover:scale-105"
-        style={{ backgroundImage: `url(${photoUrl})` }}
+        className="absolute inset-0 bg-[#2C2C2E] bg-cover bg-center transition-transform duration-500 group-hover:scale-105"
+        style={photoUrl ? { backgroundImage: `url(${photoUrl})` } : undefined}
       />
       <div className="absolute inset-0 bg-gradient-to-r from-black/90 via-black/60 to-transparent" />
       <div className="relative z-10 flex w-full items-center justify-between gap-2">
@@ -112,9 +112,7 @@ export function BuilderEServiceGrid({
     (s) => s.itemsByKey.builder_e_attractions_widget
   );
   const ui = (brandingRow || getItem("builder_e_attractions_widget")) as BrandCardData;
-  const [heroBg, setHeroBg] = useState(
-    () => ui.mediaUrl ?? "/brand/hero-background.jpg"
-  );
+  const [heroBg, setHeroBg] = useState(() => ui.mediaUrl ?? "");
   const [heroTitle, setHeroTitle] = useState(
     () => ui.title ?? "Attractions & Experiences"
   );
@@ -135,7 +133,7 @@ export function BuilderEServiceGrid({
 
   /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
-    setHeroBg(ui.mediaUrl ?? "/brand/hero-background.jpg");
+    setHeroBg(ui.mediaUrl ?? "");
     setHeroTitle(ui.title ?? "Attractions & Experiences");
     setHeroSub(ui.description ?? "");
   }, [ui.mediaUrl, ui.title, ui.description]);

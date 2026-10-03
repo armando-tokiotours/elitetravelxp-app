@@ -59,52 +59,31 @@ export function ChargingScreen({
   );
 }
 
+/**
+ * Speed test: never block the homepage — warm icons/characters in the background.
+ */
 export function HomeAssetWarmGate({ children }: { children: ReactNode }) {
-  const [progress, setProgress] = useState<WarmProgress>({
-    loaded: 0,
-    total: 1,
-    percent: 0,
-    done: false,
-  });
-  const [ready, setReady] = useState(false);
-
   useEffect(() => {
     try {
-      if (sessionStorage.getItem(HOME_SESSION_KEY) === "1") {
-        setReady(true);
-        setProgress({ loaded: 1, total: 1, percent: 100, done: true });
-        return;
-      }
+      if (sessionStorage.getItem(HOME_SESSION_KEY) === "1") return;
     } catch {
       /* private mode */
     }
 
-    let cancelled = false;
     void warmCriticalAssets((p) => {
-      if (cancelled) return;
-      setProgress(p);
-      if (p.done) {
-        try {
-          sessionStorage.setItem(HOME_SESSION_KEY, "1");
-        } catch {
-          /* ignore */
-        }
-        setReady(true);
+      if (!p.done) return;
+      try {
+        sessionStorage.setItem(HOME_SESSION_KEY, "1");
+      } catch {
+        /* ignore */
       }
     });
-
-    return () => {
-      cancelled = true;
-    };
   }, []);
 
-  if (ready) return <>{children}</>;
-
-  return (
-    <ChargingScreen progress={progress} label="Charging your trip assets…" />
-  );
+  return <>{children}</>;
 }
 
+/** Fire-and-forget builder warm — does not block navigation. */
 export function runBuilderEntryWarm(
   onProgress?: (p: WarmProgress) => void
 ): Promise<void> {

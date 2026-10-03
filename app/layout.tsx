@@ -2,8 +2,9 @@ import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
 import { DynamicTypography } from "@/components/layout/DynamicTypography";
 import { BrandDocumentMeta } from "@/components/branding/BrandDocumentMeta";
-import { SeasonalParticlesHost } from "@/components/branding/SeasonalParticles";
+import { LazySeasonalParticlesHost } from "@/components/branding/LazySeasonalParticlesHost";
 import { BrandCharacterPreloader } from "@/components/branding/BrandCharacterPreloader";
+import { AppLinkInterceptor } from "@/components/navigation/AppLinkInterceptor";
 import { BRAND_DESCRIPTION, BRAND_TITLE, BRAND_URL } from "@/lib/brand";
 import "./globals.css";
 
@@ -54,20 +55,23 @@ const beauty = localFont({
 export const metadata: Metadata = {
   title: {
     default: BRAND_TITLE,
-    template: `%s · TOKIOTOURS`,
+    template: `%s · Tokiotours`,
   },
   description: BRAND_DESCRIPTION,
   metadataBase: new URL(BRAND_URL),
   icons: {
-    icon: [{ url: "/brand/favicon.png", type: "image/png" }],
+    icon: [
+      { url: "/favicon.ico", sizes: "any" },
+      { url: "/brand/favicon.png", type: "image/png" },
+    ],
     apple: [{ url: "/brand/favicon.png", type: "image/png" }],
-    shortcut: "/brand/favicon.png",
+    shortcut: "/favicon.ico",
   },
   openGraph: {
     title: BRAND_TITLE,
     description: BRAND_DESCRIPTION,
     url: BRAND_URL,
-    siteName: "TOKIOTOURS",
+    siteName: "Tokiotours",
     type: "website",
   },
 };
@@ -89,54 +93,8 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       style={{ backgroundColor: "#05080C" }}
     >
       <head>
-        {/* Instant SVG / brand asset preloading — zero lag on tab/state swaps */}
-        <link
-          rel="preload"
-          href="/brand/1day-peek.svg"
-          as="image"
-          type="image/svg+xml"
-        />
-        <link
-          rel="preload"
-          href="/svg/1day-peek.svg"
-          as="image"
-          type="image/svg+xml"
-        />
-        <link
-          rel="preload"
-          href="/brand/mascot-bow.svg"
-          as="image"
-          type="image/svg+xml"
-        />
-        <link
-          rel="preload"
-          href="/svg/mascot-bow.svg"
-          as="image"
-          type="image/svg+xml"
-        />
-        <link
-          rel="preload"
-          href="/brand/mascot-card.svg"
-          as="image"
-          type="image/svg+xml"
-        />
-        <link
-          rel="preload"
-          href="/svg/mascot-card.svg"
-          as="image"
-          type="image/svg+xml"
-        />
-        <link
-          rel="preload"
-          href="/brand/mascot-multiday.svg"
-          as="image"
-          type="image/svg+xml"
-        />
-        <link
-          rel="preload"
-          href="/brand/tokiotours-logo.png"
-          as="image"
-        />
+        {/* Only tiny brand marks — never preload megabyte SVG peeks (kills VPS first paint). */}
+        <link rel="preload" href="/brand/tokiotours-logo-icon.png" as="image" />
         <link
           rel="preload"
           href="/brand/fox-peek.webp"
@@ -148,7 +106,8 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <BrandCharacterPreloader />
         <DynamicTypography />
         <BrandDocumentMeta />
-        <SeasonalParticlesHost />
+        <LazySeasonalParticlesHost />
+        <AppLinkInterceptor />
         {children}
       </body>
     </html>

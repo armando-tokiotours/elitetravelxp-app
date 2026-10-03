@@ -16,11 +16,8 @@ import {
 import { hydrateStoresFromPreEliteBrief } from "@/lib/preEliteHydrate";
 import { toPassStatusLabel } from "@/lib/bookingStatus";
 import { useModalDismiss } from "@/hooks/useModalDismiss";
-import {
-  BuilderEntryChargingOverlay,
-  runBuilderEntryWarm,
-} from "@/components/branding/HomeAssetWarmGate";
-import type { WarmProgress } from "@/lib/assetWarmup";
+import { runBuilderEntryWarm } from "@/components/branding/HomeAssetWarmGate";
+import { prefetchBuilderConfig } from "@/lib/builderConfigCache";
 import { TokioClockLoader } from "@/components/common/TokioClockLoader";
 import { SystemMessageFox } from "@/components/branding/SystemMessageFox";
 import {
@@ -120,13 +117,6 @@ export function PreBuildConfirmation({
   const [helpOpen, setHelpOpen] = useState(false);
   const [newBookingOpen, setNewBookingOpen] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
-  const [builderCharging, setBuilderCharging] = useState(false);
-  const [builderWarmProgress, setBuilderWarmProgress] = useState<WarmProgress>({
-    loaded: 0,
-    total: 1,
-    percent: 0,
-    done: false,
-  });
   const emailSentCount = usePreBuilderStore((s) => s.emailSentCount);
   const bumpEmailSentCount = usePreBuilderStore((s) => s.bumpEmailSentCount);
   const { showHi, triggerHi } = useMascotHiTap();
@@ -214,16 +204,9 @@ export function PreBuildConfirmation({
     setSaveGateOpen(false);
     setActionMsg("Request saved. Media charged for Trip Builder.");
     setToast("Brief saved — Trip Builder unlocked.");
-    setBuilderCharging(true);
-    setBuilderWarmProgress({
-      loaded: 0,
-      total: 1,
-      percent: 0,
-      done: false,
-    });
-    void runBuilderEntryWarm((p) => setBuilderWarmProgress(p)).then(() => {
-      setBuilderCharging(false);
-    });
+    // Speed test: warm characters/icons + catalog in background — never block Save.
+    void runBuilderEntryWarm();
+    prefetchBuilderConfig();
   };
 
   const openBuilder = () => {
@@ -247,8 +230,8 @@ export function PreBuildConfirmation({
     const href = (() => {
       if (alreadyLoaded) {
         return isSingleDay
-          ? `/builder-single?ref=${encodeURIComponent(bookingRef)}`
-          : `/builder?ref=${encodeURIComponent(bookingRef)}`;
+          ? `/builder/day-pass?ref=${encodeURIComponent(bookingRef)}`
+          : `/builder/japan-journey?ref=${encodeURIComponent(bookingRef)}`;
       }
       const result = hydrateStoresFromPreEliteBrief({
         bookingRef,
@@ -257,21 +240,15 @@ export function PreBuildConfirmation({
         itineraryData,
       });
       if (!result) {
-        return isSingleDay ? "/builder-single" : "/builder";
+        return isSingleDay ? "/builder/day-pass" : "/builder/japan-journey";
       }
       return result.href;
     })();
 
-    setBuilderCharging(true);
-    setBuilderWarmProgress({
-      loaded: 0,
-      total: 1,
-      percent: 0,
-      done: false,
-    });
-    void runBuilderEntryWarm((p) => setBuilderWarmProgress(p)).then(() => {
-      router.push(href);
-    });
+    // Navigate immediately; warm icons + catalog in background.
+    void runBuilderEntryWarm();
+    prefetchBuilderConfig();
+    router.push(href);
   };
 
   /** html2pdf can leave a full-screen overlay that swallows all clicks. */
@@ -438,8 +415,8 @@ export function PreBuildConfirmation({
           label: "Trip type",
           value:
             data.tripType === "single_day"
-              ? "Single-Day Tour"
-              : "Multi-Day Journey",
+              ? "1-Day Express Pass"
+              : "Grand Japan Journey",
         },
         { label: "Timing", value: data.dates },
         {
@@ -492,74 +469,30 @@ export function PreBuildConfirmation({
             {/* Spacer under overlapping mascot — never capture clicks */}
             <div className="pointer-events-none h-16 w-full" aria-hidden />
 
-            {/* 2. Grey Save + grey ? · gold Continue · New Booking */}
-            <div className="relative z-20 flex w-full flex-col items-center space-y-2 pt-1">
-              <div className="relative z-20 flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (builderUnlocked) {
-                      setSaveModalOpen(true);
-                      return;
-                    }
-                    saveBriefLocal();
-                  }}
-                  disabled={builderCharging}
-                  aria-label={
-                    builderCharging
-                      ? "Charging"
-                      : builderUnlocked
-                        ? "Saved"
-                        : "Save brief"
-                  }
-                  className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-full border border-zinc-600/80 bg-zinc-900/80 text-zinc-400 transition-all pointer-events-auto hover:border-zinc-500 hover:text-zinc-300 disabled:opacity-50"
-                >
-                  {builderCharging ? (
-                    <span className="font-mono text-[9px] text-zinc-500">…</span>
-                  ) : (
-                    <Save className="h-4 w-4" strokeWidth={2} aria-hidden />
-                  )}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setHelpOpen(true)}
-                  aria-label="Help"
-                  className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-full border border-zinc-600/80 bg-zinc-900/80 text-zinc-400 transition-all pointer-events-auto hover:border-zinc-500 hover:text-zinc-300"
-                >
-                  <HelpCircle className="h-4 w-4" strokeWidth={2} />
-                </button>
-              </div>
-
+            {/* Save + Help stay under mascot */}
+            <div className="relative z-20 flex items-center gap-2 pt-1">
               <button
                 type="button"
                 onClick={() => {
-                  setSending(false);
-                  cleanupHtml2PdfOverlay();
-                  openBuilder();
+                  if (builderUnlocked) {
+                    setSaveModalOpen(true);
+                    return;
+                  }
+                  saveBriefLocal();
                 }}
-                className="relative z-20 flex min-h-[5.25rem] w-full cursor-pointer flex-col items-center justify-center overflow-hidden rounded-xl border border-white/70 bg-white/10 px-2 py-3 text-center text-[#F6A724] shadow-md transition-all pointer-events-auto animate-locations-help-glow hover:bg-white/[0.14]"
+                aria-label={builderUnlocked ? "Saved" : "Save brief"}
+                className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-full border border-zinc-600/80 bg-zinc-900/80 text-zinc-400 transition-all pointer-events-auto hover:border-zinc-500 hover:text-zinc-300"
               >
-                <span
-                  aria-hidden
-                  className="pointer-events-none absolute inset-0 animate-locations-help-ring rounded-xl border border-white/80"
-                />
-                <span className="relative z-10 inline-flex max-w-[9.5rem] flex-col items-center gap-1 px-1">
-                  <span className="text-[11px] font-bold leading-tight tracking-wider uppercase">
-                    Continue to Trip Builder!
-                  </span>
-                  <ArrowRight className="h-3.5 w-3.5" aria-hidden />
-                </span>
+                <Save className="h-4 w-4" strokeWidth={2} aria-hidden />
               </button>
-
-              {onReset ? (
-                <button
-                  type="button"
-                  onClick={() => setNewBookingOpen(true)}
-                  className="relative z-20 flex min-h-[2.75rem] w-full cursor-pointer items-center justify-center rounded-xl border border-zinc-700 bg-black/40 px-2 text-[10px] font-bold uppercase tracking-wider text-zinc-200 transition-all pointer-events-auto hover:bg-zinc-800"
-                >
-                  New Booking
-                </button>
-              ) : null}
+              <button
+                type="button"
+                onClick={() => setHelpOpen(true)}
+                aria-label="Help"
+                className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-full border border-zinc-600/80 bg-zinc-900/80 text-zinc-400 transition-all pointer-events-auto hover:border-zinc-500 hover:text-zinc-300"
+              >
+                <HelpCircle className="h-4 w-4" strokeWidth={2} />
+              </button>
             </div>
           </div>
 
@@ -594,6 +527,38 @@ export function PreBuildConfirmation({
               </p>
             )}
           </div>
+        </div>
+
+        {/* Full-width Continue CTA (spans entire card, not left column only) */}
+        <div className="relative z-20 mt-4 flex w-full flex-col gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              setSending(false);
+              cleanupHtml2PdfOverlay();
+              openBuilder();
+            }}
+            className="relative z-20 flex min-h-[3.5rem] w-full cursor-pointer items-center justify-center gap-2 overflow-hidden rounded-xl border border-white/70 bg-white/10 px-4 py-3 text-center text-[#F6A724] shadow-md transition-all pointer-events-auto animate-locations-help-glow hover:bg-white/[0.14]"
+          >
+            <span
+              aria-hidden
+              className="pointer-events-none absolute inset-0 animate-locations-help-ring rounded-xl border border-white/80"
+            />
+            <span className="relative z-10 text-xs font-bold leading-tight tracking-wider uppercase sm:text-sm">
+              Continue to Trip Builder!
+            </span>
+            <ArrowRight className="relative z-10 h-4 w-4 shrink-0" aria-hidden />
+          </button>
+
+          {onReset ? (
+            <button
+              type="button"
+              onClick={() => setNewBookingOpen(true)}
+              className="relative z-20 flex min-h-[2.75rem] w-full cursor-pointer items-center justify-center rounded-xl border border-zinc-700 bg-black/40 px-2 text-[10px] font-bold uppercase tracking-wider text-zinc-200 transition-all pointer-events-auto hover:bg-zinc-800"
+            >
+              New Booking
+            </button>
+          ) : null}
         </div>
 
         {/* 3. Centered Booking Reference + status */}
@@ -685,9 +650,6 @@ export function PreBuildConfirmation({
         </div>
       ) : null}
 
-      {builderCharging ? (
-        <BuilderEntryChargingOverlay progress={builderWarmProgress} />
-      ) : null}
     </>
   );
 }

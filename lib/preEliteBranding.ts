@@ -29,9 +29,24 @@ import {
   type StorySlide,
 } from "@/lib/preEliteStories";
 import { isVideoFilename, plainBrandingText } from "@/lib/brandingUi";
-import { videoPosterUrlForSrc } from "@/lib/videoPosterUrl";
 
 export const PRE_ELITE_BRANDING_CATEGORY = "pre_elite" as const;
+
+/**
+ * Guest UI media must live under `public/` (path starts with `/brand`, `/images`, `/svg`, …).
+ * PocketBase `/api/files/…` blobs are data-store uploads — ignored for guest rendering.
+ */
+export function isPublicMediaPath(url: string): boolean {
+  const u = (url || "").trim();
+  if (!u.startsWith("/")) return false;
+  if (u.startsWith("/api/")) return false;
+  return true;
+}
+
+function publicOnly(url: string | undefined): string {
+  const u = (url || "").trim();
+  return isPublicMediaPath(u) ? u : "";
+}
 export const PRE_ELITE_BRANDING_PREFIX = "pre_elite_";
 export const PRE_ELITE_QUIZ_LOCAL_KEY = "tokio_pre_elite_quiz_branding";
 
@@ -157,15 +172,23 @@ function applySlideMedia(
   url: string | undefined,
   stillUrl?: string
 ): StorySlide {
-  const media = (url || "").trim();
-  if (!media) return slide;
+  const media = publicOnly(url);
+  const still = publicOnly(stillUrl);
+  // No PB files, no videos — guest stories are public stills only.
+  // Missing media → empty imageUrl (UI paints plain grey card, never logo).
+  if (!media) {
+    return {
+      ...slide,
+      videoUrl: undefined,
+      imageUrl: still || slide.imageUrl || "",
+    };
+  }
   if (isVideoFilename(media)) {
-    const still =
-      (stillUrl || "").trim() ||
-      (slide.imageUrl && !isVideoFilename(slide.imageUrl)
-        ? slide.imageUrl
-        : videoPosterUrlForSrc(media));
-    return { ...slide, videoUrl: media, imageUrl: still };
+    return {
+      ...slide,
+      videoUrl: undefined,
+      imageUrl: still || slide.imageUrl || "",
+    };
   }
   return { ...slide, imageUrl: media, videoUrl: undefined };
 }
@@ -181,7 +204,7 @@ function ensureThreeSlides(
       id: `${optionId}-slide-${n}`,
       title: `Moment ${n}`,
       caption: "A closer look at how this choice shapes your Japan days.",
-      imageUrl: next[0]?.imageUrl || "/brand/hero-japan-pagoda.jpg",
+      imageUrl: next[0]?.imageUrl || "",
     });
   }
   return next;
@@ -272,49 +295,22 @@ export function resolvePreEliteCardMedia(
   local?: PreEliteQuizLocalEntry | null,
   svgFallback?: string
 ): { url: string; isVideo: boolean; posterUrl?: string } {
-  const card =
-    (local?.cardUrl || "").trim() || (branding?.cardUrl || "").trim();
-  const cardPoster =
-    (local?.cardPosterUrl || "").trim() ||
-    (branding?.cardPosterUrl || "").trim();
-  if (card) {
-    const isVideo = isVideoFilename(card);
-    return {
-      url: card,
-      isVideo,
-      posterUrl: isVideo
-        ? cardPoster || videoPosterUrlForSrc(card)
-        : undefined,
-    };
+  const card = publicOnly(local?.cardUrl || branding?.cardUrl);
+  if (card && !isVideoFilename(card)) {
+    return { url: card, isVideo: false };
   }
-  const svg = (svgFallback || "").trim();
+  const svg = publicOnly(svgFallback);
   if (svg) {
     return { url: svg, isVideo: false };
   }
-  const slide1 =
-    (local?.mediaUrl || "").trim() || (branding?.mediaUrl || "").trim();
-  if (slide1) {
-    const isVideo = isVideoFilename(slide1);
-    return {
-      url: slide1,
-      isVideo,
-      posterUrl: isVideo ? videoPosterUrlForSrc(slide1) : undefined,
-    };
+  const slide1 = publicOnly(local?.mediaUrl || branding?.mediaUrl);
+  if (slide1 && !isVideoFilename(slide1)) {
+    return { url: slide1, isVideo: false };
   }
   const story = getStoryExplanation(optionId);
-  const s1 = story?.slides[0];
-  const fromStory = (s1?.videoUrl || s1?.imageUrl || "").trim();
-  if (fromStory) {
-    const isVideo = isVideoFilename(fromStory);
-    return {
-      url: fromStory,
-      isVideo,
-      posterUrl: isVideo
-        ? (s1?.imageUrl && !isVideoFilename(s1.imageUrl)
-            ? s1.imageUrl
-            : videoPosterUrlForSrc(fromStory))
-        : undefined,
-    };
+  const fromStory = publicOnly(story?.slides[0]?.imageUrl);
+  if (fromStory && !isVideoFilename(fromStory)) {
+    return { url: fromStory, isVideo: false };
   }
   return { url: "/svg/style-premium-comfort.svg", isVideo: false };
 }

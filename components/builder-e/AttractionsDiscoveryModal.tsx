@@ -88,7 +88,12 @@ function thumbUrl(tour: PbTour): string {
   const raw = tourPhoto(tour);
   if (!raw) return "";
   if (raw.startsWith("http") || raw.startsWith("/")) return raw;
-  return pbFileUrl(tour.collectionId || "tours", tour.id, raw) || raw;
+  return (
+    pbFileUrl(tour.collectionId || "tours", tour.id, raw, {
+      thumb: "400x300",
+      format: "webp",
+    }) || raw
+  );
 }
 
 export function AttractionsDiscoveryModal({
@@ -105,7 +110,7 @@ export function AttractionsDiscoveryModal({
   const [styleFilter, setStyleFilter] = useState<StyleFilter>("ALL STYLES");
   const [reelOpen, setReelOpen] = useState(false);
   const [reelIndex, setReelIndex] = useState(0);
-  const [widgetBg, setWidgetBg] = useState("/brand/hero-background.jpg");
+  const [widgetBg, setWidgetBg] = useState("");
   void widgetBg;
 
   const ensureLoaded = useSiteBrandingStore((s) => s.ensureLoaded);
@@ -146,9 +151,7 @@ export function AttractionsDiscoveryModal({
         if (cancelled) return;
         setCatalog(ticketed);
         setWidgetBg(
-          brandingAttractionsWidgetUrl(branding) ||
-            brandingItem.mediaUrl ||
-            "/brand/hero-background.jpg"
+          brandingAttractionsWidgetUrl(branding) || brandingItem.mediaUrl || ""
         );
       } finally {
         if (!cancelled) setLoading(false);
@@ -236,8 +239,7 @@ export function AttractionsDiscoveryModal({
             </p>
           ) : (
             filtered.map((exp, idx) => {
-              const thumb =
-                thumbUrl(exp) || "/brand/hero-single-day.jpg";
+              const thumb = thumbUrl(exp) || "";
               const city = cityNameOf(exp) || "Japan";
               const duration = exp.duration_hours
                 ? `${exp.duration_hours}h`
@@ -253,8 +255,8 @@ export function AttractionsDiscoveryModal({
                   className="group relative flex h-24 w-full items-center overflow-hidden rounded-2xl border border-white/10 px-5 text-left shadow-xl transition-all hover:border-[#F6A724]"
                 >
                   <div
-                    className="absolute inset-0 bg-cover bg-center transition-transform duration-500 group-hover:scale-105"
-                    style={{ backgroundImage: `url(${thumb})` }}
+                    className="absolute inset-0 bg-[#2C2C2E] bg-cover bg-center transition-transform duration-500 group-hover:scale-105"
+                    style={thumb ? { backgroundImage: `url(${thumb})` } : undefined}
                   />
                   <div className="absolute inset-0 bg-gradient-to-r from-black/90 via-black/60 to-transparent" />
                   <div className="relative z-10 flex w-full items-center justify-between">

@@ -6,6 +6,7 @@ import { JapanKeyword } from "@/components/branding/JapanKeyword";
 import { ManageBookingModal } from "@/components/modals/ManageBookingModal";
 import { BRAND_LOGO_ICON } from "@/lib/brand";
 import { performFullBookingReset } from "@/lib/useBookingSync";
+import { prefetchBuilderConfig } from "@/lib/builderConfigCache";
 import { usePreBuilderStore } from "@/store/usePreBuilderStore";
 import {
   DEFAULT_HOMEPAGE_HERO_INTRO,
@@ -115,6 +116,11 @@ export function HomepageHeroCards() {
 
   useEffect(() => () => clearTimers(), [clearTimers]);
 
+  // Warm catalog early so Pre-Elite → builder is usually a cache hit.
+  useEffect(() => {
+    prefetchBuilderConfig();
+  }, []);
+
   const sortedCards = useMemo(
     () => [...intro.cards].sort((a, b) => a.order - b.order),
     [intro.cards]
@@ -128,29 +134,29 @@ export function HomepageHeroCards() {
       setIsLocked(true);
       clearTimers();
 
-      // Mobile: 1.2s viewfinder hold · desktop: 0.5s
+      // Quick white flash in the photo box, then navigate (no multi-second hold).
       const isMobile =
         typeof window !== "undefined" &&
         window.matchMedia("(max-width: 639px)").matches;
-      const holdDuration = isMobile ? 1200 : 500;
+      const holdDuration = isMobile ? 120 : 80;
+
+      // Reset + trip type in parallel — never blocks navigation.
+      void (async () => {
+        try {
+          await performFullBookingReset();
+          if (card.tripType) {
+            usePreBuilderStore.getState().setTripType(card.tripType);
+          }
+        } catch {
+          /* navigation still proceeds */
+        }
+      })();
 
       const holdId = window.setTimeout(() => {
         setIsFlashing(true);
-
-        void (async () => {
-          try {
-            await performFullBookingReset();
-            if (card.tripType) {
-              usePreBuilderStore.getState().setTripType(card.tripType);
-            }
-          } catch {
-            /* navigation still proceeds */
-          }
-        })();
-
         const navId = window.setTimeout(() => {
           router.push(card.route);
-        }, 300);
+        }, 90);
         timersRef.current.push(navId);
       }, holdDuration);
       timersRef.current.push(holdId);
@@ -159,24 +165,19 @@ export function HomepageHeroCards() {
   );
 
   return (
-    <div className="tokio-ambient-bg relative flex h-dvh max-h-dvh w-full select-none flex-col overflow-hidden text-white pt-[max(0.75rem,env(safe-area-inset-top))] pb-[max(0.75rem,env(safe-area-inset-bottom))]">
-      {isFlashing ? (
-        <div
-          aria-hidden
-          className="animate-camera-flash pointer-events-none fixed inset-0 z-50 bg-[#05080C]"
-        />
-      ) : null}
-
-      <header className="relative z-20 flex shrink-0 items-center justify-between px-4 py-2 sm:px-8 sm:py-2.5">
+    // Mobile: svh = visible Safari height (chrome subtracted). Allow scroll if still short.
+    // Desktop: keep locked dvh composition.
+    <div className="tokio-ambient-bg relative flex min-h-svh w-full select-none flex-col overflow-x-hidden overflow-y-auto text-white pt-[max(0.5rem,env(safe-area-inset-top))] pb-[max(0.5rem,env(safe-area-inset-bottom))] sm:h-dvh sm:max-h-dvh sm:overflow-hidden sm:pt-[max(0.75rem,env(safe-area-inset-top))] sm:pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+      <header className="relative z-20 flex shrink-0 items-center justify-between px-4 py-1.5 sm:px-8 sm:py-2.5">
         <div className="flex items-center gap-2 sm:gap-2.5">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={BRAND_LOGO_ICON}
             alt="TOKIOTOURS"
-            className="h-7 w-7 rounded-full object-cover sm:h-8 sm:w-8"
+            className="h-6 w-6 rounded-full object-cover sm:h-8 sm:w-8"
           />
-          <span className="font-godiva text-[11px] tracking-[0.18em] text-white uppercase sm:text-sm">
-            TOKIOTOURS
+          <span className="font-godiva text-[10px] tracking-[0.18em] text-white uppercase sm:text-sm">
+            Tokiotours
           </span>
         </div>
         <button
@@ -188,17 +189,17 @@ export function HomepageHeroCards() {
         </button>
       </header>
 
-      <div className="relative z-10 mx-auto flex min-h-0 w-full max-w-5xl flex-1 flex-col items-center px-4 pb-2 pt-1 sm:max-h-[calc(100dvh-7.5rem)] sm:items-stretch sm:px-8 sm:pb-3 sm:pt-2">
-        <div className="mb-2 w-full shrink-0 space-y-1 text-center sm:hidden">
+      <div className="relative z-10 mx-auto flex min-h-0 w-full max-w-5xl flex-1 flex-col items-center px-4 pb-1 pt-0.5 sm:max-h-[calc(100dvh-7.5rem)] sm:items-stretch sm:px-8 sm:pb-3 sm:pt-2">
+        <div className="mb-1.5 w-full shrink-0 space-y-0.5 text-center sm:mb-2 sm:hidden sm:space-y-1">
           {intro.scriptTitle ? (
-            <JapanKeyword className="block text-[1.15rem] leading-none text-[#E02B49]">
+            <JapanKeyword className="block text-[1rem] leading-none text-[#E02B49] [@media(max-height:700px)]:text-[0.9rem]">
               {intro.scriptTitle}
             </JapanKeyword>
           ) : null}
-          <h1 className="font-godiva whitespace-pre-line text-[1.05rem] leading-tight tracking-wide text-white uppercase">
+          <h1 className="font-godiva whitespace-pre-line text-[0.95rem] leading-tight tracking-wide text-white uppercase [@media(max-height:700px)]:text-[0.85rem]">
             {intro.mainTitle}
           </h1>
-          <p className="mx-auto line-clamp-3 max-w-sm text-[10px] leading-snug font-light text-gray-300">
+          <p className="mx-auto line-clamp-2 max-w-sm text-[9px] leading-snug font-light text-gray-300 [@media(max-height:700px)]:line-clamp-1 sm:line-clamp-3 sm:text-[10px]">
             {intro.tagline}
           </p>
         </div>
@@ -218,8 +219,8 @@ export function HomepageHeroCards() {
           </p>
         </div>
 
-        {/* Mobile: centered stack · Desktop: top-aligned 3-col (untouched) */}
-        <div className="relative z-10 mx-auto my-auto flex min-h-0 w-full max-w-md flex-1 flex-col items-center justify-center gap-2.5 sm:mt-2 sm:mb-auto sm:max-w-5xl sm:grid sm:grid-cols-3 sm:items-start sm:justify-items-center sm:gap-6">
+        {/* Mobile: compact stack that can shrink · Desktop: top-aligned 3-col */}
+        <div className="relative z-10 mx-auto flex min-h-0 w-full max-w-md flex-1 flex-col items-center justify-start gap-1.5 sm:my-auto sm:mt-2 sm:mb-auto sm:max-w-5xl sm:grid sm:grid-cols-3 sm:items-start sm:justify-items-center sm:gap-6 [@media(max-height:700px)]:gap-1">
           {sortedCards.map((card) => {
             const isActive = activeCardId === card.id;
             const isOtherActive = activeCardId !== null && !isActive;
@@ -236,17 +237,18 @@ export function HomepageHeroCards() {
                 onMouseLeave={() => {
                   if (!isLocked) setActiveCardId(null);
                 }}
-                className={`group m-0 flex w-full max-w-[90%] cursor-pointer flex-col items-center justify-center p-0 text-center transition-all duration-300 sm:max-w-none sm:flex-none sm:justify-start ${
+                className={`group m-0 flex min-h-0 w-full max-w-[92%] flex-1 cursor-pointer flex-col items-center justify-center p-0 text-center transition-all duration-300 sm:max-w-none sm:flex-none sm:justify-start ${
                   isOtherActive
                     ? "scale-[0.98] opacity-80"
                     : "scale-100 opacity-100"
                 } ${isLocked && !isActive ? "pointer-events-none" : ""}`}
               >
-                {/* Photo — full-width 16:9 mobile · portrait desktop */}
+                {/* Photo — shorter on phone so 3 fit in Safari svh · portrait desktop */}
                 <div
-                  className={`relative aspect-video w-full shrink-0 overflow-hidden border p-0 transition-all duration-500
-                    rounded-2xl
+                  className={`relative aspect-[2.2/1] w-full min-h-0 max-h-[22svh] flex-1 overflow-hidden border p-0 transition-all duration-500
+                    rounded-xl bg-[#2C2C2E]
                     sm:aspect-[3/4.2] sm:h-auto sm:max-h-[50vh] sm:flex-none sm:rounded-2xl
+                    [@media(max-height:700px)]:max-h-[18svh]
                     ${
                       isActive
                         ? "border-amber-400/70 shadow-[0_20px_50px_rgba(0,0,0,0.9),0_0_35px_rgba(246,167,36,0.5)] sm:scale-105"
@@ -254,15 +256,17 @@ export function HomepageHeroCards() {
                     }
                     ${isOtherActive ? "opacity-80 blur-[2px]" : ""}`}
                 >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={card.heroPhotoUrl}
-                    alt=""
-                    className={`absolute inset-0 h-full w-full object-cover transition-all duration-700 ${
-                      isActive ? "scale-110" : "scale-100"
-                    } ${isOtherActive ? "brightness-75 contrast-90" : "brightness-100"}`}
-                    draggable={false}
-                  />
+                  {card.heroPhotoUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={card.heroPhotoUrl}
+                      alt=""
+                      className={`absolute inset-0 h-full w-full object-cover transition-all duration-700 ${
+                        isActive ? "scale-110" : "scale-100"
+                      } ${isOtherActive ? "brightness-75 contrast-90" : "brightness-100"}`}
+                      draggable={false}
+                    />
+                  ) : null}
 
                   <CardOverlay text={card.japaneseText} overlay={card.overlay} />
 
@@ -273,12 +277,20 @@ export function HomepageHeroCards() {
                       isActive ? "opacity-35" : "opacity-70"
                     }`}
                   />
+
+                  {/* White camera flash — only inside this photo box, then navigate */}
+                  {isFlashing && isActive ? (
+                    <div
+                      aria-hidden
+                      className="animate-box-camera-flash pointer-events-none absolute inset-0 z-40 bg-white"
+                    />
+                  ) : null}
                 </div>
 
                 {/* Title centered under photo (mobile + desktop) */}
-                <div className="mt-1 shrink-0 text-center sm:mt-2">
+                <div className="mt-0.5 shrink-0 text-center sm:mt-2">
                   <h3
-                    className={`font-godiva text-xs tracking-widest uppercase transition-colors sm:text-sm ${
+                    className={`font-godiva text-[10px] tracking-widest uppercase transition-colors sm:text-sm ${
                       isActive ? "text-[#F6A724]" : "text-white"
                     }`}
                   >
@@ -291,7 +303,7 @@ export function HomepageHeroCards() {
         </div>
       </div>
 
-      <footer className="relative z-10 flex shrink-0 flex-wrap items-center justify-center gap-2 border-t border-white/10 px-4 py-2.5 pb-[max(0.5rem,env(safe-area-inset-bottom))] text-center text-[9px] font-medium text-gray-400 sm:gap-6 sm:py-3 sm:text-[11px]">
+      <footer className="relative z-10 flex shrink-0 flex-wrap items-center justify-center gap-1.5 border-t border-white/10 px-4 py-1.5 pb-[max(0.75rem,calc(env(safe-area-inset-bottom)+0.35rem))] text-center text-[8px] font-medium text-gray-400 sm:gap-6 sm:py-3 sm:pb-[max(0.5rem,env(safe-area-inset-bottom))] sm:text-[11px]">
         <span>🏆 100% Private Guide</span>
         <span>•</span>
         <span>⚡ Instant Itinerary</span>

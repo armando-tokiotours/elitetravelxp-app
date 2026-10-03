@@ -55,7 +55,13 @@ const TRANSIT_BUFFER_MIN = 15;
  * Dedicated Single-Day Travel Dossier — hour-by-hour schedule, city hub,
  * pace & guide. Never renders multi-city airport routes or hotel nights.
  */
-export function SingleDayItineraryView() {
+export function SingleDayItineraryView({
+  depositPaidEur = 0,
+  hasPaidFull = false,
+}: {
+  depositPaidEur?: number;
+  hasPaidFull?: boolean;
+} = {}) {
   const tourDate = useSingleDayBuilderStore((s) => s.tourDate);
   const adults = useSingleDayBuilderStore((s) => s.adults);
   const children = useSingleDayBuilderStore((s) => s.children);
@@ -214,10 +220,10 @@ export function SingleDayItineraryView() {
   return (
     <div
       id="single-day-dossier-view"
-      className="w-full space-y-6 overflow-hidden px-0 text-white"
+      className="w-full space-y-6 overflow-visible px-0 text-white"
     >
       <p className="px-0 text-[0.65rem] font-semibold uppercase tracking-[0.35em] text-[#F6A724]">
-        Single-Day Tour Dossier
+        1-Day Express Pass · Itinerary
       </p>
 
       <JapanBookingPass
@@ -238,8 +244,11 @@ export function SingleDayItineraryView() {
         startDateText={passDate}
         endDateText={passDate}
         status={passStatus}
+        depositPaidEur={depositPaidEur}
+        hasPaidFull={hasPaidFull}
         qrValue={buildDossierQrUrl(pnrCode, "/builder-single/itinerary")}
         conciergeAgentName={agentDisplay}
+        editHref="/builder-single"
       />
 
       <CoordinationTeamSection
@@ -344,6 +353,7 @@ export function SingleDayItineraryView() {
         meetingPointName={meetingPointName || null}
         meetingPointAddress={meetingPoint || null}
         variant="screen"
+        editHref="/builder-single"
       />
 
       <DossierTermsFooterSection />

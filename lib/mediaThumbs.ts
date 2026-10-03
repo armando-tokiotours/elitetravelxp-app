@@ -25,6 +25,8 @@ export const PB_THUMBS = {
   /** City navigation pills */
   pill: "100x100",
   chip: "120x120",
+  /** Catalog / itinerary grids — never full originals */
+  grid: "400x300",
   /** Tour / experience cards */
   card: "600x400",
   cardSquare: "400x400",
@@ -32,3 +34,9 @@ export const PB_THUMBS = {
   reel: "800x1200",
   hero: "1920x1080",
 } as const;
+
+/** Default WebP thumb opts for guest catalog grids. */
+export const PB_GRID_THUMB = {
+  thumb: PB_THUMBS.grid,
+  format: "webp" as const,
+};

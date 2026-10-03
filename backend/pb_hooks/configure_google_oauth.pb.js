@@ -39,7 +39,11 @@ onBootstrap((e) => {
       displayName: "Google Workspace",
       clientId: clientId,
       clientSecret: clientSecret,
-      // PKCE recommended for public clients; Google supports it with PocketBase
+      // Leave URLs empty so PocketBase uses built-in Google defaults
+      // (auth v2 + oauth2.googleapis.com/token + userinfo v3).
+      authURL: "",
+      tokenURL: "",
+      userInfoURL: "",
       pkce: true,
     });
 

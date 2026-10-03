@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { Loader2, RotateCcw } from "lucide-react";
+import Link from "next/link";
+import { Loader2, RotateCcw, SquarePen } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import {
   downloadAppleWalletPass,
@@ -36,8 +37,11 @@ export function JapanBookingPass({
   endTime = "15:00",
   singleDayHighlights,
   status = "IN_PROGRESS",
+  depositPaidEur = 0,
+  hasPaidFull = false,
   conciergeAgentName,
   qrValue,
+  editHref,
   actions,
   onDownloadWalletPass,
   onRefreshPass,
@@ -203,41 +207,55 @@ export function JapanBookingPass({
               <img
                 src="/images/tokiotours-logo.png"
                 alt="Tokiotours"
-                className="h-6 w-6 shrink-0 rounded-full object-cover"
+                className="h-7 w-7 shrink-0 rounded-full object-cover"
               />
-              <span className="font-godiva text-sm font-bold tracking-wider text-white">
+              <span className="font-godiva text-base font-bold tracking-wider text-white">
                 TOKIOTOURS
               </span>
             </div>
-            <div className="relative flex flex-col items-end gap-1">
+            <div className="flex flex-col items-end gap-1">
               {(() => {
                 const st = String(status || "DRAFT").toUpperCase();
-                const isDraft = st === "DRAFT";
-                const confirmed =
-                  st === "CONFIRMED" || st === "IN_OPS" || st === "DONE";
                 const cancelled = st === "CANCELLED" || st === "CANCELED";
-                const incoming =
+                const statusConfirmed =
+                  st === "CONFIRMED" || st === "IN_OPS" || st === "DONE";
+                const depositPaid =
+                  Number(depositPaidEur) > 0 ||
+                  st === "QUOTED" ||
+                  statusConfirmed;
+                const fullyPaid = Boolean(hasPaidFull) || st === "DONE";
+
+                let label = st;
+                let badgeClass =
+                  "border border-dotted border-[#F6A724]/70 px-2 py-0.5 text-[10px] font-extrabold tracking-wider uppercase text-[#F6A724]";
+
+                if (cancelled) {
+                  label = "CANCELLED";
+                  badgeClass =
+                    "rounded-md border border-[#E60F43]/70 bg-[#E60F43]/15 px-2.5 py-1 text-[10px] font-extrabold tracking-wider uppercase text-[#E60F43]";
+                } else if (fullyPaid || (statusConfirmed && hasPaidFull)) {
+                  label = "CONFIRMED & FULLY PAID ✓";
+                  badgeClass =
+                    "rounded-md bg-emerald-500 px-2.5 py-1 text-[10px] font-extrabold tracking-wider uppercase text-black shadow-md";
+                } else if (statusConfirmed || depositPaid) {
+                  label = "DEPOSIT PAID / RESERVED ✓";
+                  badgeClass =
+                    "rounded-md bg-emerald-500 px-2.5 py-1 text-[10px] font-extrabold tracking-wider uppercase text-black shadow-md";
+                } else if (st === "DRAFT") {
+                  label = "HOLD / PENDING DEPOSIT";
+                  badgeClass =
+                    "rounded-md bg-amber-500 px-2.5 py-1 text-[10px] font-extrabold tracking-wider uppercase text-black shadow-md";
+                } else if (
                   st === "INCOMING" ||
                   st === "IN_PROGRESS" ||
-                  st === "QUOTED" ||
-                  st === "REVIEW";
-                return (
-                  <span
-                    className={`border border-dotted px-2 py-0.5 text-[12px] font-bold tracking-[0.18em] uppercase ${
-                      isDraft
-                        ? "border-zinc-500/60 text-zinc-500"
-                        : confirmed
-                          ? "border-emerald-300/70 text-emerald-300"
-                          : cancelled
-                            ? "border-[#E60F43]/70 text-[#E60F43]"
-                            : incoming
-                              ? "border-[#F6A724]/70 text-[#F6A724]"
-                              : "border-[#F6A724]/70 text-[#F6A724]"
-                    }`}
-                  >
-                    {st}
-                  </span>
-                );
+                  st === "REVIEW"
+                ) {
+                  label = "HOLD / PENDING DEPOSIT";
+                  badgeClass =
+                    "rounded-md bg-amber-500 px-2.5 py-1 text-[10px] font-extrabold tracking-wider uppercase text-black shadow-md";
+                }
+
+                return <span className={badgeClass}>{label}</span>;
               })()}
               <span className="text-[10px] font-semibold tracking-[0.16em] text-white uppercase">
                 {tripType === "multi"
@@ -493,13 +511,33 @@ export function JapanBookingPass({
     </div>
   );
 
-  if (!showSectionOutline) return ticket;
+  const editControl = editHref ? (
+    <Link
+      href={editHref}
+      aria-label="Edit Itinerary"
+      title="Edit Itinerary"
+      className="absolute top-1 right-1 z-20 rounded-md p-1.5 text-zinc-500 transition-colors hover:text-[#D91147]"
+    >
+      <SquarePen className="h-5 w-5" strokeWidth={2} />
+    </Link>
+  ) : null;
+
+  if (!showSectionOutline) {
+    if (!editControl) return ticket;
+    return (
+      <div className="relative w-full overflow-visible">
+        {editControl}
+        {ticket}
+      </div>
+    );
+  }
 
   return (
-    <div className="relative mx-auto my-6 w-full max-w-2xl rounded-3xl border-2 border-dashed border-white/40 bg-black/20 p-4">
+    <div className="relative mx-auto my-6 w-full max-w-2xl overflow-visible rounded-3xl border-2 border-dashed border-white/40 bg-black/20 p-4">
       <span className="absolute -top-3 left-4 z-20 rounded border border-white/30 bg-zinc-800 px-2 py-0.5 font-mono text-[9px] tracking-widest text-amber-400 uppercase">
         SECTION 2: BOOKING PASS
       </span>
+      {editControl}
       {ticket}
     </div>
   );

@@ -186,7 +186,7 @@ export function BuilderEServiceModal({
         <div className="mb-4 flex items-start justify-between gap-3">
           <div>
             <p className="text-[10px] font-bold tracking-[0.2em] text-[#F6A724] uppercase">
-              Builder E
+              VIP Access
             </p>
             <h2 className="font-godiva mt-1 text-xl tracking-wide text-white uppercase">
               {copy.title}

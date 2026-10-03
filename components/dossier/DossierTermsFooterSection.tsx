@@ -67,12 +67,6 @@ export function DossierTermsFooterSection({
           <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-white/45">
             Cancellation policy
           </p>
-          <p className="mt-2 text-sm leading-relaxed text-zinc-300">
-            Deposits are non-refundable once the itinerary is confirmed. Within
-            30 days of travel, a 100% cancellation fee may apply to private
-            transport and guides. Issued rail / Suica tickets follow operator
-            rules.
-          </p>
           <Link
             href="/policies"
             target="_blank"

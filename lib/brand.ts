@@ -1,18 +1,17 @@
-/** Canonical TOKIOTOURS brand strings — use instead of hardcoding.
+/** Canonical Tokiotours brand strings — use instead of hardcoding.
  * Browser tab title/description can be overridden in Team → Site Branding
  * (`document_title` / `document_description` on site_branding).
  */
-export const BRAND_NAME = "TOKIOTOURS";
+export const BRAND_NAME = "Tokiotours";
 
 export const BRAND_DOMAIN = "tokiotours-app.com";
 
 export const BRAND_URL = `https://${BRAND_DOMAIN}`;
 
-export const BRAND_TITLE =
-  "TOKIOTOURS — Bespoke Luxury Japan Travel Builder";
+export const BRAND_TITLE = "Tokiotours — Japan Journey Architect";
 
 export const BRAND_DESCRIPTION =
-  "Bespoke luxury Japan itineraries — design your journey with the live Trip Builder.";
+  "Custom 1-Day Highlights & Grand Bespoke Japan Vacation Builder";
 
 export const BRAND_DIFFERENCE_TITLE = "The TOKIOTOURS Difference";
 

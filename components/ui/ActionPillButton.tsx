@@ -1,8 +1,10 @@
 "use client";
 
+import { CTA_SECURE_DEPOSIT } from "@/lib/tourPaymentStatus";
+
 /**
  * High-converting neon pill CTA — teal → amber gradient, white double ring, amber glow.
- * Default labels: Secure My Dates / Pay Balance. Pass `label` for custom copy.
+ * Default labels: Secure Dates / Pay Balance. Pass `label` for custom copy.
  */
 export function ActionPillButton({
   conciergeFeePaid = false,
@@ -20,13 +22,13 @@ export function ActionPillButton({
   className?: string;
   /** Soft glow pulse before first interaction */
   pulse?: boolean;
-  /** Custom label — overrides Secure My Dates / Pay Balance */
+  /** Custom label — overrides Secure Dates / Pay Balance */
   label?: string;
 }) {
   if (paymentConfirmed && !labelOverride) return null;
 
   const label =
-    labelOverride ?? (conciergeFeePaid ? "Pay Balance" : "Secure My Dates");
+    labelOverride ?? (conciergeFeePaid ? "Pay Balance" : CTA_SECURE_DEPOSIT);
 
   return (
     <button

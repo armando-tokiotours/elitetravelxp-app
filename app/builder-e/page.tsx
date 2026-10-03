@@ -3,9 +3,9 @@ import { Suspense } from "react";
 import { BuilderEView } from "@/components/builder-e/BuilderEView";
 
 export const metadata: Metadata = {
-  title: "Builder E — Experiences & Micro-Services",
+  title: "VIP Tickets & Local Access",
   description:
-    "Book chauffeurs, attractions, and transit passes with TOKIOTOURS — standalone micro-services.",
+    "Hard-to-get tickets, restaurant reservations & local specs",
 };
 
 export default function BuilderEPage() {
@@ -13,7 +13,7 @@ export default function BuilderEPage() {
     <Suspense
       fallback={
         <div className="flex min-h-dvh items-center justify-center bg-black text-sm text-zinc-400">
-          Loading Builder E…
+          Loading VIP Access…
         </div>
       }
     >

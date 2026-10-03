@@ -44,10 +44,10 @@ export function BottomNav() {
       ? "/builder-single"
       : "/builder";
   const builderLabel = isBuilderE
-    ? "Builder E"
+    ? "VIP Access"
     : isSingleDay
-      ? "Builder S"
-      : "Builder M";
+      ? "1-Day Pass"
+      : "Journey";
   const itineraryHref = isBuilderE
     ? "/builder-e/dossier"
     : isSingleDay
@@ -72,7 +72,7 @@ export function BottomNav() {
   const allTabs: NavTab[] = [
     {
       href: "/builder-e",
-      label: "Builder E",
+      label: "VIP Access",
       icon: BuilderIcon,
       kind: "link",
       match: "builderE",

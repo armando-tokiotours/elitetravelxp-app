@@ -51,6 +51,45 @@ const nextConfig: NextConfig = {
       },
     ];
   },
+  async redirects() {
+    return [
+      {
+        source: "/builder-single",
+        destination: "/builder/day-pass",
+        permanent: false,
+      },
+      {
+        source: "/builder-single/itinerary",
+        destination: "/builder/day-pass/itinerary",
+        permanent: false,
+      },
+      {
+        source: "/builder-single/itinerary/:path*",
+        destination: "/builder/day-pass/itinerary/:path*",
+        permanent: false,
+      },
+      {
+        source: "/builder-e",
+        destination: "/builder/vip-access",
+        permanent: false,
+      },
+      {
+        source: "/builder-e/dossier",
+        destination: "/builder/vip-access/dossier",
+        permanent: false,
+      },
+      {
+        source: "/builder/itinerary",
+        destination: "/builder/japan-journey/itinerary",
+        permanent: false,
+      },
+      {
+        source: "/builder/itinerary/:path*",
+        destination: "/builder/japan-journey/itinerary/:path*",
+        permanent: false,
+      },
+    ];
+  },
 };
 
 export default nextConfig;

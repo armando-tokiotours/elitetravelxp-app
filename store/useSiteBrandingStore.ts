@@ -14,7 +14,6 @@ import {
   fetchBrandingUiItems,
   type PbBrandingUiItem,
 } from "@/lib/pocketbase/client";
-import { videoPosterUrlForSrc } from "@/lib/videoPosterUrl";
 import type { PaceId } from "@/lib/travelPace";
 import type {
   ProfilerCrowdStyle,
@@ -36,6 +35,16 @@ import {
   quizPaceBrandingKey,
   quizVibeBrandingKey,
 } from "@/lib/brandingUi";
+import { isPublicMediaPath } from "@/lib/preEliteBranding";
+
+/** Guest UI: only `public/` paths — ignore PocketBase /api/files blobs. */
+function guestPublicMedia(pbOrPath: string, fallback = ""): string {
+  const a = (pbOrPath || "").trim();
+  if (isPublicMediaPath(a) && !isVideoFilename(a)) return a;
+  const b = (fallback || "").trim();
+  if (isPublicMediaPath(b) && !isVideoFilename(b)) return b;
+  return "";
+}
 
 export interface ResolvedBrandingUiItem {
   key: string;
@@ -89,28 +98,25 @@ function resolveItem(
   const creditBody =
     plainBrandingText(row?.credit_body) || fallback?.creditBody || "";
   const pbMedia = brandingUiMediaUrl(row);
-  const mediaUrl = pbMedia || fallback?.mediaFallback || "";
-  const isVideo = mediaUrl ? isVideoFilename(mediaUrl) : false;
+  const mediaUrl = guestPublicMedia(
+    pbMedia,
+    fallback?.mediaFallback || ""
+  );
+  const isVideo = false;
   const pbPoster = brandingUiPosterUrl(row);
-  const posterUrl =
-    pbPoster ||
-    (key === "elite_concierge_modal" || key === "concierge_preview"
+  const posterFallback =
+    key === "elite_concierge_modal" || key === "concierge_preview"
       ? CONCIERGE_POSTER_FALLBACK
       : key === "single_day_builder_hero"
         ? SINGLE_DAY_BUILDER_CONFIG.hero.fallbackImage
-        : isVideo
-          ? videoPosterUrlForSrc(mediaUrl)
-          : mediaUrl);
-  const slide3Url = brandingUiSlide3Url(row);
-  const cardUrl = brandingUiCardUrl(row);
-  const cardPosterPb = brandingUiCardPosterUrl(row);
-  const cardIsVideo = cardUrl ? isVideoFilename(cardUrl) : false;
-  const cardPosterUrl = cardIsVideo
-    ? cardPosterPb || videoPosterUrlForSrc(cardUrl)
-    : "";
-  const mediaPosterUrl = brandingUiMediaPosterUrl(row);
-  const slide2PosterUrl = brandingUiSlide2PosterUrl(row);
-  const slide3PosterUrl = brandingUiSlide3PosterUrl(row);
+        : mediaUrl;
+  const posterUrl = guestPublicMedia(pbPoster, posterFallback);
+  const slide3Url = guestPublicMedia(brandingUiSlide3Url(row));
+  const cardUrl = guestPublicMedia(brandingUiCardUrl(row));
+  const cardPosterUrl = guestPublicMedia(brandingUiCardPosterUrl(row));
+  const mediaPosterUrl = guestPublicMedia(brandingUiMediaPosterUrl(row));
+  const slide2PosterUrl = guestPublicMedia(brandingUiSlide2PosterUrl(row));
+  const slide3PosterUrl = guestPublicMedia(brandingUiSlide3PosterUrl(row));
 
   return {
     key,

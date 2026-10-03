@@ -1,9 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { FileText } from "lucide-react";
 import { buildCityMap, getCityName } from "@/lib/cityLabels";
 import { activeBookingRef } from "@/utils/pnr";
 import { syncMultiDayBookingLead } from "@/lib/syncBookingLead";
@@ -42,13 +40,11 @@ import {
 } from "@/components/builder/TravelDossierView";
 import { GuestTalkBubble } from "@/components/dossier/GuestTalkBubble";
 import { ThankYouPassMascot } from "@/components/branding/PandaFlexibleMascot";
-import { FeePaidRibbon } from "@/components/dossier/FeeCreditRibbon";
-import { DossierActionToolbar } from "@/components/dossier/DossierActionToolbar";
 import { TicketVoucherDownloadBanner } from "@/components/dossier/TicketVoucherDownloadBanner";
+import { LiquidGlassHero } from "@/components/guest/LiquidGlassHero";
+import { ItineraryTopActions } from "@/components/navigation/ItineraryTopActions";
 import { MobileTopChrome } from "@/components/navigation/MobileTopChrome";
 import { SaveRequiredContactModal } from "@/components/builder/SaveRequiredContactModal";
-import { IdleHeroMascot } from "@/components/branding/IdleHeroMascot";
-import { GoldLight } from "@/components/branding/GoldLight";
 import { showSystemMessage } from "@/store/useSystemMessageStore";
 import { getSystemMessage } from "@/lib/systemMessages";
 import { dossierPrimaryCtaLabel } from "@/lib/tourPaymentStatus";
@@ -98,7 +94,6 @@ export default function ItineraryPageClient() {
   const [printResult, setPrintResult] = useState<PrintRequestResult | null>(
     null
   );
-  const [sendPulsarDone, setSendPulsarDone] = useState(false);
   const [costPulsarDone, setCostPulsarDone] = useState(false);
   const [saveContactOpen, setSaveContactOpen] = useState(false);
   const [pendingAfterSave, setPendingAfterSave] = useState<
@@ -311,7 +306,6 @@ export default function ItineraryPageClient() {
       });
       return;
     }
-    setSendPulsarDone(true);
     setPrintSkipTerms(true);
     setPrintOpen(true);
   };
@@ -641,79 +635,51 @@ export default function ItineraryPageClient() {
         brandTitle="Itinerary"
         ctaHref="/builder"
         ctaLabel="Builder"
+        actions={
+          <ItineraryTopActions
+            locked={!contactReady}
+            invoiceActive={activeView === "invoice"}
+            onPlan={() => setMode("dossier")}
+            onInvoice={() => {
+              if (activeView === "invoice") setMode("dossier");
+              else void requestInvoiceView();
+            }}
+          />
+        }
       />
       <div className="mx-auto w-full max-w-md px-4 py-6 md:max-w-lg lg:max-w-2xl">
-          {/* Section 1 — Hero header + navigation actions */}
+          {/* Section 1 — Hero + Save/Send/Print */}
           <DossierSectionOutline
             label="Section 1: Hero & Nav"
             className="no-print my-4"
           >
-            <header className="group relative overflow-visible rounded-2xl border border-white/10 bg-[#0A1017]/80 p-5 shadow-2xl backdrop-blur-md sm:p-6">
-              {/* Clip gold wash to card interior — mascot can still sit outside */}
-              <div
-                className="pointer-events-none absolute inset-0 z-0 overflow-hidden rounded-2xl"
-                aria-hidden
-              >
-                <GoldLight color="#F6A724" active />
-              </div>
-              <div className="relative z-10 space-y-4 text-left">
-              <div className="relative grid grid-cols-3 items-end gap-2">
-                <div className="col-span-2 min-w-0">
-                  <p className="text-[0.65rem] font-semibold uppercase tracking-[0.35em] text-[#F6A724]">
-                    Multi day · Itinerary
-                  </p>
-                  <h1 className="mt-1 break-words font-godiva text-2xl uppercase leading-tight tracking-wide text-white sm:text-3xl">
-                    {customerName}
-                  </h1>
-                  <h2 className="mt-0.5 font-godiva text-[1.125rem] uppercase tracking-wider text-white/90">
-                    Dossier
-                  </h2>
-                  <p className="mt-1 text-sm text-white/55">
-                    Day-by-day Japan route and private multi-day quotation.
-                  </p>
-                </div>
-                <div className="col-span-1 flex justify-end self-end">
-                  <IdleHeroMascot
-                    activeSrc="/brand/mascot-phone.webp"
-                    idleSrc="/brand/mascot-time.webp"
-                    idleMs={7_000}
-                    className="z-[1] -mb-2 h-28 w-auto select-none object-contain sm:h-36 md:h-40"
-                  />
-                </div>
-              </div>
-
-              <div className="border-t border-white/10 pt-2">
-                {feeCreditEur > 0 ? (
-                  <FeePaidRibbon feeEur={feeCreditEur} className="mb-3" />
-                ) : null}
-                <TicketVoucherDownloadBanner
-                  pnr={activeBookingRef({
-                    tempBookingRef: state.tempBookingRef,
-                    confirmedBookingRef: state.confirmedBookingRef,
-                    bookingStatus: state.bookingStatus,
-                  })}
-                  className="mb-3"
-                />
-                <DossierActionToolbar
-                  contactReady={contactReady}
-                  costPulsarDone={costPulsarDone}
-                  continueHref="/builder"
-                  howMuchLabel={dossierPrimaryCtaLabel(feeCreditEur)}
-                  conciergeFeePaid={feeCreditEur > 0}
-                  onHowMuchCost={handleRequestPay}
-                  onSave={() => void requestSaveOnly()}
-                  onSend={() => void requestSendPdf()}
-                  onPrint={requestPrintOnly}
-                  onItinerary={() => setMode("dossier")}
-                  onInvoice={() => {
-                    if (activeView === "invoice") setMode("dossier");
-                    else void requestInvoiceView();
-                  }}
-                  invoiceActive={activeView === "invoice"}
-                />
-              </div>
-              </div>
-            </header>
+            <LiquidGlassHero
+              pnr={activeBookingRef({
+                tempBookingRef: state.tempBookingRef,
+                confirmedBookingRef: state.confirmedBookingRef,
+                bookingStatus: state.bookingStatus,
+              })}
+              bookingType="MULTI_DAY"
+              title="Grand Japan Journey · Itinerary"
+              guestName={customerName !== "Guest" ? customerName : undefined}
+              depositAmount={feeCreditEur}
+              payLabel={dossierPrimaryCtaLabel(feeCreditEur)}
+              payPulse={!costPulsarDone}
+              continueHref="/builder"
+              locked={!contactReady}
+              onSave={() => void requestSaveOnly()}
+              onSend={() => void requestSendPdf()}
+              onPrint={requestPrintOnly}
+              onPayContinue={handleRequestPay}
+            />
+            <TicketVoucherDownloadBanner
+              pnr={activeBookingRef({
+                tempBookingRef: state.tempBookingRef,
+                confirmedBookingRef: state.confirmedBookingRef,
+                bookingStatus: state.bookingStatus,
+              })}
+              className="mb-3"
+            />
           </DossierSectionOutline>
 
           <main className="mt-6 w-full overflow-x-hidden pb-8">

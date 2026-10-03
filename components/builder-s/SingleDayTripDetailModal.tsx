@@ -216,6 +216,7 @@ export function SingleDayTripDetailModal({
               }}
               label="Tour date"
               title="CHOOSE TOUR DATE"
+              labelClassName="text-[14px] font-medium uppercase tracking-[0.14em] text-white"
             />
 
             <SeasonalityCard

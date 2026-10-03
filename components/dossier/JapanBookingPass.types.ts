@@ -46,9 +46,15 @@ export interface BookingPassProps {
   routeBreakdown?: RouteBreakdownItem[];
 
   status?: BookingPassStatus;
+  /** Concierge / design deposit already credited (€). */
+  depositPaidEur?: number;
+  /** True when guest has settled the full package balance. */
+  hasPaidFull?: boolean;
   /** Concierge agent name for direct bookings (shown near PNR). */
   conciergeAgentName?: string | null;
   qrValue?: string;
+  /** When set, shows a compact edit icon linking to the builder. */
+  editHref?: string;
   actions?: ReactNode;
   onDownloadWalletPass?: () => void;
   onRefreshPass?: () => void;

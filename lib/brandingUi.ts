@@ -48,7 +48,7 @@ export const BRANDING_UI_FALLBACKS: Record<string, BrandingUiFallback> = {
     subtitle: "See more, linger less",
     description:
       "Packed days with multiple highlights. Ideal if this is a first visit and you want maximum coverage.\n\nExpect earlier starts, efficient transfers between cities, and fuller daily schedules. Best for energetic travelers who prefer momentum over downtime.",
-    mediaFallback: "/photo/pace-fast.jpg",
+    mediaFallback: "",
     sortOrder: 1,
   },
   pace_moderate: {
@@ -58,7 +58,7 @@ export const BRANDING_UI_FALLBACKS: Record<string, BrandingUiFallback> = {
     subtitle: "Balanced discovery",
     description:
       "A classic rhythm — signature experiences with room to breathe between them.\n\nOne primary focus per day with optional add-ons. Comfortable pacing for couples and families who want culture and rest in equal measure.",
-    mediaFallback: "/photo/pace-moderate.jpg",
+    mediaFallback: "",
     sortOrder: 2,
   },
   pace_relaxed: {
@@ -68,7 +68,7 @@ export const BRANDING_UI_FALLBACKS: Record<string, BrandingUiFallback> = {
     subtitle: "Slow luxury",
     description:
       "Fewer moves, deeper stays. Space for spa mornings, long lunches, and unhurried evenings.\n\nLonger city stays and lighter daily agendas. Perfect when the journey itself is the destination and recovery matters as much as sightseeing.",
-    mediaFallback: "/photo/pace-relaxed.jpg",
+    mediaFallback: "",
     sortOrder: 3,
   },
   quiz_vibe_culture: {
@@ -168,7 +168,7 @@ export const BRANDING_UI_FALLBACKS: Record<string, BrandingUiFallback> = {
     subtitle: "Day-by-day design with a dedicated specialist",
     description:
       "One dedicated specialist plans every detail — restaurants, experiences, and logistics — so you travel without the guesswork.",
-    mediaFallback: "/videos/elite-concierge-preview.mp4",
+    mediaFallback: "",
     sortOrder: 1,
   },
   elite_concierge_modal: {
@@ -177,7 +177,7 @@ export const BRANDING_UI_FALLBACKS: Record<string, BrandingUiFallback> = {
     title: "Day-by-Day Design",
     subtitle: "Design deposit €50",
     description: "",
-    mediaFallback: "/videos/elite-concierge-preview.mp4",
+    mediaFallback: "",
     sortOrder: 0,
     inclusionTitle: "What's included",
     inclusionBody:
@@ -192,7 +192,7 @@ export const BRANDING_UI_FALLBACKS: Record<string, BrandingUiFallback> = {
     title: "Activity Matcher",
     subtitle: "Unsure what to pick? Take our 30-Second Activity Matcher",
     description: "",
-    mediaFallback: "/images/matcher-poster.webp",
+    mediaFallback: "",
     sortOrder: 1,
     ctaPrimary: "Watch Your Activity Match Reel",
     ctaSecondary: "Take 30-Sec Style Quiz",
@@ -204,7 +204,7 @@ export const BRANDING_UI_FALLBACKS: Record<string, BrandingUiFallback> = {
     subtitle: "Explore All Experiences",
     description:
       "Filter by City (Tokyo, Kyoto, Osaka) & Style (Food, Anime, Nature)",
-    mediaFallback: "/brand/hero-background.jpg",
+    mediaFallback: "",
     sortOrder: 1,
     ctaPrimary: "Explore",
     ctaSecondary: "",
@@ -216,7 +216,7 @@ export const BRANDING_UI_FALLBACKS: Record<string, BrandingUiFallback> = {
     subtitle: "TAILORED PLANNING",
     description:
       "Have a tight or specific budget? Input your target limits and we will curate the best affordable sights, transit, and optional experiences for you.",
-    mediaFallback: "/images/matcher-poster.webp",
+    mediaFallback: "",
     sortOrder: 1,
     ctaPrimary: "Open Budget Planner",
     ctaSecondary: "Back to Builder",
@@ -259,7 +259,7 @@ export const BRANDING_UI_FALLBACKS: Record<string, BrandingUiFallback> = {
     subtitle: "Neighborhood pace on foot",
     description:
       "Your host leads you through alleys, temples, and market streets on foot. Ideal for compact districts where the best moments sit between subway exits.\n\nComfortable shoes recommended. Luggage stays at your hotel; we plan loops that return you near your meeting point.",
-    mediaFallback: "/brand/hero-single-day.jpg",
+    mediaFallback: "",
     sortOrder: 10,
   },
   transit_subway: {
@@ -269,7 +269,7 @@ export const BRANDING_UI_FALLBACKS: Record<string, BrandingUiFallback> = {
     subtitle: "IC card + guided transfers",
     description:
       "We provide (or top up) a Suica/Pasmo IC card and escort every transfer. Your host handles ticket gates, platform changes, and station exits so you never guess which stairs to take.\n\nBest for covering distant districts in one day while staying light and flexible.",
-    mediaFallback: "/brand/hero-single-day.jpg",
+    mediaFallback: "",
     sortOrder: 11,
   },
   transit_private_driver: {
@@ -279,12 +279,12 @@ export const BRANDING_UI_FALLBACKS: Record<string, BrandingUiFallback> = {
     subtitle: "Door-to-door vehicle",
     description:
       "A licensed private driver meets you at your hotel or station hub and relocates you between stops. Drop-off at each experience; rejoin after for the next leg.\n\nBest for families, luggage days, rain, or when you want zero station friction between icons.",
-    mediaFallback: "/brand/hero-single-day.jpg",
+    mediaFallback: "",
     sortOrder: 12,
   },
 };
 
-export const CONCIERGE_POSTER_FALLBACK = "/images/concierge-poster.webp";
+export const CONCIERGE_POSTER_FALLBACK = "";
 
 export const PACE_IDS = ["fast", "moderate", "relaxed"] as const;
 export const QUIZ_VIBE_IDS = [

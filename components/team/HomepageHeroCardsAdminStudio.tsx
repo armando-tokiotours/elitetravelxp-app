@@ -40,9 +40,9 @@ type SelectedTarget =
   | { kind: "overlay"; id: HomepageHeroCardId };
 
 const CARD_LABELS: Record<HomepageHeroCardId, string> = {
-  single: "Single Day Tour",
-  experience: "Services / Tickets (Builder E)",
-  multiday: "Multi-Day Journey",
+  single: "1-Day Express Pass",
+  experience: "VIP Tickets & Local Access",
+  multiday: "Grand Japan Journey",
 };
 
 const CARD_ORDER: HomepageHeroCardId[] = [

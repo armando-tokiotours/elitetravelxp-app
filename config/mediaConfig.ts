@@ -9,7 +9,8 @@
 export const SINGLE_DAY_BUILDER_HERO_KEY = "single_day_builder_hero";
 
 /** Public brand path written by Site Branding → “save to public assets”. */
-export const SINGLE_DAY_HERO_PUBLIC_FALLBACK = "/brand/hero-single-day.jpg";
+/** Empty = plain grey until a real public/brand hero is saved. */
+export const SINGLE_DAY_HERO_PUBLIC_FALLBACK = "";
 
 /** localStorage mirror so Builder S hero updates instantly after admin save. */
 export const BUILDER_S_HERO_LS_KEY = "tokio_builder_s_hero";
@@ -56,17 +57,14 @@ export function writeBuilderSHeroLocalCache(
 export const SINGLE_DAY_BUILDER_CONFIG = {
   hero: {
     /** @deprecated Prefer scriptAccent; kept for older callers */
-    title: "SINGLE-DAY EXPERIENCES",
+    title: "1-DAY EXPRESS PASS",
     scriptAccent: "Japan!",
     mainTitlePrefix: "YOUR DAY IN",
     subtitle:
-      "Curated 1-day immersive discovery across Japan's finest districts.",
-    videoUrl:
-      process.env.NEXT_PUBLIC_SINGLE_BUILDER_HERO_VIDEO ||
-      "/videos/tokyo-day-hero.mp4",
-    fallbackImage:
-      process.env.NEXT_PUBLIC_SINGLE_BUILDER_HERO_IMG ||
-      "/images/tokyo-day-hero.jpg",
+      "Custom 1-Day Private Route & Instant Quote",
+    videoUrl: process.env.NEXT_PUBLIC_SINGLE_BUILDER_HERO_VIDEO || "",
+    /** Empty = plain grey until a real public hero is uploaded. */
+    fallbackImage: process.env.NEXT_PUBLIC_SINGLE_BUILDER_HERO_IMG || "",
   },
   sections: {
     cityThumbnails: {

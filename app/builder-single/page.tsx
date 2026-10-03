@@ -3,9 +3,8 @@ import { Suspense } from "react";
 import { SingleDayBuilderView } from "@/components/builder-single/SingleDayBuilderView";
 
 export const metadata: Metadata = {
-  title: "Single-Day Tour Builder",
-  description:
-    "Hour-by-hour day-trip builder for TOKIOTOURS — activities, timing, and intra-city movement.",
+  title: "1-Day Express Pass",
+  description: "Custom 1-Day Private Route & Instant Quote",
 };
 
 export default function BuilderSinglePage() {

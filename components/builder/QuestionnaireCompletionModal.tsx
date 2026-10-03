@@ -1,6 +1,8 @@
 "use client";
 
+import { useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { prefetchBuilderConfig } from "@/lib/builderConfigCache";
 
 type BuilderType = "multiday" | "single";
 
@@ -22,15 +24,20 @@ export function QuestionnaireCompletionModal({
 }: Props) {
   const router = useRouter();
 
+  useEffect(() => {
+    if (open) prefetchBuilderConfig();
+  }, [open]);
+
   if (!open) return null;
 
   const handleEnterBuilder = () => {
     const ok = onConfirm();
     if (ok === false) return;
+    prefetchBuilderConfig();
     if (builderType === "single") {
-      router.push("/builder-single");
+      router.push("/builder/day-pass");
     } else {
-      router.push("/builder");
+      router.push("/builder/japan-journey");
     }
   };
 
@@ -42,7 +49,7 @@ export function QuestionnaireCompletionModal({
           <img
             src="/images/note-icon.webp"
             alt="TokioTours Mascot"
-            className="h-28 w-28 animate-bounce object-contain drop-shadow-[0_10px_20px_rgba(0,0,0,0.8)]"
+            className="h-28 w-28 object-contain drop-shadow-[0_10px_20px_rgba(0,0,0,0.8)]"
           />
         </div>
 

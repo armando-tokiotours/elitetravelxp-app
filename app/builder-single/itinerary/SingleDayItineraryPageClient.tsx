@@ -8,7 +8,6 @@ import {
   calculateSingleDayQuote,
   formatEur,
   singleDayPerPersonEur,
-  singleDayPerPersonHourEur,
 } from "@/lib/singleDayPricing";
 import { useBuilderStore } from "@/store/useBuilderStore";
 import {
@@ -22,8 +21,7 @@ import {
 import { SingleDayItineraryView } from "@/components/builder-single/SingleDayItineraryView";
 import { GuestTalkBubble } from "@/components/dossier/GuestTalkBubble";
 import { ThankYouPassMascot } from "@/components/branding/PandaFlexibleMascot";
-import { FeePaidRibbon } from "@/components/dossier/FeeCreditRibbon";
-import { DossierActionToolbar } from "@/components/dossier/DossierActionToolbar";
+import { LiquidGlassHero } from "@/components/guest/LiquidGlassHero";
 import { TicketVoucherDownloadBanner } from "@/components/dossier/TicketVoucherDownloadBanner";
 import { ActionPillButton } from "@/components/ui/ActionPillButton";
 import {
@@ -41,13 +39,13 @@ import {
 import { SingleDayInvoicePrint } from "@/components/builder-single/SingleDayInvoicePrint";
 import { SingleDayBudgetModal } from "@/components/builder-s/SingleDayBudgetModal";
 import { SaveRequiredContactModal } from "@/components/builder/SaveRequiredContactModal";
-import { MobileTopChrome } from "@/components/navigation/MobileTopChrome";
-import { IdleHeroMascot } from "@/components/branding/IdleHeroMascot";
-import { GoldLight } from "@/components/branding/GoldLight";
+import { TopNavBar } from "@/components/navigation/TopNavBar";
+import { BUILDER_ROUTES } from "@/lib/builderRoutes";
 import { SystemMessageFox } from "@/components/branding/SystemMessageFox";
 import { showSystemMessage } from "@/store/useSystemMessageStore";
 import { getSystemMessage } from "@/lib/systemMessages";
 import { dossierPrimaryCtaLabel } from "@/lib/tourPaymentStatus";
+import { activeBookingRef } from "@/utils/pnr";
 import {
   hasGuestContact,
   saveContactAndCreateDraft,
@@ -59,7 +57,6 @@ import {
 } from "@/lib/itineraryGates";
 import { useItineraryStore } from "@/store/useItineraryStore";
 import { usePreBuilderStore } from "@/store/usePreBuilderStore";
-import { activeBookingRef } from "@/utils/pnr";
 
 type ViewMode = "dossier" | "invoice";
 
@@ -626,78 +623,53 @@ export default function SingleDayItineraryPageClient() {
   return (
     <div className="builder-theme relative z-10 min-h-screen overflow-x-hidden bg-transparent pb-44 text-white md:pb-36">
       <SystemMessageFox />
-      <MobileTopChrome
-        brandTitle="Itinerary"
-        ctaHref="/builder-single"
+      <TopNavBar
+        brandTitle="1-Day Express Pass"
+        ctaHref={BUILDER_ROUTES.dayPass}
         ctaLabel="Builder"
+        locked={!contactReady}
+        invoiceActive={activeView === "invoice"}
+        onSave={() => void requestSaveOnly()}
+        onPrint={requestPrintOnly}
+        onPlan={() => setMode("dossier")}
+        onInvoice={() => {
+          if (activeView === "invoice") setMode("dossier");
+          else void requestInvoiceView();
+        }}
       />
-      <div className="mx-auto mt-4 max-w-3xl px-4 sm:px-5">
-          <header className="group no-print relative overflow-visible rounded-2xl border border-white/10 bg-[#0A1017]/80 px-4 py-5 shadow-2xl backdrop-blur-md sm:px-5">
-            <div
-              className="pointer-events-none absolute inset-0 z-0 overflow-hidden rounded-2xl"
-              aria-hidden
-            >
-              <GoldLight color="#F6A724" active />
-            </div>
-            <div className="relative z-10">
-          <div className="relative grid grid-cols-3 items-end gap-2">
-            <div className="col-span-2 min-w-0">
-              <p className="text-[0.65rem] font-semibold uppercase tracking-[0.35em] text-[#F6A724]">
-                Single day · Itinerary
-              </p>
-              <h1 className="mt-1 break-words font-godiva text-2xl uppercase leading-tight tracking-wide text-white sm:text-3xl">
-                {customerName}
-              </h1>
-              <h2 className="mt-0.5 font-godiva text-[1.125rem] uppercase tracking-wider text-white/90">
-                Dossier
-              </h2>
-              <p className="mt-1 text-sm text-white/55">
-                Hour-by-hour day plan and private single-day quotation.
-              </p>
-            </div>
-            <div className="col-span-1 flex justify-end self-end">
-              <IdleHeroMascot
-                activeSrc="/brand/mascot-phone.webp"
-                idleSrc="/brand/mascot-time.webp"
-                idleMs={7_000}
-                className="z-[1] -mb-2 h-28 w-auto select-none object-contain sm:h-36 md:h-40"
-              />
-            </div>
-          </div>
-
-          <div className="mt-4 border-t border-white/10 pt-3">
-            {feeCreditEur > 0 ? (
-              <FeePaidRibbon feeEur={feeCreditEur} className="mb-3" />
-            ) : null}
-            <TicketVoucherDownloadBanner
-              pnr={activeBookingRef({
-                tempBookingRef,
-                confirmedBookingRef,
-                bookingStatus,
-              })}
-              className="mb-3"
-            />
-            <DossierActionToolbar
-              contactReady={contactReady}
-              costPulsarDone={costPulsarDone}
-              continueHref="/builder-single"
-              howMuchLabel={dossierPrimaryCtaLabel(feeCreditEur)}
-              conciergeFeePaid={feeCreditEur > 0}
-              onHowMuchCost={handleRequestPay}
-              onSave={() => void requestSaveOnly()}
-              onSend={() => void requestSendPdf()}
-              onPrint={requestPrintOnly}
-              onItinerary={() => setMode("dossier")}
-              onInvoice={() => {
-                if (activeView === "invoice") setMode("dossier");
-                else void requestInvoiceView();
-              }}
-              invoiceActive={activeView === "invoice"}
-            />
-          </div>
-          </div>
-        </header>
-        </div>
+      <div className="no-print mx-auto max-w-3xl px-4 sm:px-5">
+        <LiquidGlassHero
+          pnr={activeBookingRef({
+            tempBookingRef,
+            confirmedBookingRef,
+            bookingStatus,
+          })}
+          bookingType="SINGLE_DAY"
+          title="1-Day Express Pass · Itinerary"
+          guestName={customerName !== "Guest" ? customerName : undefined}
+          depositAmount={feeCreditEur}
+          payLabel={dossierPrimaryCtaLabel(feeCreditEur)}
+          payPulse={!costPulsarDone}
+          continueHref={BUILDER_ROUTES.dayPass}
+          locked={!contactReady}
+          onSave={() => void requestSaveOnly()}
+          onSend={() => void requestSendPdf()}
+          onPrint={requestPrintOnly}
+          onPlanInvoice={() => {
+            if (activeView === "invoice") setMode("dossier");
+            else void requestInvoiceView();
+          }}
+          onPayContinue={handleRequestPay}
+        />
+        <TicketVoucherDownloadBanner
+          pnr={activeBookingRef({
+            tempBookingRef,
+            confirmedBookingRef,
+            bookingStatus,
+          })}
+          className="mb-2"
+        />
+      </div>
 
         <main className="mx-auto w-full max-w-3xl overflow-x-hidden px-4 py-6 pb-40 md:pb-28">
           <div
@@ -708,7 +680,14 @@ export default function SingleDayItineraryPageClient() {
             }
             aria-hidden={activeView !== "dossier"}
           >
-            <SingleDayItineraryView />
+            <SingleDayItineraryView
+              depositPaidEur={feeCreditEur}
+              hasPaidFull={
+                totalPaidEur > 0 &&
+                quote.totalEur > 0 &&
+                totalPaidEur >= quote.totalEur
+              }
+            />
           </div>
 
           <div
@@ -732,16 +711,56 @@ export default function SingleDayItineraryPageClient() {
       {contactReady ? (
       <div className="no-print sticky-action-bar fixed inset-x-0 bottom-28 z-30 mb-2 w-full overflow-x-hidden pr-[4.75rem] sm:bottom-6 sm:left-20 sm:pr-24 sm:pl-0">
         <div className="mx-auto flex w-full max-w-5xl px-2 sm:px-4">
-          <div className="flex w-full flex-col gap-2 rounded-2xl border border-white/10 bg-[#0D1117]/95 p-2 shadow-2xl backdrop-blur-md sm:flex-row sm:items-center sm:gap-3 sm:p-2.5">
-            {/* Mobile: buttons on top; desktop: buttons on the right */}
-            <div className="flex w-full items-center justify-end gap-2 sm:order-2 sm:w-auto sm:shrink-0">
+          <div className="flex w-full flex-row items-center gap-2 rounded-2xl border border-white/10 bg-[#0D1117]/95 p-2 shadow-2xl backdrop-blur-md sm:gap-3 sm:p-2.5">
+            <div className="min-w-0 flex-1 pl-1 sm:pl-2">
+              {(() => {
+                const paid = Math.max(0, totalPaidEur || feeCreditEur || 0);
+                const partyMin = Math.max(0, Number(quote.min) || Number(quote.totalEur) || 0);
+                const partyMax = Math.max(
+                  partyMin,
+                  Number(quote.max) || Number(quote.totalEur) || 0
+                );
+                const pendingMin = Math.max(0, partyMin - paid);
+                const pendingMax = Math.max(0, partyMax - paid);
+                const ppMin = singleDayPerPersonEur(pendingMin, totalGuests);
+                const ppMax = singleDayPerPersonEur(pendingMax, totalGuests);
+                return (
+                  <>
+                    <p className="truncate text-[9px] font-bold uppercase tracking-wider text-[#00B4D8]">
+                      Remaining balance due
+                    </p>
+                    <p className="truncate text-sm font-extrabold text-[#F6A724] sm:text-base">
+                      {pendingMin === pendingMax
+                        ? formatEur(pendingMin)
+                        : `${formatEur(pendingMin)} ~ ${formatEur(pendingMax)}`}
+                    </p>
+                    <p className="truncate text-[9px] text-emerald-400/90">
+                      Est.{" "}
+                      {ppMin === ppMax
+                        ? formatEur(ppMin)
+                        : `${formatEur(ppMin)} ~ ${formatEur(ppMax)}`}{" "}
+                      /pp
+                      <span className="ml-1.5 text-zinc-500">
+                        · party{" "}
+                        {partyMin === partyMax
+                          ? formatEur(partyMin)
+                          : `${formatEur(partyMin)} ~ ${formatEur(partyMax)}`}
+                        {paid > 0 ? ` · paid ${formatEur(paid)}` : ""}
+                      </span>
+                    </p>
+                  </>
+                );
+              })()}
+            </div>
+            <div className="flex shrink-0 items-center justify-end gap-2">
               <button
                 type="button"
                 onClick={openBudget}
-                className="inline-flex min-w-0 flex-1 items-center justify-center gap-1.5 rounded-xl border border-white/15 bg-white/5 px-2.5 py-2.5 text-[10px] font-bold uppercase tracking-wide text-white transition hover:bg-white/10 sm:flex-none sm:px-4 sm:text-xs"
+                aria-label="Price Composition"
+                title="Price Composition"
+                className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/15 bg-white/5 text-white transition hover:bg-white/10"
               >
-                <Wallet className="h-3.5 w-3.5 shrink-0" />
-                Price Composition
+                <Wallet className="h-4 w-4 shrink-0" aria-hidden />
               </button>
               <ActionPillButton
                 conciergeFeePaid={feeCreditEur > 0}
@@ -749,33 +768,6 @@ export default function SingleDayItineraryPageClient() {
                 pulse={!costPulsarDone}
                 className="shrink-0"
               />
-            </div>
-            <div className="min-w-0 flex-1 pl-1 sm:order-1 sm:pl-2">
-              <p className="text-[9px] font-bold uppercase tracking-wider text-[#00B4D8]">
-                Est. range · per person
-              </p>
-              <p className="truncate text-sm font-extrabold text-white sm:text-base">
-                {formatEur(
-                  singleDayPerPersonEur(quote.totalEur, totalGuests)
-                )}
-                <span className="ml-1 text-[10px] font-semibold text-white/50">
-                  /pp
-                </span>
-              </p>
-              <p className="truncate text-[9px] text-zinc-500">
-                {tourHours}h ·{" "}
-                {formatEur(
-                  singleDayPerPersonHourEur(
-                    quote.totalEur,
-                    totalGuests,
-                    tourHours
-                  )
-                )}
-                /pp/h
-                <span className="ml-1.5 text-zinc-600">
-                  · party {formatEur(quote.totalEur)}
-                </span>
-              </p>
             </div>
           </div>
         </div>

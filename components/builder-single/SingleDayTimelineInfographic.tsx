@@ -1,6 +1,7 @@
 "use client";
 
-import { MapPin } from "lucide-react";
+import Link from "next/link";
+import { MapPin, SquarePen } from "lucide-react";
 import { BoardingPassCard } from "@/components/builder/BoardingPassCard";
 import { QUIZ_VIBE } from "@/lib/experienceProfiler";
 import { formatDurationBadge } from "@/lib/experiencesPlaces";
@@ -111,6 +112,7 @@ export function SingleDayTimelineInfographic({
   meetingPointName,
   meetingPointAddress,
   variant = "screen",
+  editHref,
 }: {
   stops: TimelineStop[];
   startTime: string;
@@ -122,6 +124,8 @@ export function SingleDayTimelineInfographic({
   meetingPointAddress?: string | null;
   /** screen = dark glass; print = high-contrast light */
   variant?: "screen" | "print";
+  /** When set, shows a compact edit control linking to the builder. */
+  editHref?: string;
 }) {
   const isPrint = variant === "print";
   const hoursLabel = Number.isInteger(totalHours)
@@ -171,7 +175,17 @@ export function SingleDayTimelineInfographic({
           : "rounded-3xl border border-white/10 bg-[#0A0E14] p-4 text-white shadow-[0_0_40px_rgba(7,84,115,0.15)] sm:p-6 md:p-8"
       }`}
     >
-      <header className="mb-6 text-center md:mb-10">
+      <header className="relative mb-6 text-center md:mb-10">
+        {editHref && !isPrint ? (
+          <Link
+            href={editHref}
+            aria-label="Edit Itinerary"
+            title="Edit Itinerary"
+            className="absolute top-0 right-0 z-10 rounded-md p-1.5 text-zinc-500 transition-colors hover:text-[#D91147]"
+          >
+            <SquarePen className="h-[18px] w-[18px]" strokeWidth={2} />
+          </Link>
+        ) : null}
         <p className="text-[0.65rem] font-semibold uppercase tracking-[0.28em] text-white">
           Day Timeline
         </p>

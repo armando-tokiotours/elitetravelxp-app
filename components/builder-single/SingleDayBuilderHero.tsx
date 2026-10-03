@@ -23,9 +23,24 @@ import {
 /** Single-day peek character (1-Day Pass ticket) */
 const HERO_CHARACTER_SRC = "/images/peek-character-1day.png";
 
+/** Logo / ENOENT stubs — never use as full-bleed hero (plain grey instead). */
+const HERO_MEDIA_STUBS = new Set([
+  "/brand/tokiotours-logo-icon.png",
+  "/brand/hero-single-day.jpg",
+  "/brand/hero-background.jpg",
+  "/brand/hero-japan-pagoda.jpg",
+  "/brand/site-logo.png",
+]);
+
+function realHeroMedia(url: string | undefined | null): string {
+  const u = (url || "").trim();
+  if (!u || HERO_MEDIA_STUBS.has(u)) return "";
+  return u;
+}
+
 /**
  * Builder S hero — Team Branding still/video (poster-first) + peek character + copy.
- * Prefer admin poster / public still; never paint black while media loads.
+ * Prefer admin poster / public still; empty → plain grey (never logo filler).
  */
 export function SingleDayBuilderHero() {
   const ensureLoaded = useSiteBrandingStore((s) => s.ensureLoaded);
@@ -72,43 +87,47 @@ export function SingleDayBuilderHero() {
   const heroSubtitle =
     localCache?.tagline?.trim() ||
     fromPb.tagline ||
-    "Curated 1-day immersive discovery across Japan's finest districts.";
+    "Custom 1-Day Private Route & Instant Quote";
   const heroLine1 = team.heroLine1;
   const heroLine2 = team.heroLine2;
 
-  const mediaUrl =
-    localCache?.mediaUrl?.trim() ||
-    item.mediaUrl?.trim() ||
-    publicHero ||
-    SINGLE_DAY_BUILDER_CONFIG.hero.fallbackImage;
+  const mediaUrl = realHeroMedia(
+    localCache?.mediaUrl ||
+      item.mediaUrl ||
+      publicHero ||
+      SINGLE_DAY_BUILDER_CONFIG.hero.fallbackImage
+  );
   const isVideo = isVideoFilename(mediaUrl);
-  const posterUrl =
-    item.posterUrl?.trim() ||
-    publicHero ||
-    SINGLE_DAY_BUILDER_CONFIG.hero.fallbackImage;
+  const posterUrl = realHeroMedia(
+    item.posterUrl ||
+      publicHero ||
+      SINGLE_DAY_BUILDER_CONFIG.hero.fallbackImage
+  );
 
   return (
     <section
       className="builder-hero relative z-10 h-[65vh] w-full min-h-[280px] overflow-hidden bg-[#05080C] sm:h-[80vh] md:min-h-[420px]"
       aria-label="Single-day builder hero"
     >
-      {isVideo ? (
+      {isVideo && mediaUrl ? (
         <LazyVideo
           src={mediaUrl}
-          poster={posterUrl}
+          poster={posterUrl || undefined}
           className="absolute inset-0 z-0 h-full w-full object-cover"
           muted
           loop
           playsInline
           autoPlay
         />
-      ) : (
+      ) : mediaUrl || posterUrl ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
           src={mediaUrl || posterUrl}
           alt=""
           className="absolute inset-0 z-0 h-full w-full object-cover"
         />
+      ) : (
+        <div aria-hidden className="absolute inset-0 z-0 bg-[#2C2C2E]" />
       )}
 
       <div
