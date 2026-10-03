@@ -2,6 +2,7 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   output: "standalone",
+  compress: true,
   // Allow opening the local app via 127.0.0.1 as well as localhost
   // (Next 16 blocks cross-origin /_next assets otherwise → stuck "Loading…").
   allowedDevOrigins: ["127.0.0.1"],

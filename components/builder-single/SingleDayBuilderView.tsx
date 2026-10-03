@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import dynamic from "next/dynamic";
 import { useSearchParams } from "next/navigation";
 import { MobileTopChrome } from "@/components/navigation/MobileTopChrome";
 import { BookingRefBadge } from "@/components/builder/BookingRefBadge";
@@ -24,11 +25,24 @@ import { usePreBuilderStore } from "@/store/usePreBuilderStore";
 import { useSingleDayBuilderStore } from "@/store/useSingleDayBuilderStore";
 import { NewBookingResetButton } from "@/components/builder/NewBookingResetButton";
 import { SingleDayBuilderHero } from "@/components/builder-single/SingleDayBuilderHero";
-import { BuilderSView } from "@/components/builder-single/BuilderSView";
 import {
   getWidgetPulsarClass,
   WidgetCallingPulse,
 } from "@/components/branding/WidgetCallingPulse";
+
+const BuilderSView = dynamic(
+  () =>
+    import("@/components/builder-single/BuilderSView").then((m) => ({
+      default: m.BuilderSView,
+    })),
+  {
+    loading: () => (
+      <div className="mx-auto max-w-6xl px-4 py-10 text-sm text-zinc-500">
+        Loading builder…
+      </div>
+    ),
+  }
+);
 import {
   readBuilderSHeroLocalCache,
   SINGLE_DAY_BUILDER_HERO_KEY,

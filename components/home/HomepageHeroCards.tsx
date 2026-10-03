@@ -1,10 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import dynamic from "next/dynamic";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { JapanKeyword } from "@/components/branding/JapanKeyword";
-import { ManageBookingModal } from "@/components/modals/ManageBookingModal";
-import { BRAND_LOGO_ICON } from "@/lib/brand";
+import { BrandLogoIcon } from "@/components/branding/BrandLogoIcon";
 import { performFullBookingReset } from "@/lib/useBookingSync";
 import { prefetchBuilderConfig } from "@/lib/builderConfigCache";
 import { usePreBuilderStore } from "@/store/usePreBuilderStore";
@@ -18,6 +19,14 @@ import {
   type HomepageHeroIntroBranding,
   type HomepageHeroOverlayLayout,
 } from "@/lib/pocketbase/client";
+
+const ManageBookingModal = dynamic(
+  () =>
+    import("@/components/modals/ManageBookingModal").then((m) => ({
+      default: m.ManageBookingModal,
+    })),
+  { ssr: false }
+);
 
 function overlayStyle(o: HomepageHeroOverlayLayout): React.CSSProperties {
   const basePx = o.role === "h1" ? 16 : o.role === "h2" ? 13 : 11;
@@ -170,10 +179,8 @@ export function HomepageHeroCards() {
     <div className="tokio-ambient-bg relative flex min-h-svh w-full select-none flex-col overflow-x-hidden overflow-y-auto text-white pt-[max(0.5rem,env(safe-area-inset-top))] pb-[max(0.5rem,env(safe-area-inset-bottom))] sm:h-dvh sm:max-h-dvh sm:overflow-hidden sm:pt-[max(0.75rem,env(safe-area-inset-top))] sm:pb-[max(0.75rem,env(safe-area-inset-bottom))]">
       <header className="relative z-20 flex shrink-0 items-center justify-between px-4 py-1.5 sm:px-8 sm:py-2.5">
         <div className="flex items-center gap-2 sm:gap-2.5">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={BRAND_LOGO_ICON}
-            alt="TOKIOTOURS"
+          <BrandLogoIcon
+            priority
             className="h-6 w-6 rounded-full object-cover sm:h-8 sm:w-8"
           />
           <span className="font-godiva text-[10px] tracking-[0.18em] text-white uppercase sm:text-sm">
@@ -221,9 +228,11 @@ export function HomepageHeroCards() {
 
         {/* Mobile: compact stack that can shrink · Desktop: top-aligned 3-col */}
         <div className="relative z-10 mx-auto flex min-h-0 w-full max-w-md flex-1 flex-col items-center justify-start gap-1.5 sm:my-auto sm:mt-2 sm:mb-auto sm:max-w-5xl sm:grid sm:grid-cols-3 sm:items-start sm:justify-items-center sm:gap-6 [@media(max-height:700px)]:gap-1">
-          {sortedCards.map((card) => {
+          {sortedCards.map((card, cardIndex) => {
             const isActive = activeCardId === card.id;
             const isOtherActive = activeCardId !== null && !isActive;
+            const photo = (card.heroPhotoUrl || "").trim();
+            const localPhoto = photo.startsWith("/") && !photo.startsWith("//");
 
             return (
               <button
@@ -256,16 +265,32 @@ export function HomepageHeroCards() {
                     }
                     ${isOtherActive ? "opacity-80 blur-[2px]" : ""}`}
                 >
-                  {card.heroPhotoUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={card.heroPhotoUrl}
-                      alt=""
-                      className={`absolute inset-0 h-full w-full object-cover transition-all duration-700 ${
-                        isActive ? "scale-110" : "scale-100"
-                      } ${isOtherActive ? "brightness-75 contrast-90" : "brightness-100"}`}
-                      draggable={false}
-                    />
+                  {photo ? (
+                    localPhoto ? (
+                      <Image
+                        src={photo}
+                        alt=""
+                        fill
+                        priority={cardIndex === 0}
+                        sizes="(max-width: 639px) 92vw, 33vw"
+                        className={`object-cover transition-all duration-700 ${
+                          isActive ? "scale-110" : "scale-100"
+                        } ${isOtherActive ? "brightness-75 contrast-90" : "brightness-100"}`}
+                        draggable={false}
+                      />
+                    ) : (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={photo}
+                        alt=""
+                        className={`absolute inset-0 h-full w-full object-cover transition-all duration-700 ${
+                          isActive ? "scale-110" : "scale-100"
+                        } ${isOtherActive ? "brightness-75 contrast-90" : "brightness-100"}`}
+                        draggable={false}
+                        loading={cardIndex === 0 ? "eager" : "lazy"}
+                        decoding="async"
+                      />
+                    )
                   ) : null}
 
                   <CardOverlay text={card.japaneseText} overlay={card.overlay} />

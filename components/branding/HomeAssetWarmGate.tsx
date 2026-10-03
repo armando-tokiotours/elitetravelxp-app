@@ -6,7 +6,7 @@ import {
   warmBuilderEntryAssets,
   type WarmProgress,
 } from "@/lib/assetWarmup";
-import { BRAND_LOGO_ICON } from "@/lib/brand";
+import { BrandLogoIcon } from "@/components/branding/BrandLogoIcon";
 
 const HOME_SESSION_KEY = "tokio-assets-warmed-v2";
 const BUILDER_SESSION_KEY = "tokio-builder-entry-warmed-v1";
@@ -14,7 +14,7 @@ const BUILDER_SESSION_KEY = "tokio-builder-entry-warmed-v1";
 export function ChargingScreen({
   progress,
   label,
-  logoSrc = BRAND_LOGO_ICON,
+  logoSrc: _logoSrc,
   embedded = false,
 }: {
   progress: WarmProgress;
@@ -29,11 +29,9 @@ export function ChargingScreen({
 
   return (
     <div className={shell}>
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src={logoSrc}
-        alt=""
-        className="mb-6 h-14 w-14 rounded-full object-cover"
+      <BrandLogoIcon
+        priority
+        className="mb-6 h-14 w-[51px] rounded-full object-cover"
       />
       <p className="font-godiva text-xs tracking-[0.28em] text-[#D91147] uppercase">
         TOKIOTOURS

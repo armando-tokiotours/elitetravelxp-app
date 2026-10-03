@@ -2,6 +2,7 @@
 
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, type ComponentType } from "react";
+import dynamic from "next/dynamic";
 import {
   Bookmark,
   CalendarDays,
@@ -14,14 +15,23 @@ import {
   Sun,
   Ticket,
 } from "lucide-react";
-import { ManageBookingModal } from "@/components/modals/ManageBookingModal";
-import { ExperienceProfilerModal } from "@/components/quiz/ExperienceProfilerModal";
-import {
-  brandingLogoUrl,
-  DEFAULT_LOGO_IMAGE,
-  fetchPublicBrandAssets,
-  fetchSiteBranding,
-} from "@/lib/pocketbase/client";
+import { BrandLogoIcon } from "@/components/branding/BrandLogoIcon";
+
+const ManageBookingModal = dynamic(
+  () =>
+    import("@/components/modals/ManageBookingModal").then((m) => ({
+      default: m.ManageBookingModal,
+    })),
+  { ssr: false }
+);
+
+const ExperienceProfilerModal = dynamic(
+  () =>
+    import("@/components/quiz/ExperienceProfilerModal").then((m) => ({
+      default: m.ExperienceProfilerModal,
+    })),
+  { ssr: false }
+);
 
 export type BuilderContextType = "MULTIDAY" | "SINGLE" | "BUILDER_E";
 
@@ -123,28 +133,9 @@ export function AppNavDock({ context }: { context: BuilderContextType }) {
   const router = useRouter();
   const pathname = usePathname();
   const items = NAV_CONFIGS[context];
-  const [logoSrc, setLogoSrc] = useState(DEFAULT_LOGO_IMAGE);
   const [manageOpen, setManageOpen] = useState(false);
   const [quizOpen, setQuizOpen] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const [branding, assets] = await Promise.all([
-          fetchSiteBranding(),
-          fetchPublicBrandAssets(),
-        ]);
-        if (!cancelled) setLogoSrc(brandingLogoUrl(branding, assets));
-      } catch {
-        /* keep default */
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   useEffect(() => {
     if (!toast) return;
@@ -173,11 +164,9 @@ export function AppNavDock({ context }: { context: BuilderContextType }) {
           className="flex h-10 w-10 items-center justify-center overflow-hidden"
           aria-label="Home"
         >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={logoSrc}
-            alt="TOKIOTOURS"
-            className="h-10 w-10 object-contain"
+          <BrandLogoIcon
+            priority
+            className="h-10 w-[51px] object-contain"
           />
         </button>
 

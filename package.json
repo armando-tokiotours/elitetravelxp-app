@@ -40,6 +40,14 @@
     "xlsx": "^0.18.5",
     "zustand": "^5.0.15"
   },
+  "browserslist": [
+    "chrome >= 111",
+    "edge >= 111",
+    "firefox >= 111",
+    "safari >= 16.4",
+    "not dead",
+    "not op_mini all"
+  ],
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
     "@types/html2canvas": "^0.5.35",

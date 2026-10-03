@@ -1,85 +1,11 @@
 @import "tailwindcss";
 
-/* Self-hosted faces under friendly CSS family names */
-@font-face {
-  font-family: "Godiva";
-  src: url("/fonts/Godiva-Regular.ttf") format("truetype");
-  font-weight: 400;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: "Hanson";
-  src: url("/fonts/Hanson-Bold.otf") format("opentype");
-  font-weight: 700;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: "Futura";
-  src: url("/fonts/Futura-Medium.ttf") format("truetype");
-  font-weight: 400 500;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: "GeosansLight";
-  src: url("/fonts/GeosansLight-Regular.ttf") format("truetype");
-  font-weight: 300 400;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: "Beauty";
-  src: url("/fonts/BeautyDemo.otf") format("opentype");
-  font-weight: 400;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: "Momo Trust Display";
-  src: url("/fonts/MomoTrustDisplay-Regular.ttf") format("truetype");
-  font-weight: 400;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: "Poppins";
-  src: url("/fonts/Poppins-Regular.ttf") format("truetype");
-  font-weight: 400;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: "Poppins";
-  src: url("/fonts/Poppins-Medium.ttf") format("truetype");
-  font-weight: 500;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: "Poppins";
-  src: url("/fonts/Poppins-SemiBold.ttf") format("truetype");
-  font-weight: 600;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: "Poppins";
-  src: url("/fonts/Poppins-Bold.ttf") format("truetype");
-  font-weight: 700;
-  font-style: normal;
-  font-display: swap;
-}
+/*
+ * Fonts: loaded ONLY via next/font/local in app/layout.tsx (display: swap,
+ * framework preload). Do not add @font-face url("/fonts/…") here — that
+ * duplicates network chains and blocks LCP.
+ * Aliases (.font-poppins / .font-momo) map to the brand stacks below.
+ */
 
 :root {
   --background: #05080c;

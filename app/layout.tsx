@@ -9,8 +9,8 @@ import { BRAND_DESCRIPTION, BRAND_TITLE, BRAND_URL } from "@/lib/brand";
 import "./globals.css";
 
 /**
- * TOKIOTOURS type stack — self-hosted faces from public/fonts
- * (Godiva, Hanson, Futura Medium, Geosans Light, BeautyDemo).
+ * TOKIOTOURS type stack — self-hosted via next/font (no CSS @font-face chains).
+ * Preload only LCP-critical faces (body + brand display); defer the rest.
  */
 const godiva = localFont({
   src: "../public/fonts/Godiva-Regular.ttf",
@@ -18,6 +18,7 @@ const godiva = localFont({
   display: "swap",
   weight: "400",
   style: "normal",
+  preload: true,
 });
 
 const hanson = localFont({
@@ -26,6 +27,7 @@ const hanson = localFont({
   display: "swap",
   weight: "700",
   style: "normal",
+  preload: false,
 });
 
 const futura = localFont({
@@ -34,6 +36,7 @@ const futura = localFont({
   display: "swap",
   weight: "500",
   style: "normal",
+  preload: true,
 });
 
 const geosans = localFont({
@@ -42,6 +45,7 @@ const geosans = localFont({
   display: "swap",
   weight: "300",
   style: "normal",
+  preload: false,
 });
 
 const beauty = localFont({
@@ -50,6 +54,7 @@ const beauty = localFont({
   display: "swap",
   weight: "400",
   style: "normal",
+  preload: false,
 });
 
 export const metadata: Metadata = {
@@ -92,16 +97,6 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       className={`${godiva.variable} ${hanson.variable} ${futura.variable} ${geosans.variable} ${beauty.variable} h-full antialiased`}
       style={{ backgroundColor: "#05080C" }}
     >
-      <head>
-        {/* Only tiny brand marks — never preload megabyte SVG peeks (kills VPS first paint). */}
-        <link rel="preload" href="/brand/tokiotours-logo-icon.png" as="image" />
-        <link
-          rel="preload"
-          href="/brand/fox-peek.webp"
-          as="image"
-          type="image/webp"
-        />
-      </head>
       <body className="tokio-ambient-bg flex min-h-full flex-col font-futura text-tokio-ice">
         <BrandCharacterPreloader />
         <DynamicTypography />

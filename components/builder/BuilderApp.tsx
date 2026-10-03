@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import dynamic from "next/dynamic";
 import { useSearchParams } from "next/navigation";
 import {
   type BuilderConfig,
@@ -19,9 +20,22 @@ import { usePreBuilderStore } from "@/store/usePreBuilderStore";
 import { useItineraryStore } from "@/store/useItineraryStore";
 import { MobileTopChrome } from "@/components/navigation/MobileTopChrome";
 import { BuilderHero } from "./BuilderHero";
-import { BuilderMView } from "./BuilderMView";
 import { BookingRefBadge } from "./BookingRefBadge";
 import { NewBookingResetButton } from "./NewBookingResetButton";
+
+const BuilderMView = dynamic(
+  () =>
+    import("./BuilderMView").then((m) => ({
+      default: m.BuilderMView,
+    })),
+  {
+    loading: () => (
+      <div className="mx-auto max-w-6xl px-4 py-10 text-sm text-zinc-500">
+        Loading journey builder…
+      </div>
+    ),
+  }
+);
 
 export function BuilderApp() {
   const searchParams = useSearchParams();

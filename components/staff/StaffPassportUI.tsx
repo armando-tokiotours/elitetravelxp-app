@@ -20,6 +20,7 @@ import {
   STAFF_ROLES,
   type StaffRole,
 } from "@/lib/staffRoles";
+import { BrandLogoIcon } from "@/components/branding/BrandLogoIcon";
 
 export type PassportStaff = {
   id: string;
@@ -34,8 +35,6 @@ export type PassportStaff = {
 
 const GOLD = "#F6A724";
 const NAVY = "#054F70";
-const LOGO_SRC = "/brand/tokiotours-logo-icon.png";
-
 /** Serve-country for credential document type + number prefix. */
 const SERVE_COUNTRIES: { name: string; code: string; match: RegExp }[] = [
   {
@@ -267,10 +266,7 @@ export function StaffPassportCard({
       <div className="relative z-10">
         <header className="flex items-start justify-between gap-2 border-b border-[#F6A724]/20 px-3 py-2.5">
           <div className="flex items-center gap-2">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={LOGO_SRC}
-              alt=""
+            <BrandLogoIcon
               className="h-7 w-7 rounded-full border object-cover"
               style={{ borderColor: GOLD }}
             />

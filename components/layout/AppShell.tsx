@@ -4,8 +4,18 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 import { Ticket } from "lucide-react";
-import { ManageBookingModal } from "@/components/modals/ManageBookingModal";
+import dynamic from "next/dynamic";
+import Image from "next/image";
+import { BrandLogoIcon } from "@/components/branding/BrandLogoIcon";
 import { BRAND_LOGO_ICON } from "@/lib/brand";
+
+const ManageBookingModal = dynamic(
+  () =>
+    import("@/components/modals/ManageBookingModal").then((m) => ({
+      default: m.ManageBookingModal,
+    })),
+  { ssr: false }
+);
 
 export function AppShell({
   children,
@@ -156,20 +166,18 @@ export function AppShell({
                 <span className="hidden sm:inline">Manage Booking</span>
                 <span className="sm:hidden">Booking</span>
               </button>
-              {logoSrc ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
+              {logoSrc &&
+              logoSrc !== BRAND_LOGO_ICON &&
+              logoSrc.startsWith("/") ? (
+                <Image
                   src={logoSrc}
                   alt="TOKIOTOURS"
+                  width={51}
+                  height={48}
                   className="hidden h-9 w-auto max-w-[7rem] object-contain sm:block"
                 />
               ) : (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={BRAND_LOGO_ICON}
-                  alt="TOKIOTOURS"
-                  className="hidden h-9 w-9 rounded-full object-cover sm:block"
-                />
+                <BrandLogoIcon className="hidden h-9 w-9 rounded-full object-cover sm:block" />
               )}
             </>
           )}
@@ -302,15 +310,22 @@ export function AppShell({
 }
 
 function BrandMark({ logoSrc }: { logoSrc?: string }) {
-  const src = logoSrc || BRAND_LOGO_ICON;
+  if (logoSrc && logoSrc !== BRAND_LOGO_ICON && logoSrc.startsWith("/")) {
+    return (
+      <Image
+        src={logoSrc}
+        alt="TOKIOTOURS"
+        width={51}
+        height={48}
+        priority
+        className="h-11 w-[51px] rounded-full object-cover sm:h-12 sm:w-[51px]"
+      />
+    );
+  }
   return (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img
-      src={src}
-      alt="TOKIOTOURS"
-      loading="eager"
-      decoding="async"
-      className="h-11 w-11 rounded-full object-cover sm:h-12 sm:w-12"
+    <BrandLogoIcon
+      priority
+      className="h-11 w-[51px] rounded-full object-cover sm:h-12 sm:w-[51px]"
     />
   );
 }
