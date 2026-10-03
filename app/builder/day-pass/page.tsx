@@ -7,18 +7,17 @@ export const metadata: Metadata = {
   description: "Custom 1-Day Private Route & Instant Quote",
 };
 
+/** Landmark comes from root `<main id="app-main">` in app/layout.tsx */
 export default function DayPassBuilderPage() {
   return (
-    <main id="day-pass-builder" className="min-h-dvh">
-      <Suspense
-        fallback={
-          <div className="flex min-h-dvh items-center justify-center bg-black text-sm text-zinc-400">
-            Opening 1-Day Express Pass…
-          </div>
-        }
-      >
-        <SingleDayBuilderView />
-      </Suspense>
-    </main>
+    <Suspense
+      fallback={
+        <div className="flex min-h-dvh items-center justify-center bg-black text-sm text-zinc-400">
+          Opening 1-Day Express Pass…
+        </div>
+      }
+    >
+      <SingleDayBuilderView />
+    </Suspense>
   );
 }

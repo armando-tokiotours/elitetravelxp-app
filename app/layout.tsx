@@ -1,16 +1,32 @@
 import type { Metadata, Viewport } from "next";
+import dynamic from "next/dynamic";
 import localFont from "next/font/local";
 import { DynamicTypography } from "@/components/layout/DynamicTypography";
 import { BrandDocumentMeta } from "@/components/branding/BrandDocumentMeta";
-import { LazySeasonalParticlesHost } from "@/components/branding/LazySeasonalParticlesHost";
 import { BrandCharacterPreloader } from "@/components/branding/BrandCharacterPreloader";
-import { AppLinkInterceptor } from "@/components/navigation/AppLinkInterceptor";
 import { BRAND_DESCRIPTION, BRAND_TITLE, BRAND_URL } from "@/lib/brand";
 import "./globals.css";
+
+const LazySeasonalParticlesHost = dynamic(
+  () =>
+    import("@/components/branding/LazySeasonalParticlesHost").then((m) => ({
+      default: m.LazySeasonalParticlesHost,
+    })),
+  { ssr: false }
+);
+
+const AppLinkInterceptor = dynamic(
+  () =>
+    import("@/components/navigation/AppLinkInterceptor").then((m) => ({
+      default: m.AppLinkInterceptor,
+    })),
+  { ssr: false }
+);
 
 /**
  * TOKIOTOURS type stack — self-hosted via next/font (no CSS @font-face chains).
  * Preload only LCP-critical faces (body + brand display); defer the rest.
+ * Beauty uses display:optional so it never blocks First Paint / LCP.
  */
 const godiva = localFont({
   src: "../public/fonts/Godiva-Regular.ttf",
@@ -24,7 +40,7 @@ const godiva = localFont({
 const hanson = localFont({
   src: "../public/fonts/Hanson-Bold.otf",
   variable: "--font-hanson-face",
-  display: "swap",
+  display: "optional",
   weight: "700",
   style: "normal",
   preload: false,
@@ -42,7 +58,7 @@ const futura = localFont({
 const geosans = localFont({
   src: "../public/fonts/GeosansLight-Regular.ttf",
   variable: "--font-geosans-face",
-  display: "swap",
+  display: "optional",
   weight: "300",
   style: "normal",
   preload: false,
@@ -51,7 +67,7 @@ const geosans = localFont({
 const beauty = localFont({
   src: "../public/fonts/BeautyDemo.otf",
   variable: "--font-beauty-face",
-  display: "swap",
+  display: "optional",
   weight: "400",
   style: "normal",
   preload: false,
@@ -81,12 +97,10 @@ export const metadata: Metadata = {
   },
 };
 
-/** Block page pinch-zoom; photos use PinchZoomPhoto instead (Instagram-style). */
+/** Allow pinch-zoom for accessibility (WCAG). Photo zoom still uses PinchZoomPhoto. */
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  maximumScale: 1,
-  userScalable: false,
   viewportFit: "cover",
 };
 
@@ -103,7 +117,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <BrandDocumentMeta />
         <LazySeasonalParticlesHost />
         <AppLinkInterceptor />
-        {children}
+        <main id="app-main" className="flex min-h-0 flex-1 flex-col">
+          {children}
+        </main>
       </body>
     </html>
   );

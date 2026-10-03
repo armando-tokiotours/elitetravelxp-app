@@ -401,11 +401,11 @@ export function PreEliteBuilderClient() {
       </header>
 
       {!hydrated || hasSavedContact || hasTempDraft ? (
-        <main className="relative mx-auto w-full max-w-3xl overflow-visible px-5 py-10 sm:py-14">
+        <div className="relative mx-auto w-full max-w-3xl overflow-visible px-5 py-10 sm:py-14">
           <div className="h-80 rounded-3xl border border-zinc-800/80 bg-[#0D1117]/80 backdrop-blur-md" />
-        </main>
+        </div>
       ) : (
-        <main className="flex min-h-0 flex-1 flex-col justify-start overflow-x-visible overflow-y-visible sm:justify-center">
+        <div className="flex min-h-0 flex-1 flex-col justify-start overflow-x-visible overflow-y-visible sm:justify-center">
           <div className="relative z-40 mx-auto w-full max-w-3xl shrink-0 px-5 pt-4 sm:pt-2">
             <div className="relative min-h-[6.5rem] overflow-visible sm:min-h-[8.5rem]">
               <button
@@ -579,7 +579,7 @@ export function PreEliteBuilderClient() {
               </div>
             </div>
           </div>
-        </main>
+        </div>
       )}
 
       <QuestionnaireCompletionModal

@@ -20,9 +20,7 @@ import { useLazyModalMount } from "@/components/builder/modals/useLazyModalMount
 import { CityLanguageSelect } from "@/components/builder/CityLanguageSelect";
 import { resolveSingleDayCityThumbnail } from "@/config/mediaConfig";
 import { SingleDayProgressBar } from "@/components/builder-single/SingleDayProgressBar";
-import { MovementDetailModal } from "@/components/builder-s/MovementDetailModal";
 import { BuilderEditModalShell } from "@/components/builder/modals/BuilderEditModalShell";
-import { CityFocusModal } from "@/components/builder/modals/CityFocusModal";
 import { MeetingPointPlacesPicker } from "@/components/builder/MeetingPointPlacesPicker";
 import { LazyVideo } from "@/components/ui/LazyVideo";
 import { useSiteBrandingStore } from "@/store/useSiteBrandingStore";
@@ -59,6 +57,22 @@ const ExperiencesPlacesModal = dynamic(
   () =>
     import("@/components/builder-s/ExperiencesPlacesModal").then((m) => ({
       default: m.ExperiencesPlacesModal,
+    })),
+  { ssr: false }
+);
+
+const CityFocusModal = dynamic(
+  () =>
+    import("@/components/builder/modals/CityFocusModal").then((m) => ({
+      default: m.CityFocusModal,
+    })),
+  { ssr: false }
+);
+
+const MovementDetailModal = dynamic(
+  () =>
+    import("@/components/builder-s/MovementDetailModal").then((m) => ({
+      default: m.MovementDetailModal,
     })),
   { ssr: false }
 );
@@ -557,8 +571,9 @@ export function BuilderSView({
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src="/brand/cat-2.png"
-                  alt=""
-                  aria-hidden
+                  alt="Tokiotours cat mascot"
+                  width={160}
+                  height={160}
                   className="pointer-events-none absolute bottom-0 left-1/2 z-0 h-[6.5rem] w-auto -translate-x-1/2 select-none object-contain object-bottom"
                 />
               </div>
@@ -573,7 +588,9 @@ export function BuilderSView({
                       // eslint-disable-next-line @next/next/no-img-element
                       <img
                         src={band.photoUrl}
-                        alt=""
+                        alt={band.title || "Selected experience"}
+                        width={600}
+                        height={200}
                         className="absolute inset-0 h-full w-full object-cover"
                       />
                     ) : (
@@ -1012,6 +1029,9 @@ function LogisticsModal({
                       <button
                         key={opt.id}
                         type="button"
+                        role="button"
+                        aria-pressed={on}
+                        aria-label={`Select ${opt.label} movement`}
                         onClick={() => onOpenMovement(opt.id)}
                         className={`group relative w-[9.5rem] shrink-0 overflow-hidden rounded-2xl border text-left transition duration-300 sm:w-auto ${
                           on
@@ -1036,7 +1056,9 @@ function LogisticsModal({
                             // eslint-disable-next-line @next/next/no-img-element
                             <img
                               src={media}
-                              alt=""
+                              alt={`${opt.label} transport option`}
+                              width={300}
+                              height={400}
                               className="h-full w-full object-cover"
                             />
                           ) : null}

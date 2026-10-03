@@ -104,6 +104,7 @@ export function LiquidGlassHero({
                 onClick={() => setIsMenuOpen((v) => !v)}
                 className="inline-flex h-[33.5px] w-[33.5px] items-center justify-center rounded-xl border border-white/15 bg-white/5 text-[15px] font-bold text-white transition hover:bg-white/15"
                 title="More"
+                aria-label="More booking actions"
                 aria-expanded={isMenuOpen}
                 aria-haspopup="menu"
               >

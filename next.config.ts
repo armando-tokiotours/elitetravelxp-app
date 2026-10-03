@@ -43,8 +43,18 @@ const nextConfig: NextConfig = {
     ],
   },
   async headers() {
-    // HSTS is set on the VPS nginx SSL block (avoid duplicate headers).
     return [
+      {
+        source: "/:path*",
+        headers: [
+          // Allow Google SSO / Revolut popups while isolating the opener.
+          // (strict same-origin breaks OAuth popup return.)
+          {
+            key: "Cross-Origin-Opener-Policy",
+            value: "same-origin-allow-popups",
+          },
+        ],
+      },
       {
         source: "/api/files/:path*",
         headers: [
