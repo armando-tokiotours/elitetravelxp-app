@@ -43,16 +43,8 @@ const nextConfig: NextConfig = {
     ],
   },
   async headers() {
+    // HSTS is set on the VPS nginx SSL block (avoid duplicate headers).
     return [
-      {
-        source: "/:path*",
-        headers: [
-          {
-            key: "Strict-Transport-Security",
-            value: "max-age=31536000; includeSubDomains",
-          },
-        ],
-      },
       {
         source: "/api/files/:path*",
         headers: [

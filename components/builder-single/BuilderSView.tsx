@@ -542,6 +542,7 @@ export function BuilderSView({
         <div className="overflow-visible">
           <button
             type="button"
+            aria-label="Edit selected experiences"
             onClick={() => openEditModal("tours")}
             className={`${WIDGET_SHELL} ${getWidgetPulsarClass(activePulsarStep, "tours")} h-[13.5rem] p-0`}
           >
