@@ -2,9 +2,12 @@
  * Guide double-confirmation status helpers.
  * Uses guide_mode (legacy select) + guide_response (pending/accepted/refused).
  *
- * Golden rule (guest Day Services): confirmed Guide / Driver / Tickets
- * only surface as confirmed when ops_hub.payment_confirmed is true.
+ * Guest Day Services: guide name may show (first name) after guide accepts;
+ * full contact (surname / email / phone) stays gated by guideContactsUnlocked
+ * (confirmed booking + fully paid) — see lib/guidePrivacy.ts.
  */
+
+import { firstNameOnly, GUIDE_CONTACT_UNLOCK_MSG } from "@/lib/guidePrivacy";
 
 export type GuideConfirmStatus =
   | "unassigned"
@@ -95,61 +98,94 @@ export function guideConfirmClientLabel(
 }
 
 /**
- * Guest-facing label after golden rule:
- * confirmed name only when guide accepted AND payment confirmed.
+ * Guest-facing guide label after acceptance + privacy gate.
+ * Before contacts unlock: first name only + unlock message.
+ * Prefer opts.firstName (staff_profiles.first_name) over token-splitting guideName.
  */
 export function guideGuestDisplay(opts: {
   status: GuideConfirmStatus;
   guideName?: string | null;
-  paymentConfirmed: boolean;
-}): { name: string | null; label: string; showConfirmed: boolean } {
-  const { status, guideName, paymentConfirmed } = opts;
-  const name = String(guideName || "").trim() || null;
+  /** Preferred: staff_profiles.first_name */
+  firstName?: string | null;
+  /** Prefer contactsUnlocked; paymentConfirmed kept as legacy fallback. */
+  paymentConfirmed?: boolean;
+  contactsUnlocked?: boolean;
+}): {
+  name: string | null;
+  label: string;
+  showConfirmed: boolean;
+  unlockMessage: string | null;
+} {
+  const { status, guideName } = opts;
+  const unlocked =
+    opts.contactsUnlocked ?? Boolean(opts.paymentConfirmed);
+  const full = String(guideName || "").trim() || null;
+  const first =
+    String(opts.firstName || "").trim() || firstNameOnly(full) || null;
 
   if (status === "pending_guide_acceptance") {
     return {
       name: null,
       label: "Waiting for confirmation",
       showConfirmed: false,
+      unlockMessage: null,
     };
   }
   if (status === "guide_confirmed") {
-    if (!paymentConfirmed) {
+    if (!unlocked) {
       return {
-        name: null,
-        label: "Waiting for payment confirmation",
-        showConfirmed: false,
+        name: first,
+        label: first ? `Guide: ${first}` : "Guide assigned",
+        showConfirmed: Boolean(first),
+        unlockMessage: GUIDE_CONTACT_UNLOCK_MSG,
       };
     }
     return {
-      name,
-      label: name ? `Guide Confirmed: ${name}` : "Guide Confirmed",
+      name: full,
+      label: full ? `Guide Confirmed: ${full}` : "Guide Confirmed",
       showConfirmed: true,
+      unlockMessage: null,
     };
   }
   return {
     name: null,
-    label: guideConfirmClientLabel(status, name),
+    label: guideConfirmClientLabel(status, full),
     showConfirmed: false,
+    unlockMessage: null,
   };
 }
 
 export function driverGuestDisplay(opts: {
   driverName?: string | null;
+  /** Preferred: staff_profiles.first_name */
+  firstName?: string | null;
   driverNeeded: boolean;
-  paymentConfirmed: boolean;
-}): { name: string | null; label: string } {
-  const name = String(opts.driverName || "").trim() || null;
-  if (!opts.driverNeeded && !name) {
-    return { name: null, label: "No driver assigned yet" };
+  paymentConfirmed?: boolean;
+  contactsUnlocked?: boolean;
+}): {
+  name: string | null;
+  label: string;
+  unlockMessage: string | null;
+} {
+  const unlocked =
+    opts.contactsUnlocked ?? Boolean(opts.paymentConfirmed);
+  const full = String(opts.driverName || "").trim() || null;
+  const first =
+    String(opts.firstName || "").trim() || firstNameOnly(full) || null;
+  if (!opts.driverNeeded && !full) {
+    return { name: null, label: "No driver assigned yet", unlockMessage: null };
   }
-  if (!name) {
-    return { name: null, label: "No driver assigned yet" };
+  if (!full) {
+    return { name: null, label: "No driver assigned yet", unlockMessage: null };
   }
-  if (!opts.paymentConfirmed) {
-    return { name: null, label: "Waiting for payment confirmation" };
+  if (!unlocked) {
+    return {
+      name: first,
+      label: first || "Driver assigned",
+      unlockMessage: GUIDE_CONTACT_UNLOCK_MSG,
+    };
   }
-  return { name, label: name };
+  return { name: full, label: full, unlockMessage: null };
 }
 
 export function isGuideBoardOpen(

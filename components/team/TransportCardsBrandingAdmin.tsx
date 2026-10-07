@@ -4,11 +4,15 @@ import type PocketBase from "pocketbase";
 import { useEffect, useState } from "react";
 import { formatPbError } from "@/lib/pocketbase/admin-schema";
 import {
-  TRANSPORT_CARD_FALLBACKS,
+  TRANSPORT_CARD_FALLBACKS_BY_SCOPE,
   TRANSPORT_CARD_MODE_ORDER,
+  TRANSPORT_GRAY_CAR,
+  parseTransportCardStorageKey,
+  transportCardStorageKey,
   uiTransportCardImageUrl,
   type PbUiTransportCard,
   type TransportCardModeId,
+  type TransportCardScope,
 } from "@/lib/uiTransportCards";
 
 type Draft = {
@@ -19,9 +23,12 @@ type Draft = {
   preview: string;
 };
 
-function draftFromRow(row: PbUiTransportCard): Draft {
-  const mode = String(row.mode_id || "").toLowerCase() as TransportCardModeId;
-  const fb = TRANSPORT_CARD_FALLBACKS[mode];
+function draftFromRow(
+  row: PbUiTransportCard,
+  scope: TransportCardScope,
+  mode: TransportCardModeId
+): Draft {
+  const fb = TRANSPORT_CARD_FALLBACKS_BY_SCOPE[scope][mode];
   return {
     title: row.title || fb?.title || "",
     description: row.description || fb?.description || "",
@@ -30,14 +37,20 @@ function draftFromRow(row: PbUiTransportCard): Draft {
     preview:
       uiTransportCardImageUrl(row, "400x400") ||
       uiTransportCardImageUrl(row) ||
-      fb?.image ||
+      (scope === "intercity" ? TRANSPORT_GRAY_CAR : fb?.image) ||
       "",
   };
 }
 
-export function TransportCardsBrandingAdmin({
+function ScopeSection({
+  scope,
+  title,
+  description,
   getClient,
 }: {
+  scope: TransportCardScope;
+  title: string;
+  description: string;
   getClient: () => PocketBase;
 }) {
   const [rows, setRows] = useState<PbUiTransportCard[]>([]);
@@ -59,36 +72,50 @@ export function TransportCardsBrandingAdmin({
           requestKey: null,
         });
 
-      // Ensure the three modes exist (migration seed may not have run yet).
       const have = new Set(
         list.map((r) => String(r.mode_id || "").toLowerCase())
       );
       for (const mode of TRANSPORT_CARD_MODE_ORDER) {
-        if (have.has(mode)) continue;
-        const fb = TRANSPORT_CARD_FALLBACKS[mode];
+        const key = transportCardStorageKey(scope, mode);
+        if (have.has(key)) continue;
+        const fb = TRANSPORT_CARD_FALLBACKS_BY_SCOPE[scope][mode];
         const created = (await pb.collection("ui_transport_cards").create({
-          mode_id: mode,
+          mode_id: key,
           title: fb.title,
           description: fb.description,
           subtext: fb.subtext,
-          sort_order: TRANSPORT_CARD_MODE_ORDER.indexOf(mode) + 1,
+          sort_order:
+            (scope === "intercity" ? 10 : 0) +
+            TRANSPORT_CARD_MODE_ORDER.indexOf(mode) +
+            1,
         })) as unknown as PbUiTransportCard;
         list = [...list, created];
       }
 
-      list = [...list].sort((a, b) => {
-        const ia = TRANSPORT_CARD_MODE_ORDER.indexOf(
-          String(a.mode_id).toLowerCase() as TransportCardModeId
-        );
-        const ib = TRANSPORT_CARD_MODE_ORDER.indexOf(
-          String(b.mode_id).toLowerCase() as TransportCardModeId
-        );
-        return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib);
-      });
+      const scoped = list
+        .filter((r) => {
+          const parsed = parseTransportCardStorageKey(r.mode_id);
+          return parsed?.scope === scope;
+        })
+        .sort((a, b) => {
+          const pa = parseTransportCardStorageKey(a.mode_id);
+          const pb = parseTransportCardStorageKey(b.mode_id);
+          const ia = pa
+            ? TRANSPORT_CARD_MODE_ORDER.indexOf(pa.mode)
+            : 99;
+          const ib = pb
+            ? TRANSPORT_CARD_MODE_ORDER.indexOf(pb.mode)
+            : 99;
+          return ia - ib;
+        });
 
-      setRows(list);
+      setRows(scoped);
       const next: Record<string, Draft> = {};
-      for (const row of list) next[row.id] = draftFromRow(row);
+      for (const row of scoped) {
+        const parsed = parseTransportCardStorageKey(row.mode_id);
+        if (!parsed) continue;
+        next[row.id] = draftFromRow(row, parsed.scope, parsed.mode);
+      }
       setDrafts(next);
     } catch (e) {
       setError(formatPbError(e));
@@ -128,10 +155,13 @@ export function TransportCardsBrandingAdmin({
         .update(row.id, fd)) as unknown as PbUiTransportCard;
 
       setRows((prev) => prev.map((r) => (r.id === saved.id ? saved : r)));
-      setDrafts((prev) => ({
-        ...prev,
-        [saved.id]: draftFromRow(saved),
-      }));
+      const parsed = parseTransportCardStorageKey(saved.mode_id);
+      if (parsed) {
+        setDrafts((prev) => ({
+          ...prev,
+          [saved.id]: draftFromRow(saved, parsed.scope, parsed.mode),
+        }));
+      }
       setMsg(`Saved “${saved.mode_id}”.`);
     } catch (e) {
       setError(formatPbError(e));
@@ -143,14 +173,8 @@ export function TransportCardsBrandingAdmin({
   return (
     <section className="space-y-4 rounded-2xl border border-zinc-800 bg-zinc-950/60 p-5">
       <div>
-        <h3 className="font-display text-lg text-zinc-100">
-          Multi-city · Transport arrangement cards
-        </h3>
-        <p className="mt-1 text-sm text-zinc-500">
-          Images, titles, and subtext for Self-arranged / Public / Private in
-          Builder M (in-city &amp; inter-city pickers). Layout and lock rules
-          stay in code.
-        </p>
+        <h3 className="font-display text-lg text-zinc-100">{title}</h3>
+        <p className="mt-1 text-sm text-zinc-500">{description}</p>
       </div>
 
       {loading ? (
@@ -163,14 +187,15 @@ export function TransportCardsBrandingAdmin({
         {rows.map((row) => {
           const draft = drafts[row.id];
           if (!draft) return null;
-          const mode = String(row.mode_id || "").toUpperCase();
+          const parsed = parseTransportCardStorageKey(row.mode_id);
+          const mode = (parsed?.mode || row.mode_id).toUpperCase();
           return (
             <article
               key={row.id}
               className="space-y-3 rounded-xl border border-zinc-800 bg-zinc-900/50 p-4"
             >
               <p className="text-[10px] font-bold tracking-wider text-[#F6A724] uppercase">
-                {mode}
+                {scope === "intercity" ? `INTER · ${mode}` : mode}
               </p>
               <div className="overflow-hidden rounded-lg border border-zinc-800 bg-zinc-950">
                 {draft.preview ? (
@@ -198,7 +223,7 @@ export function TransportCardsBrandingAdmin({
                       file: f,
                       preview: f
                         ? URL.createObjectURL(f)
-                        : draftFromRow(row).preview,
+                        : draft.preview,
                     });
                   }}
                 />
@@ -250,5 +275,28 @@ export function TransportCardsBrandingAdmin({
         })}
       </div>
     </section>
+  );
+}
+
+export function TransportCardsBrandingAdmin({
+  getClient,
+}: {
+  getClient: () => PocketBase;
+}) {
+  return (
+    <div className="space-y-6">
+      <ScopeSection
+        scope="incity"
+        title="Multi-city · In-city transport cards"
+        description="Self / Public / Private for moving around inside a city (metro · Suica). Layout and lock rules stay in code."
+        getClient={getClient}
+      />
+      <ScopeSection
+        scope="intercity"
+        title="Multi-city · Inter-city transport cards"
+        description="Self / Train · Bullet train / Private for city→city hops. Gray car until you upload photos. Separate keys so they never collide with in-city."
+        getClient={getClient}
+      />
+    </div>
   );
 }

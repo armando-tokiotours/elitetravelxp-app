@@ -1,18 +1,31 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import type PocketBase from "pocketbase";
 import { formatPbError } from "@/lib/pocketbase/admin-schema";
-import { getPbBaseUrl } from "@/lib/pocketbase/client";
 import {
+  saveStaffCredentialViaApi,
+  uploadStaffAvatarViaApi,
+} from "@/lib/staffCredentialClient";
+import {
+  parseStaffLanguages,
+  serializeStaffLanguages,
+} from "@/lib/staffLanguages";
+import {
+  combineStaffDisplayName,
   ensureStaffProfile,
-  updateStaffProfile,
+  resolveStaffNamePartsForEditor,
   type StaffProfile,
 } from "@/lib/staffProfiles";
+import { LanguagePills } from "@/components/staff/LanguagePills";
 import {
+  ensureDriverProfile,
   ensureGuideProfile,
+  getDriverByStaff,
   getGuideByStaff,
+  updateDriverProfile,
   updateGuideProfile,
+  type DriverProfile,
   type GuideProfile,
 } from "@/lib/roleProfiles";
 import {
@@ -21,6 +34,10 @@ import {
   type StaffRole,
 } from "@/lib/staffRoles";
 import { BrandLogoIcon } from "@/components/branding/BrandLogoIcon";
+import {
+  optimizeCredentialPhoto,
+  staffAvatarSrc,
+} from "@/lib/staffPhoto";
 
 export type PassportStaff = {
   id: string;
@@ -205,9 +222,16 @@ function buildMrz(
   return [line1, line2];
 }
 
-function photoUrl(profile: StaffProfile | null | undefined): string | null {
-  if (!profile?.photo || !profile.id) return null;
-  return `${getPbBaseUrl()}/api/files/staff_profiles/${profile.id}/${profile.photo}`;
+function photoUrl(
+  profile: StaffProfile | null | undefined,
+  staffId?: string
+): string | null {
+  const sid = String(staffId || profile?.staff_id || "").trim();
+  if (!profile?.photo || !sid) return null;
+  return staffAvatarSrc(sid, {
+    photo: profile.photo,
+    updated: profile.updated,
+  });
 }
 
 /** Grid passport bio-data card */
@@ -216,23 +240,48 @@ export function StaffPassportCard({
   profile,
   guide,
   isYou,
+  canManage,
   onEdit,
   onResetPassword,
   onDelete,
   onRoleChange,
+  onPhotoSaved,
+  onUploadPhoto,
+  onAssignCase,
 }: {
   user: PassportStaff;
   profile: StaffProfile | null;
   guide?: GuideProfile | null;
   isYou: boolean;
+  /** Owner / ops / superuser — change anyone's photo and assign bookings. */
+  canManage?: boolean;
   onEdit: () => void;
   onResetPassword: () => void;
   onDelete: () => void;
   onRoleChange: (role: StaffRole) => void;
+  onPhotoSaved?: () => void | Promise<void>;
+  onUploadPhoto?: (file: File) => Promise<void>;
+  onAssignCase?: () => void;
 }) {
+  const fromParts = combineStaffDisplayName(
+    profile?.first_name,
+    profile?.last_name
+  );
   const display =
-    guide?.full_name || profile?.display_name || user.name || user.email;
-  const { surname, given } = splitName(display);
+    fromParts ||
+    guide?.full_name ||
+    profile?.display_name ||
+    user.name ||
+    user.email;
+  // Prefer DB first/last when set (passport surname = last, given = first).
+  const { surname, given } =
+    profile?.first_name || profile?.last_name
+      ? {
+          surname: String(profile?.last_name || "—").trim().toUpperCase() || "—",
+          given:
+            String(profile?.first_name || "—").trim().toUpperCase() || "—",
+        }
+      : splitName(display);
   const city =
     guide?.city_of_operation ||
     profile?.strength_cities?.split(/[,/]/)[0]?.trim() ||
@@ -244,7 +293,14 @@ export function StaffPassportCard({
   ]);
   const docNo = credentialDocNo(serve.code, user.id);
   const [mrz1, mrz2] = buildMrz(display, docNo, user.created);
-  const url = photoUrl(profile);
+  const url = photoUrl(profile, user.id);
+  const [imgBroken, setImgBroken] = useState(false);
+  const [photoBusy, setPhotoBusy] = useState(false);
+  const [photoError, setPhotoError] = useState<string | null>(null);
+  const canChangePhoto = Boolean(isYou || canManage);
+  useEffect(() => {
+    setImgBroken(false);
+  }, [url]);
   const monogram = (display || "?").slice(0, 1).toUpperCase();
   const langs =
     (Array.isArray(guide?.main_tour_languages) &&
@@ -302,21 +358,66 @@ export function StaffPassportCard({
               className="aspect-[3/4] overflow-hidden rounded-sm bg-zinc-900"
               style={{ boxShadow: `inset 0 0 0 2px ${GOLD}` }}
             >
-              {url ? (
+              {url && !imgBroken ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={url} alt="" className="h-full w-full object-cover" />
+                <img
+                  src={url}
+                  alt=""
+                  className="h-full w-full object-cover"
+                  onError={() => setImgBroken(true)}
+                />
               ) : (
                 <div className="flex h-full items-center justify-center font-godiva text-2xl text-zinc-600">
                   {monogram}
                 </div>
               )}
             </div>
-            <span
-              className="absolute inset-x-0 bottom-0 bg-black/75 py-0.5 text-center text-[8px] font-bold uppercase tracking-wider"
-              style={{ color: GOLD }}
-            >
-              Verified credential
-            </span>
+            {canChangePhoto && onUploadPhoto ? (
+              <label className="absolute inset-x-0 bottom-0 cursor-pointer bg-black/80 py-0.5 text-center text-[8px] font-bold uppercase tracking-wider text-[#F6A724]">
+                {photoBusy ? "Saving…" : "Change photo"}
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,image/*"
+                  className="hidden"
+                  disabled={photoBusy}
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    e.target.value = "";
+                    if (!f) return;
+                    void (async () => {
+                      setPhotoBusy(true);
+                      setPhotoError(null);
+                      try {
+                        const optimized = await optimizeCredentialPhoto(f);
+                        await onUploadPhoto(optimized);
+                        setImgBroken(false);
+                        await onPhotoSaved?.();
+                      } catch (err) {
+                        setPhotoError(
+                          err instanceof Error
+                            ? err.message
+                            : "Photo did not save."
+                        );
+                      } finally {
+                        setPhotoBusy(false);
+                      }
+                    })();
+                  }}
+                />
+              </label>
+            ) : (
+              <span
+                className="absolute inset-x-0 bottom-0 bg-black/75 py-0.5 text-center text-[8px] font-bold uppercase tracking-wider"
+                style={{ color: GOLD }}
+              >
+                Verified credential
+              </span>
+            )}
+            {photoError ? (
+              <p className="mt-1 text-[8px] leading-tight text-red-300">
+                {photoError}
+              </p>
+            ) : null}
           </div>
 
           <div className="min-w-0 flex-1 space-y-1.5">
@@ -369,6 +470,15 @@ export function StaffPassportCard({
           >
             Edit credential
           </button>
+          {canManage && onAssignCase ? (
+            <button
+              type="button"
+              onClick={onAssignCase}
+              className="rounded-full border border-[#075473] bg-[#075473]/20 px-3 py-1 text-[11px] font-semibold text-cyan-200"
+            >
+              Assign to booking
+            </button>
+          ) : null}
           <button
             type="button"
             onClick={onResetPassword}
@@ -413,14 +523,30 @@ function Field({
   );
 }
 
-const BOOKLET_PAGES = [
-  "Identity",
-  "Region",
-  "Expertise",
-  "Rates",
-] as const;
 
-/** 4-page passport booklet editor modal */
+type BookletKind = "guide" | "driver" | "agency" | "staff";
+
+function bookletKindForRole(role?: StaffRole | null): BookletKind {
+  if (role === "guide") return "guide";
+  if (role === "driver") return "driver";
+  if (role === "agency") return "agency";
+  return "staff";
+}
+
+function bookletPagesForKind(kind: BookletKind): readonly string[] {
+  switch (kind) {
+    case "guide":
+      return ["Identity", "Region", "Expertise", "Rates"] as const;
+    case "driver":
+      return ["Identity", "Operations", "Payout"] as const;
+    case "agency":
+      return ["Identity", "Agency", "Payout"] as const;
+    default:
+      return ["Identity", "Coverage", "Payout"] as const;
+  }
+}
+
+/** Role-aware passport booklet editor modal */
 export function PassportBookletModal({
   user,
   profile,
@@ -436,23 +562,37 @@ export function PassportBookletModal({
   onSaved: () => Promise<void>;
   onError: (m: string) => void;
 }) {
+  const kind = bookletKindForRole(user.role);
+  const pages = bookletPagesForKind(kind);
+  const lastPage = pages.length - 1;
+
   const [page, setPage] = useState(0);
   const [guide, setGuide] = useState<GuideProfile | null>(null);
+  const [driver, setDriver] = useState<DriverProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
-  const [displayName, setDisplayName] = useState(
-    profile?.display_name || user.name || ""
-  );
+  const initialNames = resolveStaffNamePartsForEditor({
+    first_name: profile?.first_name,
+    last_name: profile?.last_name,
+    display_name: profile?.display_name,
+    fallbackName: user.name,
+  });
+  const [firstName, setFirstName] = useState(initialNames.first_name);
+  const [lastName, setLastName] = useState(initialNames.last_name);
   const [phone, setPhone] = useState(profile?.phone || "");
   const [bio, setBio] = useState(profile?.bio || "");
-  const [languages, setLanguages] = useState(profile?.languages || "");
+  const [languages, setLanguages] = useState<string[]>(() =>
+    parseStaffLanguages(profile?.languages)
+  );
   const [cities, setCities] = useState(profile?.strength_cities || "");
   const [videoUrl, setVideoUrl] = useState(profile?.video_url || "");
   const [bankInfo, setBankInfo] = useState(profile?.bank_info || "");
   const [paymentLink, setPaymentLink] = useState(profile?.payment_link || "");
   const [payoutNotes, setPayoutNotes] = useState(profile?.payout_notes || "");
   const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [agencyId, setAgencyId] = useState(user.agency_id || "");
 
   // Guide-specific
   const [cityOp, setCityOp] = useState("");
@@ -473,67 +613,131 @@ export function PassportBookletModal({
     comfort_couples: true,
   });
 
+  // Driver-specific
+  const [licenseNo, setLicenseNo] = useState("");
+  const [fleetName, setFleetName] = useState("");
+  const [driverType, setDriverType] = useState("independent");
+
+  useEffect(() => {
+    setPage(0);
+  }, [user.id, kind]);
+
   useEffect(() => {
     void (async () => {
       setLoading(true);
       try {
         const pb = getClient();
-        await ensureStaffProfile(pb, user.id, {
-          display_name: user.name || "",
+        try {
+          await ensureStaffProfile(pb, user.id, {
+            display_name: user.name || "",
+          });
+        } catch (profileErr) {
+          onError(
+            `${formatPbError(profileErr)} — profile row could not be created; you can still edit and Save.`
+          );
+        }
+
+        // Prefer stored first/last; editor-only split of display_name when empty.
+        const seeded = resolveStaffNamePartsForEditor({
+          first_name: profile?.first_name,
+          last_name: profile?.last_name,
+          display_name: profile?.display_name,
+          fallbackName: user.name,
         });
-        if (user.role === "guide") {
-          const g =
-            (await getGuideByStaff(pb, user.id)) ||
-            (await ensureGuideProfile(pb, user.id, {
-              full_name: user.name || "",
-              email: user.email,
-            }));
-          setGuide(g);
-          setDisplayName(String(g.full_name || displayName));
-          setPhone(String(g.phone_number || phone));
-          setCityOp(String(g.city_of_operation || ""));
-          setDayTrips(
-            Array.isArray(g.out_of_city_day_trips)
-              ? g.out_of_city_day_trips.map(String)
-              : []
-          );
-          setAvail(String(g.availability_pattern || ""));
-          setAvailNotes(String(g.availability_notes || ""));
-          setJlpt(String(g.japanese_jlpt_level || ""));
-          setTourLangs(
-            Array.isArray(g.main_tour_languages)
-              ? g.main_tour_languages.map(String)
-              : []
-          );
-          setExpertise(
-            Array.isArray(g.expertise_topics)
-              ? g.expertise_topics.map(String)
-              : []
-          );
-          setOtherExp(String(g.other_expertise || ""));
-          setPerfectDay(String(g.perfect_day_tour_description || ""));
-          setVisaType(String(g.visa_type || ""));
-          setVisaExp(
-            g.visa_expiration_date
-              ? String(g.visa_expiration_date).slice(0, 10)
-              : ""
-          );
-          setRate6(
-            g.base_rate_6h_or_less != null ? String(g.base_rate_6h_or_less) : ""
-          );
-          setRate8(
-            g.base_rate_8h_or_less != null ? String(g.base_rate_8h_or_less) : ""
-          );
-          setExtraHead(
-            g.extra_head_percentage != null
-              ? String(g.extra_head_percentage)
-              : ""
-          );
-          const c: Record<string, boolean> = { comfort_couples: true };
-          for (const [k] of COMFORT_KEYS) {
-            c[k] = Boolean(g[k] ?? (k === "comfort_couples" ? true : false));
+        setFirstName(seeded.first_name);
+        setLastName(seeded.last_name);
+
+        if (kind === "guide") {
+          const g = await getGuideByStaff(pb, user.id);
+          if (g) {
+            setGuide(g);
+            // Guide.full_name is combined; only seed editor if profile first/last empty.
+            if (!profile?.first_name && !profile?.last_name && g.full_name) {
+              const fromGuide = resolveStaffNamePartsForEditor({
+                fallbackName: String(g.full_name),
+              });
+              setFirstName(fromGuide.first_name);
+              setLastName(fromGuide.last_name);
+            }
+            setPhone(String(g.phone_number || profile?.phone || ""));
+            setCityOp(String(g.city_of_operation || ""));
+            setDayTrips(
+              Array.isArray(g.out_of_city_day_trips)
+                ? g.out_of_city_day_trips.map(String)
+                : []
+            );
+            setAvail(String(g.availability_pattern || ""));
+            setAvailNotes(String(g.availability_notes || ""));
+            setJlpt(String(g.japanese_jlpt_level || ""));
+            setTourLangs(
+              Array.isArray(g.main_tour_languages)
+                ? g.main_tour_languages.map(String)
+                : []
+            );
+            setLanguages((prev) =>
+              prev.length
+                ? prev
+                : parseStaffLanguages(
+                    profile?.languages || g.main_tour_languages
+                  )
+            );
+            setExpertise(
+              Array.isArray(g.expertise_topics)
+                ? g.expertise_topics.map(String)
+                : []
+            );
+            setOtherExp(String(g.other_expertise || ""));
+            setPerfectDay(String(g.perfect_day_tour_description || ""));
+            setVisaType(String(g.visa_type || ""));
+            setVisaExp(
+              g.visa_expiration_date
+                ? String(g.visa_expiration_date).slice(0, 10)
+                : ""
+            );
+            setRate6(
+              g.base_rate_6h_or_less != null
+                ? String(g.base_rate_6h_or_less)
+                : ""
+            );
+            setRate8(
+              g.base_rate_8h_or_less != null
+                ? String(g.base_rate_8h_or_less)
+                : ""
+            );
+            setExtraHead(
+              g.extra_head_percentage != null
+                ? String(g.extra_head_percentage)
+                : ""
+            );
+            const c: Record<string, boolean> = { comfort_couples: true };
+            for (const [k] of COMFORT_KEYS) {
+              c[k] = Boolean(
+                g[k] ?? (k === "comfort_couples" ? true : false)
+              );
+            }
+            setComfort(c);
           }
-          setComfort(c);
+        } else if (kind === "driver") {
+          const d = await getDriverByStaff(pb, user.id);
+          if (d) {
+            setDriver(d);
+            if (!profile?.first_name && !profile?.last_name && d.full_name) {
+              const fromDriver = resolveStaffNamePartsForEditor({
+                fallbackName: String(d.full_name),
+              });
+              setFirstName(fromDriver.first_name);
+              setLastName(fromDriver.last_name);
+            }
+            setPhone(String(d.phone_number || profile?.phone || ""));
+            setCities(
+              Array.isArray(d.operating_cities)
+                ? d.operating_cities.map(String).join(", ")
+                : profile?.strength_cities || ""
+            );
+            setLicenseNo(String(d.operating_license_number || ""));
+            setFleetName(String(d.company_fleet_name || ""));
+            setDriverType(String(d.driver_type || "independent"));
+          }
         }
       } catch (e) {
         onError(formatPbError(e));
@@ -542,9 +746,9 @@ export function PassportBookletModal({
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user.id, user.role]);
+  }, [user.id, user.role, kind]);
 
-  const existingPhoto = photoUrl(profile);
+  const existingPhoto = photoUrl(profile, user.id);
   const preview = useMemo(
     () => (photoFile ? URL.createObjectURL(photoFile) : existingPhoto),
     [photoFile, existingPhoto]
@@ -560,39 +764,71 @@ export function PassportBookletModal({
 
   const save = async () => {
     setSaving(true);
+    setSaveError(null);
     try {
       const pb = getClient();
-      await pb.collection("staff").update(
-        user.id,
-        { name: displayName.trim() },
-        { requestKey: null }
-      );
-      await updateStaffProfile(
-        pb,
-        user.id,
-        {
-          display_name: displayName.trim(),
+      const token = pb.authStore.token;
+      const firstTrim = firstName.trim();
+      const lastTrim = lastName.trim();
+      if (!firstTrim) throw new Error("First name is required.");
+      const nameTrim = combineStaffDisplayName(firstTrim, lastTrim);
+      if (!nameTrim) throw new Error("First name is required.");
+
+      const langText = serializeStaffLanguages(languages);
+
+      try {
+        await saveStaffCredentialViaApi(token, user.id, {
+          first_name: firstTrim,
+          last_name: lastTrim,
+          display_name: nameTrim,
+          staff_name: nameTrim,
           phone: phone.trim(),
           bio: bio.trim(),
-          languages:
-            tourLangs.length > 0 ? tourLangs.join(", ") : languages.trim(),
-          strength_cities: cityOp.trim() || cities.trim(),
+          languages: langText,
+          strength_cities:
+            kind === "guide"
+              ? cityOp.trim() || cities.trim()
+              : cities.trim(),
           video_url: videoUrl.trim(),
           bank_info: bankInfo.trim(),
           payment_link: paymentLink.trim(),
           payout_notes: payoutNotes.trim(),
-        },
-        { photo: photoFile || undefined }
-      );
+          ...(kind === "agency" ? { agency_id: agencyId.trim() } : {}),
+        });
+      } catch (profileErr) {
+        throw new Error(
+          `Could not save profile: ${
+            profileErr instanceof Error
+              ? profileErr.message
+              : formatPbError(profileErr)
+          }`
+        );
+      }
 
-      if (user.role === "guide" || guide) {
+      if (photoFile) {
+        try {
+          await uploadStaffAvatarViaApi(token, user.id, photoFile);
+        } catch (photoErr) {
+          throw new Error(
+            photoErr instanceof Error
+              ? photoErr.message
+              : "Photo did not save."
+          );
+        }
+      }
+
+      if (kind === "guide") {
+        if (!String(user.email || "").trim()) {
+          throw new Error(
+            "Guide credential needs an email on the staff login."
+          );
+        }
         const g =
           guide ||
           (await ensureGuideProfile(pb, user.id, {
-            full_name: displayName.trim(),
+            full_name: nameTrim,
             email: user.email,
           }));
-        // Map UI labels to stored select values that exist in PB
         const mapTrip = (v: string) =>
           v === "Kawaguchiko / Mt. Fuji" ? "Kawaguchiko" : v;
         const mapAvail = (v: string) =>
@@ -602,7 +838,7 @@ export function PassportBookletModal({
           v === "Native / Fluent" ? "Native" : v;
 
         await updateGuideProfile(pb, g.id, {
-          full_name: displayName.trim(),
+          full_name: nameTrim,
           email: user.email,
           phone_number: phone.trim(),
           city_of_operation: cityOp.trim(),
@@ -621,22 +857,509 @@ export function PassportBookletModal({
           extra_head_percentage: Number(extraHead) || 0,
           ...comfort,
         });
+        setGuide(await getGuideByStaff(pb, user.id));
+      }
+
+      if (kind === "driver") {
+        const d =
+          driver ||
+          (await ensureDriverProfile(pb, user.id, { full_name: nameTrim }));
+        const opsCities = cities
+          .split(/[,/]/)
+          .map((x) => x.trim())
+          .filter(Boolean);
+        await updateDriverProfile(pb, d.id, {
+          full_name: nameTrim,
+          phone_number: phone.trim(),
+          operating_cities: opsCities,
+          operating_license_number: licenseNo.trim(),
+          company_fleet_name: fleetName.trim(),
+          driver_type: driverType.trim() || "independent",
+        });
+        setDriver(await getDriverByStaff(pb, user.id));
       }
 
       await onSaved();
     } catch (e) {
-      onError(formatPbError(e));
+      const detail =
+        e instanceof Error && e.message
+          ? e.message
+          : formatPbError(e);
+      setSaveError(detail);
     } finally {
       setSaving(false);
     }
   };
 
   const docNo = credentialDocNo(
-    resolveServeCountry([cityOp, cities, guide?.city_of_operation]).code,
+    resolveServeCountry([
+      cityOp,
+      cities,
+      guide?.city_of_operation,
+      fleetName,
+    ]).code,
     user.id
   );
   const inp =
     "mt-1 w-full rounded-lg border border-[#F6A724]/20 bg-[#0D1117] px-3 py-2 text-sm text-white";
+
+  const identityPage = (
+    <div className="space-y-4">
+      <div className="flex gap-4">
+        <div
+          className="h-28 w-20 shrink-0 overflow-hidden bg-zinc-900"
+          style={{ boxShadow: `inset 0 0 0 2px ${GOLD}` }}
+        >
+          {preview ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={preview} alt="" className="h-full w-full object-cover" />
+          ) : (
+            <div className="flex h-full items-center justify-center text-zinc-600">
+              —
+            </div>
+          )}
+        </div>
+        <label className="flex-1 text-[10px] uppercase tracking-wider text-zinc-400">
+          Credential photo
+          <span className="mt-0.5 block font-normal normal-case tracking-normal text-zinc-500">
+            JPG · 360×480 · auto-compressed for fast load
+          </span>
+          <input
+            type="file"
+            accept="image/jpeg,image/png,image/webp,image/*"
+            className="mt-1 block w-full text-xs text-zinc-300"
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              e.target.value = "";
+              if (!f) return;
+              void optimizeCredentialPhoto(f)
+                .then((file) => {
+                  setPhotoFile(file);
+                  setSaveError(null);
+                })
+                .catch((err) =>
+                  setSaveError(
+                    err instanceof Error ? err.message : "Photo could not be read."
+                  )
+                );
+            }}
+          />
+        </label>
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <label className="text-[10px] uppercase tracking-wider text-zinc-400">
+          First name *
+          <input
+            className={inp}
+            value={firstName}
+            onChange={(e) => setFirstName(e.target.value)}
+            autoComplete="given-name"
+          />
+        </label>
+        <label className="text-[10px] uppercase tracking-wider text-zinc-400">
+          Last name
+          <input
+            className={inp}
+            value={lastName}
+            onChange={(e) => setLastName(e.target.value)}
+            autoComplete="family-name"
+            placeholder="Shown after booking is fully paid"
+          />
+        </label>
+        <label className="text-[10px] uppercase tracking-wider text-zinc-400 sm:col-span-2">
+          Phone
+          <input
+            className={inp}
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+          />
+        </label>
+        <label className="text-[10px] uppercase tracking-wider text-zinc-400 sm:col-span-2">
+          Email
+          <input className={inp} value={user.email} disabled />
+        </label>
+        <label className="text-[10px] uppercase tracking-wider text-zinc-400 sm:col-span-2">
+          Bio / notes
+          <textarea
+            className={inp}
+            rows={3}
+            value={bio}
+            onChange={(e) => setBio(e.target.value)}
+          />
+        </label>
+      </div>
+    </div>
+  );
+
+  const payoutPage = (
+    <div className="space-y-4">
+      <label className="block text-[10px] uppercase tracking-wider text-zinc-400">
+        Bank / IBAN info
+        <textarea
+          className={inp}
+          rows={3}
+          value={bankInfo}
+          onChange={(e) => setBankInfo(e.target.value)}
+        />
+      </label>
+      <label className="block text-[10px] uppercase tracking-wider text-zinc-400">
+        Payment link (Wise / etc.)
+        <input
+          className={inp}
+          value={paymentLink}
+          onChange={(e) => setPaymentLink(e.target.value)}
+        />
+      </label>
+      <label className="block text-[10px] uppercase tracking-wider text-zinc-400">
+        Payout notes
+        <input
+          className={inp}
+          value={payoutNotes}
+          onChange={(e) => setPayoutNotes(e.target.value)}
+        />
+      </label>
+      <label className="block text-[10px] uppercase tracking-wider text-zinc-400">
+        Video URL
+        <input
+          className={inp}
+          value={videoUrl}
+          onChange={(e) => setVideoUrl(e.target.value)}
+        />
+      </label>
+    </div>
+  );
+
+  let pageBody: ReactNode = null;
+  if (page === 0) {
+    pageBody = identityPage;
+  } else if (kind === "guide") {
+    if (page === 1) {
+      pageBody = (
+        <div className="space-y-4">
+          <label className="block text-[10px] uppercase tracking-wider text-zinc-400">
+            City of operation
+            <input
+              className={inp}
+              value={cityOp || cities}
+              onChange={(e) => {
+                setCityOp(e.target.value);
+                setCities(e.target.value);
+              }}
+              placeholder="Tokyo, Kyoto, Osaka, Hiroshima…"
+            />
+          </label>
+          <div>
+            <p className="text-[10px] uppercase tracking-wider text-zinc-400">
+              Out-of-city day trips
+            </p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {DAY_TRIPS.map((t) => (
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() => toggleMulti(dayTrips, setDayTrips, t)}
+                  className={`rounded-full px-2.5 py-1 text-[10px] ${
+                    dayTrips.includes(t)
+                      ? "bg-[#075473] text-white"
+                      : "border border-zinc-700 text-zinc-400"
+                  }`}
+                >
+                  {t}
+                </button>
+              ))}
+            </div>
+          </div>
+          <label className="block text-[10px] uppercase tracking-wider text-zinc-400">
+            Availability pattern
+            <select
+              className={inp}
+              value={avail}
+              onChange={(e) => setAvail(e.target.value)}
+            >
+              <option value="">—</option>
+              {AVAIL.map((a) => (
+                <option key={a} value={a}>
+                  {a}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="block text-[10px] uppercase tracking-wider text-zinc-400">
+            Availability notes
+            <input
+              className={inp}
+              value={availNotes}
+              onChange={(e) => setAvailNotes(e.target.value)}
+            />
+          </label>
+          <div>
+            <p className="text-[10px] uppercase tracking-wider text-zinc-400">
+              Main tour languages
+            </p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {LANGS.map((l) => (
+                <button
+                  key={l}
+                  type="button"
+                  onClick={() => toggleMulti(tourLangs, setTourLangs, l)}
+                  className={`rounded-full px-2.5 py-1 text-[10px] ${
+                    tourLangs.includes(l)
+                      ? "bg-[#075473] text-white"
+                      : "border border-zinc-700 text-zinc-400"
+                  }`}
+                >
+                  {l}
+                </button>
+              ))}
+            </div>
+          </div>
+          <label className="block text-[10px] uppercase tracking-wider text-zinc-400">
+            Japanese JLPT / proficiency
+            <select
+              className={inp}
+              value={jlpt}
+              onChange={(e) => setJlpt(e.target.value)}
+            >
+              <option value="">—</option>
+              {JLPT.map((j) => (
+                <option key={j} value={j}>
+                  {j}
+                </option>
+              ))}
+            </select>
+          </label>
+          <LanguagePills
+            selected={languages}
+            onToggle={(l) => toggleMulti(languages, setLanguages, l)}
+          />
+        </div>
+      );
+    } else if (page === 2) {
+      pageBody = (
+        <div className="space-y-4">
+          <div>
+            <p className="text-[10px] uppercase tracking-wider text-zinc-400">
+              Group comfortability
+            </p>
+            <div className="mt-2 grid gap-2 sm:grid-cols-2">
+              {COMFORT_KEYS.map(([key, label]) => (
+                <label
+                  key={key}
+                  className="flex items-center gap-2 text-xs text-zinc-300"
+                >
+                  <input
+                    type="checkbox"
+                    checked={Boolean(comfort[key])}
+                    onChange={(e) =>
+                      setComfort((c) => ({
+                        ...c,
+                        [key]: e.target.checked,
+                      }))
+                    }
+                  />
+                  {label}
+                </label>
+              ))}
+            </div>
+          </div>
+          <div>
+            <p className="text-[10px] uppercase tracking-wider text-zinc-400">
+              Expertise topics
+            </p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {EXPERTISE.map((t) => (
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() => toggleMulti(expertise, setExpertise, t)}
+                  className={`rounded-full px-2.5 py-1 text-[10px] ${
+                    expertise.includes(t)
+                      ? "bg-[#075473] text-white"
+                      : "border border-zinc-700 text-zinc-400"
+                  }`}
+                >
+                  {t}
+                </button>
+              ))}
+            </div>
+          </div>
+          <label className="block text-[10px] uppercase tracking-wider text-zinc-400">
+            Niche / other expertise
+            <input
+              className={inp}
+              value={otherExp}
+              onChange={(e) => setOtherExp(e.target.value)}
+            />
+          </label>
+          <label className="block text-[10px] uppercase tracking-wider text-zinc-400">
+            Perfect day tour
+            <textarea
+              className={inp}
+              rows={4}
+              value={perfectDay}
+              onChange={(e) => setPerfectDay(e.target.value)}
+            />
+          </label>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className="text-[10px] uppercase tracking-wider text-zinc-400">
+              Visa type
+              <input
+                className={inp}
+                value={visaType}
+                onChange={(e) => setVisaType(e.target.value)}
+              />
+            </label>
+            <label className="text-[10px] uppercase tracking-wider text-zinc-400">
+              Visa expiration
+              <input
+                type="date"
+                className={inp}
+                value={visaExp}
+                onChange={(e) => setVisaExp(e.target.value)}
+              />
+            </label>
+          </div>
+        </div>
+      );
+    } else if (page === 3) {
+      pageBody = (
+        <div className="space-y-4">
+          <div className="grid gap-3 sm:grid-cols-3">
+            <label className="text-[10px] uppercase tracking-wider text-zinc-400">
+              Base ≤6h
+              <input
+                type="number"
+                className={inp}
+                value={rate6}
+                onChange={(e) => setRate6(e.target.value)}
+              />
+            </label>
+            <label className="text-[10px] uppercase tracking-wider text-zinc-400">
+              Base ≤8h
+              <input
+                type="number"
+                className={inp}
+                value={rate8}
+                onChange={(e) => setRate8(e.target.value)}
+              />
+            </label>
+            <label className="text-[10px] uppercase tracking-wider text-zinc-400">
+              Extra head %
+              <input
+                type="number"
+                className={inp}
+                value={extraHead}
+                onChange={(e) => setExtraHead(e.target.value)}
+              />
+            </label>
+          </div>
+          {payoutPage}
+        </div>
+      );
+    }
+  } else if (kind === "driver" && page === 1) {
+    pageBody = (
+      <div className="space-y-4">
+        <label className="block text-[10px] uppercase tracking-wider text-zinc-400">
+          Operating cities
+          <input
+            className={inp}
+            value={cities}
+            onChange={(e) => setCities(e.target.value)}
+            placeholder="Tokyo, Yokohama, Narita…"
+          />
+        </label>
+        <label className="block text-[10px] uppercase tracking-wider text-zinc-400">
+          License number
+          <input
+            className={inp}
+            value={licenseNo}
+            onChange={(e) => setLicenseNo(e.target.value)}
+          />
+        </label>
+        <label className="block text-[10px] uppercase tracking-wider text-zinc-400">
+          Fleet / company name
+          <input
+            className={inp}
+            value={fleetName}
+            onChange={(e) => setFleetName(e.target.value)}
+          />
+        </label>
+        <label className="block text-[10px] uppercase tracking-wider text-zinc-400">
+          Driver type
+          <select
+            className={inp}
+            value={driverType}
+            onChange={(e) => setDriverType(e.target.value)}
+          >
+            <option value="independent">Independent</option>
+            <option value="company">Company / fleet</option>
+          </select>
+        </label>
+      </div>
+    );
+  } else if (kind === "agency" && page === 1) {
+    pageBody = (
+      <div className="space-y-4">
+        <label className="block text-[10px] uppercase tracking-wider text-zinc-400">
+          Agency id
+          <input
+            className={inp}
+            value={agencyId}
+            onChange={(e) => setAgencyId(e.target.value)}
+            placeholder="agencies record id"
+          />
+        </label>
+        <label className="block text-[10px] uppercase tracking-wider text-zinc-400">
+          Markets / hubs
+          <input
+            className={inp}
+            value={cities}
+            onChange={(e) => setCities(e.target.value)}
+            placeholder="Benelux, Spain, LATAM…"
+          />
+        </label>
+        <LanguagePills
+          selected={languages}
+          onToggle={(l) => toggleMulti(languages, setLanguages, l)}
+        />
+        <label className="block text-[10px] uppercase tracking-wider text-zinc-400">
+          Agency notes
+          <textarea
+            className={inp}
+            rows={4}
+            value={bio}
+            onChange={(e) => setBio(e.target.value)}
+            placeholder="Commission terms, preferred contact hours…"
+          />
+        </label>
+      </div>
+    );
+  } else if (kind === "staff" && page === 1) {
+    pageBody = (
+      <div className="space-y-4">
+        <label className="block text-[10px] uppercase tracking-wider text-zinc-400">
+          City / hub coverage
+          <input
+            className={inp}
+            value={cities}
+            onChange={(e) => setCities(e.target.value)}
+            placeholder="Tokyo ops · Amsterdam HQ…"
+          />
+        </label>
+        <LanguagePills
+          selected={languages}
+          onToggle={(l) => toggleMulti(languages, setLanguages, l)}
+        />
+        <p className="text-[11px] text-zinc-500">
+          Staff credentials do not use guide day-trips, JLPT, or tour rates.
+          Use Coverage for hub + languages, then Payout for bank details.
+        </p>
+      </div>
+    );
+  } else if (page === lastPage) {
+    pageBody = payoutPage;
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/80 p-3 sm:items-center sm:p-6">
@@ -648,17 +1371,13 @@ export function PassportBookletModal({
               "repeating-linear-gradient(12deg, transparent, transparent 8px, #F6A724 8px, #F6A724 9px)",
           }}
         />
-
-        <header className="relative z-10 flex items-center justify-between gap-3 border-b border-[#F6A724]/25 px-4 py-3">
+        <header className="relative z-10 flex items-start justify-between gap-3 border-b border-[#F6A724]/25 px-4 py-3">
           <div>
-            <p
-              className="font-godiva text-sm uppercase tracking-[0.22em]"
-              style={{ color: GOLD }}
-            >
-              Credential booklet
+            <p className="font-godiva text-sm tracking-wider text-[#F6A724]">
+              CREDENTIAL BOOKLET
             </p>
-            <p className="font-mono text-[10px] text-zinc-500">
-              {docNo} · {roleBadge(user.role)} · Page {page + 1}/4
+            <p className="mt-0.5 text-[10px] tracking-wider text-zinc-500 uppercase">
+              {docNo} · {roleBadge(user.role)} · Page {page + 1}/{pages.length}
             </p>
           </div>
           <button
@@ -671,7 +1390,7 @@ export function PassportBookletModal({
         </header>
 
         <nav className="relative z-10 flex gap-1 overflow-x-auto border-b border-zinc-800 px-3 py-2">
-          {BOOKLET_PAGES.map((label, i) => (
+          {pages.map((label, i) => (
             <button
               key={label}
               type="button"
@@ -692,349 +1411,20 @@ export function PassportBookletModal({
           {loading ? (
             <p className="text-sm text-zinc-400">Opening booklet…</p>
           ) : (
-            <>
-              {page === 0 ? (
-                <div className="space-y-4">
-                  <div className="flex gap-4">
-                    <div
-                      className="h-28 w-20 shrink-0 overflow-hidden bg-zinc-900"
-                      style={{ boxShadow: `inset 0 0 0 2px ${GOLD}` }}
-                    >
-                      {preview ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={preview}
-                          alt=""
-                          className="h-full w-full object-cover"
-                        />
-                      ) : (
-                        <div className="flex h-full items-center justify-center text-zinc-600">
-                          —
-                        </div>
-                      )}
-                    </div>
-                    <label className="flex-1 text-[10px] uppercase tracking-wider text-zinc-400">
-                      Credential photo
-                      <input
-                        type="file"
-                        accept="image/*"
-                        className="mt-1 block w-full text-xs text-zinc-300"
-                        onChange={(e) =>
-                          setPhotoFile(e.target.files?.[0] || null)
-                        }
-                      />
-                    </label>
-                  </div>
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <label className="text-[10px] uppercase tracking-wider text-zinc-400">
-                      Full name *
-                      <input
-                        className={inp}
-                        value={displayName}
-                        onChange={(e) => setDisplayName(e.target.value)}
-                      />
-                    </label>
-                    <label className="text-[10px] uppercase tracking-wider text-zinc-400">
-                      Phone *
-                      <input
-                        className={inp}
-                        value={phone}
-                        onChange={(e) => setPhone(e.target.value)}
-                      />
-                    </label>
-                    <label className="text-[10px] uppercase tracking-wider text-zinc-400 sm:col-span-2">
-                      Email
-                      <input
-                        className={inp}
-                        value={user.email}
-                        disabled
-                      />
-                    </label>
-                    <label className="text-[10px] uppercase tracking-wider text-zinc-400 sm:col-span-2">
-                      Bio
-                      <textarea
-                        className={inp}
-                        rows={3}
-                        value={bio}
-                        onChange={(e) => setBio(e.target.value)}
-                      />
-                    </label>
-                  </div>
-                </div>
-              ) : null}
-
-              {page === 1 ? (
-                <div className="space-y-4">
-                  <label className="block text-[10px] uppercase tracking-wider text-zinc-400">
-                    City of operation
-                    <input
-                      className={inp}
-                      value={cityOp || cities}
-                      onChange={(e) => {
-                        setCityOp(e.target.value);
-                        setCities(e.target.value);
-                      }}
-                      placeholder="Tokyo, Kyoto, Osaka, Hiroshima…"
-                    />
-                  </label>
-                  <div>
-                    <p className="text-[10px] uppercase tracking-wider text-zinc-400">
-                      Out-of-city day trips
-                    </p>
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      {DAY_TRIPS.map((t) => (
-                        <button
-                          key={t}
-                          type="button"
-                          onClick={() =>
-                            toggleMulti(dayTrips, setDayTrips, t)
-                          }
-                          className={`rounded-full px-2.5 py-1 text-[10px] ${
-                            dayTrips.includes(t)
-                              ? "bg-[#075473] text-white"
-                              : "border border-zinc-700 text-zinc-400"
-                          }`}
-                        >
-                          {t}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  <label className="block text-[10px] uppercase tracking-wider text-zinc-400">
-                    Availability pattern
-                    <select
-                      className={inp}
-                      value={avail}
-                      onChange={(e) => setAvail(e.target.value)}
-                    >
-                      <option value="">—</option>
-                      {AVAIL.map((a) => (
-                        <option key={a} value={a}>
-                          {a}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <label className="block text-[10px] uppercase tracking-wider text-zinc-400">
-                    Availability notes
-                    <input
-                      className={inp}
-                      value={availNotes}
-                      onChange={(e) => setAvailNotes(e.target.value)}
-                      placeholder="Available Mon-Wed afternoons & all weekends"
-                    />
-                  </label>
-                  <div>
-                    <p className="text-[10px] uppercase tracking-wider text-zinc-400">
-                      Main tour languages
-                    </p>
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      {LANGS.map((l) => (
-                        <button
-                          key={l}
-                          type="button"
-                          onClick={() =>
-                            toggleMulti(tourLangs, setTourLangs, l)
-                          }
-                          className={`rounded-full px-2.5 py-1 text-[10px] ${
-                            tourLangs.includes(l)
-                              ? "bg-[#075473] text-white"
-                              : "border border-zinc-700 text-zinc-400"
-                          }`}
-                        >
-                          {l}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  <label className="block text-[10px] uppercase tracking-wider text-zinc-400">
-                    Japanese JLPT / proficiency
-                    <select
-                      className={inp}
-                      value={jlpt}
-                      onChange={(e) => setJlpt(e.target.value)}
-                    >
-                      <option value="">—</option>
-                      {JLPT.map((j) => (
-                        <option key={j} value={j}>
-                          {j}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <label className="block text-[10px] uppercase tracking-wider text-zinc-400">
-                    Languages (profile text)
-                    <input
-                      className={inp}
-                      value={languages}
-                      onChange={(e) => setLanguages(e.target.value)}
-                    />
-                  </label>
-                </div>
-              ) : null}
-
-              {page === 2 ? (
-                <div className="space-y-4">
-                  <div>
-                    <p className="text-[10px] uppercase tracking-wider text-zinc-400">
-                      Group comfortability
-                    </p>
-                    <div className="mt-2 grid gap-2 sm:grid-cols-2">
-                      {COMFORT_KEYS.map(([key, label]) => (
-                        <label
-                          key={key}
-                          className="flex items-center gap-2 text-xs text-zinc-300"
-                        >
-                          <input
-                            type="checkbox"
-                            checked={Boolean(comfort[key])}
-                            onChange={(e) =>
-                              setComfort((c) => ({
-                                ...c,
-                                [key]: e.target.checked,
-                              }))
-                            }
-                          />
-                          {label}
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-                  <div>
-                    <p className="text-[10px] uppercase tracking-wider text-zinc-400">
-                      Expertise topics
-                    </p>
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      {EXPERTISE.map((t) => (
-                        <button
-                          key={t}
-                          type="button"
-                          onClick={() =>
-                            toggleMulti(expertise, setExpertise, t)
-                          }
-                          className={`rounded-full px-2.5 py-1 text-[10px] ${
-                            expertise.includes(t)
-                              ? "bg-[#075473] text-white"
-                              : "border border-zinc-700 text-zinc-400"
-                          }`}
-                        >
-                          {t}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  <label className="block text-[10px] uppercase tracking-wider text-zinc-400">
-                    Niche / other expertise
-                    <input
-                      className={inp}
-                      value={otherExp}
-                      onChange={(e) => setOtherExp(e.target.value)}
-                    />
-                  </label>
-                  <label className="block text-[10px] uppercase tracking-wider text-zinc-400">
-                    Perfect day tour
-                    <textarea
-                      className={inp}
-                      rows={4}
-                      value={perfectDay}
-                      onChange={(e) => setPerfectDay(e.target.value)}
-                      placeholder="Describe your perfect day tour"
-                    />
-                  </label>
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <label className="text-[10px] uppercase tracking-wider text-zinc-400">
-                      Visa type
-                      <input
-                        className={inp}
-                        value={visaType}
-                        onChange={(e) => setVisaType(e.target.value)}
-                        placeholder="Spouse Visa, Permanent Resident…"
-                      />
-                    </label>
-                    <label className="text-[10px] uppercase tracking-wider text-zinc-400">
-                      Visa expiration
-                      <input
-                        type="date"
-                        className={inp}
-                        value={visaExp}
-                        onChange={(e) => setVisaExp(e.target.value)}
-                      />
-                    </label>
-                  </div>
-                </div>
-              ) : null}
-
-              {page === 3 ? (
-                <div className="space-y-4">
-                  <div className="grid gap-3 sm:grid-cols-3">
-                    <label className="text-[10px] uppercase tracking-wider text-zinc-400">
-                      Base ≤6h
-                      <input
-                        type="number"
-                        className={inp}
-                        value={rate6}
-                        onChange={(e) => setRate6(e.target.value)}
-                      />
-                    </label>
-                    <label className="text-[10px] uppercase tracking-wider text-zinc-400">
-                      Base ≤8h
-                      <input
-                        type="number"
-                        className={inp}
-                        value={rate8}
-                        onChange={(e) => setRate8(e.target.value)}
-                      />
-                    </label>
-                    <label className="text-[10px] uppercase tracking-wider text-zinc-400">
-                      Extra head %
-                      <input
-                        type="number"
-                        className={inp}
-                        value={extraHead}
-                        onChange={(e) => setExtraHead(e.target.value)}
-                      />
-                    </label>
-                  </div>
-                  <label className="block text-[10px] uppercase tracking-wider text-zinc-400">
-                    Bank / IBAN info
-                    <textarea
-                      className={inp}
-                      rows={3}
-                      value={bankInfo}
-                      onChange={(e) => setBankInfo(e.target.value)}
-                    />
-                  </label>
-                  <label className="block text-[10px] uppercase tracking-wider text-zinc-400">
-                    Payment link (Wise / etc.)
-                    <input
-                      className={inp}
-                      value={paymentLink}
-                      onChange={(e) => setPaymentLink(e.target.value)}
-                    />
-                  </label>
-                  <label className="block text-[10px] uppercase tracking-wider text-zinc-400">
-                    Payout notes
-                    <input
-                      className={inp}
-                      value={payoutNotes}
-                      onChange={(e) => setPayoutNotes(e.target.value)}
-                    />
-                  </label>
-                  <label className="block text-[10px] uppercase tracking-wider text-zinc-400">
-                    Video URL
-                    <input
-                      className={inp}
-                      value={videoUrl}
-                      onChange={(e) => setVideoUrl(e.target.value)}
-                    />
-                  </label>
-                </div>
-              ) : null}
-            </>
+            pageBody
           )}
         </div>
 
-        <footer className="relative z-10 flex items-center justify-between gap-2 border-t border-[#F6A724]/20 px-4 py-3">
+        <footer className="relative z-10 space-y-2 border-t border-[#F6A724]/20 px-4 py-3">
+          {saveError ? (
+            <p
+              role="alert"
+              className="rounded-lg border border-red-500/40 bg-red-950/80 px-3 py-2 text-xs text-red-200"
+            >
+              {saveError}
+            </p>
+          ) : null}
+          <div className="flex flex-wrap items-center justify-between gap-2">
           <button
             type="button"
             disabled={page === 0}
@@ -1043,25 +1433,27 @@ export function PassportBookletModal({
           >
             ← Back
           </button>
-          {page < 3 ? (
+          <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"
-              onClick={() => setPage((p) => Math.min(3, p + 1))}
-              className="rounded-full px-4 py-2 text-xs font-semibold text-[#0D1117]"
-              style={{ background: GOLD }}
-            >
-              Next →
-            </button>
-          ) : (
-            <button
-              type="button"
-              disabled={saving}
+              disabled={saving || loading}
               onClick={() => void save()}
-              className="rounded-full bg-[#1BA58A] px-5 py-2 text-xs font-semibold text-white disabled:opacity-50"
+              className="rounded-full bg-[#1BA58A] px-4 py-2 text-xs font-semibold text-white disabled:opacity-50"
             >
-              {saving ? "Saving…" : "Save credential"}
+              {saving ? "Saving…" : "Save & close"}
             </button>
-          )}
+            {page < lastPage ? (
+              <button
+                type="button"
+                onClick={() => setPage((p) => Math.min(lastPage, p + 1))}
+                className="rounded-full px-4 py-2 text-xs font-semibold text-[#0D1117]"
+                style={{ background: GOLD }}
+              >
+                Next →
+              </button>
+            ) : null}
+          </div>
+          </div>
         </footer>
       </div>
     </div>

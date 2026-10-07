@@ -5,13 +5,15 @@ import type { GuideConfirmStatus } from "@/lib/guideConfirmStatus";
 import { guideConfirmClientLabel } from "@/lib/guideConfirmStatus";
 import type { PassStatusLabel } from "@/lib/bookingStatus";
 import type { CanonicalBookingStatus } from "@/lib/bookingStatus";
+import type { DayGuideAssignment } from "@/lib/guideJobs";
 
 export type OpsBookingSnapshot = {
   status: CanonicalBookingStatus | null;
   passStatus: PassStatusLabel | null;
   paymentConfirmed: boolean;
+  contactsUnlocked: boolean;
   assignedAgent: string | null;
-  /** Payment-gated display name for Day Services */
+  /** Payment/privacy-gated display name for Day Services */
   guideName: string | null;
   driverName: string | null;
   guideStatus: GuideConfirmStatus;
@@ -24,6 +26,17 @@ export type OpsBookingSnapshot = {
   ticketStatus: string;
   ticketsPurchaseAllowed: boolean;
   ticketGuestLabel: string | null;
+  guidePhotoUrl: string | null;
+  guideEmail: string | null;
+  guidePhone: string | null;
+  guideWhatsapp: string | null;
+  guideUnlockMessage: string | null;
+  driverPhotoUrl: string | null;
+  driverEmail: string | null;
+  driverPhone: string | null;
+  driverUnlockMessage: string | null;
+  /** Per-day accepted guides (privacy-masked) */
+  dayGuides: DayGuideAssignment[];
   loading: boolean;
 };
 
@@ -31,6 +44,7 @@ const EMPTY: Omit<OpsBookingSnapshot, "loading"> = {
   status: null,
   passStatus: null,
   paymentConfirmed: false,
+  contactsUnlocked: false,
   assignedAgent: null,
   guideName: null,
   driverName: null,
@@ -44,11 +58,21 @@ const EMPTY: Omit<OpsBookingSnapshot, "loading"> = {
   ticketStatus: "none",
   ticketsPurchaseAllowed: false,
   ticketGuestLabel: null,
+  guidePhotoUrl: null,
+  guideEmail: null,
+  guidePhone: null,
+  guideWhatsapp: null,
+  guideUnlockMessage: null,
+  driverPhotoUrl: null,
+  driverEmail: null,
+  driverPhone: null,
+  driverUnlockMessage: null,
+  dayGuides: [],
 };
 
 /**
  * Live Ops snapshot by PNR — collections only.
- * Golden rule: confirmed guide/driver/tickets only when payment_confirmed.
+ * Contacts unlock when booking confirmed + fully paid (see guidePrivacy).
  */
 export function useOpsBookingSnapshot(
   pnr: string | null | undefined
@@ -87,8 +111,8 @@ export function useOpsBookingSnapshot(
           status: data.status || null,
           passStatus: data.passStatus || null,
           paymentConfirmed: Boolean(data.paymentConfirmed),
+          contactsUnlocked: Boolean(data.contactsUnlocked),
           assignedAgent: String(data.assignedAgent || "").trim() || null,
-          // Guest Day Services: only payment-gated display names (never raw Ops IDs)
           guideName: String(data.guide || "").trim() || null,
           driverName: String(data.driver || "").trim() || null,
           guideStatus,
@@ -106,6 +130,30 @@ export function useOpsBookingSnapshot(
           ticketGuestLabel: data.ticketGuestLabel
             ? String(data.ticketGuestLabel)
             : null,
+          guidePhotoUrl: data.guidePhotoUrl
+            ? String(data.guidePhotoUrl)
+            : null,
+          guideEmail: data.guideEmail ? String(data.guideEmail) : null,
+          guidePhone: data.guidePhone ? String(data.guidePhone) : null,
+          guideWhatsapp: data.guideWhatsapp
+            ? String(data.guideWhatsapp)
+            : null,
+          guideUnlockMessage: data.guideUnlockMessage
+            ? String(data.guideUnlockMessage)
+            : null,
+          driverPhotoUrl: data.driverPhotoUrl
+            ? String(data.driverPhotoUrl)
+            : null,
+          driverEmail: data.driverEmail ? String(data.driverEmail) : null,
+          driverPhone: data.driverPhone ? String(data.driverPhone) : null,
+          driverUnlockMessage: data.driverUnlockMessage
+            ? String(data.driverUnlockMessage)
+            : null,
+          dayGuides: Array.isArray(
+            (data as { dayGuides?: DayGuideAssignment[] }).dayGuides
+          )
+            ? ((data as { dayGuides: DayGuideAssignment[] }).dayGuides || [])
+            : [],
           loading: false,
         });
       } catch {
@@ -129,5 +177,6 @@ export function useOpsStaffNames(pnr: string | null | undefined) {
     guideLabel: snap.guideLabel,
     guideConfirmed: snap.guideConfirmed,
     paymentConfirmed: snap.paymentConfirmed,
+    contactsUnlocked: snap.contactsUnlocked,
   };
 }

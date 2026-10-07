@@ -47,18 +47,36 @@ function appendUnique(prev: Msg[], next: Msg): Msg[] {
 }
 
 /**
- * Guest communications page for a PNR (linked from Coordination Team widget).
+ * Guest communications for a PNR — full page route or embedded modal overlay.
  * Topic pills prepend [TICKETS] / [TOUR] / … so Ops sees intent immediately.
  */
 export function GuestCommPage({
   backHref = "/builder/itinerary",
+  pnr: pnrProp,
+  guestEmail: guestEmailProp,
+  guestName: guestNameProp,
+  onClose,
+  embedded = false,
 }: {
   backHref?: string;
+  /** When set (modal), overrides URL search params. */
+  pnr?: string;
+  guestEmail?: string;
+  guestName?: string;
+  /** Modal close — shows ✕ instead of back link. */
+  onClose?: () => void;
+  embedded?: boolean;
 }) {
   const searchParams = useSearchParams();
-  const pnr = String(searchParams.get("pnr") || "").trim();
-  const guestEmail = String(searchParams.get("guestEmail") || "").trim();
-  const guestName = String(searchParams.get("guestName") || "").trim();
+  const pnr = String(
+    pnrProp ?? searchParams.get("pnr") ?? ""
+  ).trim();
+  const guestEmail = String(
+    guestEmailProp ?? searchParams.get("guestEmail") ?? ""
+  ).trim();
+  const guestName = String(
+    guestNameProp ?? searchParams.get("guestName") ?? ""
+  ).trim();
 
   const [messages, setMessages] = useState<Msg[]>([]);
   const [agentName, setAgentName] = useState<string | null>(null);
@@ -240,28 +258,57 @@ export function GuestCommPage({
     return (
       <div className="mx-auto max-w-lg px-4 py-10 text-white">
         <p className="text-sm text-zinc-400">Missing booking reference.</p>
-        <Link href={backHref} className="mt-4 inline-block text-[#075473]">
-          ← Back to dossier
-        </Link>
+        {onClose ? (
+          <button
+            type="button"
+            onClick={onClose}
+            className="mt-4 inline-block text-[#075473]"
+          >
+            ← Close
+          </button>
+        ) : (
+          <Link href={backHref} className="mt-4 inline-block text-[#075473]">
+            ← Back to dossier
+          </Link>
+        )}
       </div>
     );
   }
 
   return (
-    <div className="mx-auto flex min-h-[70vh] max-w-lg flex-col px-4 py-6 text-white">
+    <div
+      className={`mx-auto flex max-w-lg flex-col text-white ${
+        embedded
+          ? "h-full min-h-0 px-4 py-4"
+          : "min-h-[70vh] px-4 py-6"
+      }`}
+    >
       <div className="mb-4 flex items-center gap-3">
-        <Link
-          href={backHref}
-          className="flex h-10 w-10 items-center justify-center rounded-full border border-zinc-700 bg-zinc-900"
-          aria-label="Back"
-        >
-          <ArrowLeft className="h-5 w-5" />
-        </Link>
-        <div>
+        {onClose ? (
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex h-10 w-10 items-center justify-center rounded-full border border-zinc-700 bg-zinc-900"
+            aria-label="Close chat"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        ) : (
+          <Link
+            href={backHref}
+            className="flex h-10 w-10 items-center justify-center rounded-full border border-zinc-700 bg-zinc-900"
+            aria-label="Back"
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </Link>
+        )}
+        <div className="min-w-0 flex-1">
           <p className="text-[10px] font-semibold tracking-wider text-zinc-500 uppercase">
             {pnr}
           </p>
-          <h1 className="font-godiva text-lg tracking-wide uppercase">{title}</h1>
+          <h1 className="font-godiva truncate text-lg tracking-wide uppercase">
+            {title}
+          </h1>
         </div>
       </div>
 

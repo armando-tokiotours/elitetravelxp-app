@@ -2,7 +2,11 @@
  * Concierge Fee vs Full Tour Pay — single source of truth helpers.
  */
 
-import { CTA_PAY_BALANCE } from "@/lib/balanceSettlement";
+import {
+  CTA_PAY_BALANCE,
+  paymentBadgeForAmount,
+  roundEur,
+} from "@/lib/balanceSettlement";
 
 export type TourPaymentStatus =
   | "UNPAID"
@@ -91,6 +95,22 @@ export const CTA_VIEW_BALANCE = CTA_PAY_BALANCE;
 /** Alternate after fee — continue building with agent. */
 export const CTA_CUSTOMIZE_CONCIERGE = "Customize with concierge";
 
-export function dossierPrimaryCtaLabel(feeCreditEur: number): string {
-  return feeCreditEur > 0 ? CTA_PAY_BALANCE : CTA_SECURE_DEPOSIT;
+export function dossierPrimaryCtaLabel(
+  feeCreditEur: number,
+  opts?: { amountPaidEur?: number; packageTotalEur?: number }
+): string {
+  const amountPaid = roundEur(
+    opts?.amountPaidEur != null && opts.amountPaidEur > 0
+      ? opts.amountPaidEur
+      : feeCreditEur
+  );
+  const packageTotal = roundEur(opts?.packageTotalEur ?? 0);
+  if (packageTotal > 0 && amountPaid > 0) {
+    const badge = paymentBadgeForAmount(amountPaid, packageTotal);
+    if (badge.fullyPaid) return "";
+    if (badge.kind !== "none") return CTA_PAY_BALANCE;
+  }
+  return amountPaid > 0 || feeCreditEur > 0
+    ? CTA_PAY_BALANCE
+    : CTA_SECURE_DEPOSIT;
 }

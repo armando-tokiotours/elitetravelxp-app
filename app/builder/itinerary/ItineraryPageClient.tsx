@@ -45,7 +45,10 @@ import { LiquidGlassHero } from "@/components/guest/LiquidGlassHero";
 import { ItineraryTopActions } from "@/components/navigation/ItineraryTopActions";
 import { MobileTopChrome } from "@/components/navigation/MobileTopChrome";
 import { SaveRequiredContactModal } from "@/components/builder/SaveRequiredContactModal";
-import { showSystemMessage } from "@/store/useSystemMessageStore";
+import {
+  dismissSystemMessage,
+  showSystemMessage,
+} from "@/store/useSystemMessageStore";
 import { getSystemMessage } from "@/lib/systemMessages";
 import { dossierPrimaryCtaLabel } from "@/lib/tourPaymentStatus";
 import {
@@ -162,10 +165,12 @@ export default function ItineraryPageClient() {
       confirmedBookingRef: state.confirmedBookingRef,
       bookingStatus: state.bookingStatus,
     });
-    void import("@/lib/feeCredit").then(({ hydrateConciergeFeeCredit }) => {
-      void hydrateConciergeFeeCredit(ref).then((eur) => {
-        setFeeCreditEur(eur);
-        if (eur > 0) setTotalPaidEur((prev) => (prev > 0 ? prev : eur));
+    void import("@/lib/feeCredit").then(({ hydrateTourPayments }) => {
+      void hydrateTourPayments(ref).then(({ feeCreditEur, totalPaidEur }) => {
+        setFeeCreditEur(feeCreditEur);
+        if (totalPaidEur > 0) {
+          setTotalPaidEur((prev) => Math.max(prev, totalPaidEur));
+        }
       });
     });
   }, [
@@ -173,6 +178,10 @@ export default function ItineraryPageClient() {
     state.confirmedBookingRef,
     state.bookingStatus,
   ]);
+
+  useEffect(() => {
+    if (showFeeModal || balanceOpen) dismissSystemMessage();
+  }, [showFeeModal, balanceOpen]);
 
   // Keep multi-day itinerary isolated — send Builder S traffic to its own dossier.
   useEffect(() => {
@@ -368,12 +377,27 @@ export default function ItineraryPageClient() {
     window.print();
   };
 
+  const openBalanceCheckout = () => {
+    dismissSystemMessage();
+    void requestInvoiceView();
+    setShowFeeModal(false);
+    setBalanceOpen(true);
+  };
+
+  const openFeeOrBalance = () => {
+    dismissSystemMessage();
+    if (feeCreditEur > 0 || totalPaidEur > 0) {
+      openBalanceCheckout();
+      return;
+    }
+    setShowFeeModal(true);
+  };
+
   const handleRequestPay = () => {
     setSubmitError(null);
     setCostPulsarDone(true);
-    if (feeCreditEur > 0) {
-      void requestInvoiceView();
-      setBalanceOpen(true);
+    if (feeCreditEur > 0 || totalPaidEur > 0) {
+      openBalanceCheckout();
       return;
     }
     requireContactOr("estimate", () => setShowEstimateModal(true));
@@ -400,21 +424,45 @@ export default function ItineraryPageClient() {
     orderId: string | null;
   }) => {
     try {
-      void import("@/lib/recordPayment").then(({ recordPaymentSuccess }) =>
-        recordPaymentSuccess({
-          pnr: paymentDetails.bookingRef,
-          kind: balanceOption === "FULL" ? "tour_full" : "tour_partial",
-          amountEur: paymentDetails.amountPaid,
-          orderId: paymentDetails.orderId,
-          builder: "multi",
-          estimatedTotalEur: quote?.max ?? 0,
-          notes:
-            balanceOption === "FULL"
-              ? "Full tour balance settlement"
-              : "30% progress payment on pending balance",
-        })
+      const { recordPaymentSuccess } = await import("@/lib/recordPayment");
+      const recorded = await recordPaymentSuccess({
+        pnr: paymentDetails.bookingRef,
+        kind: balanceOption === "FULL" ? "tour_full" : "tour_partial",
+        amountEur: paymentDetails.amountPaid,
+        orderId: paymentDetails.orderId,
+        builder: "multi",
+        estimatedTotalEur: quote?.max ?? 0,
+        notes:
+          balanceOption === "FULL"
+            ? "Full tour balance settlement"
+            : "30% progress payment on pending balance",
+      });
+      if (!recorded.ok) {
+        setSubmitError(
+          recorded.error ||
+            "Payment succeeded but Ops total paid failed to sync. Contact concierge with your ref."
+        );
+      }
+      const nextPaid = Math.max(
+        recorded.totalPaidEur || 0,
+        Math.max(totalPaidEur, feeCreditEur) + paymentDetails.amountPaid
       );
-      setTotalPaidEur((prev) => prev + paymentDetails.amountPaid);
+      setTotalPaidEur(nextPaid);
+      const { markTotalPaidEur } = await import("@/lib/feeCredit");
+      markTotalPaidEur(paymentDetails.bookingRef, nextPaid);
+      // Seed guest cart into ops_hub for Ops Pricing Studio
+      void import("@/lib/itemizedInvoice").then(
+        ({ buildMultiDayInvoiceItems }) => {
+          void import("@/lib/syncGuestInvoiceCart").then(
+            ({ syncGuestInvoiceCart }) =>
+              syncGuestInvoiceCart({
+                pnr: paymentDetails.bookingRef,
+                items: buildMultiDayInvoiceItems(state, config),
+                estimatedTotalEur: quote?.max ?? 0,
+              })
+          );
+        }
+      );
       setSubmittedRef(paymentDetails.bookingRef);
       setIsCheckoutModalOpen(false);
       setCheckoutMode("deposit");
@@ -439,7 +487,7 @@ export default function ItineraryPageClient() {
       setConciergeFeeEur(c.feeAmountEur);
     });
     void requestSaveOnly();
-    setShowFeeModal(true);
+    openFeeOrBalance();
   };
 
   const handleSaveDraftAndEmail = async () => {
@@ -498,25 +546,41 @@ export default function ItineraryPageClient() {
           path: selectedPath || "FULL",
         }),
       });
-      void import("@/lib/recordPayment").then(({ recordPaymentSuccess }) =>
-        recordPaymentSuccess({
-          pnr: paymentDetails.bookingRef,
-          kind: "concierge_deposit",
-          amountEur: paymentDetails.amountPaid,
-          orderId: paymentDetails.orderId,
-          path: selectedPath || "FULL",
-          builder: "multi",
-        })
+      const { recordPaymentSuccess } = await import("@/lib/recordPayment");
+      const recorded = await recordPaymentSuccess({
+        pnr: paymentDetails.bookingRef,
+        kind: "concierge_deposit",
+        amountEur: paymentDetails.amountPaid,
+        orderId: paymentDetails.orderId,
+        path: selectedPath || "FULL",
+        builder: "multi",
+        estimatedTotalEur: quote?.max ?? 0,
+      });
+      const paid = Math.max(
+        recorded.totalPaidEur || 0,
+        paymentDetails.amountPaid
       );
-      void import("@/lib/feeCredit").then(({ markConciergeFeePaid }) =>
-        markConciergeFeePaid(
-          paymentDetails.bookingRef,
-          paymentDetails.amountPaid
-        )
+      const { markConciergeFeePaid, markTotalPaidEur } = await import(
+        "@/lib/feeCredit"
       );
+      markConciergeFeePaid(paymentDetails.bookingRef, paymentDetails.amountPaid);
+      markTotalPaidEur(paymentDetails.bookingRef, paid);
       confirmBookingRef(paymentDetails.bookingRef, "in_progress");
       setSubmittedRef(paymentDetails.bookingRef);
       setFeeCreditEur(paymentDetails.amountPaid);
+      setTotalPaidEur((prev) => Math.max(prev, paid));
+      void import("@/lib/itemizedInvoice").then(
+        ({ buildMultiDayInvoiceItems }) => {
+          void import("@/lib/syncGuestInvoiceCart").then(
+            ({ syncGuestInvoiceCart }) =>
+              syncGuestInvoiceCart({
+                pnr: paymentDetails.bookingRef,
+                items: buildMultiDayInvoiceItems(state, config),
+                estimatedTotalEur: quote?.max ?? 0,
+              })
+          );
+        }
+      );
       showSystemMessage({
         text: "Deposit received — your dates are held. An agent will contact you soon.",
         tone: "info",
@@ -570,23 +634,28 @@ export default function ItineraryPageClient() {
       });
       confirmBookingRef(result.reference, "in_progress");
       setSubmittedRef(result.reference);
-      void import("@/lib/recordPayment").then(({ recordPaymentSuccess }) =>
-        recordPaymentSuccess({
-          pnr: result.reference,
-          kind:
-            paymentDetails.paymentType === "full"
-              ? "tour_full"
-              : paymentDetails.paymentType === "partial"
-                ? "tour_partial"
-                : "tour_deposit",
-          amountEur: paymentDetails.amountPaid,
-          currency: paymentDetails.currency,
-          orderId: paymentDetails.orderId,
-          guestEmail: paymentDetails.customerEmail,
-          guestName: paymentDetails.customerName,
-          builder: "multi",
-        })
-      );
+      const { recordPaymentSuccess } = await import("@/lib/recordPayment");
+      const recorded = await recordPaymentSuccess({
+        pnr: result.reference,
+        kind:
+          paymentDetails.paymentType === "full"
+            ? "tour_full"
+            : paymentDetails.paymentType === "partial"
+              ? "tour_partial"
+              : "tour_deposit",
+        amountEur: paymentDetails.amountPaid,
+        currency: paymentDetails.currency,
+        orderId: paymentDetails.orderId,
+        guestEmail: paymentDetails.customerEmail,
+        guestName: paymentDetails.customerName,
+        builder: "multi",
+        estimatedTotalEur: quote?.max ?? 0,
+      });
+      if (recorded.totalPaidEur != null && recorded.totalPaidEur > 0) {
+        setTotalPaidEur((prev) => Math.max(prev, recorded.totalPaidEur!));
+        const { markTotalPaidEur } = await import("@/lib/feeCredit");
+        markTotalPaidEur(result.reference, recorded.totalPaidEur);
+      }
 
       const email = String(paymentDetails.customerEmail || "")
         .trim()
@@ -630,7 +699,7 @@ export default function ItineraryPageClient() {
 
   return (
     <div className="builder-theme relative z-10 min-h-screen w-full overflow-x-hidden bg-transparent pb-28 text-white md:pb-20">
-      <SystemMessageFox />
+      {showFeeModal || balanceOpen ? null : <SystemMessageFox />}
       <MobileTopChrome
         brandTitle="Itinerary"
         ctaHref="/builder"
@@ -662,14 +731,22 @@ export default function ItineraryPageClient() {
               bookingType="MULTI_DAY"
               title="Grand Japan Journey · Itinerary"
               guestName={customerName !== "Guest" ? customerName : undefined}
-              depositAmount={feeCreditEur}
-              payLabel={dossierPrimaryCtaLabel(feeCreditEur)}
+              depositAmount={Math.max(totalPaidEur, feeCreditEur)}
+              packageTotalEur={quote?.max ?? quote?.min ?? 0}
+              payLabel={dossierPrimaryCtaLabel(feeCreditEur, {
+                amountPaidEur: Math.max(totalPaidEur, feeCreditEur),
+                packageTotalEur: quote?.max ?? quote?.min ?? 0,
+              })}
               payPulse={!costPulsarDone}
               continueHref="/builder"
               locked={!contactReady}
               onSave={() => void requestSaveOnly()}
               onSend={() => void requestSendPdf()}
               onPrint={requestPrintOnly}
+              onPlanInvoice={() => {
+                if (activeView === "invoice") setMode("dossier");
+                else void requestInvoiceView();
+              }}
               onPayContinue={handleRequestPay}
             />
             <TicketVoucherDownloadBanner
@@ -699,6 +776,12 @@ export default function ItineraryPageClient() {
                 fleetLabel={fleetLabel}
                 arrivalHub={arrivalHub}
                 departureHub={departureHub}
+                depositPaidEur={feeCreditEur}
+                hasPaidFull={
+                  totalPaidEur > 0 &&
+                  (quote?.max ?? quote?.min ?? 0) > 0 &&
+                  totalPaidEur >= (quote?.min ?? quote?.max ?? 0)
+                }
                 afterSummary={
                   activeView === "dossier" ? (
                     <PriceSummaryFooter
@@ -710,7 +793,13 @@ export default function ItineraryPageClient() {
                       totalGuests={totalGuests}
                       onRequestPay={handleRequestPay}
                       requestDisabled={!quote}
-                      reserveLabel={dossierPrimaryCtaLabel(feeCreditEur)}
+                      reserveLabel={dossierPrimaryCtaLabel(feeCreditEur, {
+                        amountPaidEur: Math.max(totalPaidEur, feeCreditEur),
+                        packageTotalEur: quote?.max ?? quote?.min ?? 0,
+                      })}
+                      pricesUnlocked={contactReady}
+                      amountPaidEur={Math.max(totalPaidEur, feeCreditEur)}
+                      packageTotalEur={quote?.max ?? quote?.min ?? 0}
                     />
                   ) : null
                 }
@@ -721,7 +810,7 @@ export default function ItineraryPageClient() {
             <div
               className={
                 activeView === "invoice"
-                  ? "mt-4 rounded-2xl border border-white/10 bg-[#0A1017]/80 px-4 py-6 shadow-2xl backdrop-blur-md sm:px-6"
+                  ? "mt-4"
                   : "invoice-capture-offscreen pointer-events-none fixed left-[-10000px] top-0 z-[-1] w-[800px] bg-[#0D1117]"
               }
               aria-hidden={activeView !== "invoice"}
@@ -731,6 +820,7 @@ export default function ItineraryPageClient() {
                 showToolbar={false}
                 onPrintRequest={requestSendPdf}
                 feeCreditEur={feeCreditEur}
+                totalPaidEur={totalPaidEur || feeCreditEur}
               />
             </div>
 
@@ -745,7 +835,13 @@ export default function ItineraryPageClient() {
                   totalGuests={totalGuests}
                   onRequestPay={handleRequestPay}
                   requestDisabled={!quote}
-                  reserveLabel={dossierPrimaryCtaLabel(feeCreditEur)}
+                  reserveLabel={dossierPrimaryCtaLabel(feeCreditEur, {
+                    amountPaidEur: Math.max(totalPaidEur, feeCreditEur),
+                    packageTotalEur: quote?.max ?? quote?.min ?? 0,
+                  })}
+                  pricesUnlocked={contactReady}
+                  amountPaidEur={Math.max(totalPaidEur, feeCreditEur)}
+                  packageTotalEur={quote?.max ?? quote?.min ?? 0}
                 />
               </div>
             ) : null}
@@ -877,7 +973,7 @@ export default function ItineraryPageClient() {
           void loadConciergeEstimateCopy().then((c) =>
             setConciergeFeeEur(c.feeAmountEur)
           );
-          setShowFeeModal(true);
+          openFeeOrBalance();
         }}
         onContinueEditing={() => {
           setSaveLaterOpen(false);
@@ -985,9 +1081,12 @@ export default function ItineraryPageClient() {
             confirmedBookingRef: state.confirmedBookingRef,
             bookingStatus: state.bookingStatus,
           })}
-          guestEmail={guestEmail}
           guestName={customerName}
+          guestEmail={guestEmail}
           tripPath="/builder/itinerary"
+          feeCreditEur={feeCreditEur}
+          totalPaidEur={totalPaidEur || feeCreditEur}
+          conciergeFeeEur={conciergeFeeEur}
         />
       </div>
     </div>

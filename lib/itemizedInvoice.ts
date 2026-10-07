@@ -21,7 +21,10 @@ import type {
 } from "@/store/useSingleDayBuilderStore";
 import type { InvoiceItem } from "@/components/invoice/ItemizedInvoiceTable";
 
-export { mergeInvoiceWithAgentServices } from "@/lib/agentServices";
+export {
+  mergeInvoiceWithAgentServices,
+  resolveGuestInvoiceItems,
+} from "@/lib/agentServices";
 export type { ServiceLineItem } from "@/lib/agentServices";
 
 export function buildSingleDayInvoiceItems(input: {

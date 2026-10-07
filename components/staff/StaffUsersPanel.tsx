@@ -6,6 +6,7 @@ import { formatPbError } from "@/lib/pocketbase/admin-schema";
 import {
   ensureStaffProfile,
   getStaffProfile,
+  splitDisplayNameForEditor,
   type StaffProfile,
 } from "@/lib/staffProfiles";
 import {
@@ -14,10 +15,12 @@ import {
   getGuideByStaff,
   type GuideProfile,
 } from "@/lib/roleProfiles";
+import { uploadStaffAvatarViaApi } from "@/lib/staffCredentialClient";
 import {
   CREDENTIAL_TABS,
   ROLE_LABELS,
   STAFF_ROLES,
+  canAccessOpsBoard,
   roleMatchesCredentialTab,
   type CredentialTab,
   type StaffRole,
@@ -26,6 +29,7 @@ import {
   PassportBookletModal,
   StaffPassportCard,
 } from "@/components/staff/StaffPassportUI";
+import { useTeamAuth } from "@/store/useTeamAuth";
 
 type TeamUser = {
   id: string;
@@ -36,6 +40,20 @@ type TeamUser = {
   active?: boolean;
   created?: string;
 };
+
+/** Guides / agencies / drivers use email+password — not Google Workspace SSO. */
+function roleUsesPasswordLogin(role: StaffRole): boolean {
+  return role === "guide" || role === "agency" || role === "driver";
+}
+
+/** Satisfy PB auth min password when pre-provisioning SSO-only staff. */
+function generateSsoPlaceholderPassword(): string {
+  const rand =
+    typeof crypto !== "undefined" && "randomUUID" in crypto
+      ? crypto.randomUUID().replace(/-/g, "")
+      : `${Date.now().toString(36)}${Math.random().toString(36).slice(2)}`;
+  return `${rand.slice(0, 12)}A1!x`;
+}
 
 export function StaffUsersPanel({
   getClient,
@@ -58,24 +76,85 @@ export function StaffUsersPanel({
   const [agencyId, setAgencyId] = useState("");
   const [password, setPassword] = useState("");
   const [passwordConfirm, setPasswordConfirm] = useState("");
+  /** Core staff: hide password UI and mint a dummy PB password for Google SSO. */
+  const [ssoPreProvision, setSsoPreProvision] = useState(true);
   const [saving, setSaving] = useState(false);
+
+  const passwordLoginRole = roleUsesPasswordLogin(role);
+  const useSsoProvision = ssoPreProvision && !passwordLoginRole;
+
+  const setRoleAndSsoDefault = (next: StaffRole) => {
+    setRole(next);
+    if (roleUsesPasswordLogin(next)) {
+      setSsoPreProvision(false);
+    } else {
+      setSsoPreProvision(true);
+    }
+  };
   const [resetId, setResetId] = useState<string | null>(null);
   const [resetPass, setResetPass] = useState("");
   const [resetConfirm, setResetConfirm] = useState("");
   const [editUser, setEditUser] = useState<TeamUser | null>(null);
+  const [assignUser, setAssignUser] = useState<TeamUser | null>(null);
+  const [assignPnr, setAssignPnr] = useState("");
+  const [assigning, setAssigning] = useState(false);
+  const [hubPnrs, setHubPnrs] = useState<{ pnr: string; guest?: string }[]>(
+    []
+  );
   const [credentialTab, setCredentialTab] =
     useState<CredentialTab>("staff");
+  const isAuthenticated = useTeamAuth((s) => s.isAuthenticated);
+  const authEmail = useTeamAuth((s) => s.email);
+  const authRole = useTeamAuth((s) => s.role);
+  const authCollection = useTeamAuth((s) => s.authCollection);
+  const canManage =
+    authCollection === "_superusers" || canAccessOpsBoard(authRole);
 
   const load = async () => {
     setLoading(true);
     setError(null);
     try {
       const pb = getClient();
+      if (!pb.authStore.isValid) {
+        setRows([]);
+        setError(
+          `Not authenticated to PocketBase (${pb.baseUrl}). Log out and sign in again on local.`
+        );
+        return;
+      }
+
+      // Stale JWT from production still looks "valid" client-side but local PB
+      // returns an empty staff list with no error. Refresh proves the token.
+      const authCollection =
+        useTeamAuth.getState().authCollection === "staff"
+          ? "staff"
+          : "_superusers";
+      try {
+        await pb.collection(authCollection).authRefresh();
+        useTeamAuth.setState({
+          token: pb.authStore.token,
+          record: pb.authStore.record,
+          isAuthenticated: true,
+        });
+      } catch {
+        setRows([]);
+        setError(
+          `Session is not valid on ${pb.baseUrl} (often an old production login). Log out, then sign in again on local.`
+        );
+        useTeamAuth.getState().logout();
+        return;
+      }
+
       const list = await pb.collection("staff").getFullList<TeamUser>({
         sort: "role,email",
         requestKey: null,
       });
       setRows(list);
+      if (list.length === 0) {
+        setError(
+          `Staff list empty from ${pb.baseUrl} after a valid session. Log out and sign in with a local owner/ops account (or PB admin), then Refresh.`
+        );
+      }
       const map: Record<string, StaffProfile | null> = {};
       const gmap: Record<string, GuideProfile | null> = {};
       await Promise.all(
@@ -105,21 +184,59 @@ export function StaffUsersPanel({
     }
   };
 
+  // Wait for team-auth persist hydrate — loading with no token returns [].
   useEffect(() => {
+    if (!isAuthenticated && !authEmail && !currentEmail) return;
     void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [isAuthenticated, authEmail, currentEmail]);
 
   const createUser = async () => {
     setSaving(true);
     setError(null);
     setMsg(null);
     try {
-      if (password.length < 8) {
-        throw new Error("Password must be at least 8 characters.");
+      const trimmedEmail = email.trim().toLowerCase();
+      const trimmedName = name.trim();
+      if (!trimmedName) {
+        throw new Error("Display name is required.");
       }
-      if (password !== passwordConfirm) {
-        throw new Error("Password confirmation does not match.");
+      // PocketBase auth email validation — catch before HTTP 400.
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+        throw new Error(
+          "Email must look like name@company.com (include @ and a domain)."
+        );
+      }
+
+      const existing = rows.find(
+        (r) => String(r.email || "").trim().toLowerCase() === trimmedEmail
+      );
+      if (existing) {
+        throw new Error(
+          "⚠️ This email already exists in the system. To change their role, edit the existing user instead of creating a new one."
+        );
+      }
+
+      let pass = password;
+      let passConfirm = passwordConfirm;
+      if (useSsoProvision) {
+        pass = generateSsoPlaceholderPassword();
+        passConfirm = pass;
+      } else {
+        if (pass.length < 8) {
+          throw new Error(
+            "⚠️ Password must be at least 8 characters and match the confirmation."
+          );
+        }
+        if (pass !== passConfirm) {
+          throw new Error(
+            "⚠️ Password must be at least 8 characters and match the confirmation."
+          );
+        }
+      }
+
+      if (role === "agency" && !agencyId.trim()) {
+        throw new Error("Agency id is required for the Agency role.");
       }
       const accountType =
         role === "guide"
@@ -129,10 +246,10 @@ export function StaffUsersPanel({
             : "STAFF";
       const created = await getClient().collection("staff").create(
         {
-          email: email.trim().toLowerCase(),
-          password,
-          passwordConfirm,
-          name: name.trim(),
+          email: trimmedEmail,
+          password: pass,
+          passwordConfirm: passConfirm,
+          name: trimmedName,
           role,
           account_type: accountType,
           agency_id: role === "agency" ? agencyId.trim() : "",
@@ -142,29 +259,34 @@ export function StaffUsersPanel({
         { requestKey: null }
       );
       try {
-        await ensureStaffProfile(getClient(), created.id, {
-          display_name: name.trim(),
-        });
+        {
+          const parts = splitDisplayNameForEditor(trimmedName);
+          await ensureStaffProfile(getClient(), created.id, {
+            display_name: trimmedName,
+            first_name: parts.first_name,
+            last_name: parts.last_name,
+          });
+        }
       } catch {
-        /* profile optional on create */
+        /* profile optional on create — do not fail staff login creation */
       }
       if (role === "guide") {
         try {
           await ensureGuideProfile(getClient(), created.id, {
-            full_name: name.trim(),
-            email: email.trim().toLowerCase(),
+            full_name: trimmedName,
+            email: trimmedEmail,
           });
         } catch {
-          /* */
+          /* guide profile optional on create */
         }
       }
       if (role === "driver") {
         try {
           await ensureDriverProfile(getClient(), created.id, {
-            full_name: name.trim(),
+            full_name: trimmedName,
           });
         } catch {
-          /* */
+          /* driver profile optional on create */
         }
       }
       setEmail("");
@@ -172,7 +294,13 @@ export function StaffUsersPanel({
       setAgencyId("");
       setPassword("");
       setPasswordConfirm("");
-      setMsg(`Staff created (${ROLE_LABELS[role]}) — they can sign in.`);
+      setMsg(
+        useSsoProvision
+          ? `Pre-provisioned ${ROLE_LABELS[role]} for Google SSO — ${trimmedEmail} can sign in with Workspace (role already assigned).`
+          : role === "guide" || role === "agency"
+            ? `${ROLE_LABELS[role]} created — they sign in with email + password (not Google SSO).`
+            : `Staff created (${ROLE_LABELS[role]}) — they can sign in.`
+      );
       await load();
     } catch (e) {
       setError(formatPbError(e));
@@ -220,6 +348,66 @@ export function StaffUsersPanel({
     }
   };
 
+  const uploadCredentialPhoto = async (staffId: string, file: File) => {
+    await uploadStaffAvatarViaApi(getClient().authStore.token, staffId, file);
+    setMsg("Photo updated.");
+    await load();
+  };
+
+  const openAssign = async (row: TeamUser) => {
+    setAssignUser(row);
+    setAssignPnr("");
+    try {
+      const list = await getClient()
+        .collection("ops_hub")
+        .getList<{ pnr: string; guest_summary?: string }>(1, 40, {
+          sort: "-updated",
+          requestKey: null,
+        });
+      setHubPnrs(
+        list.items.map((h) => ({
+          pnr: String(h.pnr || "").toUpperCase(),
+          guest: String(h.guest_summary || "").trim(),
+        }))
+      );
+    } catch {
+      setHubPnrs([]);
+    }
+  };
+
+  const assignToBooking = async () => {
+    if (!assignUser) return;
+    const pnr = assignPnr.trim().toUpperCase().replace(/"/g, "");
+    if (!pnr) {
+      setError("Enter a PNR to assign.");
+      return;
+    }
+    setAssigning(true);
+    setError(null);
+    try {
+      const pb = getClient();
+      const name =
+        assignUser.name || assignUser.email || "Staff";
+      const hub = await pb
+        .collection("ops_hub")
+        .getFirstListItem(`pnr="${pnr}"`, { requestKey: null });
+      await pb.collection("ops_hub").update(
+        hub.id,
+        {
+          assigned_agent_id: assignUser.id,
+          assigned_agent: name,
+        },
+        { requestKey: null }
+      );
+      setMsg(`${name} assigned as concierge agent on ${pnr}.`);
+      setAssignUser(null);
+    } catch (e) {
+      setError(formatPbError(e));
+    } finally {
+      setAssigning(false);
+    }
+  };
+
   const removeUser = async (row: TeamUser) => {
     if (row.email === currentEmail) {
       setError("You cannot delete the account you are signed in with.");
@@ -253,6 +441,10 @@ export function StaffUsersPanel({
 
       <div className="mt-6 rounded-2xl border border-zinc-800 bg-zinc-950 p-4">
         <h3 className="font-medium text-zinc-100">Create staff</h3>
+        <p className="mt-1 text-xs text-zinc-500">
+          Pre-create core staff with their Workspace email + role before first
+          Google login. Guides &amp; agencies use email + password (any domain).
+        </p>
         <div className="mt-3 grid gap-3 sm:grid-cols-2">
           <label className="block text-xs uppercase tracking-wider text-zinc-400 sm:col-span-2">
             Email
@@ -261,7 +453,13 @@ export function StaffUsersPanel({
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="mt-1 w-full rounded-xl border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-100"
-              placeholder="colleague@yourcompany.com"
+              placeholder={
+                useSsoProvision
+                  ? "name@tokiotours.nl"
+                  : role === "guide"
+                    ? "guide@gmail.com"
+                    : "agent@agency.com"
+              }
             />
           </label>
           <label className="block text-xs uppercase tracking-wider text-zinc-400">
@@ -276,7 +474,9 @@ export function StaffUsersPanel({
             Role
             <select
               value={role}
-              onChange={(e) => setRole(e.target.value as StaffRole)}
+              onChange={(e) =>
+                setRoleAndSsoDefault(e.target.value as StaffRole)
+              }
               className="mt-1 w-full rounded-xl border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-100"
             >
               {STAFF_ROLES.map((r) => (
@@ -297,37 +497,99 @@ export function StaffUsersPanel({
               />
             </label>
           ) : null}
-          <label className="block text-xs uppercase tracking-wider text-zinc-400">
-            Password
+
+          <label
+            className={`flex items-start gap-2.5 rounded-xl border px-3 py-2.5 sm:col-span-2 ${
+              passwordLoginRole
+                ? "cursor-not-allowed border-zinc-800 bg-zinc-900/40 opacity-70"
+                : "cursor-pointer border-cyan-500/30 bg-cyan-500/5"
+            }`}
+          >
             <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="mt-1 w-full rounded-xl border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-100"
+              type="checkbox"
+              className="mt-0.5"
+              checked={useSsoProvision}
+              disabled={passwordLoginRole}
+              onChange={(e) => setSsoPreProvision(e.target.checked)}
             />
+            <span className="text-xs text-zinc-300 normal-case tracking-normal">
+              <span className="font-semibold text-white">
+                Pre-provision for Google SSO
+              </span>
+              <span className="mt-0.5 block text-zinc-500">
+                {passwordLoginRole
+                  ? "Guides, agencies, and drivers sign in with email + password — SSO pre-provision is off."
+                  : "Hides password fields. Creates the account with a hidden password so PocketBase is satisfied; they sign in with Google Workspace."}
+              </span>
+            </span>
           </label>
-          <label className="block text-xs uppercase tracking-wider text-zinc-400">
-            Confirm password
-            <input
-              type="password"
-              value={passwordConfirm}
-              onChange={(e) => setPasswordConfirm(e.target.value)}
-              className="mt-1 w-full rounded-xl border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-100"
-            />
-          </label>
+
+          {!useSsoProvision ? (
+            <>
+              <p className="text-[11px] leading-relaxed text-amber-200/80 sm:col-span-2">
+                Guides and Agencies use Email + Password to log in. Please set
+                an initial password (min 8 characters).
+              </p>
+              <label className="block text-xs uppercase tracking-wider text-zinc-400">
+                Password
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="mt-1 w-full rounded-xl border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-100"
+                  autoComplete="new-password"
+                />
+              </label>
+              <label className="block text-xs uppercase tracking-wider text-zinc-400">
+                Confirm password
+                <input
+                  type="password"
+                  value={passwordConfirm}
+                  onChange={(e) => setPasswordConfirm(e.target.value)}
+                  className="mt-1 w-full rounded-xl border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-100"
+                  autoComplete="new-password"
+                />
+              </label>
+            </>
+          ) : (
+            <p className="text-[11px] leading-relaxed text-zinc-500 sm:col-span-2">
+              Password fields hidden — a secure placeholder is generated so
+              PocketBase accepts the create. Staff never need this password if
+              they use Google SSO.
+            </p>
+          )}
         </div>
         <button
           type="button"
-          disabled={saving || !email || !password}
+          disabled={
+            saving ||
+            !email.trim() ||
+            !name.trim() ||
+            (!useSsoProvision && !password)
+          }
           onClick={() => void createUser()}
           className="mt-4 rounded-full bg-[#075473] px-5 py-2 text-sm font-semibold text-white disabled:opacity-50"
         >
-          {saving ? "Creating…" : "+ Create staff"}
+          {saving
+            ? "Creating…"
+            : useSsoProvision
+              ? "+ Pre-provision SSO"
+              : "+ Create staff"}
         </button>
       </div>
 
       <div className="mt-6">
-        <h3 className="mb-3 font-medium text-zinc-100">Credential registry</h3>
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <h3 className="font-medium text-zinc-100">Credential registry</h3>
+          <button
+            type="button"
+            onClick={() => void load()}
+            disabled={loading}
+            className="rounded-full border border-zinc-700 px-3 py-1 text-[11px] font-bold tracking-wider text-zinc-300 uppercase hover:border-zinc-500 disabled:opacity-50"
+          >
+            {loading ? "Loading…" : "Refresh"}
+          </button>
+        </div>
         <div
           className="mb-4 flex flex-wrap gap-1.5"
           role="tablist"
@@ -380,7 +642,13 @@ export function StaffUsersPanel({
                 profile={profiles[row.id] || null}
                 guide={guides[row.id] || null}
                 isYou={row.email === currentEmail}
+                canManage={canManage}
                 onEdit={() => setEditUser(row)}
+                onUploadPhoto={(file) => uploadCredentialPhoto(row.id, file)}
+                onPhotoSaved={() => load()}
+                onAssignCase={
+                  canManage ? () => void openAssign(row) : undefined
+                }
                 onResetPassword={() => {
                   setResetId(row.id);
                   setResetPass("");
@@ -435,6 +703,53 @@ export function StaffUsersPanel({
         </div>
       ) : null}
 
+      {assignUser ? (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 p-4 sm:items-center">
+          <div className="w-full max-w-md space-y-3 rounded-2xl border border-white/10 bg-[#0D1117] p-5">
+            <p className="text-sm font-semibold text-white">
+              Assign {assignUser.name || assignUser.email} to a booking
+            </p>
+            <p className="text-[11px] text-zinc-500">
+              Same as concierge agent assignment on Booking status — pick a PNR.
+            </p>
+            <label className="block text-[10px] uppercase tracking-wider text-zinc-500">
+              Booking PNR
+              <input
+                className="mt-1 w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 font-mono text-sm text-white uppercase"
+                value={assignPnr}
+                onChange={(e) => setAssignPnr(e.target.value.toUpperCase())}
+                placeholder="JPN-XXXXXX"
+                list="credential-assign-pnrs"
+              />
+            </label>
+            <datalist id="credential-assign-pnrs">
+              {hubPnrs.map((h) => (
+                <option key={h.pnr} value={h.pnr}>
+                  {h.guest || h.pnr}
+                </option>
+              ))}
+            </datalist>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                disabled={assigning}
+                onClick={() => void assignToBooking()}
+                className="rounded-full bg-[#075473] px-4 py-2 text-xs font-bold text-white disabled:opacity-50"
+              >
+                {assigning ? "Saving…" : "Assign as agent"}
+              </button>
+              <button
+                type="button"
+                onClick={() => setAssignUser(null)}
+                className="rounded-full border border-zinc-600 px-4 py-2 text-xs text-zinc-300"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       {editUser ? (
         <PassportBookletModal
           user={editUser}
@@ -442,6 +757,7 @@ export function StaffUsersPanel({
           getClient={getClient}
           onClose={() => setEditUser(null)}
           onSaved={async () => {
+            setError(null);
             setMsg(`Credential updated · ${editUser.email}`);
             setEditUser(null);
             await load();

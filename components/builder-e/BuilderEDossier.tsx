@@ -11,10 +11,7 @@ import { ConciergeCommitmentFlow, ConciergeFeeModal } from "@/components/checkou
 import { DossierActionToolbar } from "@/components/dossier/DossierActionToolbar";
 import { DossierTermsFooterSection } from "@/components/dossier/DossierTermsFooterSection";
 import { SaveForLaterOptionsModal } from "@/components/checkout/SaveForLaterOptionsModal";
-import {
-  FeeCreditInvoiceBlock,
-  FeePaidRibbon,
-} from "@/components/dossier/FeeCreditRibbon";
+import { FeePaidRibbon } from "@/components/dossier/FeeCreditRibbon";
 import { TripRangeMiniCalendar } from "@/components/builder/TripRangeMiniCalendar";
 import { RevolutCheckoutModal } from "@/components/checkout/RevolutCheckoutModal";
 import { BalancePaymentModal } from "@/components/checkout/BalancePaymentModal";
@@ -27,7 +24,10 @@ import {
 import { useItineraryStore } from "@/store/useItineraryStore";
 import { usePreBuilderStore } from "@/store/usePreBuilderStore";
 import { syncBuilderELead } from "@/lib/syncBuilderE";
-import { showSystemMessage } from "@/store/useSystemMessageStore";
+import {
+  dismissSystemMessage,
+  showSystemMessage,
+} from "@/store/useSystemMessageStore";
 import {
   buildBuilderEContactSnapshot,
   validateBuilderEContact,
@@ -36,6 +36,28 @@ import { DEFAULT_CONCIERGE_FEE_EUR } from "@/lib/conciergeEstimateFlow";
 import { loadConciergeEstimateCopy } from "@/lib/conciergeEstimateFlow";
 import { formatEur } from "@/lib/singleDayPricing";
 import { dossierPrimaryCtaLabel } from "@/lib/tourPaymentStatus";
+import {
+  ItineraryStopTicket,
+  PaperActivityTicketCard,
+} from "@/components/dossier/ItineraryStopTickets";
+import {
+  ItemizedInvoiceTable,
+  invoicePackageRangeEur,
+  toFlatInvoiceRow,
+  type InvoiceItem,
+} from "@/components/invoice/ItemizedInvoiceTable";
+import {
+  InvoiceBriefEstimateBox,
+  InvoiceMetaList,
+  InvoiceMetaRow,
+} from "@/components/invoice/InvoiceBriefChrome";
+import { MobileDossierLayout } from "@/components/guest/MobileDossierLayout";
+import { FlatInvoiceBrief } from "@/components/ops/FlatInvoiceBrief";
+import {
+  resolveGuestInvoiceItems,
+  type PriceMode,
+  type ServiceLineItem,
+} from "@/lib/agentServices";
 
 export function BuilderEDossierView() {
   const state = useBuilderEStore();
@@ -63,6 +85,12 @@ export function BuilderEDossierView() {
   const [conciergeFeeEur, setConciergeFeeEur] = useState(DEFAULT_CONCIERGE_FEE_EUR);
   const [feeCreditEur, setFeeCreditEur] = useState(0);
   const [totalPaidEur, setTotalPaidEur] = useState(0);
+  const [agentServices, setAgentServices] = useState<ServiceLineItem[]>([]);
+  const [approvedFromServer, setApprovedFromServer] = useState<number | null>(
+    null
+  );
+  const [priceModeFromServer, setPriceModeFromServer] =
+    useState<PriceMode | null>(null);
   const [balanceOpen, setBalanceOpen] = useState(false);
   const [balanceAmount, setBalanceAmount] = useState(0);
   const [balanceOption, setBalanceOption] =
@@ -73,24 +101,203 @@ export function BuilderEDossierView() {
     () => buildBuilderEContactSnapshot(state.cart),
     [state.cart]
   );
+  const localInvoiceItems = useMemo<InvoiceItem[]>(
+    () =>
+      state.cart.map((item, idx) => {
+        const snap = contactSnapshot.selected_services[idx];
+        return {
+          id: item.id,
+          category: item.category,
+          title: item.label,
+          status: "ACCEPTED" as const,
+          basePriceEur: snap?.estimatedEur ?? 0,
+          notes: item.summary || undefined,
+        };
+      }),
+    [state.cart, contactSnapshot.selected_services]
+  );
+  // Prefer ops_hub.extras.agent_services when Ops has saved a cart.
+  const invoiceItems = useMemo(
+    () => resolveGuestInvoiceItems(localInvoiceItems, agentServices),
+    [localInvoiceItems, agentServices]
+  );
+  const lockedApproved =
+    approvedFromServer != null && approvedFromServer > 0
+      ? approvedFromServer
+      : null;
+  const guestPriceMode = priceModeFromServer;
+  const { packageMinEur, packageMaxEur } = useMemo(
+    () => invoicePackageRangeEur(invoiceItems),
+    [invoiceItems]
+  );
+  const paidTowardTour = Math.max(totalPaidEur, feeCreditEur);
+  const feeCreditAmount =
+    feeCreditEur > 0
+      ? feeCreditEur
+      : conciergeFeeEur || DEFAULT_CONCIERGE_FEE_EUR;
   const contactError = validateBuilderEContact({
     fullName: guestName,
     email: guestEmail,
     whatsapp: guestWhatsapp,
   });
+  const categoryLabel =
+    category === "DRIVER"
+      ? "Private Transfer"
+      : category === "EXPERIENCE"
+        ? "Experience"
+        : category === "TRANSIT"
+          ? "Transit & Rail"
+          : "VIP Access";
+  const serviceLabel =
+    state.cart
+      .map((item) => item.label)
+      .filter(Boolean)
+      .join(" · ") || categoryLabel;
+  const tourDate =
+    builderETourDate(state) || contactSnapshot.startDate || null;
+  const dateLabel = tourDate || "Date TBD";
+  const pax = Math.max(1, contactSnapshot.paxCount);
+  const guestsLabel =
+    builderEGuestSummary(state) ||
+    `${pax} guest${pax === 1 ? "" : "s"}`;
+
+  const tripDetails = (
+    <>
+      <InvoiceMetaRow label="Guest" value={guestName || "Guest"} />
+      <InvoiceMetaRow label="Email" value={guestEmail || "—"} />
+      <InvoiceMetaRow label="Category" value={categoryLabel} />
+      <InvoiceMetaRow label="Service" value={serviceLabel} />
+      <InvoiceMetaRow label="Date" value={dateLabel} />
+      <InvoiceMetaRow label="Guests" value={guestsLabel} />
+      {contactSnapshot.estimated_total > 0 ? (
+        <InvoiceMetaRow
+          label="Est. / Person"
+          value={formatEur(Math.round(packageMinEur / pax))}
+        />
+      ) : null}
+    </>
+  );
+
+  const estimateBox = (
+    <InvoiceBriefEstimateBox
+      pnr={pnr}
+      guestName={guestName || "Guest"}
+      partySize={pax}
+      packageMinEur={packageMinEur}
+      packageMaxEur={packageMaxEur}
+      finalApprovedPrice={lockedApproved}
+      priceMode={guestPriceMode}
+    />
+  );
 
   useEffect(() => {
     ensureBookingRef();
   }, [ensureBookingRef]);
 
   useEffect(() => {
-    void import("@/lib/feeCredit").then(({ hydrateConciergeFeeCredit }) => {
-      void hydrateConciergeFeeCredit(state.bookingRef).then((eur) => {
-        setFeeCreditEur(eur);
-        if (eur > 0) setTotalPaidEur((prev) => (prev > 0 ? prev : eur));
-      });
+    const ref = String(state.bookingRef || "").trim();
+    if (!ref || ref.startsWith("TMP-") || ref.includes("····")) {
+      setAgentServices([]);
+      setApprovedFromServer(null);
+      setPriceModeFromServer(null);
+      return;
+    }
+    let cancelled = false;
+    const applyAgentPayload = (data: {
+      services?: ServiceLineItem[];
+      finalApprovedPrice?: number | null;
+      priceMode?: PriceMode | string | null;
+    }) => {
+      setAgentServices(data.services || []);
+      setApprovedFromServer(
+        data.finalApprovedPrice != null &&
+          Number.isFinite(Number(data.finalApprovedPrice)) &&
+          Number(data.finalApprovedPrice) > 0
+          ? Math.round(Number(data.finalApprovedPrice))
+          : null
+      );
+      setPriceModeFromServer(
+        data.priceMode === "exact"
+          ? "exact"
+          : data.priceMode === "estimate"
+            ? "estimate"
+            : null
+      );
+    };
+    const load = () => {
+      void fetch(`/api/bookings/agent-services?pnr=${encodeURIComponent(ref)}`, {
+        cache: "no-store",
+      })
+        .then((r) => (r.ok ? r.json() : null))
+        .then(
+          (data: {
+            services?: ServiceLineItem[];
+            finalApprovedPrice?: number | null;
+            priceMode?: PriceMode | string | null;
+          } | null) => {
+            if (cancelled || !data) return;
+            applyAgentPayload(data);
+            if ((data.services || []).length === 0 && invoiceItems.length > 0) {
+              void import("@/lib/syncGuestInvoiceCart").then(
+                ({ syncGuestInvoiceCart }) =>
+                  syncGuestInvoiceCart({
+                    pnr: ref,
+                    items: invoiceItems,
+                    estimatedTotalEur: contactSnapshot.estimated_total,
+                  }).then((result) => {
+                    if (cancelled || !result.ok || !result.seeded) return;
+                    void fetch(
+                      `/api/bookings/agent-services?pnr=${encodeURIComponent(ref)}`,
+                      { cache: "no-store" }
+                    )
+                      .then((r) => (r.ok ? r.json() : null))
+                      .then(
+                        (again: {
+                          services?: ServiceLineItem[];
+                          finalApprovedPrice?: number | null;
+                          priceMode?: PriceMode | string | null;
+                        } | null) => {
+                          if (cancelled || !again) return;
+                          applyAgentPayload(again);
+                        }
+                      );
+                  })
+              );
+            }
+          }
+        )
+        .catch(() => {
+          /* ignore */
+        });
+    };
+    load();
+    const t = window.setInterval(load, 20_000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(t);
+    };
+  }, [
+    state.bookingRef,
+    invoiceItems,
+    contactSnapshot.estimated_total,
+  ]);
+
+  useEffect(() => {
+    void import("@/lib/feeCredit").then(({ hydrateTourPayments }) => {
+      void hydrateTourPayments(state.bookingRef).then(
+        ({ feeCreditEur, totalPaidEur }) => {
+          setFeeCreditEur(feeCreditEur);
+          if (totalPaidEur > 0) {
+            setTotalPaidEur((prev) => Math.max(prev, totalPaidEur));
+          }
+        }
+      );
     });
   }, [state.bookingRef]);
+
+  useEffect(() => {
+    if (feeOpen || balanceOpen) dismissSystemMessage();
+  }, [feeOpen, balanceOpen]);
 
   useEffect(() => {
     const it = useItineraryStore.getState();
@@ -175,6 +382,21 @@ export function BuilderEDossierView() {
     }
   };
 
+  const openBalanceCheckout = () => {
+    dismissSystemMessage();
+    setFeeOpen(false);
+    setBalanceOpen(true);
+  };
+
+  const openFeeOrBalance = () => {
+    dismissSystemMessage();
+    if (feeCreditEur > 0 || totalPaidEur > 0) {
+      openBalanceCheckout();
+      return;
+    }
+    setFeeOpen(true);
+  };
+
   const openFeeCheckout = async (path: "FULL" | "PARTIAL") => {
     setCheckoutPath(path);
     setEstimateOpen(false);
@@ -190,7 +412,7 @@ export function BuilderEDossierView() {
         showSystemMessage({ text: result.error, tone: "error" });
       }
     });
-    setFeeOpen(true);
+    openFeeOrBalance();
   };
 
   const saveDraftAndEmail = async () => {
@@ -259,28 +481,38 @@ export function BuilderEDossierView() {
         const body = (await res.json().catch(() => ({}))) as { error?: string };
         throw new Error(body.error || "Could not record fee payment.");
       }
-      void import("@/lib/recordPayment").then(({ recordPaymentSuccess }) =>
-        recordPaymentSuccess({
-          pnr: paymentDetails.bookingRef,
-          kind: "concierge_deposit",
-          amountEur: paymentDetails.amountPaid,
-          orderId: paymentDetails.orderId,
-          path: checkoutPath,
-          guestEmail,
-          guestName,
-          builder: "builder-e",
-        })
+      const { recordPaymentSuccess } = await import("@/lib/recordPayment");
+      const recorded = await recordPaymentSuccess({
+        pnr: paymentDetails.bookingRef,
+        kind: "concierge_deposit",
+        amountEur: paymentDetails.amountPaid,
+        orderId: paymentDetails.orderId,
+        path: checkoutPath,
+        guestEmail,
+        guestName,
+        builder: "builder-e",
+        estimatedTotalEur: contactSnapshot.estimated_total,
+      });
+      const paid = Math.max(
+        recorded.totalPaidEur || 0,
+        paymentDetails.amountPaid
       );
-      void import("@/lib/feeCredit").then(({ markConciergeFeePaid }) =>
-        markConciergeFeePaid(
-          paymentDetails.bookingRef,
-          paymentDetails.amountPaid
-        )
+      const { markConciergeFeePaid, markTotalPaidEur } = await import(
+        "@/lib/feeCredit"
       );
+      markConciergeFeePaid(paymentDetails.bookingRef, paymentDetails.amountPaid);
+      markTotalPaidEur(paymentDetails.bookingRef, paid);
       setFeeCreditEur(paymentDetails.amountPaid);
-      setTotalPaidEur(paymentDetails.amountPaid);
+      setTotalPaidEur(paid);
       setSubmittedRef(paymentDetails.bookingRef);
       setCheckoutOpen(false);
+      void import("@/lib/syncGuestInvoiceCart").then(({ syncGuestInvoiceCart }) =>
+        syncGuestInvoiceCart({
+          pnr: paymentDetails.bookingRef,
+          items: invoiceItems,
+          estimatedTotalEur: contactSnapshot.estimated_total,
+        })
+      );
       showSystemMessage({
         text: "Deposit received — your dates are held. TokioTours will follow up shortly.",
         tone: "info",
@@ -308,9 +540,9 @@ export function BuilderEDossierView() {
   };
 
   return (
-    <div className="builder-theme relative z-10 min-h-screen overflow-x-hidden bg-transparent pb-28 text-white">
-      <SystemMessageFox />
-      <div className="no-print">
+    <div className="builder-theme relative z-10 min-h-screen overflow-x-hidden bg-transparent pb-28 text-white print:bg-white print:pb-0 print:text-black">
+      {feeOpen || balanceOpen ? null : <SystemMessageFox />}
+      <div className="no-print print:hidden">
         <MobileTopChrome
           brandTitle="VIP Access"
           ctaHref="/builder-e"
@@ -435,20 +667,36 @@ export function BuilderEDossierView() {
                   Cart · {state.cart.length} item
                   {state.cart.length === 1 ? "" : "s"}
                 </p>
-                {state.cart.map((item) => (
-                  <div
-                    key={item.id}
-                    className="rounded-xl border border-white/10 bg-black/30 px-3 py-2"
-                  >
-                    <p className="text-[10px] font-bold tracking-wider text-[#F6A724] uppercase">
-                      {item.category}
-                    </p>
-                    <p className="text-sm font-semibold text-white">
-                      {item.label}
-                    </p>
-                    <p className="text-[11px] text-zinc-500">{item.summary}</p>
-                  </div>
-                ))}
+                {state.cart.map((item, idx) => {
+                  const cat = String(item.category || "").toUpperCase();
+                  const isTicketish =
+                    cat.includes("EXPERIENCE") ||
+                    cat.includes("TICKET") ||
+                    cat.includes("ATTRACTION") ||
+                    cat.includes("TRANSIT");
+                  if (isTicketish) {
+                    return (
+                      <PaperActivityTicketCard
+                        key={item.id}
+                        kind="ticket"
+                        title={item.label}
+                        stopNumber={idx + 1}
+                        vibeLabel={item.category}
+                        address={item.summary}
+                      />
+                    );
+                  }
+                  return (
+                    <ItineraryStopTicket
+                      key={item.id}
+                      kind="tour"
+                      title={item.label}
+                      stopNumber={idx + 1}
+                      vibeLabel={item.category}
+                      address={item.summary}
+                    />
+                  );
+                })}
               </section>
             ) : null}
             {category ? (
@@ -517,13 +765,12 @@ export function BuilderEDossierView() {
 
               {category === "EXPERIENCE" ? (
                 <div className="space-y-3 text-sm">
-                  <Row
-                    label="Experience"
-                    value={state.experience.activityTitle || "—"}
-                  />
-                  <Row
-                    label="When"
-                    value={[
+                  <PaperActivityTicketCard
+                    kind="ticket"
+                    title={state.experience.activityTitle || "Experience"}
+                    stopNumber={1}
+                    vibeLabel="Entry ticket"
+                    address={[
                       state.experience.targetDate || "Date TBD",
                       state.experience.timeSlot || "",
                     ]
@@ -560,6 +807,20 @@ export function BuilderEDossierView() {
 
               {category === "TRANSIT" ? (
                 <div className="space-y-3 text-sm">
+                  <PaperActivityTicketCard
+                    kind="ticket"
+                    title={
+                      state.transit.passType.replace(/_/g, " ") ||
+                      "Transit pass"
+                    }
+                    stopNumber={1}
+                    vibeLabel="Transit"
+                    address={
+                      state.transit.routeFrom || state.transit.routeTo
+                        ? `${state.transit.routeFrom || "—"} → ${state.transit.routeTo || "—"}`
+                        : state.transit.travelDate || undefined
+                    }
+                  />
                   <Row
                     label="Pass"
                     value={
@@ -607,29 +868,48 @@ export function BuilderEDossierView() {
                 </div>
               ) : null}
 
-              {state.guestEmail ? (
-                <p className="mt-4 text-xs text-zinc-500">
-                  Contact: {state.guestName || "Guest"} · {state.guestEmail}
-                  {state.guestWhatsapp ? ` · ${state.guestWhatsapp}` : ""}
+              {!contactDone ? (
+                <p className="mt-3 text-sm text-zinc-500">
+                  Package estimate unlocks after you save name, email &amp;
+                  WhatsApp.
                 </p>
-              ) : null}
-              {contactSnapshot.estimated_total > 0 ? (
-                <p className="mt-3 text-sm font-semibold text-white">
-                  Package estimate{" "}
-                  <span className="tabular-nums text-[#F6A724]">
-                    {formatEur(contactSnapshot.estimated_total)}
-                  </span>
-                </p>
-              ) : null}
-              {feeCreditEur > 0 ? (
-                <FeeCreditInvoiceBlock
-                  packageTotalEur={contactSnapshot.estimated_total}
-                  feeCreditEur={feeCreditEur}
-                  className="mt-3"
-                />
               ) : null}
             </div>
           </section>
+            ) : null}
+
+            {/* Invoice Brief — same 3-box architecture as Builder S / M */}
+            {contactDone && invoiceItems.length > 0 ? (
+              <div className="mt-4 space-y-5">
+                <MobileDossierLayout
+                  tripDetails={tripDetails}
+                  estimate={estimateBox}
+                  itemized={
+                    <FlatInvoiceBrief
+                      items={invoiceItems.map(toFlatInvoiceRow)}
+                      depositAmount={feeCreditEur}
+                      totalPaidEur={paidTowardTour}
+                      finalApprovedPrice={lockedApproved}
+                      priceMode={guestPriceMode}
+                    />
+                  }
+                />
+                <div className="hidden space-y-5 print:hidden md:block">
+                  <InvoiceMetaList>{tripDetails}</InvoiceMetaList>
+                  <ItemizedInvoiceTable
+                    pnr={pnr}
+                    guestName={guestName || "Guest"}
+                    partySize={pax}
+                    items={invoiceItems}
+                    conciergeFeePaid={feeCreditEur > 0 || paidTowardTour > 0}
+                    conciergeFeeAmount={feeCreditAmount}
+                    totalPaidEur={paidTowardTour}
+                    finalApprovedPrice={lockedApproved}
+                    priceMode={guestPriceMode}
+                    composition="desktop"
+                  />
+                </div>
+              </div>
             ) : null}
           </>
         )}
@@ -640,19 +920,36 @@ export function BuilderEDossierView() {
 
         <div className="mt-6">
           {feeCreditEur > 0 ? (
-            <FeePaidRibbon feeEur={feeCreditEur} className="mb-3" />
+            <FeePaidRibbon
+              feeEur={feeCreditEur}
+              totalPaidEur={totalPaidEur || feeCreditEur}
+              packageTotalEur={contactSnapshot.estimated_total}
+              className="mb-3"
+            />
           ) : null}
           <DossierActionToolbar
             contactReady={contactDone}
             costPulsarDone={costPulsarDone}
             continueHref="/builder-e"
             howMuchDisabled={!category || savingContact}
-            howMuchLabel={dossierPrimaryCtaLabel(feeCreditEur)}
-            conciergeFeePaid={feeCreditEur > 0}
+            howMuchLabel={dossierPrimaryCtaLabel(feeCreditEur, {
+              amountPaidEur: Math.max(totalPaidEur, feeCreditEur),
+              packageTotalEur: contactSnapshot.estimated_total,
+            })}
+            conciergeFeePaid={feeCreditEur > 0 || totalPaidEur > 0}
             onHowMuchCost={() => {
               setCostPulsarDone(true);
-              if (feeCreditEur > 0) {
-                setBalanceOpen(true);
+              const paid = Math.max(totalPaidEur, feeCreditEur);
+              const total = contactSnapshot.estimated_total;
+              if (total > 0 && paid >= total) {
+                showSystemMessage({
+                  text: "✓ Your trip is 100% fully paid. No further action required.",
+                  tone: "info",
+                });
+                return;
+              }
+              if (paid > 0) {
+                openBalanceCheckout();
                 return;
               }
               void saveAndNotify();
@@ -717,7 +1014,7 @@ export function BuilderEDossierView() {
           void loadConciergeEstimateCopy().then((c) =>
             setConciergeFeeEur(c.feeAmountEur)
           );
-          setFeeOpen(true);
+          openFeeOrBalance();
         }}
         onContinueEditing={() => {
           setSaveLaterOpen(false);
@@ -770,8 +1067,11 @@ export function BuilderEDossierView() {
         customerPhone={guestWhatsapp}
         onPaymentSuccess={(details) => {
           if (balanceCheckout) {
-            void import("@/lib/recordPayment").then(({ recordPaymentSuccess }) =>
-              recordPaymentSuccess({
+            void (async () => {
+              const { recordPaymentSuccess } = await import(
+                "@/lib/recordPayment"
+              );
+              const recorded = await recordPaymentSuccess({
                 pnr: details.bookingRef,
                 kind: balanceOption === "FULL" ? "tour_full" : "tour_partial",
                 amountEur: details.amountPaid,
@@ -780,19 +1080,33 @@ export function BuilderEDossierView() {
                 guestName,
                 builder: "builder-e",
                 estimatedTotalEur: contactSnapshot.estimated_total,
-              })
-            );
-            setTotalPaidEur((prev) => prev + details.amountPaid);
-            setBalanceCheckout(false);
-            setCheckoutOpen(false);
-            setSubmittedRef(details.bookingRef);
-            showSystemMessage({
-              text:
-                balanceOption === "FULL"
-                  ? "Full tour balance received — thank you."
-                  : "Progress payment received — remaining balance due before travel.",
-              tone: "info",
-            });
+              });
+              const nextPaid = Math.max(
+                recorded.totalPaidEur || 0,
+                Math.max(totalPaidEur, feeCreditEur) + details.amountPaid
+              );
+              setTotalPaidEur(nextPaid);
+              const { markTotalPaidEur } = await import("@/lib/feeCredit");
+              markTotalPaidEur(details.bookingRef, nextPaid);
+              void import("@/lib/syncGuestInvoiceCart").then(
+                ({ syncGuestInvoiceCart }) =>
+                  syncGuestInvoiceCart({
+                    pnr: details.bookingRef,
+                    items: invoiceItems,
+                    estimatedTotalEur: contactSnapshot.estimated_total,
+                  })
+              );
+              setBalanceCheckout(false);
+              setCheckoutOpen(false);
+              setSubmittedRef(details.bookingRef);
+              showSystemMessage({
+                text:
+                  balanceOption === "FULL"
+                    ? "Full tour balance received — thank you."
+                    : "Progress payment received — remaining balance due before travel.",
+                tone: "info",
+              });
+            })();
             return;
           }
           void handlePaymentSuccess(details);

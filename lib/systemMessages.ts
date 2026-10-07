@@ -30,7 +30,9 @@ export type SystemMessageKey =
   | "builder_m_hotel_rooms_required"
   | "sending_again"
   | "sending_pdf"
-  | "guest_comm_needs_agent";
+  | "guest_comm_needs_agent"
+  | "guest_comm_needs_deposit"
+  | "guest_comm_unavailable";
 
 export type SystemMessageDef = {
   key: SystemMessageKey;
@@ -202,7 +204,21 @@ export const SYSTEM_MESSAGE_CATALOG: readonly SystemMessageDef[] = [
     label: "Itinerary · chat needs agent",
     group: "itinerary",
     defaultText:
-      "You need an TokioTours agent to talk — We will assign one soon.",
+      "In-app messaging unlocks once your agent is assigned — we’ll match you soon.",
+  },
+  {
+    key: "guest_comm_needs_deposit",
+    label: "Itinerary · chat needs Concierge Deposit",
+    group: "itinerary",
+    defaultText:
+      "In-app messaging unlocks after your €60 Concierge Deposit — 100% credited toward your tour.",
+  },
+  {
+    key: "guest_comm_unavailable",
+    label: "Itinerary · chat unavailable",
+    group: "itinerary",
+    defaultText:
+      "In-app messaging unlocks once your Concierge Deposit is secured and your agent is assigned.",
   },
 ] as const;
 
@@ -237,9 +253,9 @@ export function writeSystemMessageOverrides(
 
 export function getSystemMessage(key: SystemMessageKey): string {
   const def = SYSTEM_MESSAGE_CATALOG.find((m) => m.key === key);
-  const fallback = def?.defaultText || key;
+  const fallback = String(def?.defaultText || key || "");
   if (typeof window === "undefined") return fallback;
   const o = readSystemMessageOverrides()[key];
-  const text = (o || "").trim();
+  const text = String(o ?? "").trim();
   return text || fallback;
 }

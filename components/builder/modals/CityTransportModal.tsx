@@ -77,7 +77,7 @@ export function CityTransportModal({
     void (async () => {
       try {
         const rows = await fetchUiTransportCards();
-        const all = resolveTransportCards(rows);
+        const all = resolveTransportCards(rows, "incity");
         setModeCards(
           all.filter((c) => c.mode === "public" || c.mode === "private")
         );

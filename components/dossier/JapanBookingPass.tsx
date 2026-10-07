@@ -9,9 +9,22 @@ import {
   downloadAppleWalletPass,
   WalletPassFallbackError,
 } from "@/lib/wallet/downloadApplePass";
+import {
+  guestBadgeForUnifiedStatus,
+  toUnifiedPbStatus,
+} from "@/lib/bookingStatus";
 import type { BookingPassProps } from "./JapanBookingPass.types";
 
 export type { BookingPassProps, RouteBreakdownItem } from "./JapanBookingPass.types";
+
+/** Cruise hubs: drop the city prefix and use 50% of the airport-code type size. */
+const CRUISE_TERMINAL_LABEL = "Cruise Terminal";
+const CRUISE_HUB_TYPE =
+  "block font-mono text-[0.75rem] md:text-[0.9375rem] font-semibold tracking-wider text-white leading-tight print:text-gray-900";
+
+function cruiseTerminalDisplay(code: string): string | null {
+  return /cruise\s+terminal/i.test(code) ? CRUISE_TERMINAL_LABEL : null;
+}
 
 /**
  * Reusable glassmorphic Japan Booking Pass — multi-day + single-day.
@@ -52,7 +65,11 @@ export function JapanBookingPass({
   const [showDraftModal, setShowDraftModal] = useState(false);
   const [portalReady, setPortalReady] = useState(false);
   const isSingle = tripType === "single";
-  const isConfirmed = String(status || "").toUpperCase() === "CONFIRMED";
+  const unifiedStatus = toUnifiedPbStatus(status, {
+    depositPaidEur,
+    hasPaidFull,
+  });
+  const isConfirmed = unifiedStatus === "FULLY_PAID";
 
   useEffect(() => {
     setPortalReady(true);
@@ -126,7 +143,7 @@ export function JapanBookingPass({
     showDraftModal && portalReady
       ? createPortal(
           <div
-            className="fixed inset-0 z-[80] flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm"
+            className="fixed inset-0 z-[80] flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm print:hidden"
             role="dialog"
             aria-modal="true"
             aria-labelledby="wallet-draft-title"
@@ -180,10 +197,10 @@ export function JapanBookingPass({
       : null;
 
   const ticket = (
-    <div className="relative w-full overflow-hidden rounded-2xl border border-white/10 bg-[#0A1017]/90 text-white shadow-2xl">
+    <div className="relative w-full overflow-hidden rounded-2xl border border-white/10 bg-[#0A1017]/90 text-white shadow-2xl print:break-inside-avoid print:rounded-none print:border print:border-gray-300 print:bg-transparent print:text-gray-900 print:shadow-none">
       {/* Top-right crimson/magenta radial glow — matches pass badge premium vibe */}
       <div
-        className="pointer-events-none absolute -top-16 -right-16 z-0 h-64 w-64 select-none rounded-full opacity-35 blur-3xl"
+        className="pointer-events-none absolute -top-16 -right-16 z-0 h-64 w-64 select-none rounded-full opacity-35 blur-3xl print:hidden"
         style={{
           background:
             "radial-gradient(circle, #E60F43 0%, rgba(230,15,67,0) 70%)",
@@ -191,16 +208,16 @@ export function JapanBookingPass({
         aria-hidden
       />
       <div
-        className="absolute top-1/2 -left-3 z-10 hidden h-6 w-6 -translate-y-1/2 rounded-full border border-white/10 bg-[#04080C] md:block"
+        className="absolute top-1/2 -left-3 z-10 hidden h-6 w-6 -translate-y-1/2 rounded-full border border-white/10 bg-[#04080C] print:hidden md:block"
         aria-hidden
       />
       <div
-        className="absolute top-1/2 -right-3 z-10 hidden h-6 w-6 -translate-y-1/2 rounded-full border border-white/10 bg-[#04080C] md:block"
+        className="absolute top-1/2 -right-3 z-10 hidden h-6 w-6 -translate-y-1/2 rounded-full border border-white/10 bg-[#04080C] print:hidden md:block"
         aria-hidden
       />
 
       <div className="relative z-10 grid grid-cols-1 md:grid-cols-12">
-        <div className="space-y-4 border-b border-dashed border-white/15 p-6 md:col-span-8 md:border-r md:border-b-0">
+        <div className="space-y-4 border-b border-dashed border-white/15 p-6 print:border-gray-300 md:col-span-8 md:border-r md:border-b-0">
           <div className="grid grid-cols-2 items-center gap-2">
             <div className="flex min-w-0 items-center gap-2">
               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -209,55 +226,17 @@ export function JapanBookingPass({
                 alt="Tokiotours"
                 className="h-7 w-7 shrink-0 rounded-full object-cover"
               />
-              <span className="font-godiva text-base font-bold tracking-wider text-white">
+              <span className="font-godiva text-base font-bold tracking-wider text-white print:text-gray-900">
                 TOKIOTOURS
               </span>
             </div>
             <div className="flex flex-col items-end gap-1">
               {(() => {
-                const st = String(status || "DRAFT").toUpperCase();
-                const cancelled = st === "CANCELLED" || st === "CANCELED";
-                const statusConfirmed =
-                  st === "CONFIRMED" || st === "IN_OPS" || st === "DONE";
-                const depositPaid =
-                  Number(depositPaidEur) > 0 ||
-                  st === "QUOTED" ||
-                  statusConfirmed;
-                const fullyPaid = Boolean(hasPaidFull) || st === "DONE";
-
-                let label = st;
-                let badgeClass =
-                  "border border-dotted border-[#F6A724]/70 px-2 py-0.5 text-[10px] font-extrabold tracking-wider uppercase text-[#F6A724]";
-
-                if (cancelled) {
-                  label = "CANCELLED";
-                  badgeClass =
-                    "rounded-md border border-[#E60F43]/70 bg-[#E60F43]/15 px-2.5 py-1 text-[10px] font-extrabold tracking-wider uppercase text-[#E60F43]";
-                } else if (fullyPaid || (statusConfirmed && hasPaidFull)) {
-                  label = "CONFIRMED & FULLY PAID ✓";
-                  badgeClass =
-                    "rounded-md bg-emerald-500 px-2.5 py-1 text-[10px] font-extrabold tracking-wider uppercase text-black shadow-md";
-                } else if (statusConfirmed || depositPaid) {
-                  label = "DEPOSIT PAID / RESERVED ✓";
-                  badgeClass =
-                    "rounded-md bg-emerald-500 px-2.5 py-1 text-[10px] font-extrabold tracking-wider uppercase text-black shadow-md";
-                } else if (st === "DRAFT") {
-                  label = "HOLD / PENDING DEPOSIT";
-                  badgeClass =
-                    "rounded-md bg-amber-500 px-2.5 py-1 text-[10px] font-extrabold tracking-wider uppercase text-black shadow-md";
-                } else if (
-                  st === "INCOMING" ||
-                  st === "IN_PROGRESS" ||
-                  st === "REVIEW"
-                ) {
-                  label = "HOLD / PENDING DEPOSIT";
-                  badgeClass =
-                    "rounded-md bg-amber-500 px-2.5 py-1 text-[10px] font-extrabold tracking-wider uppercase text-black shadow-md";
-                }
-
+                const { label, className: badgeClass } =
+                  guestBadgeForUnifiedStatus(unifiedStatus);
                 return <span className={badgeClass}>{label}</span>;
               })()}
-              <span className="text-[10px] font-semibold tracking-[0.16em] text-white uppercase">
+              <span className="text-[10px] font-semibold tracking-[0.16em] text-white uppercase print:text-gray-900">
                 {tripType === "multi"
                   ? "JAPAN MULTI-DAY PASS"
                   : "JAPAN DAY TOUR PASS"}
@@ -269,25 +248,36 @@ export function JapanBookingPass({
             <div className="min-w-0 max-w-[38%]">
               {(() => {
                 const code = String(leftCode || "");
+                const cruiseLabel = cruiseTerminalDisplay(code);
+                if (cruiseLabel && !isSingle) {
+                  return (
+                    <>
+                      <span className={CRUISE_HUB_TYPE}>{cruiseLabel}</span>
+                      <span className="mt-0.5 block text-[10px] tracking-wider text-zinc-400 uppercase print:text-gray-600">
+                        {leftLabel}
+                      </span>
+                    </>
+                  );
+                }
                 const isAirportCode = /^[A-Z]{3}$/.test(code.trim());
                 const isTime = /^\d{1,2}:\d{2}/.test(code.trim());
                 if (isAirportCode || isTime || isSingle) {
                   return (
                     <>
                       <span
-                        className={`font-black font-mono tracking-wider text-white ${
+                        className={`font-black font-mono tracking-wider text-white print:text-gray-900 ${
                           isSingle ? "text-xl md:text-2xl" : "text-2xl md:text-3xl"
                         }`}
                       >
                         {leftCode}
                       </span>
-                      <span className="block text-[10px] tracking-wider text-zinc-400 uppercase">
+                      <span className="block text-[10px] tracking-wider text-zinc-400 uppercase print:text-gray-600">
                         {leftLabel}
                       </span>
                     </>
                   );
                 }
-                // Cruise / long hub name: city −20%, "Cruise Port" −50%
+                // Other long hub names: city −20%, remainder −50%
                 const parts = code.split(/\s+/).filter(Boolean);
                 const city = parts[0] || code;
                 const rest =
@@ -334,16 +324,33 @@ export function JapanBookingPass({
             </div>
 
             <div className="text-right">
-              <span
-                className={`font-black font-mono tracking-wider text-white ${
-                  isSingle ? "text-xl md:text-2xl" : "text-2xl md:text-3xl"
-                }`}
-              >
-                {rightCode}
-              </span>
-              <span className="block text-[10px] tracking-wider text-zinc-400 uppercase">
-                {rightLabel}
-              </span>
+              {(() => {
+                const cruiseLabel = cruiseTerminalDisplay(String(rightCode || ""));
+                if (cruiseLabel && !isSingle) {
+                  return (
+                    <>
+                      <span className={CRUISE_HUB_TYPE}>{cruiseLabel}</span>
+                      <span className="mt-0.5 block text-[10px] tracking-wider text-zinc-400 uppercase print:text-gray-600">
+                        {rightLabel}
+                      </span>
+                    </>
+                  );
+                }
+                return (
+                  <>
+                    <span
+                      className={`font-black font-mono tracking-wider text-white print:text-gray-900 ${
+                        isSingle ? "text-xl md:text-2xl" : "text-2xl md:text-3xl"
+                      }`}
+                    >
+                      {rightCode}
+                    </span>
+                    <span className="block text-[10px] tracking-wider text-zinc-400 uppercase print:text-gray-600">
+                      {rightLabel}
+                    </span>
+                  </>
+                );
+              })()}
             </div>
           </div>
 
@@ -430,13 +437,13 @@ export function JapanBookingPass({
 
         <div className="relative flex flex-col items-center justify-center space-y-3 bg-cyan-950/20 p-6 text-center md:col-span-4">
           {actions ? (
-            <div className="absolute top-3 right-3">{actions}</div>
+            <div className="absolute top-3 right-3 print:hidden">{actions}</div>
           ) : onRefreshPass ? (
             <button
               type="button"
               onClick={onRefreshPass}
               title="Refresh Pass Details"
-              className="absolute top-3 right-3 rounded-lg bg-black/40 p-1.5 text-zinc-400 transition-all hover:bg-black/60 hover:text-white"
+              className="absolute top-3 right-3 rounded-lg bg-black/40 p-1.5 text-zinc-400 transition-all hover:bg-black/60 hover:text-white print:hidden"
             >
               <RotateCcw className="h-3.5 w-3.5" />
             </button>
@@ -446,7 +453,7 @@ export function JapanBookingPass({
             <span className="block text-[9px] font-bold tracking-widest text-zinc-400 uppercase">
               BOOKING REF
             </span>
-            <span className="block font-mono text-lg font-bold tracking-wider text-[#F6A724]">
+            <span className="block font-mono text-lg font-bold tracking-wider text-[#F6A724] print:text-gray-900">
               {pnrCode}
             </span>
             {conciergeAgentName ? (
@@ -470,7 +477,7 @@ export function JapanBookingPass({
             />
           </div>
 
-          <div className="flex w-full flex-col items-center justify-center gap-2 pt-1">
+          <div className="flex w-full flex-col items-center justify-center gap-2 pt-1 print:hidden">
             <button
               type="button"
               onClick={handleAppleWalletClick}
@@ -495,11 +502,14 @@ export function JapanBookingPass({
           </div>
 
           {walletMsg ? (
-            <p className="text-[9px] leading-snug text-zinc-400" role="status">
+            <p
+              className="text-[9px] leading-snug text-zinc-400 print:hidden"
+              role="status"
+            >
               {walletMsg}
             </p>
           ) : (
-            <p className="text-[9px] leading-snug text-zinc-500">
+            <p className="text-[9px] leading-snug text-zinc-500 print:hidden">
               {isConfirmed
                 ? "Add this pass to Apple Wallet on your iPhone."
                 : "Wallet pass activates after concierge marks this booking Confirmed."}
@@ -516,7 +526,7 @@ export function JapanBookingPass({
       href={editHref}
       aria-label="Edit Itinerary"
       title="Edit Itinerary"
-      className="absolute top-1 right-1 z-20 rounded-md p-1.5 text-zinc-500 transition-colors hover:text-[#D91147]"
+      className="absolute top-1 right-1 z-20 rounded-md p-1.5 text-zinc-500 transition-colors hover:text-[#D91147] print:hidden"
     >
       <SquarePen className="h-5 w-5" strokeWidth={2} />
     </Link>
@@ -533,8 +543,8 @@ export function JapanBookingPass({
   }
 
   return (
-    <div className="relative mx-auto my-6 w-full max-w-2xl overflow-visible rounded-3xl border-2 border-dashed border-white/40 bg-black/20 p-4">
-      <span className="absolute -top-3 left-4 z-20 rounded border border-white/30 bg-zinc-800 px-2 py-0.5 font-mono text-[9px] tracking-widest text-amber-400 uppercase">
+    <div className="relative mx-auto my-6 w-full max-w-2xl overflow-visible rounded-3xl border-2 border-dashed border-white/40 bg-black/20 p-4 print:rounded-none print:border print:border-gray-300 print:bg-transparent">
+      <span className="absolute -top-3 left-4 z-20 rounded border border-white/30 bg-zinc-800 px-2 py-0.5 font-mono text-[9px] tracking-widest text-amber-400 uppercase print:border-gray-300 print:bg-white print:text-gray-900">
         SECTION 2: BOOKING PASS
       </span>
       {editControl}

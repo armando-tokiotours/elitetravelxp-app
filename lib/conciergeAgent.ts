@@ -4,12 +4,16 @@
  */
 
 import { getAdminPocketBase } from "@/lib/pocketbase/admin";
-import { getPbBaseUrl } from "@/lib/pocketbase/client";
+import { combineStaffDisplayName } from "@/lib/staffProfiles";
 
 export type ConciergeAgentInfo = {
   id: string;
   name: string;
+  firstName?: string;
+  lastName?: string;
   email?: string;
+  /** Digits-only WhatsApp / phone from staff_profiles (for wa.me). */
+  whatsappDigits?: string;
   photoUrl?: string | null;
   source?: string;
 };
@@ -37,6 +41,9 @@ export async function findConciergeAgentByPnr(
     let email = "";
     let photoUrl: string | null = null;
     let displayName = name || "Your concierge";
+    let firstName = "";
+    let lastName = "";
+    let whatsappDigits = "";
 
     if (id) {
       try {
@@ -52,11 +59,19 @@ export async function findConciergeAgentByPnr(
         const profile = await pb
           .collection("staff_profiles")
           .getFirstListItem(`staff_id="${id}"`, { requestKey: null });
-        if (profile.display_name) {
+        const fn = String(profile.first_name || "").trim();
+        const ln = String(profile.last_name || "").trim();
+        if (fn || ln) {
+          firstName = fn;
+          lastName = ln;
+          displayName =
+            combineStaffDisplayName(fn, ln) || displayName;
+        } else if (profile.display_name) {
           displayName = String(profile.display_name).trim() || displayName;
         }
-        if (profile.photo && profile.id) {
-          photoUrl = `${getPbBaseUrl()}/api/files/staff_profiles/${profile.id}/${encodeURIComponent(String(profile.photo))}`;
+        whatsappDigits = String(profile.phone || "").replace(/\D/g, "");
+        if (profile.photo) {
+          photoUrl = `/api/staff/avatar/${encodeURIComponent(id)}?v=${encodeURIComponent(String(profile.photo))}`;
         }
       } catch {
         /* ignore */
@@ -66,7 +81,10 @@ export async function findConciergeAgentByPnr(
     return {
       id,
       name: displayName,
+      firstName: firstName || undefined,
+      lastName: lastName || undefined,
       email: email || undefined,
+      whatsappDigits: whatsappDigits.length >= 8 ? whatsappDigits : undefined,
       photoUrl,
       source: String(hub.source || "") || undefined,
     };

@@ -16,6 +16,7 @@ import {
 } from "@/config/emailDefaults";
 import { EmailTemplateAssetsPanel } from "@/components/team/EmailTemplateAssetsPanel";
 import { PdfConfigPanel } from "@/components/team/PdfConfigPanel";
+import { GuideInviteButton } from "@/components/staff/GuideInviteButton";
 
 type TabId = "smtp" | "routing" | "template" | "pdf";
 
@@ -466,6 +467,10 @@ export function TeamConfigDashboard({
             }))
           }
         />
+      ) : null}
+
+      {!compact ? (
+        <GuideInviteButton guideEmail="" guideName="" />
       ) : null}
     </div>
   );

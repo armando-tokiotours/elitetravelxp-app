@@ -2,15 +2,29 @@
 
 import { useEffect, useState } from "react";
 import { formatPbError } from "@/lib/pocketbase/admin-schema";
-import { getPbBaseUrl } from "@/lib/pocketbase/client";
 import {
+  combineStaffDisplayName,
   ensureStaffProfile,
+  resolveStaffNamePartsForEditor,
   updateStaffProfile,
   type StaffProfile,
 } from "@/lib/staffProfiles";
 import { canAccessOpsBoard } from "@/lib/staffRoles";
 import { useTeamAuth } from "@/store/useTeamAuth";
 import { StaffPortalShell } from "@/components/staff/StaffPortalShell";
+import {
+  optimizeCredentialPhoto,
+  staffAvatarSrc,
+} from "@/lib/staffPhoto";
+import {
+  saveStaffCredentialViaApi,
+  uploadStaffAvatarViaApi,
+} from "@/lib/staffCredentialClient";
+import {
+  parseStaffLanguages,
+  serializeStaffLanguages,
+} from "@/lib/staffLanguages";
+import { LanguagePills } from "@/components/staff/LanguagePills";
 
 function allowProfile(role: Parameters<typeof canAccessOpsBoard>[0]) {
   return Boolean(role);
@@ -38,10 +52,11 @@ function ProfileInner() {
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
-  const [displayName, setDisplayName] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
   const [phone, setPhone] = useState("");
   const [bio, setBio] = useState("");
-  const [languages, setLanguages] = useState("");
+  const [languages, setLanguages] = useState<string[]>([]);
   const [cities, setCities] = useState("");
   const [videoUrl, setVideoUrl] = useState("");
   const [bankInfo, setBankInfo] = useState("");
@@ -68,10 +83,17 @@ function ProfileInner() {
           display_name: seedName,
         });
         setProfile(p);
-        setDisplayName(p.display_name || seedName);
+        const names = resolveStaffNamePartsForEditor({
+          first_name: p.first_name,
+          last_name: p.last_name,
+          display_name: p.display_name,
+          fallbackName: seedName,
+        });
+        setFirstName(names.first_name);
+        setLastName(names.last_name);
         setPhone(p.phone || "");
         setBio(p.bio || "");
-        setLanguages(p.languages || "");
+        setLanguages(parseStaffLanguages(p.languages));
         setCities(p.strength_cities || "");
         setVideoUrl(p.video_url || "");
         setBankInfo(p.bank_info || "");
@@ -92,26 +114,45 @@ function ProfileInner() {
     setError(null);
     try {
       const pb = getClient();
-      const updated = await updateStaffProfile(
-        pb,
-        staffId,
-        {
-          display_name: displayName.trim(),
-          phone: phone.trim(),
-          bio: bio.trim(),
-          languages: languages.trim(),
-          strength_cities: cities.trim(),
-          video_url: videoUrl.trim(),
-          bank_info: bankInfo.trim(),
-          payment_link: paymentLink.trim(),
-          payout_notes: payoutNotes.trim(),
-        },
-        {
-          photo: photoFile || undefined,
-          video: videoFile || undefined,
-        }
-      );
-      setProfile(updated);
+      const token = pb.authStore.token;
+      const firstTrim = firstName.trim();
+      const lastTrim = lastName.trim();
+      const nameTrim = combineStaffDisplayName(firstTrim, lastTrim);
+      if (!firstTrim) throw new Error("First name is required.");
+      const updated = await saveStaffCredentialViaApi(token, staffId, {
+        first_name: firstTrim,
+        last_name: lastTrim,
+        display_name: nameTrim,
+        staff_name: nameTrim,
+        phone: phone.trim(),
+        bio: bio.trim(),
+        languages: serializeStaffLanguages(languages),
+        strength_cities: cities.trim(),
+        video_url: videoUrl.trim(),
+        bank_info: bankInfo.trim(),
+        payment_link: paymentLink.trim(),
+        payout_notes: payoutNotes.trim(),
+      });
+      if (photoFile) {
+        const { photo } = await uploadStaffAvatarViaApi(
+          token,
+          staffId,
+          photoFile
+        );
+        updated.photo = photo;
+        updated.updated = String(Date.now());
+      }
+      if (videoFile) {
+        const withVideo = await updateStaffProfile(
+          pb,
+          staffId,
+          {},
+          { video: videoFile }
+        );
+        setProfile(withVideo);
+      } else {
+        setProfile(updated);
+      }
       setPhotoFile(null);
       setVideoFile(null);
       setMsg("Profile saved.");
@@ -124,10 +165,10 @@ function ProfileInner() {
 
   if (loading) return <p className="text-sm text-zinc-400">Loading profile…</p>;
 
-  const photoUrl =
-    profile?.photo && profile.id
-      ? `${getPbBaseUrl()}/api/files/staff_profiles/${profile.id}/${profile.photo}`
-      : null;
+  const photoUrl = staffAvatarSrc(staffId, {
+    photo: profile?.photo,
+    updated: profile?.updated,
+  });
 
   return (
     <div className="mx-auto max-w-2xl space-y-4">
@@ -140,14 +181,25 @@ function ProfileInner() {
 
       <div className="grid gap-3 sm:grid-cols-2">
         <label className="block text-xs uppercase tracking-wider text-zinc-500">
-          Display name
+          First name
           <input
             className="mt-1 w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-white"
-            value={displayName}
-            onChange={(e) => setDisplayName(e.target.value)}
+            value={firstName}
+            onChange={(e) => setFirstName(e.target.value)}
+            autoComplete="given-name"
           />
         </label>
         <label className="block text-xs uppercase tracking-wider text-zinc-500">
+          Last name
+          <input
+            className="mt-1 w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-white"
+            value={lastName}
+            onChange={(e) => setLastName(e.target.value)}
+            autoComplete="family-name"
+            placeholder="Hidden until booking is fully paid"
+          />
+        </label>
+        <label className="block text-xs uppercase tracking-wider text-zinc-500 sm:col-span-2">
           Phone
           <input
             className="mt-1 w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-white"
@@ -168,15 +220,14 @@ function ProfileInner() {
       </label>
 
       <div className="grid gap-3 sm:grid-cols-2">
-        <label className="block text-xs uppercase tracking-wider text-zinc-500">
-          Languages spoken
-          <input
-            className="mt-1 w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-white"
-            placeholder="English, Spanish, Japanese"
-            value={languages}
-            onChange={(e) => setLanguages(e.target.value)}
-          />
-        </label>
+        <LanguagePills
+          selected={languages}
+          onToggle={(l) =>
+            setLanguages((prev) =>
+              prev.includes(l) ? prev.filter((x) => x !== l) : [...prev, l]
+            )
+          }
+        />
         <label className="block text-xs uppercase tracking-wider text-zinc-500">
           Strength cities
           <input
@@ -191,19 +242,33 @@ function ProfileInner() {
       <div className="grid gap-3 sm:grid-cols-2">
         <label className="block text-xs uppercase tracking-wider text-zinc-500">
           Photo
+          <span className="mt-0.5 block font-normal normal-case text-zinc-500">
+            Square or portrait — saved as 360×480 JPEG
+          </span>
           {photoUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
               src={photoUrl}
               alt=""
-              className="mt-2 h-20 w-20 rounded-lg object-cover"
+              className="mt-2 h-24 w-[4.5rem] rounded-lg object-cover"
             />
           ) : null}
           <input
             type="file"
-            accept="image/jpeg,image/png,image/webp"
+            accept="image/jpeg,image/png,image/webp,image/*"
             className="mt-2 block w-full text-xs text-zinc-400"
-            onChange={(e) => setPhotoFile(e.target.files?.[0] || null)}
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              e.target.value = "";
+              if (!f) return;
+              void optimizeCredentialPhoto(f)
+                .then(setPhotoFile)
+                .catch((err) =>
+                  setError(
+                    err instanceof Error ? err.message : "Photo could not be read."
+                  )
+                );
+            }}
           />
         </label>
         <label className="block text-xs uppercase tracking-wider text-zinc-500">

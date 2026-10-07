@@ -3,8 +3,8 @@
 import { useEffect, useState } from "react";
 
 /**
- * Ops → generate password-setup / profile onboarding link for a guide.
- * Works with assigned guide or a manually entered email (any domain).
+ * Team Configuration → Email Settings: generate password-setup /
+ * profile onboarding link for a guide (personal email domains).
  */
 export function GuideInviteButton({
   guideEmail,

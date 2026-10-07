@@ -21,6 +21,7 @@ import {
   type PbTransitMode,
   type PbTransfer,
   type PbVehicle,
+  isGuestCatalogTour,
   rulesToMap,
   DEFAULT_APP_SETTINGS,
 } from "@/lib/pocketbase/client";
@@ -120,7 +121,7 @@ export async function fetchBuilderConfigServer(): Promise<BuilderConfig> {
   ]);
 
   const cities = citiesRaw.filter((c) => c.is_active !== false);
-  const tours = toursRaw.filter((t) => t.is_active !== false);
+  const tours = toursRaw.filter(isGuestCatalogTour);
   const seasonalHighlights = seasonalHighlightsRaw.filter(
     (h) => h.is_active !== false
   );

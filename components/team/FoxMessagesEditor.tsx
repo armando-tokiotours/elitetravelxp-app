@@ -10,6 +10,12 @@ import {
   writeSystemMessageOverrides,
   type SystemMessageKey,
 } from "@/lib/systemMessages";
+import {
+  DEFAULT_FOX_SPEECH_STYLE,
+  readFoxSpeechStyle,
+  writeFoxSpeechStyle,
+  type FoxSpeechStyle,
+} from "@/lib/foxSpeechStyle";
 
 function cleanDrafts(
   drafts: Partial<Record<SystemMessageKey, string>>
@@ -166,6 +172,8 @@ export function FoxMessagesEditor() {
         </div>
       ))}
 
+      <FoxSpeechStyleControls />
+
       <div className="rounded-2xl border border-zinc-800 bg-[#0D1117] p-4 sm:p-5">
         <p className="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-500">
           Fire a fox message
@@ -215,6 +223,131 @@ export function FoxMessagesEditor() {
           Preview stage
         </p>
         <SystemMessageFox />
+      </div>
+    </div>
+  );
+}
+
+function FoxSpeechStyleControls() {
+  const [style, setStyle] = useState<FoxSpeechStyle>(DEFAULT_FOX_SPEECH_STYLE);
+
+  useEffect(() => {
+    setStyle(readFoxSpeechStyle());
+  }, []);
+
+  const patch = (p: Partial<FoxSpeechStyle>) => {
+    const next = { ...style, ...p };
+    setStyle(next);
+    writeFoxSpeechStyle(next);
+  };
+
+  return (
+    <div className="rounded-2xl border border-zinc-800 bg-[#0D1117] p-4 sm:p-5">
+      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-500">
+        Fox speech look
+      </p>
+      <p className="mt-1 text-sm text-zinc-400">
+        Stroke swell, fill colors, size — saved in this browser. Fire Tip /
+        Error / Instruction below to preview.
+      </p>
+      <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <label className="block text-[10px] uppercase tracking-wider text-zinc-500">
+          Stroke width (px)
+          <input
+            type="range"
+            min={2}
+            max={14}
+            value={style.strokeWidthPx}
+            onChange={(e) => patch({ strokeWidthPx: Number(e.target.value) })}
+            className="mt-1 w-full"
+          />
+          <span className="text-xs text-zinc-400">{style.strokeWidthPx}px</span>
+        </label>
+        <label className="block text-[10px] uppercase tracking-wider text-zinc-500">
+          Stroke color
+          <input
+            type="color"
+            value={style.strokeColor}
+            onChange={(e) => patch({ strokeColor: e.target.value })}
+            className="mt-1 h-9 w-full cursor-pointer rounded border border-zinc-700 bg-zinc-950"
+          />
+        </label>
+        <label className="block text-[10px] uppercase tracking-wider text-zinc-500">
+          Font size (rem)
+          <input
+            type="range"
+            min={0.8}
+            max={1.6}
+            step={0.05}
+            value={style.fontSizeRem}
+            onChange={(e) => patch({ fontSizeRem: Number(e.target.value) })}
+            className="mt-1 w-full"
+          />
+          <span className="text-xs text-zinc-400">{style.fontSizeRem}rem</span>
+        </label>
+        <label className="block text-[10px] uppercase tracking-wider text-zinc-500">
+          Tip fill
+          <input
+            type="color"
+            value={style.tipFill}
+            onChange={(e) => patch({ tipFill: e.target.value })}
+            className="mt-1 h-9 w-full cursor-pointer rounded border border-zinc-700 bg-zinc-950"
+          />
+        </label>
+        <label className="block text-[10px] uppercase tracking-wider text-zinc-500">
+          Error fill
+          <input
+            type="color"
+            value={style.errorFill}
+            onChange={(e) => patch({ errorFill: e.target.value })}
+            className="mt-1 h-9 w-full cursor-pointer rounded border border-zinc-700 bg-zinc-950"
+          />
+        </label>
+        <label className="block text-[10px] uppercase tracking-wider text-zinc-500">
+          Instruction fill
+          <input
+            type="color"
+            value={style.infoFill}
+            onChange={(e) => patch({ infoFill: e.target.value })}
+            className="mt-1 h-9 w-full cursor-pointer rounded border border-zinc-700 bg-zinc-950"
+          />
+        </label>
+        <label className="block text-[10px] uppercase tracking-wider text-zinc-500">
+          Shadow strength
+          <input
+            type="range"
+            min={0.2}
+            max={2}
+            step={0.1}
+            value={style.shadowStrength}
+            onChange={(e) =>
+              patch({ shadowStrength: Number(e.target.value) })
+            }
+            className="mt-1 w-full"
+          />
+        </label>
+        <label className="block text-[10px] uppercase tracking-wider text-zinc-500">
+          Words per line
+          <input
+            type="range"
+            min={2}
+            max={8}
+            value={style.wordsPerLine}
+            onChange={(e) => patch({ wordsPerLine: Number(e.target.value) })}
+            className="mt-1 w-full"
+          />
+          <span className="text-xs text-zinc-400">{style.wordsPerLine}</span>
+        </label>
+        <button
+          type="button"
+          onClick={() => {
+            setStyle(DEFAULT_FOX_SPEECH_STYLE);
+            writeFoxSpeechStyle(DEFAULT_FOX_SPEECH_STYLE);
+          }}
+          className="self-end rounded-xl border border-zinc-700 px-3 py-2 text-xs font-semibold uppercase tracking-wider text-zinc-300"
+        >
+          Reset look
+        </button>
       </div>
     </div>
   );

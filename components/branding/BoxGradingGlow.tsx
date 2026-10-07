@@ -27,7 +27,7 @@ export function BoxGradingGlow({ className = "" }: { className?: string }) {
   return (
     <>
       <div
-        className={`pointer-events-none absolute -top-[4.5rem] -left-[4.5rem] z-0 select-none rounded-full blur-2xl ${className}`}
+        className={`pointer-events-none absolute -top-[4.5rem] -left-[4.5rem] z-0 select-none rounded-full blur-2xl print:hidden ${className}`}
         style={{
           width: blueSizePx,
           height: blueSizePx,
@@ -37,7 +37,7 @@ export function BoxGradingGlow({ className = "" }: { className?: string }) {
         aria-hidden
       />
       <div
-        className={`pointer-events-none absolute -top-8 -right-8 z-0 select-none rounded-full blur-2xl ${className}`}
+        className={`pointer-events-none absolute -top-8 -right-8 z-0 select-none rounded-full blur-2xl print:hidden ${className}`}
         style={{
           width: amberSizePx,
           height: amberSizePx,

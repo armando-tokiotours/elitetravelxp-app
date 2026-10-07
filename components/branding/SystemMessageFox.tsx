@@ -7,6 +7,11 @@ import {
   useSystemMessageStore,
   type SystemMessageTone,
 } from "@/store/useSystemMessageStore";
+import {
+  DEFAULT_FOX_SPEECH_STYLE,
+  readFoxSpeechStyle,
+  type FoxSpeechStyle,
+} from "@/lib/foxSpeechStyle";
 
 const CHAR_SPLIT = 48;
 
@@ -24,7 +29,7 @@ export function SystemMessageFox() {
   const [mounted, setMounted] = useState(false);
 
   const parts = useMemo(
-    () => (message ? splitSpeech(message.text) : []),
+    () => (message ? splitSpeech(message.text ?? "") : []),
     [message]
   );
 
@@ -74,8 +79,8 @@ export function SystemMessageFox() {
   // Clear AppNavDock w-16 on sm+ (left); keep flush on mobile
   const shellClass =
     side === "right"
-      ? "pointer-events-none fixed bottom-[5.75rem] right-0 z-[95] w-[min(62vw,18.85rem)] max-w-[18.85rem] sm:bottom-28 sm:w-[min(55vw,19.5rem)]"
-      : "pointer-events-none fixed bottom-[5.75rem] left-0 z-[95] w-[min(62vw,18.85rem)] max-w-[18.85rem] sm:bottom-28 sm:left-16 sm:w-[min(55vw,19.5rem)]";
+      ? "pointer-events-none fixed bottom-[5.75rem] right-0 z-[95] w-[min(62vw,18.85rem)] max-w-[18.85rem] print:hidden sm:bottom-28 sm:w-[min(55vw,19.5rem)]"
+      : "pointer-events-none fixed bottom-[5.75rem] left-0 z-[95] w-[min(62vw,18.85rem)] max-w-[18.85rem] print:hidden sm:bottom-28 sm:left-16 sm:w-[min(55vw,19.5rem)]";
 
   const node = (
     <div className={shellClass} aria-live="polite">
@@ -164,19 +169,38 @@ function FoxStrokeSpeech({
   children: string;
   tone: SystemMessageTone;
 }) {
-  const fill = toneFill(tone);
-  const lines = wrapWordsPerLine(children, 4);
+  const [style, setStyle] = useState<FoxSpeechStyle>(DEFAULT_FOX_SPEECH_STYLE);
+
+  useEffect(() => {
+    setStyle(readFoxSpeechStyle());
+    const sync = () => setStyle(readFoxSpeechStyle());
+    window.addEventListener("tokio-fox-speech-style", sync);
+    window.addEventListener("storage", sync);
+    return () => {
+      window.removeEventListener("tokio-fox-speech-style", sync);
+      window.removeEventListener("storage", sync);
+    };
+  }, []);
+
+  const fill =
+    tone === "error"
+      ? style.errorFill
+      : tone === "tip"
+        ? style.tipFill
+        : style.infoFill;
+  const lines = wrapWordsPerLine(children, style.wordsPerLine);
+  const s = Math.max(0.2, style.shadowStrength);
 
   return (
     <p
-      className="relative max-w-full whitespace-pre-line text-left text-[1.05rem] font-black leading-snug tracking-wide"
+      className="relative max-w-full whitespace-pre-line text-left font-black leading-snug tracking-wide"
       style={{
-        fontFamily: 'Verdana, Geneva, sans-serif',
+        fontFamily: "Verdana, Geneva, sans-serif",
+        fontSize: `${style.fontSizeRem}rem`,
         color: fill,
-        WebkitTextStroke: "8px #ffffff",
+        WebkitTextStroke: `${style.strokeWidthPx}px ${style.strokeColor}`,
         paintOrder: "stroke fill",
-        textShadow:
-          "0 2px 0 rgba(255,255,255,0.95), 0 4px 12px rgba(0,0,0,0.45)",
+        textShadow: `0 ${2 * s}px 0 ${style.strokeColor}, 0 ${4 * s}px ${12 * s}px rgba(0,0,0,${0.45 * s})`,
       }}
     >
       {lines.join("\n")}
@@ -184,15 +208,15 @@ function FoxStrokeSpeech({
   );
 }
 
-function toneFill(tone: SystemMessageTone): string {
-  if (tone === "error") return "#E60F43";
-  if (tone === "tip") return "#075473";
-  return "#1a1510";
-}
-
 /** Max 3–4 words per visual line inside a bubble. */
-export function wrapWordsPerLine(text: string, maxWords = 4): string[] {
-  const words = text.trim().split(/\s+/).filter(Boolean);
+export function wrapWordsPerLine(
+  text: string | null | undefined,
+  maxWords = 4
+): string[] {
+  const words = String(text ?? "")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
   if (words.length === 0) return [""];
   const lines: string[] = [];
   for (let i = 0; i < words.length; i += maxWords) {
@@ -202,8 +226,11 @@ export function wrapWordsPerLine(text: string, maxWords = 4): string[] {
 }
 
 /** Split long speech into ≤2 readable chunks at word boundaries. */
-export function splitSpeech(text: string): string[] {
-  const t = text.trim().replace(/\s+/g, " ");
+export function splitSpeech(text: string | null | undefined): string[] {
+  // Guard: message.text can be missing during HMR / partial store payloads.
+  const t = String(text ?? "")
+    .trim()
+    .replace(/\s+/g, " ");
   if (t.length <= CHAR_SPLIT) return [t];
 
   const soft = Math.min(CHAR_SPLIT + 12, t.length);

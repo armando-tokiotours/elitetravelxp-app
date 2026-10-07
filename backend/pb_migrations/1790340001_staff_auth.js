@@ -20,6 +20,9 @@ migrate((app) => {
     updateRule: "@request.auth.id != ''",
     deleteRule: "@request.auth.id != ''",
     authRule: "",
+    // Null manageRule: only the record owner or a _superusers JWT can
+    // update another staff login (name/password). Owner/ops in `staff`
+    // cannot staff.update(otherId). Credential booklet uses admin API.
     manageRule: null,
     passwordAuth: {
       enabled: true,

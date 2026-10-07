@@ -58,6 +58,9 @@ COPY --from=builder --chown=nextjs:nodejs /app/passModels ./passModels
 # Puppeteer must be complete on disk (standalone tracing often drops CJS build)
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules/puppeteer-core ./node_modules/puppeteer-core
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules/@puppeteer ./node_modules/@puppeteer
+# Ticket voucher PDFs (local VPS storage; mount a host volume in compose)
+RUN mkdir -p /app/public/uploads/tickets \
+  && chown -R nextjs:nodejs /app/public/uploads
 
 USER nextjs
 

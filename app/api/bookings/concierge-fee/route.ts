@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server";
 import { getAdminPocketBase } from "@/lib/pocketbase/admin";
 import { followupDateThreeMonthsBefore } from "@/lib/conciergeEstimateFlow";
+import {
+  ensureConciergeFeeInLedger,
+  sumPaymentsLedgerEur,
+  syncOpsHubTotalPaidFromLedger,
+} from "@/lib/paymentsLedger";
 
 function normalizePnr(raw: string | null | undefined): string {
   return String(raw || "")
@@ -29,6 +34,7 @@ export async function GET(request: Request) {
       deposit_amount?: number | string;
       concierge_fee_amount?: number | string;
       tour_payment_status?: string;
+      total_paid_eur?: number | string;
     } | null = null;
     try {
       hub = await pb
@@ -46,11 +52,28 @@ export async function GET(request: Request) {
       )
     );
     let feeCreditEur = feePaid ? deposit || 60 : 0;
+    let totalPaidEur = Math.max(
+      0,
+      Math.round(Number(hub?.total_paid_eur) || 0)
+    );
 
-    // Soft-heal from payments ledger when ops flags were inverted / missing fields
+    // Backfill missing fee row, then sum ALL payments (fee + milestones)
+    if (feePaid || feeCreditEur > 0) {
+      await ensureConciergeFeeInLedger(pb, pnr, feeCreditEur || deposit || 60);
+    }
+    const ledgerSum = await sumPaymentsLedgerEur(pb, pnr);
+    if (ledgerSum > totalPaidEur) {
+      totalPaidEur = ledgerSum;
+    } else if (ledgerSum > 0) {
+      totalPaidEur = ledgerSum;
+    }
+
+    // Soft-heal fee flags from concierge_deposit rows when missing
     if (!feeCreditEur) {
       try {
-        const pays = await pb.collection("payments").getFullList({
+        const pays = await pb.collection("payments").getFullList<{
+          amount_eur?: number | string;
+        }>({
           filter: `pnr="${pnr}" && kind="concierge_deposit"`,
           requestKey: null,
         });
@@ -60,42 +83,86 @@ export async function GET(request: Request) {
             Math.round(Number(pays[0].amount_eur) || 60)
           );
           feeCreditEur = amt || 60;
-          if (hub?.id) {
-            try {
-              await pb.collection("ops_hub").update(
-                (hub as { id: string }).id,
-                {
-                  concierge_fee_paid: true,
-                  concierge_fee_amount: feeCreditEur,
-                  deposit_amount: feeCreditEur,
-                  tour_payment_status: "FEE_PAID",
-                  payment_confirmed: false,
-                },
-                { requestKey: null }
-              );
-            } catch {
-              /* fields may not exist yet */
-            }
-          }
         }
       } catch {
         /* payments optional */
       }
     }
 
+    if (totalPaidEur <= 0 && feeCreditEur > 0) {
+      totalPaidEur = feeCreditEur;
+    } else if (feeCreditEur > 0 && totalPaidEur < feeCreditEur) {
+      totalPaidEur = feeCreditEur;
+    }
+
+    // Persist healed total so Ops Financial Audit (reads ops_hub) matches guest
+    if (hub?.id && totalPaidEur > Math.round(Number(hub.total_paid_eur) || 0)) {
+      try {
+        const statusUpper = String(hub.tour_payment_status || "").toUpperCase();
+        const patch: Record<string, unknown> = {
+          total_paid_eur: totalPaidEur,
+        };
+        if (feeCreditEur > 0) {
+          patch.concierge_fee_paid = true;
+          patch.concierge_fee_amount = feeCreditEur;
+          patch.deposit_amount = feeCreditEur;
+          if (
+            statusUpper !== "PARTIALLY_PAID" &&
+            statusUpper !== "FULLY_PAID"
+          ) {
+            patch.tour_payment_status =
+              totalPaidEur > feeCreditEur ? "PARTIALLY_PAID" : "FEE_PAID";
+          }
+        }
+        if (
+          totalPaidEur > feeCreditEur &&
+          feeCreditEur > 0 &&
+          statusUpper !== "FULLY_PAID"
+        ) {
+          patch.tour_payment_status = "PARTIALLY_PAID";
+          patch.payment_confirmed = false;
+        }
+        await pb
+          .collection("ops_hub")
+          .update((hub as { id: string }).id, patch, { requestKey: null });
+      } catch {
+        /* non-blocking heal */
+      }
+    }
+
+    const explicitStatus = String(hub?.tour_payment_status || "")
+      .trim()
+      .toUpperCase();
+    const paymentConfirmed = Boolean(hub?.payment_confirmed);
+    let tourPaymentStatus =
+      explicitStatus === "FULLY_PAID" ||
+      explicitStatus === "PARTIALLY_PAID" ||
+      explicitStatus === "FEE_PAID" ||
+      explicitStatus === "UNPAID"
+        ? explicitStatus
+        : feeCreditEur > 0
+          ? "FEE_PAID"
+          : null;
+    if (paymentConfirmed || tourPaymentStatus === "FULLY_PAID") {
+      tourPaymentStatus = "FULLY_PAID";
+    } else if (totalPaidEur > feeCreditEur && feeCreditEur > 0) {
+      // Prefer ledger-derived partial over a stale FEE_PAID hub flag
+      tourPaymentStatus = "PARTIALLY_PAID";
+    }
+
     return NextResponse.json({
       ok: true,
       pnr,
       concierge_fee_paid: feeCreditEur > 0 || feePaid,
-      payment_confirmed:
-        feeCreditEur > 0 ? false : Boolean(hub?.payment_confirmed),
-      tour_payment_status:
-        feeCreditEur > 0
-          ? "FEE_PAID"
-          : hub?.tour_payment_status || null,
+      payment_confirmed: tourPaymentStatus === "FULLY_PAID",
+      tour_payment_status: tourPaymentStatus,
       deposit_amount: feeCreditEur || deposit,
       concierge_fee_amount: feeCreditEur || deposit,
       feeCreditEur,
+      totalPaidEur,
+      total_paid_eur: totalPaidEur,
+      /** Alias — single source of truth for guest payment math */
+      amountPaid: totalPaidEur,
     });
   } catch (err) {
     const message =
@@ -167,8 +234,83 @@ export async function POST(request: Request) {
     const amount = Math.max(0, Number(body.amount) || 60);
     const path = body.path === "PARTIAL" ? "PARTIAL" : "FULL";
 
+    // Central payments ledger FIRST (idempotent on order_id when present)
+    // so hub sync can read the authoritative sum including this fee.
+    try {
+      const orderId = String(body.orderId || "").trim();
+      let skipCreate = false;
+      if (orderId) {
+        try {
+          await pb
+            .collection("payments")
+            .getFirstListItem(`order_id="${orderId.replace(/"/g, "")}"`, {
+              requestKey: null,
+            });
+          skipCreate = true;
+        } catch {
+          skipCreate = false;
+        }
+      }
+      if (!skipCreate) {
+        // Avoid duplicate fee rows when orderId is empty
+        if (!orderId) {
+          try {
+            await pb
+              .collection("payments")
+              .getFirstListItem(
+                `pnr="${pnr}" && kind="concierge_deposit" && amount_eur=${amount}`,
+                { requestKey: null }
+              );
+            skipCreate = true;
+          } catch {
+            skipCreate = false;
+          }
+        }
+      }
+      if (!skipCreate) {
+        await pb.collection("payments").create(
+          {
+            pnr,
+            kind: "concierge_deposit",
+            amount_eur: amount,
+            currency: "EUR",
+            provider: "revolut",
+            order_id: orderId,
+            path,
+            notes: `Concierge deposit (${path})`,
+          },
+          { requestKey: null }
+        );
+      }
+    } catch {
+      /* payments collection may not exist yet on older PB */
+    }
+
+    const ledgerSum = await sumPaymentsLedgerEur(pb, pnr);
+    const nextPaid = Math.max(ledgerSum, amount);
+    let tourPaymentStatus = "FEE_PAID";
+    let paymentConfirmed = false;
+
     if (hub) {
-      // €60 concierge deposit is NEVER full tour payment
+      // €60 concierge deposit is NEVER full tour payment.
+      // Never clobber a higher cumulative total (e.g. fee+milestone already recorded).
+      const existingHub = hub as {
+        id: string;
+        payment_confirmed?: boolean;
+        total_paid_eur?: number | string;
+        tour_payment_status?: string;
+      };
+      const statusUpper = String(
+        existingHub.tour_payment_status || ""
+      ).toUpperCase();
+      const keepPartialOrFull =
+        statusUpper === "PARTIALLY_PAID" || statusUpper === "FULLY_PAID";
+      tourPaymentStatus = keepPartialOrFull
+        ? String(existingHub.tour_payment_status || "FEE_PAID")
+        : nextPaid > amount
+          ? "PARTIALLY_PAID"
+          : "FEE_PAID";
+      paymentConfirmed = Boolean(existingHub.payment_confirmed);
       await pb.collection("ops_hub").update(
         hub.id,
         {
@@ -176,13 +318,15 @@ export async function POST(request: Request) {
           concierge_fee_paid: true,
           concierge_fee_amount: amount,
           deposit_amount: amount,
-          tour_payment_status: "FEE_PAID",
-          payment_confirmed: false,
-          total_paid_eur: amount,
+          tour_payment_status: tourPaymentStatus,
+          payment_confirmed: paymentConfirmed,
+          total_paid_eur: nextPaid,
           is_read: false,
         },
         { requestKey: null }
       );
+      // Hard guarantee: hub === ledger sum (fee + any prior milestones)
+      await syncOpsHubTotalPaidFromLedger(pb, pnr);
     }
 
     try {
@@ -216,50 +360,19 @@ export async function POST(request: Request) {
       /* non-blocking */
     }
 
-    // Central payments ledger (idempotent on order_id when present)
-    try {
-      const orderId = String(body.orderId || "").trim();
-      let skipCreate = false;
-      if (orderId) {
-        try {
-          await pb
-            .collection("payments")
-            .getFirstListItem(`order_id="${orderId.replace(/"/g, "")}"`, {
-              requestKey: null,
-            });
-          skipCreate = true;
-        } catch {
-          skipCreate = false;
-        }
-      }
-      if (!skipCreate) {
-        await pb.collection("payments").create(
-          {
-            pnr,
-            kind: "concierge_deposit",
-            amount_eur: amount,
-            currency: "EUR",
-            provider: "revolut",
-            order_id: orderId,
-            path,
-            notes: `Concierge deposit (${path})`,
-          },
-          { requestKey: null }
-        );
-      }
-    } catch {
-      /* payments collection may not exist yet on older PB */
-    }
+    const finalPaid = await sumPaymentsLedgerEur(pb, pnr);
 
     return NextResponse.json({
       ok: true,
       status: "incoming",
       concierge_fee_paid: true,
-      payment_confirmed: false,
-      tour_payment_status: "FEE_PAID",
+      payment_confirmed: paymentConfirmed,
+      tour_payment_status: tourPaymentStatus,
       deposit_amount: amount,
       concierge_fee_amount: amount,
       feeCreditEur: amount,
+      totalPaidEur: Math.max(finalPaid, nextPaid, amount),
+      total_paid_eur: Math.max(finalPaid, nextPaid, amount),
     });
   } catch (err) {
     const message =

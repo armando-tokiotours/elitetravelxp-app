@@ -1,27 +1,35 @@
 "use client";
 
 import {
+  Suspense,
   useEffect,
   useRef,
   useState,
   type CSSProperties,
   type PointerEvent as ReactPointerEvent,
 } from "react";
-import { usePathname, useRouter } from "next/navigation";
+import { createPortal } from "react-dom";
 import { MessageCircle } from "lucide-react";
-import { useConciergeAgentName } from "@/lib/useConciergeAgentName";
+import { GuestCommPage } from "@/components/dossier/GuestCommPage";
+import { useConciergeAgent } from "@/lib/useConciergeAgent";
 import { showSystemMessage } from "@/store/useSystemMessageStore";
 import { getSystemMessage } from "@/lib/systemMessages";
+import { DEFAULT_CONCIERGE_FEE_EUR } from "@/lib/conciergeEstimateFlow";
+import {
+  GUEST_COMM_OPEN_EVENT,
+  isGuestTalkUnlocked,
+  type GuestCommOpenDetail,
+} from "@/lib/guestTalkChat";
 
 const STORAGE_KEY = "tokiotours.guestTalkBubble.position";
 const DRAG_THRESHOLD_PX = 6;
-const FAB_SIZE_PX = 56; // h-14 / w-14
-const EDGE_INSET_PX = 20; // right-5 / left-5
-const EDGE_INSET_LG_PX = 32; // lg:right-8
-const DEFAULT_BOTTOM_MOBILE_PX = 192; // bottom-48
-const DEFAULT_BOTTOM_DESKTOP_PX = 128; // md:bottom-32
+const FAB_SIZE_PX = 56;
+const EDGE_INSET_PX = 20;
+const EDGE_INSET_LG_PX = 32;
+const DEFAULT_BOTTOM_MOBILE_PX = 192;
+const DEFAULT_BOTTOM_DESKTOP_PX = 128;
 const TOP_GAP_PX = 16;
-const DOCK_HEIGHT_PX = 64; // AppNavDock mobile h-16
+const DOCK_HEIGHT_PX = 64;
 const DOCK_GAP_PX = 12;
 
 type DockSide = "left" | "right";
@@ -56,7 +64,9 @@ function readSafeInset(side: "top" | "bottom") {
   const probe = document.createElement("div");
   probe.style.cssText = `position:fixed;visibility:hidden;pointer-events:none;padding-${side}:env(safe-area-inset-${side},0px);`;
   document.body.appendChild(probe);
-  const value = parseFloat(getComputedStyle(probe).getPropertyValue(`padding-${side}`)) || 0;
+  const value =
+    parseFloat(getComputedStyle(probe).getPropertyValue(`padding-${side}`)) ||
+    0;
   probe.remove();
   return value;
 }
@@ -89,7 +99,10 @@ function readStoredPosition(): FabPosition | null {
     if (!raw) return null;
     const parsed = JSON.parse(raw) as Partial<FabPosition>;
     if (parsed.side !== "left" && parsed.side !== "right") return null;
-    if (typeof parsed.bottomPx !== "number" || !Number.isFinite(parsed.bottomPx)) {
+    if (
+      typeof parsed.bottomPx !== "number" ||
+      !Number.isFinite(parsed.bottomPx)
+    ) {
       return null;
     }
     return { side: parsed.side, bottomPx: parsed.bottomPx };
@@ -102,7 +115,7 @@ function writeStoredPosition(pos: FabPosition) {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(pos));
   } catch {
-    // ignore quota / private mode
+    /* ignore */
   }
 }
 
@@ -111,35 +124,49 @@ function nearestSide(clientX: number): DockSide {
 }
 
 /**
- * Floating guest talk bubble (same look as Ops Comms Hub FAB).
- * Opens /comm only when a concierge agent is assigned; otherwise shows the fox tip.
- * Draggable vertically with left/right edge docking; position persists in localStorage.
+ * Floating guest talk bubble — opens GuestCommPage as an overlay modal
+ * (no route navigation / no WhatsApp). Locked until Concierge Deposit + agent.
  */
 export function GuestTalkBubble({
   pnr,
-  guestEmail,
   guestName,
-  tripPath,
+  guestEmail,
+  feeCreditEur = 0,
+  totalPaidEur = 0,
+  conciergeFeeEur = DEFAULT_CONCIERGE_FEE_EUR,
 }: {
   pnr: string;
-  guestEmail?: string;
   guestName?: string;
-  /** Base itinerary path, e.g. /builder-single/itinerary */
-  tripPath: string;
+  guestEmail?: string;
+  /** @deprecated Unused — chat opens as modal on the current page. */
+  tripPath?: string;
+  feeCreditEur?: number;
+  totalPaidEur?: number;
+  conciergeFeeEur?: number;
 }) {
-  const router = useRouter();
-  const pathname = usePathname();
   const ref = String(pnr || "").trim();
-  const agentName = useConciergeAgentName(ref);
-  const assigned = Boolean(agentName && agentName.trim());
+  const agent = useConciergeAgent(ref);
+  const agentName = agent?.name || null;
+  const agentAssigned = Boolean(agentName);
+  const unlocked = isGuestTalkUnlocked({
+    feeCreditEur,
+    totalPaidEur,
+    conciergeFeeEur,
+  });
+  const canOpenChat = unlocked && agentAssigned;
 
   const [pos, setPos] = useState<FabPosition>(() => defaultPosition());
   const [ready, setReady] = useState(false);
   const [dragging, setDragging] = useState(false);
+  const [chatOpen, setChatOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const dragRef = useRef<DragState | null>(null);
   const suppressClickRef = useRef(false);
 
-  // Hydrate from localStorage + clamp to current viewport
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   useEffect(() => {
     const stored = readStoredPosition();
     const next = stored ?? defaultPosition();
@@ -147,7 +174,6 @@ export function GuestTalkBubble({
     setReady(true);
   }, []);
 
-  // Re-clamp on resize / orientation change
   useEffect(() => {
     const onResize = () => {
       setPos((prev) => ({
@@ -159,27 +185,59 @@ export function GuestTalkBubble({
     return () => window.removeEventListener("resize", onResize);
   }, []);
 
-  // Chat is a full /comm page — hide FAB there so it never covers the thread UI
-  const chatOpen = Boolean(pathname?.includes("/comm"));
+  useEffect(() => {
+    if (!chatOpen) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [chatOpen]);
+
+  // Coordination Team (and others) can request the same modal without routing
+  useEffect(() => {
+    const onOpen = (e: Event) => {
+      const detail = (e as CustomEvent<GuestCommOpenDetail>).detail;
+      const eventPnr = String(detail?.pnr || "").trim();
+      if (!eventPnr || eventPnr.toUpperCase() !== ref.toUpperCase()) return;
+      if (!unlocked) {
+        showSystemMessage({
+          text: getSystemMessage("guest_comm_needs_deposit"),
+          tone: "info",
+        });
+        return;
+      }
+      if (!agentAssigned) {
+        showSystemMessage({
+          text: getSystemMessage("guest_comm_needs_agent"),
+          tone: "info",
+        });
+        return;
+      }
+      setChatOpen(true);
+    };
+    window.addEventListener(GUEST_COMM_OPEN_EVENT, onOpen);
+    return () => window.removeEventListener(GUEST_COMM_OPEN_EVENT, onOpen);
+  }, [ref, unlocked, agentAssigned]);
 
   if (!ref || ref === "—" || ref.includes("····")) return null;
-  if (chatOpen) return null;
 
   const openChat = () => {
-    if (!assigned) {
+    if (!unlocked) {
+      showSystemMessage({
+        text: getSystemMessage("guest_comm_needs_deposit"),
+        tone: "info",
+      });
+      return;
+    }
+    if (!agentAssigned) {
       showSystemMessage({
         text: getSystemMessage("guest_comm_needs_agent"),
         tone: "info",
       });
       return;
     }
-    const base = tripPath.replace(/\/$/, "");
-    const qs = new URLSearchParams({
-      pnr: ref,
-      guestEmail: guestEmail || "",
-      guestName: guestName || "",
-    });
-    router.push(`${base}/comm?${qs.toString()}`);
+    setChatOpen(true);
   };
 
   const inset = edgeInsetPx();
@@ -188,7 +246,7 @@ export function GuestTalkBubble({
     right: pos.side === "right" ? inset : "auto",
     bottom: pos.bottomPx,
     touchAction: "none",
-    opacity: ready ? 1 : 0,
+    opacity: ready ? (unlocked ? 1 : 0.72) : 0,
   };
 
   const onPointerDown = (e: ReactPointerEvent<HTMLButtonElement>) => {
@@ -232,7 +290,9 @@ export function GuestTalkBubble({
 
     if (drag.dragging) {
       const side = nearestSide(e.clientX);
-      const bottomPx = clampBottomPx(drag.originBottomPx - (e.clientY - drag.startY));
+      const bottomPx = clampBottomPx(
+        drag.originBottomPx - (e.clientY - drag.startY)
+      );
       const next = { side, bottomPx };
       setPos(next);
       writeStoredPosition(next);
@@ -250,36 +310,70 @@ export function GuestTalkBubble({
     openChat();
   };
 
+  const title = !unlocked
+    ? "Unlocks after €60 Concierge Deposit"
+    : canOpenChat
+      ? agentName
+        ? `Message ${agentName}`
+        : "Open messages"
+      : "Agent required to open chat";
+
+  const modal =
+    mounted && chatOpen
+      ? createPortal(
+          <div
+            className="fixed inset-0 z-[120] flex flex-col bg-[#05080C] print:hidden"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Concierge chat"
+          >
+            <Suspense
+              fallback={
+                <p className="px-4 py-10 text-sm text-zinc-500">
+                  Opening messages…
+                </p>
+              }
+            >
+              <GuestCommPage
+                embedded
+                pnr={ref}
+                guestEmail={guestEmail}
+                guestName={guestName}
+                onClose={() => setChatOpen(false)}
+              />
+            </Suspense>
+          </div>,
+          document.body
+        )
+      : null;
+
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      onPointerDown={onPointerDown}
-      onPointerMove={onPointerMove}
-      onPointerUp={endDrag}
-      onPointerCancel={endDrag}
-      style={style}
-      className={`no-print fixed z-50 flex h-14 w-14 cursor-grab items-center justify-center rounded-full bg-[#1CA67F] text-white shadow-2xl transition-[background-color,transform,opacity] hover:bg-[#178f6c] ${
-        dragging ? "cursor-grabbing scale-105" : "active:scale-95"
-      }`}
-      aria-label={
-        assigned
-          ? `Chat with ${agentName}`
-          : "Talk to your TokioTours agent"
-      }
-      title={
-        assigned
-          ? `Chat with ${agentName}`
-          : "Agent required to open chat"
-      }
-    >
-      <MessageCircle className="h-6 w-6" aria-hidden />
-      {!assigned ? (
-        <span
-          className="absolute -top-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-[#0D1117] bg-amber-400"
-          aria-hidden
-        />
-      ) : null}
-    </button>
+    <>
+      <button
+        type="button"
+        onClick={onClick}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={endDrag}
+        onPointerCancel={endDrag}
+        style={style}
+        className={`no-print fixed z-50 flex h-14 w-14 cursor-grab items-center justify-center rounded-full bg-[#1CA67F] text-white shadow-2xl transition-[background-color,transform,opacity] hover:bg-[#178f6c] print:hidden ${
+          dragging ? "cursor-grabbing scale-105" : "active:scale-95"
+        } ${!unlocked ? "ring-2 ring-amber-400/70" : ""}`}
+        aria-label={title}
+        title={title}
+      >
+        <MessageCircle className="h-6 w-6" aria-hidden />
+        {!canOpenChat ? (
+          <span
+            className={`absolute -top-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-[#0D1117] ${
+              !unlocked ? "bg-amber-400" : "bg-zinc-400"
+            }`}
+            aria-hidden
+          />
+        ) : null}
+      </button>
+      {modal}
+    </>
   );
 }

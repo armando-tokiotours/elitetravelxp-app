@@ -1,7 +1,16 @@
 "use client";
 
 import type { ReactNode } from "react";
-import type { OpsGuestRequirements } from "@/lib/opsGuestRequirements";
+import {
+  accommodationSummaryStops,
+  type OpsGuestRequirements,
+} from "@/lib/opsGuestRequirements";
+import {
+  matchGuideJobForDay,
+  normalizeGuideJobStatus,
+  normalizeTourDateIso,
+  type GuideJobRow,
+} from "@/lib/guideJobs";
 
 function PassBadge({ value }: { value: boolean | null }) {
   if (value === true) {
@@ -22,10 +31,22 @@ function Field({
 }) {
   return (
     <div>
-      <p className="text-[10px] font-semibold tracking-wider text-zinc-500 uppercase">
+      <p className="text-[10px] font-normal tracking-wider text-zinc-500 uppercase">
         {label}
       </p>
-      <p className="mt-0.5 text-xs text-zinc-200 sm:text-sm">{value || "—"}</p>
+      <p className="mt-0.5 text-xs font-bold text-white sm:text-sm">
+        {value || "—"}
+      </p>
+    </div>
+  );
+}
+
+/** Logistics row: grey label · bold value */
+function LogisticsRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="text-xs">
+      <span className="font-normal text-zinc-500">{label}:</span>{" "}
+      <span className="font-bold text-white">{value || "—"}</span>
     </div>
   );
 }
@@ -57,9 +78,12 @@ function SectionTitle({
 export function GuestRequirementsTab({
   reqs,
   langFlag = "",
+  guideJobs = [],
 }: {
   reqs: OpsGuestRequirements;
   langFlag?: string;
+  /** Per-day guide_jobs for this PNR (from Dispatch sync). */
+  guideJobs?: GuideJobRow[];
 }) {
   const partyTotal = reqs.adults + reqs.children + reqs.infants;
   const partyDetail = [
@@ -73,6 +97,9 @@ export function GuestRequirementsTab({
   ]
     .filter(Boolean)
     .join(", ");
+
+  // Keep Hotel & Accommodation UI; only hide when lodging not required / no real data.
+  const hotelStops = accommodationSummaryStops(reqs.itineraryStops);
 
   return (
     <div className="space-y-6 text-xs text-white">
@@ -114,8 +141,13 @@ export function GuestRequirementsTab({
           <span className="text-[10px] font-bold tracking-wider text-gray-400 uppercase">
             IC cards &amp; logistics
           </span>
-          <div className="text-xs font-bold text-cyan-400">
-            {reqs.icCardsLabel}
+          <div className="text-xs font-bold">
+            <span className="text-white">Suica / PASMO</span>{" "}
+            <span className="text-cyan-400">
+              {reqs.icCardsLabel
+                .replace(/^Suica\s*\/\s*PASMO\s*/i, "")
+                .trim() || "—"}
+            </span>
           </div>
         </div>
       </div>
@@ -153,43 +185,34 @@ export function GuestRequirementsTab({
         {/* B. Flight, Logistics & Transit */}
         <div className="space-y-3 rounded-2xl border border-white/10 bg-[#0D1117] p-4">
           <SectionTitle>2. Flight, logistics &amp; transit</SectionTitle>
-          <div className="space-y-2 text-xs text-gray-300">
-            <div>
-              <strong className="text-white">Arrival hub:</strong>{" "}
-              {reqs.arrivalHubLabel}
-            </div>
-            <div>
-              <strong className="text-white">Arrival pickup:</strong>{" "}
-              {reqs.arrivalVipLabel}
-            </div>
-            <div>
-              <strong className="text-white">Arrival flight:</strong>{" "}
-              {reqs.arrivalFlightLabel}
-            </div>
-            <div>
-              <strong className="text-white">Departure hub:</strong>{" "}
-              {reqs.departureHubLabel}
-            </div>
-            <div>
-              <strong className="text-white">Departure drop-off:</strong>{" "}
-              {reqs.departureDropoffLabel}
-            </div>
-            <div>
-              <strong className="text-white">Departure flight:</strong>{" "}
-              {reqs.departureFlightLabel}
-            </div>
-            <div>
-              <strong className="text-white">Chauffeur pickup:</strong>{" "}
-              {reqs.chauffeurPickupLabel}
-            </div>
-            <div>
-              <strong className="text-white">Shinkansen:</strong>{" "}
-              {reqs.shinkansenLabel}
-            </div>
-            <div>
-              <strong className="text-white">Transport mix:</strong>{" "}
-              {reqs.transportStrategy}
-            </div>
+          <div className="space-y-2">
+            <LogisticsRow label="Arrival hub" value={reqs.arrivalHubLabel} />
+            <LogisticsRow label="Arrival pickup" value={reqs.arrivalVipLabel} />
+            <LogisticsRow
+              label="Arrival flight"
+              value={reqs.arrivalFlightLabel}
+            />
+            <LogisticsRow
+              label="Departure hub"
+              value={reqs.departureHubLabel}
+            />
+            <LogisticsRow
+              label="Departure drop-off"
+              value={reqs.departureDropoffLabel}
+            />
+            <LogisticsRow
+              label="Departure flight"
+              value={reqs.departureFlightLabel}
+            />
+            <LogisticsRow
+              label="Chauffeur pickup"
+              value={reqs.chauffeurPickupLabel}
+            />
+            <LogisticsRow label="Shinkansen" value={reqs.shinkansenLabel} />
+            <LogisticsRow
+              label="Transport mix"
+              value={reqs.transportStrategy}
+            />
             <div className="flex flex-wrap gap-3 pt-1">
               <span>
                 JR Pass: <PassBadge value={reqs.guestHasJRPass} />
@@ -205,12 +228,12 @@ export function GuestRequirementsTab({
         </div>
       </div>
 
-      {/* C. Hotel & Accommodation */}
+      {/* C. Hotel & Accommodation Summary — always show section 3; empty shell when no lodging */}
       <div className="space-y-3 rounded-2xl border border-white/10 bg-[#0D1117] p-4">
         <SectionTitle>3. Hotel &amp; accommodation summary</SectionTitle>
-        {reqs.itineraryStops.length > 0 ? (
+        {hotelStops.length > 0 ? (
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
-            {reqs.itineraryStops.map((stop, idx) => (
+            {hotelStops.map((stop, idx) => (
               <div
                 key={`${stop.cityId}-${idx}`}
                 className="rounded-xl border border-white/5 bg-black/40 p-3"
@@ -238,9 +261,7 @@ export function GuestRequirementsTab({
             ))}
           </div>
         ) : (
-          <p className="text-xs text-zinc-500 italic">
-            No accommodation cities selected yet.
-          </p>
+          <p className="text-xs text-zinc-500">No hotel requested</p>
         )}
       </div>
 
@@ -305,7 +326,25 @@ export function GuestRequirementsTab({
                   {loc.outgoingTitle ? ` · Out: ${loc.outgoingTitle}` : ""}
                 </p>
 
-                {loc.days.map((day) => (
+                {loc.days.map((day) => {
+                  const dayJob = matchGuideJobForDay(guideJobs, {
+                    date: day.date,
+                    dayIndex: day.dayIndex,
+                  });
+                  const jobStatus = dayJob
+                    ? normalizeGuideJobStatus(dayJob.status)
+                    : null;
+                  const guideName = String(
+                    dayJob?.assigned_guide_name || ""
+                  ).trim();
+                  const guideInitial = guideName
+                    ? guideName.charAt(0).toUpperCase()
+                    : "?";
+                  const needsGuide =
+                    day.hasGuide ||
+                    (day.tours && day.tours.length > 0) ||
+                    Boolean(dayJob);
+                  return (
                   <div
                     key={`${loc.cityId}-${day.dayIndex}-${day.date || "tbd"}`}
                     className="rounded-lg border border-white/5 bg-[#0D1117] p-3"
@@ -314,22 +353,44 @@ export function GuestRequirementsTab({
                       <span className="font-bold text-[#F6A724]">
                         DAY {day.dayIndex}
                         {day.dateLabel ? ` — ${day.dateLabel}` : ""} ({loc.cityName})
+                        {normalizeTourDateIso(day.date) ? (
+                          <span className="ml-1 font-mono text-[10px] font-normal text-zinc-500">
+                            {normalizeTourDateIso(day.date)}
+                          </span>
+                        ) : null}
                       </span>
-                      <div className="flex flex-wrap gap-1">
+                      <div className="flex flex-wrap items-center gap-1">
                         {day.hasCar ? (
                           <span className="rounded bg-white/10 px-2 py-0.5 text-[10px] text-zinc-300">
                             CAR
                           </span>
                         ) : null}
-                        {day.hasGuide ? (
-                          <span className="rounded bg-white/10 px-2 py-0.5 text-[10px] text-zinc-300">
-                            GUIDE
+                        {jobStatus === "ACCEPTED" ||
+                        jobStatus === "COMPLETED" ? (
+                          <span className="inline-flex items-center gap-1.5 rounded border border-[#075473]/40 bg-[#075473]/25 px-2 py-0.5 text-[10px] font-bold text-cyan-200">
+                            <span className="flex h-4 w-4 items-center justify-center rounded-full bg-[#075473] text-[8px] text-white">
+                              {guideInitial}
+                            </span>
+                            {guideName || "Guide confirmed"}
                           </span>
-                        ) : (
-                          <span className="rounded bg-white/5 px-2 py-0.5 text-[10px] text-zinc-500">
+                        ) : jobStatus === "OFFERED" ? (
+                          <span className="inline-flex items-center gap-1.5 rounded border border-amber-500/40 bg-amber-500/15 px-2 py-0.5 text-[10px] font-bold text-amber-200">
+                            <span className="flex h-4 w-4 items-center justify-center rounded-full bg-amber-600/80 text-[8px] text-white">
+                              {guideInitial}
+                            </span>
+                            {guideName
+                              ? `${guideName} · offered`
+                              : "Guide offered"}
+                          </span>
+                        ) : jobStatus === "OPEN_BOARD" ? (
+                          <span className="rounded border border-cyan-500/30 bg-cyan-500/10 px-2 py-0.5 text-[10px] font-bold text-cyan-300 uppercase">
+                            Open board
+                          </span>
+                        ) : needsGuide ? (
+                          <span className="rounded border border-zinc-700 bg-white/5 px-2 py-0.5 text-[10px] text-zinc-500 uppercase">
                             Guide unassigned
                           </span>
-                        )}
+                        ) : null}
                         {day.hasTickets ? (
                           <span className="rounded bg-[#F6A724]/20 px-2 py-0.5 text-[10px] font-bold text-[#F6A724]">
                             TICKETS
@@ -372,7 +433,8 @@ export function GuestRequirementsTab({
                       ) : null}
                     </div>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             ))
           ) : (

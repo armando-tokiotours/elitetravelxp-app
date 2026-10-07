@@ -5,6 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { NewBookingResetButton } from "@/components/builder/NewBookingResetButton";
 import { ActionPillButton } from "@/components/ui/ActionPillButton";
+import { paymentBadgeForAmount } from "@/lib/balanceSettlement";
 
 export type PassHeroBookingType = "SINGLE_DAY" | "MULTI_DAY" | "VIP_CONCIERGE";
 
@@ -14,21 +15,24 @@ const MASCOT_BY_TYPE: Record<PassHeroBookingType, string> = {
   VIP_CONCIERGE: "/brand/1-day-pass-ico.png",
 };
 
-const TITLE_BY_TYPE: Record<PassHeroBookingType, string> = {
-  SINGLE_DAY: "1-Day Express Pass · Itinerary",
-  MULTI_DAY: "Grand Japan Journey · Itinerary",
-  VIP_CONCIERGE: "VIP Tickets & Local Access · Dossier",
+/** Short product tag under the guest name (not the hero headline). */
+const PRODUCT_TAG_BY_TYPE: Record<PassHeroBookingType, string> = {
+  SINGLE_DAY: "(1-DAY EXPRESS)",
+  MULTI_DAY: "(JAPAN JOURNEY)",
+  VIP_CONCIERGE: "(VIP ACCESS)",
 };
 
 /**
  * Liquid-glass dossier / pass hero.
  * Save · Send · Print live in top chrome; this surface owns pay + ⋮ menu.
+ * Badge + CTA derive from PocketBase `amountPaid` (via depositAmount) + package total.
  */
 export function LiquidGlassHero({
   pnr,
   guestName,
   bookingType = "SINGLE_DAY",
   depositAmount = 0,
+  packageTotalEur = 0,
   payLabel,
   payPulse = false,
   continueHref = "/builder/day-pass",
@@ -41,7 +45,10 @@ export function LiquidGlassHero({
   title?: string;
   guestName?: string;
   bookingType?: PassHeroBookingType;
+  /** Single source of truth: total paid toward tour (ops_hub.total_paid_eur). */
   depositAmount?: number;
+  /** Package estimate — drives 30% / fully-paid badge thresholds. */
+  packageTotalEur?: number;
   payLabel?: string;
   payPulse?: boolean;
   continueHref?: string;
@@ -57,10 +64,13 @@ export function LiquidGlassHero({
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
 
+  const amountPaid = Math.max(0, Math.round(Number(depositAmount) || 0));
+  const badge = paymentBadgeForAmount(amountPaid, packageTotalEur);
   const mascotSrc = MASCOT_BY_TYPE[bookingType];
-  const productTitle = TITLE_BY_TYPE[bookingType];
-  const guestLine = guestName?.trim() || "Guest";
+  const productTag = PRODUCT_TAG_BY_TYPE[bookingType];
+  const guestHeadline = guestName?.trim() || "Guest";
   const pillLabel = payLabel?.replace(/\s*▶\s*$/u, "").trim() || undefined;
+  const showPayCta = !badge.fullyPaid && Boolean(pillLabel);
 
   useEffect(() => {
     if (!isMenuOpen) return;
@@ -72,7 +82,7 @@ export function LiquidGlassHero({
   }, [isMenuOpen]);
 
   return (
-    <div className="relative z-40 mx-auto my-4 w-full max-w-5xl">
+    <div className="relative z-40 mx-auto my-4 w-full max-w-5xl print:hidden">
       <div className="glass-panel relative space-y-5 overflow-hidden rounded-3xl border border-white/15 bg-[#0A1017]/80 p-5 text-white shadow-2xl backdrop-blur-2xl sm:p-6">
         <div className="flex flex-col gap-3 overflow-visible border-b border-white/10 pb-4">
           <div className="flex w-full shrink-0 items-start justify-between gap-3">
@@ -92,9 +102,11 @@ export function LiquidGlassHero({
                   {pnr ? `PASS · ${pnr}` : "PASS"}
                 </span>
                 <h1 className="truncate text-[15px] font-black uppercase leading-tight tracking-wider text-white sm:text-[18px]">
-                  {productTitle}
+                  {guestHeadline}
                 </h1>
-                <p className="truncate text-xs text-white/55">{guestLine}</p>
+                <p className="truncate text-[0.6rem] leading-tight tracking-wide text-white/55">
+                  {productTag}
+                </p>
               </div>
             </div>
 
@@ -124,26 +136,23 @@ export function LiquidGlassHero({
                         setIsMenuOpen(false);
                         onPlanInvoice();
                       }}
-                      className="flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-[10px] font-bold uppercase text-white hover:bg-white/10"
+                      className="flex w-full items-center rounded-xl px-3 py-2.5 text-left font-semibold text-white/90 transition hover:bg-white/10"
                     >
-                      <span>Invoice &amp; Plan</span>
-                      <span aria-hidden>⇄</span>
+                      Plan / Invoice
                     </button>
                   ) : null}
                   <Link
                     href={continueHref}
                     role="menuitem"
+                    className="flex w-full items-center rounded-xl px-3 py-2.5 font-semibold text-white/90 transition hover:bg-white/10"
                     onClick={() => setIsMenuOpen(false)}
-                    className="flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-[10px] font-bold uppercase text-cyan-300 hover:bg-white/10"
                   >
-                    <span>Continue Booking</span>
-                    <span aria-hidden>▶</span>
+                    Continue editing
                   </Link>
-                  {/* Keep reset mounted — do not close menu wrapper before modal opens */}
                   <div
-                    className="rounded-xl px-1 py-1"
-                    onClick={(e) => e.stopPropagation()}
-                    onMouseDown={(e) => e.stopPropagation()}
+                    role="none"
+                    className="border-t border-white/10 pt-1"
+                    onClick={() => setIsMenuOpen(false)}
                   >
                     <NewBookingResetButton scope="full" variant="nav" />
                   </div>
@@ -155,7 +164,7 @@ export function LiquidGlassHero({
 
         <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
           <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
-            {depositAmount > 0 ? (
+            {badge.kind !== "none" ? (
               <>
                 <button
                   type="button"
@@ -166,34 +175,42 @@ export function LiquidGlassHero({
                   <span className="flex h-4 w-4 items-center justify-center rounded-full bg-emerald-500 text-[10px] font-extrabold text-black">
                     ✓
                   </span>
-                  <span>
-                    Fee Credit Applied (−€{Math.round(depositAmount)})
-                  </span>
+                  <span>{badge.label}</span>
                   <span className="ml-1 text-[10px] text-emerald-400">
                     {isAccordionOpen ? "◀" : "▸"}
                   </span>
                 </button>
                 {isAccordionOpen ? (
                   <span className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-[11px] text-gray-300">
-                    100% credited toward tour balance.
+                    {badge.fullyPaid
+                      ? "Your trip is 100% fully paid. No further action required."
+                      : badge.milestone30Met
+                        ? "30% progress secured — pay the remaining balance when ready."
+                        : "100% credited toward tour balance."}
                   </span>
                 ) : null}
               </>
             ) : (
-              <span className="text-[11px] text-white/40">
-                Secure date to unlock features
-              </span>
+              <button
+                type="button"
+                onClick={onPayContinue}
+                className="text-left text-[11px] font-bold uppercase tracking-wide text-cyan-400 transition hover:text-cyan-300"
+              >
+                View Pricing Details ▸
+              </button>
             )}
           </div>
 
-          <div className="shrink-0 rounded-2xl border border-white/10 bg-white/5 p-1.5">
-            <ActionPillButton
-              conciergeFeePaid={depositAmount > 0}
-              onClick={onPayContinue}
-              pulse={payPulse}
-              label={pillLabel}
-            />
-          </div>
+          {showPayCta ? (
+            <div className="shrink-0">
+              <ActionPillButton
+                conciergeFeePaid={amountPaid > 0}
+                onClick={onPayContinue}
+                pulse={payPulse}
+                label={pillLabel}
+              />
+            </div>
+          ) : null}
         </div>
       </div>
 

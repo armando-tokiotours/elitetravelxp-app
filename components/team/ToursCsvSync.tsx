@@ -25,6 +25,7 @@ const CSV_HEADERS = [
   "access_type", // e.g. guided_route | direct_ticket
   "crowd_tag", // e.g. hidden_gem | classic_highlight
   "is_niche", // true | false
+  "is_bonus", // true | false — agent-only until added to package
   "price_1_pax",
   "price_2_pax",
   "price_3_pax",
@@ -258,6 +259,7 @@ export function ToursCsvSync({
           ),
           crowd_tag: String(r.crowd_tag ?? ""),
           is_niche: r.is_niche === true,
+          is_bonus: r.is_bonus === true,
           price_1_pax: Number(r.price_1_pax) || "",
           price_2_pax: Number(r.price_2_pax) || "",
           price_3_pax: Number(r.price_3_pax) || "",
@@ -344,6 +346,7 @@ export function ToursCsvSync({
             vibe_tags: vibeTags,
             access_type: accessType,
             is_niche: boolish(cell(row, "is_niche", "niche", "vip"), false),
+            is_bonus: boolish(cell(row, "is_bonus", "bonus", "gift"), false),
             duration_hours: num(row, "duration_hours", "duration") ?? 0,
             languages: languagesFromCsv(cell(row, "languages")),
             is_customizable_duration: boolish(

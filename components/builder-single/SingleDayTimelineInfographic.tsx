@@ -1,16 +1,23 @@
 "use client";
 
 import Link from "next/link";
-import { MapPin, SquarePen } from "lucide-react";
+import { SquarePen } from "lucide-react";
 import { BoardingPassCard } from "@/components/builder/BoardingPassCard";
+import {
+  ItineraryStopTicket,
+  resolveItineraryStopKind,
+  type ItineraryStopKind,
+} from "@/components/dossier/ItineraryStopTickets";
 import { QUIZ_VIBE } from "@/lib/experienceProfiler";
-import { formatDurationBadge } from "@/lib/experiencesPlaces";
 import {
   formatClock12h,
   type TimedRouteItem,
 } from "@/lib/singleDayTimeSlots";
 import type { SingleDaySelectedExperience } from "@/store/useSingleDayBuilderStore";
 import type { PbTour } from "@/lib/pocketbase/client";
+
+/** Guided tour stop vs activity/entry ticket (paper stub skin). */
+export type TimelineStopKind = ItineraryStopKind;
 
 export type TimelineStop = TimedRouteItem<SingleDaySelectedExperience> & {
   thumbUrl?: string;
@@ -20,7 +27,22 @@ export type TimelineStop = TimedRouteItem<SingleDaySelectedExperience> & {
   address?: string;
   vibeLabel?: string;
   ringTone?: "red" | "cyan";
+  stopKind?: TimelineStopKind;
 };
+
+function resolveStopKind(
+  stop: TimedRouteItem<SingleDaySelectedExperience>,
+  item: PbTour | undefined
+): TimelineStopKind {
+  return resolveItineraryStopKind({
+    category: item?.category,
+    access_type: item?.access_type || stop.access_type,
+    is_self_guided: item?.is_self_guided,
+    is_extra: stop.is_extra,
+    title: stop.title || item?.title,
+    description: item?.description,
+  });
+}
 
 function vibeLabelFromTags(tags: string[] | undefined): string {
   if (!tags?.length) return "Experience";
@@ -48,14 +70,6 @@ function ringToneFromTags(tags: string[] | undefined): "red" | "cyan" {
   return "cyan";
 }
 
-function durationPillLabel(hours: number): string {
-  if (!Number.isFinite(hours) || hours <= 0) return "—";
-  if (Number.isInteger(hours)) {
-    return `${hours} Hour${hours === 1 ? "" : "s"}`;
-  }
-  const badge = formatDurationBadge(hours).replace(/h$/i, "");
-  return `${badge} Hours`;
-}
 
 /** Compact range: "09:00 – 11:00 AM" */
 export function formatTimeSlotRange(startHm: string, endHm: string): string {
@@ -95,6 +109,7 @@ export function enrichTimelineStops(
       address,
       vibeLabel: vibeLabelFromTags(tags),
       ringTone: ringToneFromTags(tags),
+      stopKind: resolveStopKind(stop, item),
     };
   });
 }
@@ -169,27 +184,27 @@ export function SingleDayTimelineInfographic({
 
   return (
     <div
-      className={`sd-timeline ${
+      className={`sd-timeline print:break-inside-avoid ${
         isPrint
           ? "sd-timeline--print text-white"
-          : "rounded-3xl border border-white/10 bg-[#0A0E14] p-4 text-white shadow-[0_0_40px_rgba(7,84,115,0.15)] sm:p-6 md:p-8"
+          : "text-white print:text-black"
       }`}
     >
-      <header className="relative mb-6 text-center md:mb-10">
+      <header className="relative mb-5 text-center md:mb-8">
         {editHref && !isPrint ? (
           <Link
             href={editHref}
             aria-label="Edit Itinerary"
             title="Edit Itinerary"
-            className="absolute top-0 right-0 z-10 rounded-md p-1.5 text-zinc-500 transition-colors hover:text-[#D91147]"
+            className="absolute top-0 right-0 z-10 rounded-md p-1.5 text-zinc-500 transition-colors hover:text-[#D91147] print:hidden"
           >
             <SquarePen className="h-[18px] w-[18px]" strokeWidth={2} />
           </Link>
         ) : null}
-        <p className="text-[0.65rem] font-semibold uppercase tracking-[0.28em] text-white">
+        <p className="text-[0.65rem] font-semibold uppercase tracking-[0.28em] text-white print:text-gray-900">
           Day Timeline
         </p>
-        <p className="mt-2 font-mono text-sm font-bold tracking-wide text-white sm:text-base">
+        <p className="mt-2 font-mono text-sm font-bold tracking-wide text-white print:text-gray-900 sm:text-base">
           {windowLabel}
         </p>
         {cityLabel || placeName ? (
@@ -205,6 +220,7 @@ export function SingleDayTimelineInfographic({
 
       <BoardingPassCard
         kind="arrival"
+        compact
         headerMain="Pick-up Pass"
         headerStub="Start"
         title={pickupTitle}
@@ -219,7 +235,7 @@ export function SingleDayTimelineInfographic({
         hubCode={cityHubCode(cityLabel)}
         stubTopLabel="Time"
         stubBottomLabel="City"
-        className="mb-6"
+        className="mb-4"
       />
 
       <ol className="sd-timeline-track relative mx-auto max-w-3xl list-none pl-0">
@@ -292,95 +308,18 @@ export function SingleDayTimelineInfographic({
                   {formatTimeSlotRange(stop.startTime, stop.endTime)}
                 </p>
 
-                <section
-                  className={`w-full overflow-hidden rounded-2xl border border-white/10 text-white shadow-2xl border-l-[3px] ${
-                    isPrint
-                      ? "border-zinc-300 border-l-[#075473] bg-white text-[#0B1F3A]"
-                      : "bg-[#0A1017]/80 border-l-[#F6A724] backdrop-blur-md"
-                  } ${branchLeft ? "md:ml-auto" : ""}`}
-                >
-                  {stop.thumbUrl ? (
-                    <div className="relative h-28 w-full overflow-hidden sm:h-32">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={stop.thumbUrl}
-                        alt=""
-                        className="h-full w-full object-cover"
-                      />
-                      <div
-                        className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent"
-                        aria-hidden
-                      />
-                      <span
-                        className={`absolute bottom-2 left-3 rounded-full px-2 py-0.5 text-[9px] font-bold tracking-wider ${
-                          isPrint
-                            ? "bg-[#0B1F3A] text-white"
-                            : "bg-[#E60F43] text-white"
-                        }`}
-                      >
-                        STOP {String(stop.stopNumber).padStart(2, "0")}
-                      </span>
-                    </div>
-                  ) : null}
-                  <div className="px-4 py-3 sm:px-5">
-                    <h4
-                      className={`font-godiva text-base uppercase tracking-wider sm:text-lg ${
-                        isPrint ? "text-[#0B1F3A]" : "text-white"
-                      }`}
-                    >
-                      {stop.title}
-                    </h4>
-                    {stop.address ? (
-                      <p
-                        className={`mt-1.5 inline-flex items-start gap-1 text-[11px] ${
-                          isPrint ? "text-zinc-500" : "text-white/40"
-                        } ${branchLeft ? "md:flex-row-reverse" : ""}`}
-                      >
-                        <MapPin className="mt-0.5 h-3 w-3 shrink-0" />
-                        <span>{stop.address}</span>
-                      </p>
-                    ) : null}
-                    {/* Mobile: route under card */}
-                    {routeText ? (
-                      <p
-                        className={`mt-2 whitespace-pre-line text-[11px] leading-relaxed md:hidden ${
-                          isPrint ? "text-zinc-500" : "text-white/50"
-                        }`}
-                      >
-                        <span className="font-bold uppercase tracking-wider text-cyan-400/80">
-                          Route ·{" "}
-                        </span>
-                        {routeText}
-                      </p>
-                    ) : null}
-                    <div
-                      className={`mt-3 flex flex-wrap gap-1.5 ${
-                        branchLeft ? "md:justify-end" : ""
-                      }`}
-                    >
-                      <span
-                        className={`rounded-full px-2.5 py-0.5 text-[10px] font-semibold ${
-                          isPrint
-                            ? "bg-zinc-100 text-[#075473]"
-                            : "bg-cyan-500/15 text-cyan-300"
-                        }`}
-                      >
-                        {durationPillLabel(Number(stop.duration_hours) || 0)}
-                      </span>
-                      {stop.vibeLabel ? (
-                        <span
-                          className={`rounded-full px-2.5 py-0.5 text-[10px] font-semibold ${
-                            isPrint
-                              ? "bg-[#E60F43]/10 text-[#E60F43]"
-                              : "bg-[#E60F43]/15 text-[#F29727]"
-                          }`}
-                        >
-                          {stop.vibeLabel}
-                        </span>
-                      ) : null}
-                    </div>
-                  </div>
-                </section>
+                <ItineraryStopTicket
+                  kind={stop.stopKind || "tour"}
+                  title={stop.title}
+                  stopNumber={stop.stopNumber}
+                  durationHours={Number(stop.duration_hours) || 0}
+                  vibeLabel={stop.vibeLabel}
+                  address={stop.address}
+                  routeText={routeText}
+                  thumbUrl={stop.thumbUrl}
+                  branchLeft={branchLeft}
+                  isPrint={isPrint}
+                />
               </div>
             </li>
           );
@@ -389,6 +328,7 @@ export function SingleDayTimelineInfographic({
 
       <BoardingPassCard
         kind="departure"
+        compact
         headerMain="Drop-off Pass"
         headerStub="End"
         title={dropoffTitle}
@@ -403,7 +343,7 @@ export function SingleDayTimelineInfographic({
         hubCode={cityHubCode(cityLabel)}
         stubTopLabel="Time"
         stubBottomLabel="City"
-        className="mt-6"
+        className="mt-4"
       />
     </div>
   );

@@ -27,6 +27,10 @@ services:
     volumes:
       # Persist Team Email Settings across rebuilds
       - ./config/emailConfig.json:/app/config/emailConfig.json
+      # Persist ticket voucher PDFs across rebuilds (served as /uploads/tickets/...).
+      # Host dir must be writable by container uid 1001 (nextjs), e.g.:
+      #   mkdir -p data/ticket-uploads && chown 1001:1001 data/ticket-uploads
+      - ./data/ticket-uploads:/app/public/uploads/tickets
     depends_on:
       - pocketbase
     networks:

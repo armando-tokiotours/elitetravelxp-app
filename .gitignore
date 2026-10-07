@@ -49,3 +49,11 @@ backend/CHANGELOG.md
 backend/LICENSE.md
 scripts/.seed-tmp/
 backend/.pb_backups/
+
+# Local ticket voucher PDFs (VPS / Docker volume)
+/public/uploads/tickets/**
+!/public/uploads/tickets/.gitkeep
+/data/ticket-uploads/
+
+# Local toolchain binaries / scratch
+.tools/

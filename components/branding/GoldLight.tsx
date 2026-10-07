@@ -147,7 +147,7 @@ export function GoldLight({
 
   return (
     <span
-      className={`pointer-events-none absolute z-0 transition-opacity duration-300 ${
+      className={`pointer-events-none absolute z-0 transition-opacity duration-300 print:hidden ${
         geom.wrapClass
       } ${
         active

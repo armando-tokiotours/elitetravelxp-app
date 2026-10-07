@@ -42,7 +42,10 @@ import { SaveRequiredContactModal } from "@/components/builder/SaveRequiredConta
 import { TopNavBar } from "@/components/navigation/TopNavBar";
 import { BUILDER_ROUTES } from "@/lib/builderRoutes";
 import { SystemMessageFox } from "@/components/branding/SystemMessageFox";
-import { showSystemMessage } from "@/store/useSystemMessageStore";
+import {
+  dismissSystemMessage,
+  showSystemMessage,
+} from "@/store/useSystemMessageStore";
 import { getSystemMessage } from "@/lib/systemMessages";
 import { dossierPrimaryCtaLabel } from "@/lib/tourPaymentStatus";
 import { activeBookingRef } from "@/utils/pnr";
@@ -160,13 +163,19 @@ export default function SingleDayItineraryPageClient() {
       confirmedBookingRef,
       bookingStatus,
     });
-    void import("@/lib/feeCredit").then(({ hydrateConciergeFeeCredit }) => {
-      void hydrateConciergeFeeCredit(ref).then((eur) => {
-        setFeeCreditEur(eur);
-        if (eur > 0) setTotalPaidEur((prev) => (prev > 0 ? prev : eur));
+    void import("@/lib/feeCredit").then(({ hydrateTourPayments }) => {
+      void hydrateTourPayments(ref).then(({ feeCreditEur, totalPaidEur }) => {
+        setFeeCreditEur(feeCreditEur);
+        if (totalPaidEur > 0) {
+          setTotalPaidEur((prev) => Math.max(prev, totalPaidEur));
+        }
       });
     });
   }, [hydrated, tempBookingRef, confirmedBookingRef, bookingStatus]);
+
+  useEffect(() => {
+    if (showFeeModal || balanceOpen) dismissSystemMessage();
+  }, [showFeeModal, balanceOpen]);
 
   useEffect(() => {
     const v = searchParams.get("view");
@@ -227,12 +236,27 @@ export default function SingleDayItineraryPageClient() {
     setSaveContactOpen(true);
   };
 
+  const openBalanceCheckout = () => {
+    dismissSystemMessage();
+    void requestInvoiceView();
+    setShowFeeModal(false);
+    setBalanceOpen(true);
+  };
+
+  const openFeeOrBalance = () => {
+    dismissSystemMessage();
+    if (feeCreditEur > 0 || totalPaidEur > 0) {
+      openBalanceCheckout();
+      return;
+    }
+    setShowFeeModal(true);
+  };
+
   const handleRequestPay = () => {
     setSubmitError(null);
     setCostPulsarDone(true);
-    if (feeCreditEur > 0) {
-      void requestInvoiceView();
-      setBalanceOpen(true);
+    if (feeCreditEur > 0 || totalPaidEur > 0) {
+      openBalanceCheckout();
       return;
     }
     requireContactOr("estimate", () => setShowEstimateModal(true));
@@ -253,23 +277,57 @@ export default function SingleDayItineraryPageClient() {
     orderId: string | null;
   }) => {
     try {
-      void import("@/lib/recordPayment").then(({ recordPaymentSuccess }) =>
-        recordPaymentSuccess({
-          pnr: paymentDetails.bookingRef,
-          kind: balanceOption === "FULL" ? "tour_full" : "tour_partial",
-          amountEur: paymentDetails.amountPaid,
-          orderId: paymentDetails.orderId,
-          guestEmail,
-          guestName: customerName,
-          builder: "single",
-          estimatedTotalEur: quote.totalEur || quote.max,
-          notes:
-            balanceOption === "FULL"
-              ? "Full tour balance settlement"
-              : "30% progress payment on pending balance",
-        })
+      const { recordPaymentSuccess } = await import("@/lib/recordPayment");
+      const recorded = await recordPaymentSuccess({
+        pnr: paymentDetails.bookingRef,
+        kind: balanceOption === "FULL" ? "tour_full" : "tour_partial",
+        amountEur: paymentDetails.amountPaid,
+        orderId: paymentDetails.orderId,
+        guestEmail,
+        guestName: customerName,
+        builder: "single",
+        estimatedTotalEur: quote.totalEur || quote.max,
+        notes:
+          balanceOption === "FULL"
+            ? "Full tour balance settlement"
+            : "30% progress payment on pending balance",
+      });
+      if (!recorded.ok) {
+        setSubmitError(
+          recorded.error ||
+            "Payment succeeded but Ops total paid failed to sync. Contact concierge with your ref."
+        );
+      }
+      const nextPaid = Math.max(
+        recorded.totalPaidEur || 0,
+        Math.max(totalPaidEur, feeCreditEur) + paymentDetails.amountPaid
       );
-      setTotalPaidEur((prev) => prev + paymentDetails.amountPaid);
+      setTotalPaidEur(nextPaid);
+      const { markTotalPaidEur } = await import("@/lib/feeCredit");
+      markTotalPaidEur(paymentDetails.bookingRef, nextPaid);
+      // Ensure Ops Pricing Studio has the guest cart after milestone pay
+      void import("@/lib/itemizedInvoice").then(
+        ({ buildSingleDayInvoiceItems }) => {
+          const st = useSingleDayBuilderStore.getState();
+          void import("@/lib/syncGuestInvoiceCart").then(
+            ({ syncGuestInvoiceCart }) =>
+              syncGuestInvoiceCart({
+                pnr: paymentDetails.bookingRef,
+                items: buildSingleDayInvoiceItems({
+                  guidePreference: st.guidePreference,
+                  tourHours: st.tourHours,
+                  selectedExperiences: st.selectedExperiences,
+                  conciergeActive,
+                  preferredMovement: st.preferredMovement,
+                  suicaNeeded: st.suicaNeeded,
+                  suicaValueEur: st.suicaValueEur,
+                  guests: Math.max(1, (st.adults || 0) + (st.children || 0)),
+                }),
+                estimatedTotalEur: quote.totalEur || quote.max,
+              })
+          );
+        }
+      );
       setSubmittedRef(paymentDetails.bookingRef);
       setIsCheckoutModalOpen(false);
       setCheckoutMode("deposit");
@@ -301,7 +359,7 @@ export default function SingleDayItineraryPageClient() {
     });
     // Persist draft before deposit so Ops sees FULL vs PARTIAL intent
     void requestSaveOnly();
-    setShowFeeModal(true);
+    openFeeOrBalance();
   };
 
   const handleSaveForLater = async () => {
@@ -364,27 +422,54 @@ export default function SingleDayItineraryPageClient() {
           path: selectedPath || "FULL",
         }),
       });
-      void import("@/lib/recordPayment").then(({ recordPaymentSuccess }) =>
-        recordPaymentSuccess({
-          pnr: paymentDetails.bookingRef,
-          kind: "concierge_deposit",
-          amountEur: paymentDetails.amountPaid,
-          orderId: paymentDetails.orderId,
-          path: selectedPath || "FULL",
-          guestEmail,
-          guestName: customerName,
-          builder: "single",
-        })
+      const { recordPaymentSuccess } = await import("@/lib/recordPayment");
+      const recorded = await recordPaymentSuccess({
+        pnr: paymentDetails.bookingRef,
+        kind: "concierge_deposit",
+        amountEur: paymentDetails.amountPaid,
+        orderId: paymentDetails.orderId,
+        path: selectedPath || "FULL",
+        guestEmail,
+        guestName: customerName,
+        builder: "single",
+        estimatedTotalEur: quote.totalEur || quote.max,
+      });
+      const paid = Math.max(
+        recorded.totalPaidEur || 0,
+        paymentDetails.amountPaid
       );
-      void import("@/lib/feeCredit").then(({ markConciergeFeePaid }) =>
-        markConciergeFeePaid(
-          paymentDetails.bookingRef,
-          paymentDetails.amountPaid
-        )
+      const { markConciergeFeePaid, markTotalPaidEur } = await import(
+        "@/lib/feeCredit"
       );
+      markConciergeFeePaid(paymentDetails.bookingRef, paymentDetails.amountPaid);
+      markTotalPaidEur(paymentDetails.bookingRef, paid);
       confirmBookingRef(paymentDetails.bookingRef, "in_progress");
       setSubmittedRef(paymentDetails.bookingRef);
       setFeeCreditEur(paymentDetails.amountPaid);
+      setTotalPaidEur((prev) => Math.max(prev, paid));
+      // Seed guest cart into ops_hub so Ops Pricing Studio is not empty
+      void import("@/lib/itemizedInvoice").then(
+        ({ buildSingleDayInvoiceItems }) => {
+          const st = useSingleDayBuilderStore.getState();
+          void import("@/lib/syncGuestInvoiceCart").then(
+            ({ syncGuestInvoiceCart }) =>
+              syncGuestInvoiceCart({
+                pnr: paymentDetails.bookingRef,
+                items: buildSingleDayInvoiceItems({
+                  guidePreference: st.guidePreference,
+                  tourHours: st.tourHours,
+                  selectedExperiences: st.selectedExperiences,
+                  conciergeActive,
+                  preferredMovement: st.preferredMovement,
+                  suicaNeeded: st.suicaNeeded,
+                  suicaValueEur: st.suicaValueEur,
+                  guests: Math.max(1, (st.adults || 0) + (st.children || 0)),
+                }),
+                estimatedTotalEur: quote.totalEur || quote.max,
+              })
+          );
+        }
+      );
       if (guestEmail) {
         void import("@/lib/syncBookingLead").then(({ syncSingleDayBookingLead }) =>
           syncSingleDayBookingLead({
@@ -569,23 +654,28 @@ export default function SingleDayItineraryPageClient() {
       });
       confirmBookingRef(result.reference, "in_progress");
       setSubmittedRef(result.reference);
-      void import("@/lib/recordPayment").then(({ recordPaymentSuccess }) =>
-        recordPaymentSuccess({
-          pnr: result.reference,
-          kind:
-            paymentDetails.paymentType === "full"
-              ? "tour_full"
-              : paymentDetails.paymentType === "partial"
-                ? "tour_partial"
-                : "tour_deposit",
-          amountEur: paymentDetails.amountPaid,
-          currency: paymentDetails.currency,
-          orderId: paymentDetails.orderId,
-          guestEmail: paymentDetails.customerEmail,
-          guestName: paymentDetails.customerName,
-          builder: "single",
-        })
-      );
+      const { recordPaymentSuccess } = await import("@/lib/recordPayment");
+      const recorded = await recordPaymentSuccess({
+        pnr: result.reference,
+        kind:
+          paymentDetails.paymentType === "full"
+            ? "tour_full"
+            : paymentDetails.paymentType === "partial"
+              ? "tour_partial"
+              : "tour_deposit",
+        amountEur: paymentDetails.amountPaid,
+        currency: paymentDetails.currency,
+        orderId: paymentDetails.orderId,
+        guestEmail: paymentDetails.customerEmail,
+        guestName: paymentDetails.customerName,
+        builder: "single",
+        estimatedTotalEur: quote.totalEur || quote.max,
+      });
+      if (recorded.totalPaidEur != null && recorded.totalPaidEur > 0) {
+        setTotalPaidEur((prev) => Math.max(prev, recorded.totalPaidEur!));
+        const { markTotalPaidEur } = await import("@/lib/feeCredit");
+        markTotalPaidEur(result.reference, recorded.totalPaidEur);
+      }
 
       const email = String(paymentDetails.customerEmail || "")
         .trim()
@@ -622,7 +712,7 @@ export default function SingleDayItineraryPageClient() {
 
   return (
     <div className="builder-theme relative z-10 min-h-screen overflow-x-hidden bg-transparent pb-44 text-white md:pb-36">
-      <SystemMessageFox />
+      {showFeeModal || balanceOpen ? null : <SystemMessageFox />}
       <TopNavBar
         brandTitle="1-Day Express Pass"
         ctaHref={BUILDER_ROUTES.dayPass}
@@ -647,8 +737,12 @@ export default function SingleDayItineraryPageClient() {
           bookingType="SINGLE_DAY"
           title="1-Day Express Pass · Itinerary"
           guestName={customerName !== "Guest" ? customerName : undefined}
-          depositAmount={feeCreditEur}
-          payLabel={dossierPrimaryCtaLabel(feeCreditEur)}
+          depositAmount={Math.max(totalPaidEur, feeCreditEur)}
+          packageTotalEur={quote.totalEur || quote.max || quote.min || 0}
+          payLabel={dossierPrimaryCtaLabel(feeCreditEur, {
+            amountPaidEur: Math.max(totalPaidEur, feeCreditEur),
+            packageTotalEur: quote.totalEur || quote.max || quote.min || 0,
+          })}
           payPulse={!costPulsarDone}
           continueHref={BUILDER_ROUTES.dayPass}
           locked={!contactReady}
@@ -693,7 +787,7 @@ export default function SingleDayItineraryPageClient() {
           <div
             className={
               activeView === "invoice"
-                ? "print-document rounded-2xl border border-white/10 bg-[#0D1117] px-4 py-6 sm:px-6"
+                ? "print-document"
                 : "invoice-capture-offscreen pointer-events-none fixed left-[-10000px] top-0 z-[-1] w-[800px] bg-[#0D1117]"
             }
             aria-hidden={activeView !== "invoice"}
@@ -703,15 +797,18 @@ export default function SingleDayItineraryPageClient() {
               showToolbar={false}
               onPrintRequest={requestSendPdf}
               feeCreditEur={feeCreditEur}
+              totalPaidEur={totalPaidEur || feeCreditEur}
             />
           </div>
         </main>
 
-      {/* Compact dual-action bar — clear of mobile chat + bottom nav */}
-      {contactReady ? (
-      <div className="no-print sticky-action-bar fixed inset-x-0 bottom-28 z-30 mb-2 w-full overflow-x-hidden pr-[4.75rem] sm:bottom-6 sm:left-20 sm:pr-24 sm:pl-0">
-        <div className="mx-auto flex w-full max-w-5xl px-2 sm:px-4">
-          <div className="flex w-full flex-row items-center gap-2 rounded-2xl border border-white/10 bg-[#0D1117]/95 p-2 shadow-2xl backdrop-blur-md sm:gap-3 sm:p-2.5">
+      {/* Bottom-center pay bar — above mobile nav / clear of desktop dock */}
+      {contactReady &&
+      Math.max(0, (quote.totalEur || quote.max || 0) - Math.max(totalPaidEur, feeCreditEur)) >
+        0 ? (
+      <div className="no-print sticky-action-bar pointer-events-none fixed inset-x-0 bottom-[4.75rem] z-30 w-full overflow-x-hidden sm:bottom-6 sm:left-20 sm:pr-6">
+        <div className="mx-auto flex w-full max-w-5xl justify-center px-3 sm:justify-start sm:px-4">
+          <div className="pointer-events-auto flex w-full max-w-md flex-row items-center gap-2 rounded-2xl border border-[#054F70]/15 bg-[#EBFFFF] p-2 shadow-2xl backdrop-blur-md sm:max-w-5xl sm:gap-3 sm:p-2.5">
             <div className="min-w-0 flex-1 pl-1 sm:pl-2">
               {(() => {
                 const paid = Math.max(0, totalPaidEur || feeCreditEur || 0);
@@ -726,27 +823,23 @@ export default function SingleDayItineraryPageClient() {
                 const ppMax = singleDayPerPersonEur(pendingMax, totalGuests);
                 return (
                   <>
-                    <p className="truncate text-[9px] font-bold uppercase tracking-wider text-[#00B4D8]">
+                    <p className="truncate text-[9px] font-bold uppercase tracking-wider text-[#054F70]/70">
                       Remaining balance due
                     </p>
-                    <p className="truncate text-sm font-extrabold text-[#F6A724] sm:text-base">
+                    <p className="truncate text-sm font-extrabold text-[#054F70] sm:text-base">
+                      {ppMin === ppMax
+                        ? formatEur(ppMin)
+                        : `${formatEur(ppMin)} ~ ${formatEur(ppMax)}`}
+                      <span className="ml-1 text-[10px] font-bold tracking-wide">
+                        /pp
+                      </span>
+                    </p>
+                    <p className="truncate text-[9px] text-[#054F70]/60">
+                      Party{" "}
                       {pendingMin === pendingMax
                         ? formatEur(pendingMin)
                         : `${formatEur(pendingMin)} ~ ${formatEur(pendingMax)}`}
-                    </p>
-                    <p className="truncate text-[9px] text-emerald-400/90">
-                      Est.{" "}
-                      {ppMin === ppMax
-                        ? formatEur(ppMin)
-                        : `${formatEur(ppMin)} ~ ${formatEur(ppMax)}`}{" "}
-                      /pp
-                      <span className="ml-1.5 text-zinc-500">
-                        · party{" "}
-                        {partyMin === partyMax
-                          ? formatEur(partyMin)
-                          : `${formatEur(partyMin)} ~ ${formatEur(partyMax)}`}
-                        {paid > 0 ? ` · paid ${formatEur(paid)}` : ""}
-                      </span>
+                      {paid > 0 ? ` · paid ${formatEur(paid)}` : ""}
                     </p>
                   </>
                 );
@@ -758,7 +851,7 @@ export default function SingleDayItineraryPageClient() {
                 onClick={openBudget}
                 aria-label="Price Composition"
                 title="Price Composition"
-                className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/15 bg-white/5 text-white transition hover:bg-white/10"
+                className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[#054F70]/30 bg-[#054F70]/5 text-[#054F70] transition hover:bg-[#054F70]/10"
               >
                 <Wallet className="h-4 w-4 shrink-0" aria-hidden />
               </button>
@@ -903,7 +996,7 @@ export default function SingleDayItineraryPageClient() {
           void loadConciergeEstimateCopy().then((c) => {
             setConciergeFeeEur(c.feeAmountEur);
           });
-          setShowFeeModal(true);
+          openFeeOrBalance();
         }}
         onContinueEditing={() => {
           setSaveLaterOpen(false);
@@ -997,9 +1090,12 @@ export default function SingleDayItineraryPageClient() {
             confirmedBookingRef,
             bookingStatus,
           })}
-          guestEmail={guestEmail}
           guestName={customerName}
+          guestEmail={guestEmail}
           tripPath="/builder-single/itinerary"
+          feeCreditEur={feeCreditEur}
+          totalPaidEur={totalPaidEur || feeCreditEur}
+          conciergeFeeEur={conciergeFeeEur}
         />
       </div>
     </div>

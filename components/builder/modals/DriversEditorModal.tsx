@@ -46,6 +46,7 @@ import {
   fetchUiTransportCards,
   resolveTransportCards,
   TRANSPORT_CARD_FALLBACKS,
+  TRANSPORT_CARD_FALLBACKS_BY_SCOPE,
   type ResolvedTransportCard,
 } from "@/lib/uiTransportCards";
 import {
@@ -66,6 +67,12 @@ const DEFAULT_MODE_CARDS: ResolvedTransportCard[] = [
   TRANSPORT_CARD_FALLBACKS.self,
   TRANSPORT_CARD_FALLBACKS.public,
   TRANSPORT_CARD_FALLBACKS.private,
+];
+
+const DEFAULT_INTERCITY_CARDS: ResolvedTransportCard[] = [
+  TRANSPORT_CARD_FALLBACKS_BY_SCOPE.intercity.self,
+  TRANSPORT_CARD_FALLBACKS_BY_SCOPE.intercity.public,
+  TRANSPORT_CARD_FALLBACKS_BY_SCOPE.intercity.private,
 ];
 
 type PanelKind = "local" | "inter";
@@ -133,6 +140,9 @@ export function DriversEditorModal({
   const [passEditOpen, setPassEditOpen] = useState(false);
   const [modeCards, setModeCards] =
     useState<ResolvedTransportCard[]>(DEFAULT_MODE_CARDS);
+  const [intercityCards, setIntercityCards] = useState<ResolvedTransportCard[]>(
+    DEFAULT_INTERCITY_CARDS
+  );
 
   const locations = useBuilderStore((s) => s.locations);
   const arrivalDate = useBuilderStore((s) => s.arrivalDate);
@@ -176,7 +186,8 @@ export function DriversEditorModal({
     void (async () => {
       const rows = await fetchUiTransportCards();
       if (cancelled) return;
-      setModeCards(resolveTransportCards(rows));
+      setModeCards(resolveTransportCards(rows, "incity"));
+      setIntercityCards(resolveTransportCards(rows, "intercity"));
     })();
     return () => {
       cancelled = true;
@@ -709,6 +720,7 @@ export function DriversEditorModal({
                                 key="local-body"
                                 title={`How do you want to move around inside ${fromName}?`}
                                 cards={modeCards}
+                                costScope="incity"
                                 suggested={suggestedLocal}
                                 selected={stop.localTransitType}
                                 allowPrivate={allowPrivate}
@@ -804,7 +816,8 @@ export function DriversEditorModal({
                                   <ModeAccordion
                                     key="inter-body"
                                     title={`How do you want to travel ${fromName} → ${toName}?`}
-                                    cards={modeCards}
+                                    cards={intercityCards}
+                                    costScope="intercity"
                                     suggested={suggestedInter}
                                     selected={stop.transitType}
                                     allowPrivate={allowPrivate}
@@ -823,8 +836,8 @@ export function DriversEditorModal({
                                         ariaLabelHide="Hide transit help"
                                         text={
                                           <>
-                                            Public legs use Suica / JR for local
-                                            and inter-city rail. Private is a
+                                            Inter-city public is train / bullet
+                                            train (Shinkansen). Private is a
                                             door-to-door chauffeur for the
                                             vehicle (not per seat). Self-arranged
                                             keeps invoice transport at €0.
@@ -1023,6 +1036,7 @@ function PassStatusBadges({
 function ModeAccordion({
   title,
   cards = DEFAULT_MODE_CARDS,
+  costScope = "incity",
   suggested,
   selected,
   allowPrivate,
@@ -1037,6 +1051,8 @@ function ModeAccordion({
 }: {
   title: string;
   cards?: ResolvedTransportCard[];
+  /** In-city shows Suica/metro; inter-city shows train / bullet train costs */
+  costScope?: "incity" | "intercity";
   suggested: Exclude<CityTransitType, "unset">;
   selected: CityTransitType;
   allowPrivate: boolean;
@@ -1179,22 +1195,51 @@ function ModeAccordion({
         {selected === "public" ? (
           <div className="mt-1 rounded-xl border border-white/10 bg-[#0D1117]/70 p-5">
             <h4 className="mb-3 text-sm font-bold tracking-wide text-[#F6A724] uppercase">
-              Public Transport Costs
+              {costScope === "intercity"
+                ? "Inter-city train costs"
+                : "Public Transport Costs"}
             </h4>
             <div className="mb-4 flex flex-col gap-2 text-sm text-zinc-300">
-              <div className="flex justify-between border-b border-white/5 pb-2">
-                <span>Suica / IC Card (Per person)</span>
-                <span className="font-mono">Est. €15</span>
-              </div>
-              <div className="flex justify-between border-b border-white/5 pb-2">
-                <span>Local Metro/Train Tickets (Daily average)</span>
-                <span className="font-mono">Est. €6 - €10</span>
-              </div>
-              <div className="pt-1 text-xs text-zinc-500">
-                * Exact ticket costs depend on daily travel distance. Bullet
-                trains (Shinkansen) are calculated separately in inter-city
-                routes.
-              </div>
+              {costScope === "intercity" ? (
+                <>
+                  <div className="flex justify-between border-b border-white/5 pb-2">
+                    <span>Shinkansen / limited express (per person)</span>
+                    <span className="font-mono">
+                      {pubCost > 0
+                        ? `Est. €${Math.round(pubCost / Math.max(1, guests))}`
+                        : "Est. on quote"}
+                    </span>
+                  </div>
+                  <div className="flex justify-between border-b border-white/5 pb-2">
+                    <span>Party total (this leg)</span>
+                    <span className="font-mono">
+                      {pubCost > 0
+                        ? `Est. €${Math.round(pubCost)}`
+                        : "Est. on quote"}
+                    </span>
+                  </div>
+                  <div className="pt-1 text-xs text-zinc-500">
+                    * Reserved seats recommended. Local Suica / metro is billed
+                    separately on in-city days.
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="flex justify-between border-b border-white/5 pb-2">
+                    <span>Suica / IC Card (Per person)</span>
+                    <span className="font-mono">Est. €15</span>
+                  </div>
+                  <div className="flex justify-between border-b border-white/5 pb-2">
+                    <span>Local Metro/Train Tickets (Daily average)</span>
+                    <span className="font-mono">Est. €6 - €10</span>
+                  </div>
+                  <div className="pt-1 text-xs text-zinc-500">
+                    * Exact ticket costs depend on daily travel distance. Bullet
+                    trains (Shinkansen) are calculated separately in inter-city
+                    routes.
+                  </div>
+                </>
+              )}
             </div>
             <a
               href="/faq"

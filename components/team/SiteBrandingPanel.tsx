@@ -533,9 +533,8 @@ export function SiteBrandingPanel({ getClient }: { getClient: () => PbClient }) 
           <div className="rounded-2xl border border-zinc-800/80 bg-zinc-900/60 p-5">
             <h2 className="font-display text-2xl text-zinc-100">Transport</h2>
             <p className="mt-1 text-sm text-zinc-400">
-              Photos and titles for Multi-city arrangement cards (Self / Public /
-              Private) and Single-day Preferred Movement (Walking / Subway /
-              Private Driver).
+              In-city + Inter-city arrangement cards (separate keys) and
+              Single-day Preferred Movement (Walking / Subway / Private Driver).
             </p>
           </div>
           <TransportCardsBrandingAdmin getClient={getClient} />
@@ -752,7 +751,7 @@ export function SiteBrandingPanel({ getClient }: { getClient: () => PbClient }) 
         <div className="mt-6">
           <UploadField
             label="Hero background"
-            hint="Wide landscape · ideal 2400×1400 JPG/WebP"
+            hint="Wide landscape · ideal 2400×1400 JPG/WebP — empty = plain grey on Builder M"
             preview={heroPreview}
             previewClass="aspect-[16/9] w-full object-cover"
             onFile={(f) => {
@@ -767,6 +766,36 @@ export function SiteBrandingPanel({ getClient }: { getClient: () => PbClient }) 
                 : "Saves a copy to public/brand/hero-background.*",
             }}
           />
+          {heroPreview || publicAssets.hero ? (
+            <button
+              type="button"
+              className="mt-2 text-xs font-semibold uppercase tracking-wider text-[#E60F43] hover:underline"
+              onClick={() => {
+                void (async () => {
+                  try {
+                    const pb = getClient();
+                    if (record?.id) {
+                      await pb.collection("site_branding").update(record.id, {
+                        hero_background_image: null,
+                      });
+                    }
+                    setHeroFile(null);
+                    setHeroPreview("");
+                    setPublicAssets((a) => {
+                      const next = { ...a };
+                      delete next.hero;
+                      return next;
+                    });
+                    setMsg("Multi-day hero cleared — Builder M shows grey until you upload.");
+                  } catch (e) {
+                    setError(formatPbError(e));
+                  }
+                })();
+              }}
+            >
+              Remove image (grey until upload)
+            </button>
+          ) : null}
         </div>
 
         <div className="mt-6 grid gap-4">
@@ -829,7 +858,7 @@ export function SiteBrandingPanel({ getClient }: { getClient: () => PbClient }) 
         <div className="mt-6">
           <UploadField
             label="Hero media"
-            hint="Landscape photo (.jpg, .webp) or video (.mp4) · ideal 2400×1400"
+            hint="Landscape photo (.jpg, .webp) or video (.mp4) · ideal 2400×1400 — empty = plain grey on Builder S"
             preview={sdPreview}
             previewClass="aspect-[16/9] w-full object-cover"
             accept="image/*,video/mp4,video/webm,video/quicktime,.m4v"
@@ -848,6 +877,47 @@ export function SiteBrandingPanel({ getClient }: { getClient: () => PbClient }) 
                 : "Images only · video stays in PocketBase",
             }}
           />
+          {sdPreview || publicAssets.hero_single ? (
+            <button
+              type="button"
+              className="mt-2 text-xs font-semibold uppercase tracking-wider text-[#E60F43] hover:underline"
+              onClick={() => {
+                void (async () => {
+                  try {
+                    const pb = getClient();
+                    if (sdRecord?.id) {
+                      await pb.collection("branding_ui_items").update(sdRecord.id, {
+                        media: null,
+                        poster: null,
+                      });
+                    }
+                    setSdFile(null);
+                    setSdPreview("");
+                    setSdPosterFile(null);
+                    setSdPosterPreview("");
+                    writeBuilderSHeroLocalCache({
+                      scriptAccent: sdScript,
+                      mainTitlePrefix: sdPrefix,
+                      tagline: sdSubtitle,
+                      mediaUrl: "",
+                    });
+                    setPublicAssets((a) => {
+                      const next = { ...a };
+                      delete next.hero_single;
+                      return next;
+                    });
+                    setSdMsg(
+                      "Single-day hero cleared — Builder S shows grey until you upload."
+                    );
+                  } catch (e) {
+                    setSdError(formatPbError(e));
+                  }
+                })();
+              }}
+            >
+              Remove media (grey until upload)
+            </button>
+          ) : null}
         </div>
 
         <div className="mt-4">

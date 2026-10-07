@@ -14,6 +14,11 @@ migrate((app) => {
   const col = new Collection({
     type: "base",
     name: "staff_profiles",
+    // Any authenticated PB actor can CRUD. Empty url fields still fail
+    // validation if sent as "". File `photo` must be FormData, not JSON.
+    // Editing another person's *staff login* is a separate issue: staff
+    // auth manageRule is null (see 1790340001_staff_auth.js) — use the
+    // admin API (/api/staff/credential) instead of changing this live rule.
     listRule: "@request.auth.id != ''",
     viewRule: "@request.auth.id != ''",
     createRule: "@request.auth.id != ''",

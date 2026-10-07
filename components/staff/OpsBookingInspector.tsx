@@ -21,6 +21,7 @@ import {
 } from "@/lib/guideConfirmStatus";
 import {
   loadOpsGuestRequirements,
+  opsProductLabelFromLead,
   type OpsGuestRequirements,
 } from "@/lib/opsGuestRequirements";
 import {
@@ -28,10 +29,19 @@ import {
   coerceStatusWithPayment,
   statusRequiresPayment,
 } from "@/lib/paymentGate";
+import {
+  opsLabelForUnifiedStatus,
+  toUnifiedPbStatus,
+} from "@/lib/bookingStatus";
 import { GuideDispatchTab } from "@/components/staff/GuideDispatchTab";
 import { OpsActivityLogPanel } from "@/components/staff/OpsActivityLogPanel";
+import { OpsCommsRemindersTab } from "@/components/staff/OpsCommsRemindersTab";
 import { OpsPaymentStatusBadges } from "@/components/staff/OpsPaymentStatusBadges";
 import { GuestRequirementsTab } from "@/components/staff/GuestRequirementsTab";
+import {
+  listGuideJobsForPnr,
+  type GuideJobRow,
+} from "@/lib/guideJobs";
 import {
   BookingStatusTab,
   type BookingStatusSavePayload,
@@ -51,7 +61,8 @@ type InspectorTab =
   | "guide"
   | "driver"
   | "tickets"
-  | "activity";
+  | "activity"
+  | "comms";
 
 const INSPECTOR_TABS: Array<{ id: InspectorTab; label: string }> = [
   { id: "requirements", label: "1. Guest Requirements" },
@@ -60,6 +71,7 @@ const INSPECTOR_TABS: Array<{ id: InspectorTab; label: string }> = [
   { id: "driver", label: "4. Driver Dispatch" },
   { id: "tickets", label: "5. Tickets & Logistics" },
   { id: "activity", label: "6. Activity & Logs" },
+  { id: "comms", label: "7. COMMS & REMINDERS" },
 ];
 
 function languageFlag(lang: string): string {
@@ -261,8 +273,10 @@ export function OpsBookingInspector({
   const [pickupNotes, setPickupNotes] = useState(row.pickup_notes || "");
   const [reqs, setReqs] = useState<OpsGuestRequirements | null>(null);
   const [reqsError, setReqsError] = useState<string | null>(null);
+  const [guideJobs, setGuideJobs] = useState<GuideJobRow[]>([]);
   const [saveVersion, setSaveVersion] = useState<number | null>(null);
   const [balUpdated, setBalUpdated] = useState<string | null>(null);
+  const [productLabel, setProductLabel] = useState("");
   const rowRef = useRef(row);
   rowRef.current = row;
   const reqsPnrRef = useRef<string>("");
@@ -276,6 +290,7 @@ export function OpsBookingInspector({
     let cancelled = false;
     setSaveVersion(null);
     setBalUpdated(null);
+    setProductLabel("");
     const pnr = String(row.pnr || "")
       .trim()
       .toUpperCase()
@@ -289,6 +304,10 @@ export function OpsBookingInspector({
             save_version?: number;
             updated?: string;
             last_saved_at?: string;
+            type?: string;
+            selections?: unknown;
+            duration_label?: string;
+            duration_value?: number;
           }>(`booking_ref="${pnr}"`, { requestKey: null });
         if (cancelled) return;
         const ver = Number(bal.save_version);
@@ -296,10 +315,19 @@ export function OpsBookingInspector({
         setBalUpdated(
           String(bal.last_saved_at || bal.updated || "").trim() || null
         );
+        setProductLabel(
+          opsProductLabelFromLead({
+            type: bal.type,
+            selections: bal.selections,
+            durationLabel: bal.duration_label,
+            durationValue: bal.duration_value,
+          })
+        );
       } catch {
         if (!cancelled) {
           setSaveVersion(null);
           setBalUpdated(null);
+          setProductLabel("");
         }
       }
     })();
@@ -369,6 +397,26 @@ export function OpsBookingInspector({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- row snapshot via rowRef
   }, [pb, row.pnr, onReloadPockets]);
 
+  const reloadGuideJobs = async () => {
+    const pnr = String(row.pnr || "")
+      .trim()
+      .toUpperCase();
+    if (!pnr) {
+      setGuideJobs([]);
+      return;
+    }
+    try {
+      setGuideJobs(await listGuideJobsForPnr(pb, pnr));
+    } catch {
+      setGuideJobs([]);
+    }
+  };
+
+  useEffect(() => {
+    void reloadGuideJobs();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pb, row.pnr, activeTab]);
+
   const guideStatus = normalizeGuideConfirmStatus(dispatch?.guide_mode, {
     boardVisible: Boolean(dispatch?.guide_board_visible),
     assignedGuideId: dispatch?.assigned_guide_id,
@@ -400,17 +448,13 @@ export function OpsBookingInspector({
 
   const bookingStatusLabel = useMemo(() => {
     const effective = coerceStatusWithPayment(status, paymentConfirmed);
-    const map: Record<string, string> = {
-      draft: "Draft",
-      incoming: "Incoming",
-      quoted: "Quoted",
-      confirmed: "Confirmed",
-      in_ops: "In Progress",
-      done: "Completed",
-      cancelled: "Cancelled",
-    };
-    return map[effective] || effective;
-  }, [status, paymentConfirmed]);
+    return opsLabelForUnifiedStatus(
+      toUnifiedPbStatus(effective, {
+        hasPaidFull: paymentConfirmed,
+        depositPaidEur: row.concierge_fee_paid ? 60 : 0,
+      })
+    );
+  }, [status, paymentConfirmed, row.concierge_fee_paid]);
 
   // Illegal combo Confirmed + unpaid must not remain in the UI
   useEffect(() => {
@@ -631,18 +675,31 @@ export function OpsBookingInspector({
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                <span className="font-mono text-xs font-semibold tracking-wide text-cyan-300">
+                <span className="font-mono text-[0.8025rem] font-semibold tracking-wide text-cyan-300">
                   PNR {row.pnr}
                 </span>
                 {!headerCollapsed ? (
-                  <span className="text-[10px] text-white/50">
+                  <span className="text-[10.7px] text-white/50">
                     {row.source === "agency" ? "B2B Agency" : "Direct"}
                     {saveVersion != null ? ` · Rev ${saveVersion}` : ""}
                   </span>
                 ) : null}
               </div>
-              <h3 className="mt-0.5 truncate text-base font-bold text-white">
-                {row.primary_city || "—"} · {paxLabel}
+              {(productLabel || reqs?.productLabel) ? (
+                <p className="mt-0.5 text-[11px] text-white/60">
+                  {productLabel || reqs?.productLabel}
+                </p>
+              ) : null}
+              <h3 className="mt-0.5 truncate text-[0.9rem] font-bold leading-snug text-white">
+                {[
+                  reqs?.guestName?.trim() && reqs.guestName !== "—"
+                    ? reqs.guestName.trim()
+                    : null,
+                  row.primary_city || "—",
+                  paxLabel,
+                ]
+                  .filter(Boolean)
+                  .join(" · ")}
               </h3>
               {!headerCollapsed ? (
                 <p className="mt-0.5 text-xs text-white/70">
@@ -738,7 +795,11 @@ export function OpsBookingInspector({
             ) : !reqs ? (
               <p className="text-xs text-zinc-500">Loading booking context…</p>
             ) : (
-              <GuestRequirementsTab reqs={reqs} langFlag={langFlag} />
+              <GuestRequirementsTab
+                reqs={reqs}
+                langFlag={langFlag}
+                guideJobs={guideJobs}
+              />
             )}
           </TabPanel>
         ) : null}
@@ -779,6 +840,10 @@ export function OpsBookingInspector({
               }}
               onClearGuide={async () => {
                 await clearGuide();
+              }}
+              onJobsChanged={async () => {
+                await onReloadPockets();
+                await reloadGuideJobs();
               }}
             />
           </TabPanel>
@@ -957,6 +1022,21 @@ export function OpsBookingInspector({
               opsHubId={row.id}
               staffId={staffId}
               staffName={staffName}
+            />
+          </TabPanel>
+        ) : null}
+
+        {activeTab === "comms" ? (
+          <TabPanel title="Comms & reminders">
+            <OpsCommsRemindersTab
+              row={row}
+              pb={pb}
+              guestName={
+                reqs?.guestName?.trim() && reqs.guestName !== "—"
+                  ? reqs.guestName.trim()
+                  : null
+              }
+              onSent={() => void onReloadPockets()}
             />
           </TabPanel>
         ) : null}

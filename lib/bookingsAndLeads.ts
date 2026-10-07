@@ -12,6 +12,7 @@ import { getAdminPocketBase } from "@/lib/pocketbase/admin";
 import type { BuilderState } from "@/store/useBuilderStore";
 import type { SingleDayBuilderState } from "@/store/useSingleDayBuilderStore";
 import { calculateCityDateRanges } from "@/lib/dateCascade";
+import { totalHotelRooms } from "@/lib/hotelCalculator";
 
 export type BookingLeadType = "multi_day" | "single_day" | "experience_only";
 
@@ -47,6 +48,9 @@ export interface MultiDaySelections {
     endDate?: string;
     hotelArrangement: "self" | "tokiotours" | "unset";
     hotelStar?: string;
+    hotelName?: string;
+    hotelUrl?: string;
+    roomsReserved?: number;
     /** How guest arrives into this stay (from previous hub/city). */
     incomingTransitType?: string;
     needsTicket?: boolean;
@@ -342,6 +346,12 @@ export function buildMultiDaySelections(
             null;
     const incoming = prev ? String(prev.transitType || "unset") : "unset";
 
+    const roomsReserved = pref?.needsHotel
+      ? totalHotelRooms(pref.rooms)
+      : 0;
+    const hotelName = String(pref?.hotelName || "").trim();
+    const hotelUrl = String(pref?.hotelUrl || "").trim();
+
     locationStops.push({
       cityId: loc.cityId,
       cityName: cityNames[loc.cityId] || undefined,
@@ -350,6 +360,9 @@ export function buildMultiDaySelections(
       endDate: range?.endDate,
       hotelArrangement,
       hotelStar,
+      ...(hotelName ? { hotelName } : {}),
+      ...(hotelUrl ? { hotelUrl } : {}),
+      ...(roomsReserved && roomsReserved > 0 ? { roomsReserved } : {}),
       incomingTransitType: incoming === "unset" ? undefined : incoming,
       needsTicket: Boolean(prev?.needsTicket),
       ticketType: prev?.ticketType,

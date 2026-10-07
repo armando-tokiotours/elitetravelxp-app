@@ -240,15 +240,8 @@ export const useTeamAuth = create<TeamAuthState>()(
             isAuthenticated: true,
           });
         } catch {
-          if (pb.authStore.isValid) {
-            const role = roleFromRecord(collection, pb.authStore.record);
-            set({
-              isAuthenticated: true,
-              role,
-              authCollection: collection,
-            });
-            return;
-          }
+          // Stale JWT (e.g. production) still looks valid client-side but fails
+          // against the current PB URL — never keep that session.
           pb.authStore.clear();
           clearAuth(set);
         }

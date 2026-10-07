@@ -14,9 +14,9 @@ export function DossierSectionOutline({
 }) {
   return (
     <div
-      className={`relative mx-auto my-6 w-full max-w-2xl rounded-2xl border-2 border-dashed border-white/40 bg-black/20 p-4 ${className}`}
+      className={`relative mx-auto my-6 w-full max-w-2xl rounded-2xl border-2 border-dashed border-white/40 bg-black/20 p-4 print:rounded-none print:border print:border-gray-300 print:bg-transparent ${className}`}
     >
-      <span className="absolute -top-3 left-4 rounded border border-white/30 bg-zinc-800 px-2 py-0.5 font-mono text-[9px] uppercase tracking-widest text-white">
+      <span className="absolute -top-3 left-4 rounded border border-white/30 bg-zinc-800 px-2 py-0.5 font-mono text-[9px] uppercase tracking-widest text-white print:border-gray-300 print:bg-white print:text-gray-900">
         {label}
       </span>
       {children}

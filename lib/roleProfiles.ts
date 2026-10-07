@@ -53,6 +53,10 @@ export async function getGuideByStaff(
   }
 }
 
+/**
+ * Load guide row; create only when missing. Never invents a placeholder email.
+ * Does not create a staff login — that stays on Create staff / invite link.
+ */
 export async function ensureGuideProfile(
   pb: PocketBase,
   staffId: string,
@@ -60,16 +64,32 @@ export async function ensureGuideProfile(
 ): Promise<GuideProfile> {
   const existing = await getGuideByStaff(pb, staffId);
   if (existing) return existing;
-  return (await pb.collection("guides").create(
-    {
-      staff: staffId,
-      full_name: seed?.full_name || "Guide",
-      email: seed?.email || "guide@example.com",
-      comfort_couples: true,
-      rate_currency: "JPY",
-    },
-    { requestKey: null }
-  )) as GuideProfile;
+
+  const email = String(seed?.email || "")
+    .trim()
+    .toLowerCase();
+  if (!email || email === "guide@example.com") {
+    throw new Error(
+      "Guide profile needs a real email first. Create staff (role Guide + password ≥ 8) or send a guide password-setup link."
+    );
+  }
+
+  try {
+    return (await pb.collection("guides").create(
+      {
+        staff: staffId,
+        full_name: seed?.full_name || "Guide",
+        email,
+        comfort_couples: true,
+        rate_currency: "JPY",
+      },
+      { requestKey: null }
+    )) as GuideProfile;
+  } catch (createErr) {
+    const raced = await getGuideByStaff(pb, staffId);
+    if (raced) return raced;
+    throw createErr;
+  }
 }
 
 export async function getDriverByStaff(

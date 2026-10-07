@@ -193,6 +193,10 @@ export interface CityHotelPref {
   /** Guests per Standard room (1 or 2) */
   standardOccupancy: 1 | 2;
   breakfast: boolean;
+  /** Booked property / space name (guest dossier stay card) */
+  hotelName?: string;
+  /** Official or booking URL for the property */
+  hotelUrl?: string;
   /** @deprecated migrated into `rooms` */
   roomType?: HotelRoomType;
 }
@@ -856,9 +860,42 @@ function defaultCityHotel(cityId: string): CityHotelPref {
   };
 }
 
+function firstNonEmptyString(...vals: unknown[]): string {
+  for (const v of vals) {
+    const s = String(v ?? "").trim();
+    if (s) return s;
+  }
+  return "";
+}
+
+/** http(s) hotel / booking link, or empty. */
+export function sanitizeHotelUrl(raw: unknown): string {
+  const s = String(raw ?? "").trim();
+  if (!s) return "";
+  try {
+    const withProto = /^https?:\/\//i.test(s) ? s : `https://${s}`;
+    const u = new URL(withProto);
+    if (u.protocol !== "http:" && u.protocol !== "https:") return "";
+    if (!u.hostname) return "";
+    return u.toString();
+  } catch {
+    return "";
+  }
+}
+
+type CityHotelPrefLoose = Partial<CityHotelPref> & {
+  roomType?: HotelRoomType;
+  hotelLabel?: string;
+  spaceName?: string;
+  space?: string;
+  bookingUrl?: string;
+  url?: string;
+  website?: string;
+};
+
 /** Migrate legacy `roomType` + optional count into `rooms`. */
 export function normalizeCityHotelPref(
-  raw: Partial<CityHotelPref> & { roomType?: HotelRoomType },
+  raw: CityHotelPrefLoose,
   cityId: string,
   fallbackCount = 1
 ): CityHotelPref {
@@ -882,6 +919,21 @@ export function normalizeCityHotelPref(
     starRaw === 3 || starRaw === 5 ? (starRaw as HotelStarRating) : 4;
   const occRaw = Number(raw.standardOccupancy);
   const standardOccupancy: 1 | 2 = occRaw === 1 ? 1 : 2;
+  const hotelName = firstNonEmptyString(
+    raw.hotelName,
+    raw.hotelLabel,
+    raw.spaceName,
+    raw.space
+  );
+  const hotelUrlRaw = firstNonEmptyString(
+    raw.hotelUrl,
+    raw.bookingUrl,
+    raw.url,
+    raw.website
+  );
+  const hotelUrl = /^\s*javascript:/i.test(hotelUrlRaw)
+    ? ""
+    : hotelUrlRaw;
 
   return {
     cityId,
@@ -890,6 +942,8 @@ export function normalizeCityHotelPref(
     rooms,
     standardOccupancy,
     breakfast: raw.breakfast ?? base.breakfast,
+    ...(hotelName ? { hotelName } : {}),
+    ...(hotelUrl ? { hotelUrl } : {}),
   };
 }
 

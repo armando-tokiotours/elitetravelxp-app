@@ -30,6 +30,7 @@ import { SiteBrandingPanel } from "@/components/team/SiteBrandingPanel";
 import { HotelRatesUploader } from "@/components/team/HotelRatesUploader";
 import { SeasonalityHub } from "@/components/team/SeasonalityHub";
 import { ToursCsvSync } from "@/components/team/ToursCsvSync";
+import { GuidePayMatrixAdmin } from "@/components/team/GuidePayMatrixAdmin";
 import { TeamConfigDashboard } from "@/components/team/TeamConfigDashboard";
 import { formatTourTierSummary } from "@/lib/tourPricing";
 import { optimizeFileForUpload } from "@/lib/optimizeUploadClient";
@@ -388,6 +389,22 @@ function rowSubtitle(def: CollectionDef, row: Record<string, unknown>): string {
     if (base != null) bits.push(`€${base} base`);
     return bits.join(" · ") || "—";
   }
+  if (def.id === "guide_pay_rules") {
+    const year = row.year != null ? String(row.year) : "";
+    const hrs =
+      row.duration_hours != null ? `${row.duration_hours}h` : null;
+    const pax = row.pax_count != null ? `${row.pax_count} pax` : null;
+    const pay =
+      row.guide_pay_jpy != null
+        ? `¥${Number(row.guide_pay_jpy).toLocaleString()}`
+        : null;
+    const exp =
+      row.expenses_jpy != null && Number(row.expenses_jpy) > 0
+        ? `+¥${Number(row.expenses_jpy).toLocaleString()} exp`
+        : null;
+    const mng = row.is_meet_and_greet === true ? "M&G" : null;
+    return [year, hrs, pax, pay, exp, mng].filter(Boolean).join(" · ") || "—";
+  }
   if (def.id === "tours") {
     const tier = formatTourTierSummary(row as never);
     const hrs = row.duration_hours;
@@ -667,6 +684,24 @@ function SourceOfTruthPanel({ getClient }: { getClient: () => PbClient }) {
                   setEditing(null);
                 }}
                 className="rounded-full bg-[#075473] px-4 py-2 text-sm font-semibold text-[#0B1F3A]"
+              >
+                + Add
+              </button>
+            }
+          />
+        ) : category === "guide_pay_rules" ? (
+          <GuidePayMatrixAdmin
+            title={def.label}
+            getClient={getClient}
+            onSynced={() => void load()}
+            trailing={
+              <button
+                type="button"
+                onClick={() => {
+                  setCreating(true);
+                  setEditing(null);
+                }}
+                className="rounded-full bg-[#075473] px-4 py-2 text-sm font-semibold text-zinc-100"
               >
                 + Add
               </button>
@@ -960,6 +995,12 @@ function RecordEditModal({
         if (
           def.id === "tours" &&
           f.key === "is_self_guided" &&
+          (v == null || v === "")
+        ) {
+          base[f.key] = "false";
+        } else if (
+          def.id === "tours" &&
+          f.key === "is_bonus" &&
           (v == null || v === "")
         ) {
           base[f.key] = "false";
@@ -1501,20 +1542,28 @@ function RecordEditModal({
                   />
                 ) : f.type === "bool" ? (
                   <div className="inline-flex rounded-full border border-[#2C2C2E] bg-[#121212] p-1">
-                    {["true", "false"].map((v) => (
-                      <button
-                        key={v}
-                        type="button"
-                        onClick={() => set(f.key, v)}
-                        className={`rounded-full px-4 py-1.5 text-sm ${
-                          (form[f.key] ?? "true") === v
-                            ? "bg-[#0B1F3A] text-white"
-                            : "text-zinc-400"
-                        }`}
-                      >
-                        {v === "true" ? "Active" : "Inactive"}
-                      </button>
-                    ))}
+                    {["true", "false"].map((v) => {
+                      const defaultBool =
+                        f.key === "is_bonus" || f.key === "is_self_guided"
+                          ? "false"
+                          : "true";
+                      return (
+                        <button
+                          key={v}
+                          type="button"
+                          onClick={() => set(f.key, v)}
+                          className={`rounded-full px-4 py-1.5 text-sm ${
+                            (form[f.key] ?? defaultBool) === v
+                              ? "bg-[#0B1F3A] text-white"
+                              : "text-zinc-400"
+                          }`}
+                        >
+                          {v === "true"
+                            ? f.trueLabel || "Active"
+                            : f.falseLabel || "Inactive"}
+                        </button>
+                      );
+                    })}
                   </div>
                 ) : f.type === "select" && f.key === "category" ? (
                   <div className="inline-flex rounded-full border border-[#2C2C2E] bg-[#121212] p-1">

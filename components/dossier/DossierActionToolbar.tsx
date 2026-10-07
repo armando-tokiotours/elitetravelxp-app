@@ -63,7 +63,7 @@ export function DossierActionToolbar({
 
   return (
     <div
-      className="mx-auto flex w-full max-w-lg flex-col gap-2"
+      className="mx-auto flex w-full max-w-lg flex-col gap-2 print:hidden"
       role="toolbar"
       aria-label="Dossier actions"
     >

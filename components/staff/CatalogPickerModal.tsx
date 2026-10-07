@@ -14,11 +14,15 @@ type CatalogFilter = "ALL" | "TOUR" | "TRANSPORT" | "TICKET";
 type Props = {
   pb: PocketBase;
   onClose: () => void;
-  onSelectService: (service: CartCatalogItem) => void;
+  onSelectService: (
+    service: CartCatalogItem,
+    opts?: { isBonus?: boolean }
+  ) => void;
 };
 
 /**
  * External catalog picker — keeps Section 3 invoice clean.
+ * Bonus gifts are designated only at add-time (not toggled on billed rows).
  */
 export function CatalogPickerModal({ pb, onClose, onSelectService }: Props) {
   const [mounted, setMounted] = useState(false);
@@ -157,26 +161,62 @@ export function CatalogPickerModal({ pb, onClose, onSelectService }: Props) {
             filteredItems.map((item) => (
               <div
                 key={item.id}
-                className="flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-[#0D141F] p-4 transition-all hover:border-cyan-500/50"
+                className={`flex flex-col gap-3 rounded-2xl border p-4 transition-all ${
+                  item.isCatalogBonus
+                    ? "border-[#F6A724]/40 bg-[#F6A724]/5 hover:border-[#F6A724]/60"
+                    : "border-white/10 bg-[#0D141F] hover:border-cyan-500/50"
+                }`}
               >
                 <div className="min-w-0">
-                  <span className="block text-[9px] font-bold text-cyan-400 uppercase">
-                    {item.category}
-                  </span>
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <span className="block text-[9px] font-bold text-cyan-400 uppercase">
+                      {item.category}
+                    </span>
+                    {item.isCatalogBonus ? (
+                      <span className="rounded border border-[#F6A724]/40 bg-[#F6A724]/20 px-1.5 py-0.5 text-[9px] font-bold tracking-wider text-[#F6A724] uppercase">
+                        🎁 Agent-only bonus
+                      </span>
+                    ) : null}
+                  </div>
                   <span className="block text-xs font-bold text-white">
                     {item.title}
                   </span>
-                  <span className="mt-1 block font-mono text-xs font-bold text-emerald-400">
-                    €{item.priceEur}
+                  <span
+                    className={`mt-1 block font-mono text-xs font-bold ${
+                      item.isCatalogBonus
+                        ? "text-[#F6A724]"
+                        : "text-emerald-400"
+                    }`}
+                  >
+                    {item.isCatalogBonus
+                      ? `€${item.priceEur} Value`
+                      : `€${item.priceEur}`}
                   </span>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => onSelectService(item)}
-                  className="shrink-0 rounded-xl bg-[#075473] px-3.5 py-2 text-[10px] font-bold text-white uppercase hover:bg-[#075473]/80"
-                >
-                  + Add
-                </button>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      onSelectService(item, { isBonus: false })
+                    }
+                    className="flex-1 rounded-xl bg-[#075473] px-3 py-2 text-[10px] font-bold text-white uppercase hover:bg-[#075473]/80"
+                  >
+                    + Add to package
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      onSelectService(item, { isBonus: true })
+                    }
+                    className={`flex flex-1 items-center justify-center gap-1.5 rounded-xl px-3 py-2 text-[10px] font-bold uppercase ${
+                      item.isCatalogBonus
+                        ? "bg-[#F6A724] text-black hover:bg-[#F6A724]/90"
+                        : "border border-[#F6A724] bg-transparent text-[#F6A724] hover:bg-[#F6A724]/10"
+                    }`}
+                  >
+                    <span aria-hidden>🎁</span> Add as Bonus
+                  </button>
+                </div>
               </div>
             ))
           )}

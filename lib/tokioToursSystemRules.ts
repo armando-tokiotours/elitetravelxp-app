@@ -25,7 +25,7 @@ export const TOKIO_TOURS_SYSTEM_RULES = `
 - Suica / PASMO: when guest chooses subway / IC transit, collect Suica need + value (€) and route ticket procurement via Ticketer (TIX) channel.
 - Private chauffeur: Alphard / HiAce capacity must fit party size; driver coordination uses DRIV channel.
 - Specialist Direct Chat: Concierge/Ops may toggle Ticketer or Driver direct guest chat ON/OFF; when ON, specialist messages appear in CUST with role badges in Ops view; guest sees branded TokioTours specialist titles.
-- Ticket voucher PDFs and chat image attachments purge ~2 days after tour end.
+- Ticket voucher PDFs (local /uploads/tickets URLs on agent_services) and chat image attachments purge ~2 days after tour end via /api/cron/cleanup-tickets.
 
 ## Comms
 - Channels: CUST (guest), OPS (internal), GUID, DRIV, TIX.

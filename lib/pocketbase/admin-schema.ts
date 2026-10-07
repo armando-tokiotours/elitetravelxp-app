@@ -3,6 +3,7 @@
 export type CollectionKey =
   | "cities"
   | "tours"
+  | "guide_pay_rules"
   | "vehicles"
   | "transport_products"
   | "transfers"
@@ -42,6 +43,9 @@ export interface FieldDef {
   hint?: string;
   /** When saving, also write this legacy column (same value / same file). */
   legacyKey?: string;
+  /** Bool toggle labels (default Active / Inactive). */
+  trueLabel?: string;
+  falseLabel?: string;
 }
 
 export interface CollectionDef {
@@ -182,6 +186,14 @@ export const COLLECTIONS: CollectionDef[] = [
         label: "Niche / VIP exclusive",
         type: "bool",
       },
+      {
+        key: "is_bonus",
+        label: "Bonus gift (agent-only)",
+        type: "bool",
+        trueLabel: "Bonus",
+        falseLabel: "No",
+        hint: "Hidden from guest catalog until an agent adds it to the package.",
+      },
       { key: "title", label: "Title", type: "text", required: true },
       { key: "description", label: "Description", type: "textarea" },
       { key: "route", label: "Route", type: "textarea" },
@@ -275,6 +287,48 @@ export const COLLECTIONS: CollectionDef[] = [
         type: "bool",
       },
       { key: "is_active", label: "Active", type: "bool" },
+    ],
+  },
+  {
+    id: "guide_pay_rules",
+    label: "Guide Pay Matrix",
+    titleKey: "tour_name",
+    sort: "year,tour_name,duration_hours,pax_count",
+    detailKeys: ["year", "duration_hours", "pax_count", "guide_pay_jpy"],
+    fields: [
+      { key: "year", label: "Year", type: "number", required: true },
+      { key: "tour_name", label: "Tour name", type: "text", required: true },
+      {
+        key: "duration_hours",
+        label: "Duration (hours)",
+        type: "number",
+        required: true,
+      },
+      {
+        key: "pax_count",
+        label: "Pax count",
+        type: "number",
+        required: true,
+      },
+      {
+        key: "guide_pay_jpy",
+        label: "Guide pay (JPY)",
+        type: "number",
+        required: true,
+      },
+      {
+        key: "expenses_jpy",
+        label: "Expenses (JPY)",
+        type: "number",
+      },
+      {
+        key: "is_meet_and_greet",
+        label: "Meet & greet",
+        type: "bool",
+        trueLabel: "Yes",
+        falseLabel: "No",
+      },
+      { key: "notes", label: "Notes", type: "textarea" },
     ],
   },
   {
@@ -754,13 +808,82 @@ export const COLLECTIONS: CollectionDef[] = [
   },
 ];
 
+type PbFieldError = { message?: string; code?: string };
+
+/** PocketBase ClientResponseError: `.data` is an alias for `.response` (full body). */
+function pbFieldErrors(e: {
+  response?: { data?: unknown };
+  data?: unknown;
+}): Record<string, PbFieldError> | null {
+  const body = e.response && typeof e.response === "object" ? e.response : null;
+  const nested = body && "data" in body ? (body as { data?: unknown }).data : null;
+  // Prefer nested field map; fall back only when `.data` is already the field map
+  // (not the full response body alias from the JS SDK).
+  const candidate =
+    nested && typeof nested === "object" && !Array.isArray(nested)
+      ? nested
+      : e.data &&
+          typeof e.data === "object" &&
+          !Array.isArray(e.data) &&
+          !("message" in (e.data as object) && "data" in (e.data as object))
+        ? e.data
+        : null;
+  if (!candidate || typeof candidate !== "object") return null;
+  const out: Record<string, PbFieldError> = {};
+  for (const [field, info] of Object.entries(candidate as Record<string, unknown>)) {
+    if (info && typeof info === "object" && !Array.isArray(info)) {
+      const row = info as PbFieldError;
+      if (row.message || row.code) out[field] = row;
+    }
+  }
+  return Object.keys(out).length ? out : null;
+}
+
+function humanizePbFieldError(field: string, info: PbFieldError): string {
+  const code = String(info.code || "");
+  const msg = String(info.message || "").toLowerCase();
+  if (
+    field === "email" &&
+    (code.includes("invalid_email") ||
+      msg.includes("valid email") ||
+      msg.includes("invalid email"))
+  ) {
+    return "Email must look like name@company.com (include @ and a domain).";
+  }
+  if (
+    field === "email" &&
+    (code.includes("unique") ||
+      code.includes("validation_not_unique") ||
+      msg.includes("unique") ||
+      msg.includes("already") ||
+      msg.includes("exists"))
+  ) {
+    return "⚠️ This email already exists in the system. To change their role, edit the existing user instead of creating a new one.";
+  }
+  if (field === "password" || field === "passwordConfirm") {
+    if (msg.includes("min") || msg.includes("at least") || code.includes("min")) {
+      return "⚠️ Password must be at least 8 characters and match the confirmation.";
+    }
+    if (msg.includes("match") || code.includes("match")) {
+      return "⚠️ Password must be at least 8 characters and match the confirmation.";
+    }
+    return "⚠️ Password must be at least 8 characters and match the confirmation.";
+  }
+  const label = field === "passwordConfirm" ? "Confirm password" : field;
+  return info.message ? `${label}: ${info.message}` : `${label} is invalid.`;
+}
+
 export function formatPbError(e: unknown): string {
   if (!e || typeof e !== "object") return "Request failed";
+  // Plain Error thrown by client validation — keep the message as-is.
+  if (e instanceof Error && !("status" in e) && !("response" in e)) {
+    return e.message || "Request failed";
+  }
   const err = e as {
     message?: string;
     status?: number;
-    response?: { message?: string; data?: Record<string, { message?: string; code?: string }> };
-    data?: Record<string, { message?: string; code?: string }>;
+    response?: { message?: string; data?: Record<string, PbFieldError> };
+    data?: Record<string, PbFieldError> | { message?: string; data?: Record<string, PbFieldError> };
   };
   // Status 0 = network failure (PocketBase down / wrong URL / CORS)
   if (err.status === 0) {
@@ -769,18 +892,24 @@ export function formatPbError(e: unknown): string {
   if (err.status === 403) {
     return "Admin session expired or missing — sign out and sign in again to Team Access.";
   }
-  const data = err.response?.data || err.data;
-  const parts: string[] = [];
-  if (err.response?.message || err.message) {
-    parts.push(String(err.response?.message || err.message));
+  const fields = pbFieldErrors(err);
+  if (fields) {
+    const human = Object.entries(fields).map(([field, info]) =>
+      humanizePbFieldError(field, info)
+    );
+    // Prefer field detail over PB's generic "Something went wrong…"
+    if (human.length === 1) return human[0];
+    return human.join(" · ");
   }
-  if (data && typeof data === "object") {
-    for (const [field, info] of Object.entries(data)) {
-      if (info && typeof info === "object" && info.message) {
-        parts.push(`${field}: ${info.message}`);
-      }
+  const raw = String(err.response?.message || err.message || "").trim();
+  if (/something went wrong/i.test(raw) || (!raw && err.status === 400)) {
+    if (err.status === 400) {
+      return "Request rejected (HTTP 400) — email may already exist, or password is invalid (min 8). Check Credential registry before creating again.";
     }
+    return err.status ? `${raw} (HTTP ${err.status})` : raw;
   }
+  const parts: string[] = [];
+  if (raw) parts.push(raw);
   if (err.status) parts.push(`(HTTP ${err.status})`);
   return parts.filter(Boolean).join(" — ") || "Request failed";
 }

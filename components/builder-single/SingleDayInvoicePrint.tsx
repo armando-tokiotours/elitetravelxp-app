@@ -14,13 +14,25 @@ import { useBuilderStore } from "@/store/useBuilderStore";
 import { useItineraryStore } from "@/store/useItineraryStore";
 import { usePreBuilderStore } from "@/store/usePreBuilderStore";
 import { formatClock12h } from "@/lib/singleDayTimeSlots";
-import { ItemizedInvoiceTable } from "@/components/invoice/ItemizedInvoiceTable";
+import {
+  ItemizedInvoiceTable,
+  invoicePackageRangeEur,
+  toFlatInvoiceRow,
+} from "@/components/invoice/ItemizedInvoiceTable";
+import {
+  InvoiceBriefEstimateBox,
+  InvoiceMetaList,
+  InvoiceMetaRow,
+} from "@/components/invoice/InvoiceBriefChrome";
+import { MobileDossierLayout } from "@/components/guest/MobileDossierLayout";
+import { FlatInvoiceBrief } from "@/components/ops/FlatInvoiceBrief";
 import { buildSingleDayInvoiceItems } from "@/lib/itemizedInvoice";
 import { getConciergeFeeCreditEur } from "@/lib/feeCredit";
-import { ELITE_CONCIERGE_FEE } from "@/lib/eliteConcierge";
+import { DEFAULT_CONCIERGE_FEE_EUR } from "@/lib/conciergeEstimateFlow";
 import { activeBookingRef } from "@/utils/pnr";
 import {
-  mergeInvoiceWithAgentServices,
+  resolveGuestInvoiceItems,
+  type PriceMode,
   type ServiceLineItem,
 } from "@/lib/agentServices";
 
@@ -32,12 +44,15 @@ export function SingleDayInvoicePrint({
   showToolbar = true,
   onPrintRequest,
   feeCreditEur,
+  totalPaidEur,
   finalApprovedPrice = null,
 }: {
   embedded?: boolean;
   showToolbar?: boolean;
   onPrintRequest?: () => void;
   feeCreditEur?: number;
+  /** Fee + progress payments — used for remaining balance. */
+  totalPaidEur?: number;
   finalApprovedPrice?: number | null;
 } = {}) {
   const tourDate = useSingleDayBuilderStore((s) => s.tourDate);
@@ -86,51 +101,18 @@ export function SingleDayInvoicePrint({
     feeCreditEur != null && feeCreditEur > 0
       ? feeCreditEur
       : getConciergeFeeCreditEur(pnr);
+  const paidTowardTour = Math.max(
+    0,
+    Math.round(Number(totalPaidEur) || 0),
+    creditEur
+  );
 
   const [agentServices, setAgentServices] = useState<ServiceLineItem[]>([]);
   const [approvedFromServer, setApprovedFromServer] = useState<number | null>(
     null
   );
-
-  useEffect(() => {
-    const ref = String(pnr || "").trim();
-    if (!ref || ref.startsWith("TMP-")) {
-      setAgentServices([]);
-      setApprovedFromServer(null);
-      return;
-    }
-    let cancelled = false;
-    const load = () => {
-      void fetch(`/api/bookings/agent-services?pnr=${encodeURIComponent(ref)}`, {
-        cache: "no-store",
-      })
-        .then((r) => (r.ok ? r.json() : null))
-        .then(
-          (data: {
-            services?: ServiceLineItem[];
-            finalApprovedPrice?: number | null;
-          } | null) => {
-            if (cancelled || !data) return;
-            setAgentServices(data.services || []);
-            setApprovedFromServer(
-              data.finalApprovedPrice != null &&
-                Number.isFinite(Number(data.finalApprovedPrice))
-                ? Math.round(Number(data.finalApprovedPrice))
-                : null
-            );
-          }
-        )
-        .catch(() => {
-          /* ignore */
-        });
-    };
-    load();
-    const t = window.setInterval(load, 20_000);
-    return () => {
-      cancelled = true;
-      window.clearInterval(t);
-    };
-  }, [pnr]);
+  const [priceModeFromServer, setPriceModeFromServer] =
+    useState<PriceMode | null>(null);
 
   const baseItems = useMemo(
     () =>
@@ -157,15 +139,108 @@ export function SingleDayInvoicePrint({
     ]
   );
 
+  useEffect(() => {
+    const ref = String(pnr || "").trim();
+    if (!ref || ref.startsWith("TMP-")) {
+      setAgentServices([]);
+      setApprovedFromServer(null);
+      setPriceModeFromServer(null);
+      return;
+    }
+    let cancelled = false;
+    const applyAgentPayload = (data: {
+      services?: ServiceLineItem[];
+      finalApprovedPrice?: number | null;
+      priceMode?: PriceMode | string | null;
+    }) => {
+      const services = data.services || [];
+      setAgentServices(services);
+      setApprovedFromServer(
+        data.finalApprovedPrice != null &&
+          Number.isFinite(Number(data.finalApprovedPrice)) &&
+          Number(data.finalApprovedPrice) > 0
+          ? Math.round(Number(data.finalApprovedPrice))
+          : null
+      );
+      setPriceModeFromServer(
+        data.priceMode === "exact"
+          ? "exact"
+          : data.priceMode === "estimate"
+            ? "estimate"
+            : null
+      );
+    };
+    const load = () => {
+      void fetch(`/api/bookings/agent-services?pnr=${encodeURIComponent(ref)}`, {
+        cache: "no-store",
+      })
+        .then((r) => (r.ok ? r.json() : null))
+        .then(
+          (data: {
+            services?: ServiceLineItem[];
+            finalApprovedPrice?: number | null;
+            priceMode?: PriceMode | string | null;
+          } | null) => {
+            if (cancelled || !data) return;
+            applyAgentPayload(data);
+            // Seed Ops cart from local estimate when extras are still empty
+            if ((data.services || []).length === 0 && baseItems.length > 0) {
+              void import("@/lib/syncGuestInvoiceCart").then(
+                ({ syncGuestInvoiceCart }) =>
+                  syncGuestInvoiceCart({
+                    pnr: ref,
+                    items: baseItems,
+                  }).then((result) => {
+                    if (cancelled || !result.ok || !result.seeded) return;
+                    // Re-fetch so guest + Ops share the same persisted cart
+                    void fetch(
+                      `/api/bookings/agent-services?pnr=${encodeURIComponent(ref)}`,
+                      { cache: "no-store" }
+                    )
+                      .then((r) => (r.ok ? r.json() : null))
+                      .then(
+                        (again: {
+                          services?: ServiceLineItem[];
+                          finalApprovedPrice?: number | null;
+                          priceMode?: PriceMode | string | null;
+                        } | null) => {
+                          if (cancelled || !again) return;
+                          applyAgentPayload(again);
+                        }
+                      );
+                  })
+              );
+            }
+          }
+        )
+        .catch(() => {
+          /* ignore */
+        });
+    };
+    load();
+    const t = window.setInterval(load, 20_000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(t);
+    };
+  }, [pnr, baseItems]);
+
+  // Prefer ops_hub.extras.agent_services when Ops has saved a cart;
+  // otherwise keep the local builder-derived estimate.
   const items = useMemo(
-    () => mergeInvoiceWithAgentServices(baseItems, agentServices),
+    () => resolveGuestInvoiceItems(baseItems, agentServices),
     [baseItems, agentServices]
   );
 
   const lockedApproved =
-    finalApprovedPrice != null && Number.isFinite(finalApprovedPrice)
+    finalApprovedPrice != null &&
+    Number.isFinite(finalApprovedPrice) &&
+    finalApprovedPrice > 0
       ? Math.round(finalApprovedPrice)
-      : approvedFromServer;
+      : approvedFromServer != null && approvedFromServer > 0
+        ? approvedFromServer
+        : null;
+  const guestPriceMode = priceModeFromServer;
 
   const baseTotal = items
     .filter((i) => i.status === "ACCEPTED")
@@ -173,6 +248,47 @@ export function SingleDayInvoicePrint({
   const pax = Math.max(1, adults + children);
   const guests = `${adults} adult${adults === 1 ? "" : "s"}, ${children} child${children === 1 ? "" : "ren"}`;
   const dateLabel = formatSingleDayDisplayDate(tourDate) || "Date TBD";
+  const { packageMinEur, packageMaxEur } = invoicePackageRangeEur(items);
+  const feeCreditAmount =
+    creditEur > 0 ? creditEur : DEFAULT_CONCIERGE_FEE_EUR;
+
+  const tripDetails = (
+    <>
+      <InvoiceMetaRow label="Guest" value={guestName} />
+      <InvoiceMetaRow label="Email" value={guestEmail || "—"} />
+      <InvoiceMetaRow label="City Hub" value={cityFocus.trim() || "—"} />
+      <InvoiceMetaRow
+        label="Date & Duration"
+        value={`${dateLabel} · ${tourHours}h`}
+      />
+      <InvoiceMetaRow label="Guests" value={guests} />
+      <InvoiceMetaRow
+        label="Language / Guide"
+        value={`${preferredTourLanguage || "EN"} · ${guidePreferenceLabel(guidePreference)} · ${formatClock12h(startTime || "09:00")}`}
+      />
+      {meetingPoint ? (
+        <InvoiceMetaRow label="Meeting Point" value={meetingPoint} />
+      ) : null}
+      <InvoiceMetaRow
+        label="Est. / Person / Hour"
+        value={formatEur(
+          singleDayPerPersonHourEur(baseTotal, pax, tourHours)
+        )}
+      />
+    </>
+  );
+
+  const estimateBox = (
+    <InvoiceBriefEstimateBox
+      pnr={pnr}
+      guestName={guestName}
+      partySize={pax}
+      packageMinEur={packageMinEur}
+      packageMaxEur={packageMaxEur}
+      finalApprovedPrice={lockedApproved}
+      priceMode={guestPriceMode}
+    />
+  );
 
   return (
     <div
@@ -200,49 +316,39 @@ export function SingleDayInvoicePrint({
         </div>
       ) : null}
 
-      <article className="mx-auto max-w-3xl space-y-5 overflow-hidden px-1 py-2 sm:px-2">
-        <dl className="grid gap-3 text-sm sm:grid-cols-2">
-          <Meta label="Guest" value={guestName} />
-          <Meta label="Email" value={guestEmail || "—"} />
-          <Meta label="City Hub" value={cityFocus.trim() || "—"} />
-          <Meta label="Date & Duration" value={`${dateLabel} · ${tourHours}h`} />
-          <Meta label="Guests" value={guests} />
-          <Meta
-            label="Language / Guide"
-            value={`${preferredTourLanguage || "EN"} · ${guidePreferenceLabel(guidePreference)} · ${formatClock12h(startTime || "09:00")}`}
-          />
-          {meetingPoint ? (
-            <Meta label="Meeting point" value={meetingPoint} />
-          ) : null}
-          <Meta
-            label="Est. / person / hour"
-            value={formatEur(
-              singleDayPerPersonHourEur(baseTotal, pax, tourHours)
-            )}
-          />
-        </dl>
-
-        <ItemizedInvoiceTable
-          pnr={pnr}
-          guestName={guestName}
-          partySize={pax}
-          items={items}
-          conciergeFeePaid={creditEur > 0}
-          conciergeFeeAmount={creditEur > 0 ? creditEur : ELITE_CONCIERGE_FEE}
-          finalApprovedPrice={lockedApproved}
+      <article className="mx-auto max-w-3xl overflow-hidden px-1 py-2 sm:px-2">
+        {/* Mobile — exactly 3 sibling boxes */}
+        <MobileDossierLayout
+          tripDetails={tripDetails}
+          estimate={estimateBox}
+          itemized={
+            <FlatInvoiceBrief
+              items={items.map(toFlatInvoiceRow)}
+              depositAmount={creditEur}
+              totalPaidEur={paidTowardTour}
+              finalApprovedPrice={lockedApproved}
+              priceMode={guestPriceMode}
+            />
+          }
         />
-      </article>
-    </div>
-  );
-}
 
-function Meta({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-xl border border-white/10 bg-black/30 px-3 py-2.5">
-      <dt className="text-[0.65rem] font-bold uppercase tracking-[0.2em] text-white/40">
-        {label}
-      </dt>
-      <dd className="mt-0.5 font-semibold text-white">{value}</dd>
+        {/* Desktop — formal table; mobile FlatInvoiceBrief prints instead */}
+        <div className="hidden space-y-5 print:hidden md:block">
+          <InvoiceMetaList>{tripDetails}</InvoiceMetaList>
+          <ItemizedInvoiceTable
+            pnr={pnr}
+            guestName={guestName}
+            partySize={pax}
+            items={items}
+            conciergeFeePaid={creditEur > 0 || paidTowardTour > 0}
+            conciergeFeeAmount={feeCreditAmount}
+            totalPaidEur={paidTowardTour}
+            finalApprovedPrice={lockedApproved}
+            priceMode={guestPriceMode}
+            composition="desktop"
+          />
+        </div>
+      </article>
     </div>
   );
 }

@@ -9,11 +9,21 @@ import { BRAND_DOMAIN } from "@/lib/brand";
 import { formatDisplayDate } from "@/store/useBuilderStore";
 import type { ExperienceService, LocationStop } from "@/store/useBuilderStore";
 import { isTransitHubStop } from "@/lib/transitHubs";
-import { toPassStatusLabel } from "@/lib/bookingStatus";
+import {
+  toPassStatusLabel,
+  toUnifiedPbStatus,
+} from "@/lib/bookingStatus";
 
 export function mapBookingStatusToPass(
-  status: BookingStatus | string
+  status: BookingStatus | string,
+  opts?: {
+    depositPaidEur?: number | null;
+    hasPaidFull?: boolean | null;
+  }
 ): BookingPassStatus {
+  if (opts) {
+    return toUnifiedPbStatus(status, opts) as BookingPassStatus;
+  }
   return toPassStatusLabel(status) as BookingPassStatus;
 }
 

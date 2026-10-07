@@ -37,7 +37,7 @@ export function MobileTopChrome({
   return (
     <>
       <header
-        className={`fixed inset-x-0 top-0 z-50 border-b border-white/10 bg-[#0A1017]/90 text-white backdrop-blur-xl ${
+        className={`fixed inset-x-0 top-0 z-50 border-b border-white/10 bg-[#0A1017]/90 text-white backdrop-blur-xl print:hidden ${
           alwaysVisible ? "" : "lg:hidden"
         }`}
       >

@@ -157,7 +157,7 @@ export function AppNavDock({ context }: { context: BuilderContextType }) {
 
   return (
     <>
-      <aside className="no-print fixed top-0 bottom-0 left-0 z-40 hidden w-16 flex-col items-center border-r border-white/10 bg-[#0A1017] py-6 sm:flex">
+      <aside className="no-print fixed top-0 bottom-0 left-0 z-40 hidden w-16 flex-col items-center border-r border-white/10 bg-[#0A1017] py-6 print:hidden sm:flex">
         <button
           type="button"
           onClick={() => router.push("/")}
@@ -199,7 +199,7 @@ export function AppNavDock({ context }: { context: BuilderContextType }) {
         </div>
       </aside>
 
-      <nav className="no-print fixed inset-x-0 bottom-0 z-50 flex h-16 items-center justify-around border-t border-white/10 bg-[#0A1017]/95 px-2 pb-[env(safe-area-inset-bottom)] backdrop-blur-md sm:hidden">
+      <nav className="no-print fixed inset-x-0 bottom-0 z-50 flex h-16 items-center justify-around border-t border-white/10 bg-[#0A1017]/95 px-2 pb-[env(safe-area-inset-bottom)] backdrop-blur-md print:hidden sm:hidden">
         {items.map((item) => {
           const Icon = item.icon;
           const active = isNavActive(pathname, item);

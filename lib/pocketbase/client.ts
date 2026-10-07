@@ -563,6 +563,11 @@ export interface PbTour {
   /** VIP / niche — only recommended when quiz allows niche */
   is_niche?: boolean;
   /**
+   * Agent-only bonus gift — hidden from guest catalog until Ops
+   * adds it to the guest package / invoice.
+   */
+  is_bonus?: boolean;
+  /**
    * guided_route | direct_ticket (buy before) | admission (on-site) |
    * vip_event | time_sensitive
    */
@@ -626,6 +631,14 @@ export interface PbTour {
   /** @deprecated removed — prefer tiered price_*_pax */
   base_price?: number;
   expand?: { city_id?: PbCity };
+}
+
+/** Guest storefront / builders — active and not agent-only bonus gifts. */
+export function isGuestCatalogTour(t: {
+  is_active?: boolean;
+  is_bonus?: boolean;
+}): boolean {
+  return t.is_active !== false && !t.is_bonus;
 }
 
 export interface PbSeasonalHighlight {
@@ -1678,7 +1691,7 @@ export async function fetchBuilderConfig(
   ]);
 
   const cities = citiesRaw.filter((c) => c.is_active !== false);
-  const tours = toursRaw.filter((t) => t.is_active !== false);
+  const tours = toursRaw.filter(isGuestCatalogTour);
   const seasonalHighlights = seasonalHighlightsRaw.filter(
     (h) => h.is_active !== false
   );
@@ -1804,13 +1817,14 @@ export async function fetchMergedExperiencesPlacesCatalog(
   cities: PbCity[] = []
 ): Promise<PbTour[]> {
   const pb = getPocketBase();
-  const [tours, eap] = await Promise.all([
+  const [toursRaw, eap] = await Promise.all([
     pb
       .collection("tours")
       .getFullList<PbTour>({ sort: "title", expand: "city_id" })
       .catch(() => [] as PbTour[]),
     fetchExperiencesAndPlaces(),
   ]);
+  const tours = toursRaw.filter(isGuestCatalogTour);
   const fromEap = eap.map((r) => mapEapToTour(r, cities));
   const tourIds = new Set(tours.map((t) => t.id));
   return [...tours, ...fromEap.filter((r) => !tourIds.has(r.id))];
@@ -1824,23 +1838,26 @@ export async function fetchBudgetPlannerTours(): Promise<PbTour[]> {
   try {
     const curated = await pb.collection("tours").getFullList<PbTour>({
       filter:
-        "(pricing_tier = 'free' || pricing_tier = 'low_cost' || is_self_guided = true)",
+        "(pricing_tier = 'free' || pricing_tier = 'low_cost' || is_self_guided = true) && is_bonus != true",
       sort: "base_price_eur,price_1_pax,title",
       expand: "city_id",
     });
     const rest = await pb.collection("tours").getFullList<PbTour>({
       filter:
-        "(pricing_tier != 'free' && pricing_tier != 'low_cost' && is_self_guided != true)",
+        "(pricing_tier != 'free' && pricing_tier != 'low_cost' && is_self_guided != true) && is_bonus != true",
       sort: "price_1_pax,title",
       expand: "city_id",
     });
     const seen = new Set(curated.map((t) => t.id));
-    return [...curated, ...rest.filter((t) => !seen.has(t.id))];
+    return [...curated, ...rest.filter((t) => !seen.has(t.id))].filter(
+      isGuestCatalogTour
+    );
   } catch {
-    return pb.collection("tours").getFullList<PbTour>({
+    const all = await pb.collection("tours").getFullList<PbTour>({
       sort: "price_1_pax,title",
       expand: "city_id",
     });
+    return all.filter(isGuestCatalogTour);
   }
 }
 
@@ -1852,7 +1869,7 @@ export async function fetchDiscoverConfig(): Promise<DiscoverConfig> {
     fetchExperiencesAndPlaces(),
   ]);
   const cities = citiesRaw.filter((c) => c.is_active !== false);
-  const tours = toursRaw.filter((t) => t.is_active !== false);
+  const tours = toursRaw.filter(isGuestCatalogTour);
   const fromEap = eapRaw
     .filter((r) => r.is_active !== false)
     .map((r) => mapEapToTour(r, cities));

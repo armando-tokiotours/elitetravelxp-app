@@ -11,7 +11,8 @@ import { ActionPillButton } from "@/components/ui/ActionPillButton";
 import { PandaFlexibleMascot } from "@/components/branding/PandaFlexibleMascot";
 
 /**
- * After €60 Concierge Fee: choose 30% progress or 100% remaining balance.
+ * Settle tour balance from PocketBase amountPaid (totalPaidEur).
+ * 30% option only while amountPaid < 30% of package; then remaining only.
  */
 export function BalancePaymentModal({
   open,
@@ -26,35 +27,41 @@ export function BalancePaymentModal({
   open: boolean;
   onClose: () => void;
   pnr: string;
-  /** Guest / lead name shown above the title */
   guestName?: string;
   totalPackageEur: number;
   conciergeCreditEur: number;
+  /** Single source of truth — ops_hub.total_paid_eur */
   totalPaidEur?: number;
   onConfirm: (option: BalancePayOption, amountEur: number) => void;
 }) {
-  const [selected, setSelected] = useState<BalancePayOption>("30_PERCENT");
-
   const math = computeBalanceOptions({
     packageTotalEur: totalPackageEur,
     conciergeCreditEur,
     totalPaidEur,
   });
 
+  const [selected, setSelected] = useState<BalancePayOption>(
+    math.show30Percent ? "30_PERCENT" : "FULL"
+  );
+
   useEffect(() => {
     if (!open) return;
-    setSelected("30_PERCENT");
+    setSelected(math.show30Percent ? "30_PERCENT" : "FULL");
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     return () => {
       document.body.style.overflow = prev;
     };
-  }, [open]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, math.show30Percent]);
 
   if (!open) return null;
 
-  const payAmount =
-    selected === "30_PERCENT" ? math.progress30 : math.pendingBalance;
+  const payAmount = math.show30Percent
+    ? selected === "30_PERCENT"
+      ? math.progress30Due
+      : math.pendingBalance
+    : math.pendingBalance;
 
   if (!(math.pendingBalance > 0)) {
     return (
@@ -68,8 +75,8 @@ export function BalancePaymentModal({
           className="w-full max-w-md rounded-3xl border border-white/10 bg-[#0A1017] p-6 shadow-2xl"
           onClick={(e) => e.stopPropagation()}
         >
-          <p className="text-sm text-emerald-300">
-            No pending tour balance — this booking looks fully settled.
+          <p className="text-sm font-semibold text-emerald-300">
+            ✓ Your trip is 100% fully paid. No further action required.
           </p>
           <button
             type="button"
@@ -135,9 +142,17 @@ export function BalancePaymentModal({
             </span>
           </div>
           <div className="flex justify-between gap-3 text-emerald-400">
-            <span>Already paid (credit)</span>
+            <span>Already paid</span>
             <span className="font-mono">− {formatEur(math.totalPaid)}</span>
           </div>
+          <p className="text-[10px] text-zinc-500">
+            Total payments received so far
+            {math.progress30Met
+              ? ` · 30% milestone met (${formatEur(math.progress30Target)})`
+              : math.credit > 0
+                ? ` · includes fee credit toward ${formatEur(math.progress30Target)} (30%)`
+                : ""}
+          </p>
           <div className="flex justify-between gap-3 border-t border-white/10 pt-2 text-sm font-bold text-white">
             <span>Pending balance</span>
             <span className="font-mono text-[#F6A724]">
@@ -151,42 +166,50 @@ export function BalancePaymentModal({
             Select payment amount
           </p>
 
-          <button
-            type="button"
-            onClick={() => setSelected("30_PERCENT")}
-            className={`flex w-full items-center justify-between rounded-2xl border p-4 text-left transition ${
-              selected === "30_PERCENT"
-                ? "border-[#075473] bg-[#075473]/30 shadow-lg"
-                : "border-white/10 bg-[#0D1117] hover:bg-white/5"
-            }`}
-          >
-            <div>
-              <p className="text-xs font-bold text-white">30% progress payment</p>
-              <p className="mt-0.5 text-[10px] text-zinc-400">
-                Lock guides &amp; major vendor bookings
-              </p>
-            </div>
-            <div className="text-right">
-              <p className="font-mono text-base font-bold text-[#F6A724]">
-                {formatEur(math.progress30)}
-              </p>
-              <p className="text-[9px] text-zinc-500">
-                Rest due 14 days before trip
-              </p>
-            </div>
-          </button>
+          {math.show30Percent ? (
+            <button
+              type="button"
+              onClick={() => setSelected("30_PERCENT")}
+              className={`flex w-full items-center justify-between rounded-2xl border p-4 text-left transition ${
+                selected === "30_PERCENT"
+                  ? "border-[#075473] bg-[#075473]/30 shadow-lg"
+                  : "border-white/10 bg-[#0D1117] hover:bg-white/5"
+              }`}
+            >
+              <div>
+                <p className="text-xs font-bold text-white">
+                  Finish 30% progress
+                </p>
+                <p className="mt-0.5 text-[10px] text-zinc-400">
+                  Fee already counted · lock guides &amp; vendors
+                </p>
+              </div>
+              <div className="text-right">
+                <p className="font-mono text-base font-bold text-[#F6A724]">
+                  {formatEur(math.progress30Due)}
+                </p>
+                <p className="text-[9px] text-zinc-500">
+                  Rest due 14 days before trip
+                </p>
+              </div>
+            </button>
+          ) : null}
 
           <button
             type="button"
             onClick={() => setSelected("FULL")}
             className={`flex w-full items-center justify-between rounded-2xl border p-4 text-left transition ${
-              selected === "FULL"
+              selected === "FULL" || !math.show30Percent
                 ? "border-[#075473] bg-[#075473]/30 shadow-lg"
                 : "border-white/10 bg-[#0D1117] hover:bg-white/5"
             }`}
           >
             <div>
-              <p className="text-xs font-bold text-white">100% full settlement</p>
+              <p className="text-xs font-bold text-white">
+                {math.show30Percent
+                  ? "100% full settlement"
+                  : "Pay remaining balance"}
+              </p>
               <p className="mt-0.5 text-[10px] text-zinc-400">
                 Settle complete trip in full
               </p>
@@ -203,7 +226,14 @@ export function BalancePaymentModal({
         <ActionPillButton
           label={`Pay ${formatEur(payAmount)} via encrypted checkout`}
           disabled={!(payAmount > 0)}
-          onClick={() => onConfirm(selected, payAmount)}
+          onClick={() =>
+            onConfirm(
+              math.show30Percent && selected === "30_PERCENT"
+                ? "30_PERCENT"
+                : "FULL",
+              payAmount
+            )
+          }
           className="w-full"
         />
       </div>

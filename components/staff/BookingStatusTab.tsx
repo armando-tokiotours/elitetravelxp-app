@@ -2,7 +2,13 @@
 
 import { useEffect, useState } from "react";
 import type PocketBase from "pocketbase";
-import { CANONICAL_STATUSES } from "@/lib/bookingStatus";
+import {
+  CANONICAL_STATUSES,
+  toCanonicalStatus,
+} from "@/lib/bookingStatus";
+import { computeProgress30Target } from "@/lib/balanceSettlement";
+import { DEFAULT_CONCIERGE_FEE_EUR } from "@/lib/conciergeEstimateFlow";
+import { parseOpsHubExtras } from "@/lib/agentServices";
 import { statusRequiresPayment } from "@/lib/paymentGate";
 import type { OpsHubRow, StaffOption } from "@/components/staff/opsHubClient";
 import { OpsPaymentStatusBadges } from "@/components/staff/OpsPaymentStatusBadges";
@@ -47,6 +53,83 @@ function formatEur(n: number): string {
   return `€${Math.round(n).toLocaleString("en-US")}`;
 }
 
+function statusLabel(status: string): string {
+  return String(status || "")
+    .trim()
+    .replace(/_/g, " ");
+}
+
+/**
+ * Financial override warnings when Ops sets a lifecycle status that
+ * conflicts with amount paid. Maps unified names (quoted / deposit_paid /
+ * fully_paid / confirmed) onto canonical dropdown values.
+ */
+function buildStatusFinancialWarning(opts: {
+  pendingStatus: string;
+  amountPaid: number;
+  feeEur: number;
+  milestone30Target: number;
+  packageTotal: number;
+}): string | null {
+  const raw = String(opts.pendingStatus || "").trim();
+  const upper = raw.toUpperCase().replace(/\s+/g, "_");
+  const canonical = toCanonicalStatus(raw);
+  const { amountPaid, feeEur, milestone30Target, packageTotal } = opts;
+
+  // quoted / awaiting quote / PENDING_DEPOSIT → fee should be paid
+  const impliesQuoted =
+    canonical === "quoted" ||
+    upper === "QUOTED" ||
+    upper === "PENDING_DEPOSIT" ||
+    upper === "PROCESSING";
+
+  // deposit / 30% / RESERVED / DEPOSIT_PAID → canonical confirmed (reserved)
+  const impliesDeposit30 =
+    canonical === "confirmed" ||
+    upper === "DEPOSIT_PAID" ||
+    upper === "RESERVED";
+
+  // fully paid / confirmed-complete → done / in_ops / FULLY_PAID
+  const impliesFullyPaid =
+    canonical === "done" ||
+    canonical === "in_ops" ||
+    upper === "FULLY_PAID" ||
+    upper === "PENDING_BALANCE";
+
+  if (impliesQuoted && amountPaid < feeEur) {
+    return (
+      `WARNING: Status implies quoted / awaiting deposit but the concierge fee ` +
+      `(${formatEur(feeEur)}) is not paid (paid: ${formatEur(amountPaid)}).`
+    );
+  }
+
+  if (
+    impliesDeposit30 &&
+    milestone30Target > 0 &&
+    amountPaid < milestone30Target
+  ) {
+    return (
+      `WARNING: Status implies 30% deposit / reserved but amount paid ` +
+      `(${formatEur(amountPaid)}) has not reached the 30% milestone ` +
+      `(${formatEur(milestone30Target)}).`
+    );
+  }
+
+  if (
+    impliesFullyPaid &&
+    packageTotal > 0 &&
+    amountPaid < packageTotal
+  ) {
+    return (
+      `WARNING: Status implies fully paid / confirmed but amount paid ` +
+      `(${formatEur(amountPaid)}) is less than the package total ` +
+      `(${formatEur(packageTotal)}). Pending balance remains.`
+    );
+  }
+
+  return null;
+}
+
 /**
  * Ops Tab 2 — financial audit + 30% progress milestone + concierge agent passport.
  */
@@ -79,6 +162,10 @@ export function BookingStatusTab({
   const [resolvingTotal, setResolvingTotal] = useState(
     !(Number(row.estimated_total_eur) > 0)
   );
+  /** Healed from payments ledger when ops_hub.total_paid_eur is stale */
+  const [healedTotalPaidEur, setHealedTotalPaidEur] = useState<number | null>(
+    null
+  );
   const staffRole = useTeamAuth((s) => s.role);
   const staffId = useTeamAuth((s) => s.staffId);
 
@@ -87,6 +174,7 @@ export function BookingStatusTab({
     setTourPay(deriveTourPayUi(row));
     setSelectedAgentId(row.assigned_agent_id || "");
     setAgentConfirmOpen(false);
+    setHealedTotalPaidEur(null);
   }, [
     row.id,
     row.status,
@@ -94,7 +182,54 @@ export function BookingStatusTab({
     row.payment_confirmed,
     row.concierge_fee_paid,
     row.assigned_agent_id,
+    row.total_paid_eur,
   ]);
+
+  // Heal TOTAL PAID via admin concierge-fee GET (ledger sum → ops_hub).
+  // Staff client PB rules can miss payments rows; this path uses admin API.
+  useEffect(() => {
+    const pnr = String(row.pnr || "")
+      .trim()
+      .toUpperCase()
+      .replace(/"/g, "");
+    if (!pnr || !row.id) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetch(
+          `/api/bookings/concierge-fee?pnr=${encodeURIComponent(pnr)}`,
+          { cache: "no-store" }
+        );
+        if (!res.ok || cancelled) return;
+        const data = (await res.json()) as {
+          totalPaidEur?: number;
+          total_paid_eur?: number;
+          amountPaid?: number;
+        };
+        const ledgerSum = Math.max(
+          0,
+          Math.round(
+            Number(data.totalPaidEur) ||
+              Number(data.amountPaid) ||
+              Number(data.total_paid_eur) ||
+              0
+          )
+        );
+        if (cancelled) return;
+        const hubPaid = Math.max(0, Math.round(Number(row.total_paid_eur) || 0));
+        if (ledgerSum > hubPaid) {
+          setHealedTotalPaidEur(ledgerSum);
+        } else if (ledgerSum > 0) {
+          setHealedTotalPaidEur(ledgerSum);
+        }
+      } catch {
+        /* admin heal optional — fall back to hub field */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [row.id, row.pnr, row.total_paid_eur]);
 
   useEffect(() => {
     let cancelled = false;
@@ -132,13 +267,24 @@ export function BookingStatusTab({
 
   const conciergeFeePaid = Boolean(row.concierge_fee_paid);
   const conciergeFeeAmount = Math.round(
-    Number(row.concierge_fee_amount) || Number(row.deposit_amount) || 60
+    Number(row.concierge_fee_amount) ||
+      Number(row.deposit_amount) ||
+      DEFAULT_CONCIERGE_FEE_EUR
   );
   const totalPaidEur = Math.round(
-    Number(row.total_paid_eur) ||
-      (conciergeFeePaid ? conciergeFeeAmount : 0) ||
-      0
+    Math.max(
+      Number(row.total_paid_eur) || 0,
+      healedTotalPaidEur || 0,
+      conciergeFeePaid ? conciergeFeeAmount : 0
+    )
   );
+
+  const approvedPrice = Math.max(
+    0,
+    Math.round(Number(parseOpsHubExtras(row.extras).final_approved_price) || 0)
+  );
+  const packageTotal = Math.max(realBaseTotal, approvedPrice);
+  const milestone30Target = computeProgress30Target(packageTotal);
 
   const audit = computeOpsFinancialAudit({
     realBaseTotal,
@@ -148,13 +294,29 @@ export function BookingStatusTab({
   });
 
   const paymentConfirmed = tourPay === "FULLY_PAID";
+  const savedStatus = row.status || "incoming";
+  const statusDirty = bookingStatus !== savedStatus;
   const savedAgentId = row.assigned_agent_id || "";
   const agentDirty = selectedAgentId !== savedAgentId;
   const currentAgent = agents.find((a) => a.id === selectedAgentId);
   const pendingAgent = agents.find((a) => a.id === selectedAgentId);
 
-  const confirmSaveAgent = () => {
-    setAgentConfirmOpen(false);
+  const confirmStatusPersist = (pending: string): boolean => {
+    const warning = buildStatusFinancialWarning({
+      pendingStatus: pending,
+      amountPaid: totalPaidEur,
+      feeEur: conciergeFeeAmount,
+      milestone30Target,
+      packageTotal,
+    });
+    const label = statusLabel(pending);
+    const message = warning
+      ? `${warning}\n\nAre you sure you want to OVERRIDE and save the status to '${label}'?`
+      : `Are you sure you want to update the booking status to '${label}'?`;
+    return window.confirm(message);
+  };
+
+  const persistBookingPayload = () => {
     void onSave({
       status: bookingStatus,
       paymentConfirmed,
@@ -163,17 +325,41 @@ export function BookingStatusTab({
     });
   };
 
-  const tourPayBadgeLabel = audit.isFullySettled
-    ? "TOUR PAY FULLY SETTLED"
-    : audit.is30PercentThresholdMet
-      ? "30% PROGRESS PAID"
-      : "TOUR PAY PENDING";
+  const saveStatusOnly = () => {
+    if (!statusDirty) return;
+    if (!confirmStatusPersist(bookingStatus)) return;
+    persistBookingPayload();
+  };
 
-  const tourPayBadgeClass = audit.isFullySettled
-    ? "border-cyan-500/40 bg-cyan-500/20 text-cyan-300"
-    : audit.is30PercentThresholdMet
-      ? "border-indigo-500/40 bg-indigo-500/20 text-indigo-300"
-      : "border-amber-500/30 bg-amber-500/20 text-amber-300";
+  const cancelStatusEdit = () => {
+    setBookingStatus(savedStatus);
+  };
+
+  const confirmSaveAgent = () => {
+    if (statusDirty && !confirmStatusPersist(bookingStatus)) {
+      setAgentConfirmOpen(false);
+      return;
+    }
+    setAgentConfirmOpen(false);
+    persistBookingPayload();
+  };
+
+  const saveAll = () => {
+    if (statusDirty && !confirmStatusPersist(bookingStatus)) return;
+    persistBookingPayload();
+  };
+
+  // Milestone-only pill — Fee/Tour pay already come from OpsPaymentStatusBadges
+  const milestoneBadge =
+    audit.isFullySettled
+      ? null
+      : audit.is30PercentThresholdMet
+        ? {
+            label: "30% PROGRESS PAID",
+            className:
+              "border-indigo-500/40 bg-indigo-500/20 text-indigo-300",
+          }
+        : null;
 
   return (
     <div className="max-w-4xl space-y-6 text-xs text-white">
@@ -185,11 +371,13 @@ export function BookingStatusTab({
           </h2>
           <div className="flex flex-wrap items-center gap-2">
             <OpsPaymentStatusBadges row={row} />
-            <span
-              className={`rounded px-2.5 py-1 text-[10px] font-bold tracking-wider uppercase ${tourPayBadgeClass}`}
-            >
-              {tourPayBadgeLabel}
-            </span>
+            {milestoneBadge ? (
+              <span
+                className={`rounded px-2.5 py-1 text-[10px] font-bold tracking-wider uppercase ${milestoneBadge.className}`}
+              >
+                {milestoneBadge.label}
+              </span>
+            ) : null}
           </div>
         </div>
 
@@ -317,7 +505,7 @@ export function BookingStatusTab({
         </div>
 
         <div className="grid grid-cols-1 gap-4 pt-2 md:grid-cols-2">
-          <div>
+          <div className="space-y-2">
             <label className="mb-1 block text-[10px] font-bold text-gray-400 uppercase">
               Overall booking status
             </label>
@@ -325,7 +513,11 @@ export function BookingStatusTab({
               value={bookingStatus}
               disabled={saving}
               onChange={(e) => setBookingStatus(e.target.value)}
-              className="w-full rounded-xl border border-white/10 bg-[#0A1017] px-3 py-2 text-white"
+              className={`w-full rounded-xl border bg-[#0A1017] px-3 py-2 text-white ${
+                statusDirty
+                  ? "border-emerald-500/60 ring-1 ring-emerald-500/30"
+                  : "border-white/10"
+              }`}
             >
               {CANONICAL_STATUSES.map((s) => (
                 <option
@@ -340,6 +532,26 @@ export function BookingStatusTab({
                 </option>
               ))}
             </select>
+            {statusDirty ? (
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  disabled={saving}
+                  onClick={saveStatusOnly}
+                  className="flex-1 rounded-xl bg-emerald-600 py-2.5 text-[11px] font-bold tracking-wider text-white uppercase shadow-lg shadow-emerald-900/40 transition hover:bg-emerald-500 disabled:opacity-40"
+                >
+                  Save Status
+                </button>
+                <button
+                  type="button"
+                  disabled={saving}
+                  onClick={cancelStatusEdit}
+                  className="flex-1 rounded-xl border border-white/15 bg-black/40 py-2.5 text-[11px] font-bold tracking-wider text-white uppercase transition hover:bg-white/5 disabled:opacity-40"
+                >
+                  Cancel
+                </button>
+              </div>
+            ) : null}
           </div>
           <div>
             <label className="mb-1 block text-[10px] font-bold text-gray-400 uppercase">
@@ -532,14 +744,7 @@ export function BookingStatusTab({
         <button
           type="button"
           disabled={saving}
-          onClick={() =>
-            void onSave({
-              status: bookingStatus,
-              paymentConfirmed,
-              tourPaymentStatus: tourPay,
-              assignedAgentId: selectedAgentId,
-            })
-          }
+          onClick={saveAll}
           className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#075473] py-4 text-xs font-bold tracking-wider text-white uppercase shadow-xl transition hover:bg-[#075473]/80 active:scale-[0.99] disabled:opacity-40"
         >
           {saving

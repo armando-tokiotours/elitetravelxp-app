@@ -30,11 +30,32 @@ export type ServiceLineItem = {
   quantity?: number;
   /** Awaiting Ops Manager override for >15% discount */
   approvalPending?: boolean;
+  /**
+   * Optional ticket fulfillment for guest Day Services.
+   * Parsed from fulfillment / delivery / issued flags when Ops sets them.
+   */
+  fulfillmentStatus?: "PENDING" | "READY";
+  /**
+   * Public URL for the per-line ticket/pass PDF (e.g. /uploads/tickets/...).
+   * Never store the binary in PocketBase — URL string only.
+   */
+  voucherUrl?: string;
+  voucherFilename?: string;
+  /** Local relative path (or URL) used for cron unlink */
+  voucherBlobPathname?: string;
+  /** YYYY-MM-DD when this line is for a specific itinerary day */
+  serviceDate?: string;
+  /** Alias persisted on some older extras payloads */
+  scheduledDate?: string;
 };
+
+export type PriceMode = "estimate" | "exact";
 
 export type AgentServicesExtras = {
   agent_services?: ServiceLineItem[];
   final_approved_price?: number | null;
+  /** Ops Pricing Studio: estimate range vs exact real price per line */
+  price_mode?: PriceMode;
   pending_discount_request?: {
     requestedTotal: number;
     originalTotal: number;
@@ -45,6 +66,8 @@ export type AgentServicesExtras = {
 
 /** Max agent self-serve discount without Ops Manager approval */
 export const MAX_AGENT_DISCOUNT_PCT = 15;
+/** Max agent self-serve markup above catalog base (Exact Real Price mode) */
+export const MAX_AGENT_INCREASE_PCT = 40;
 
 export type CartCatalogItem = {
   id: string;
@@ -52,6 +75,8 @@ export type CartCatalogItem = {
   category: AgentServiceCategory;
   priceEur: number;
   subtitle?: string;
+  /** Tour marked Bonus gift in Team Access — agent-only until added */
+  isCatalogBonus?: boolean;
 };
 
 export function itemDiscountPercent(item: ServiceLineItem): number {
@@ -65,6 +90,52 @@ export function itemDiscountPercent(item: ServiceLineItem): number {
 
 export function itemExceedsAgentDiscount(item: ServiceLineItem): boolean {
   return itemDiscountPercent(item) > MAX_AGENT_DISCOUNT_PCT;
+}
+
+/** Allowed exact-price band vs catalog `basePriceEur` (−15% / +40%). */
+export function exactPriceBand(basePriceEur: number): {
+  minAllowed: number;
+  maxAllowed: number;
+} {
+  const base = Math.max(0, Math.round(Number(basePriceEur) || 0));
+  return {
+    minAllowed: Math.round(base * (1 - MAX_AGENT_DISCOUNT_PCT / 100)),
+    maxAllowed: Math.round(base * (1 + MAX_AGENT_INCREASE_PCT / 100)),
+  };
+}
+
+export type ExactPriceBandViolation = {
+  item: ServiceLineItem;
+  tooLow: boolean;
+  tooHigh: boolean;
+  minAllowed: number;
+  maxAllowed: number;
+  standard: number;
+  price: number;
+};
+
+/** Exact-mode guardrail: −15% / +40% of catalog base. Skips bonus / €0 base. */
+export function exactPriceBandViolation(
+  item: ServiceLineItem
+): ExactPriceBandViolation | null {
+  if (item.isBonus) return null;
+  const standard = Math.max(0, Math.round(Number(item.basePriceEur) || 0));
+  if (standard <= 0) return null;
+  const price = Math.max(0, Math.round(Number(item.finalPriceEur) || 0));
+  const { minAllowed, maxAllowed } = exactPriceBand(standard);
+  const tooLow = price < minAllowed;
+  const tooHigh = price > maxAllowed;
+  if (!tooLow && !tooHigh) return null;
+  return { item, tooLow, tooHigh, minAllowed, maxAllowed, standard, price };
+}
+
+export function listExactPriceBandViolations(
+  cart: ServiceLineItem[]
+): ExactPriceBandViolation[] {
+  return cart
+    .filter((i) => i.status === "ACCEPTED" || i.status === "OPTIONAL")
+    .map((i) => exactPriceBandViolation(i))
+    .filter((v): v is ExactPriceBandViolation => v != null);
 }
 
 /** Billable cart lines only (bonuses excluded from 15% math). */
@@ -198,6 +269,12 @@ export function parseOpsHubExtras(raw: unknown): AgentServicesExtras {
         ? Math.round(Number(approved))
         : null;
 
+  const modeRaw = String(obj.price_mode || "")
+    .trim()
+    .toLowerCase();
+  const price_mode: PriceMode | undefined =
+    modeRaw === "exact" ? "exact" : modeRaw === "estimate" ? "estimate" : undefined;
+
   let pending_discount_request: AgentServicesExtras["pending_discount_request"] =
     null;
   const pending = obj.pending_discount_request;
@@ -211,7 +288,12 @@ export function parseOpsHubExtras(raw: unknown): AgentServicesExtras {
     };
   }
 
-  return { agent_services, final_approved_price, pending_discount_request };
+  return {
+    agent_services,
+    final_approved_price,
+    price_mode,
+    pending_discount_request,
+  };
 }
 
 export function normalizeServiceLineItem(raw: unknown): ServiceLineItem | null {
@@ -239,6 +321,51 @@ export function normalizeServiceLineItem(raw: unknown): ServiceLineItem | null {
       ? statusRaw
       : "ACCEPTED";
 
+  const fulfillmentRaw = String(
+    r.fulfillmentStatus ??
+      r.fulfillment_status ??
+      r.fulfillment ??
+      r.deliveryStatus ??
+      r.delivery_status ??
+      r.issued ??
+      ""
+  )
+    .trim()
+    .toLowerCase();
+  const voucherUrl =
+    String(
+      r.voucherUrl ?? r.voucher_url ?? r.fileUrl ?? r.file_url ?? ""
+    ).trim() || undefined;
+  const voucherFilename =
+    String(
+      r.voucherFilename ??
+        r.voucher_filename ??
+        r.fileName ??
+        r.file_name ??
+        ""
+    ).trim() || undefined;
+  const voucherBlobPathname =
+    String(
+      r.voucherBlobPathname ??
+        r.voucher_blob_pathname ??
+        r.blobPathname ??
+        r.blob_pathname ??
+        ""
+    ).trim() || undefined;
+
+  const fulfillmentStatus: ServiceLineItem["fulfillmentStatus"] =
+    fulfillmentRaw === "ready" ||
+    fulfillmentRaw === "delivered" ||
+    fulfillmentRaw === "issued" ||
+    fulfillmentRaw === "done" ||
+    fulfillmentRaw === "true"
+      ? "READY"
+      : fulfillmentRaw === "pending" || fulfillmentRaw === "false"
+        ? "PENDING"
+        : voucherUrl
+          ? "READY"
+          : undefined;
+
   return {
     id: String(r.id || `custom-${Date.now()}`).trim() || `custom-${Date.now()}`,
     title,
@@ -259,15 +386,60 @@ export function normalizeServiceLineItem(raw: unknown): ServiceLineItem | null {
       String(r.catalogSourceId || r.catalog_source_id || "").trim() || undefined,
     quantity: Math.max(1, Math.round(Number(r.quantity) || 1)),
     approvalPending: Boolean(r.approvalPending || r.approval_pending),
+    fulfillmentStatus,
+    voucherUrl,
+    voucherFilename,
+    voucherBlobPathname,
+    serviceDate:
+      String(r.serviceDate ?? r.service_date ?? r.date ?? "")
+        .trim()
+        .slice(0, 10) || undefined,
+    scheduledDate:
+      String(r.scheduledDate ?? r.scheduled_date ?? "")
+        .trim()
+        .slice(0, 10) || undefined,
   };
+}
+
+/** Keep cloud voucher fields when a cart replace omits them for the same id. */
+export function preserveVoucherFieldsOnReplace(
+  incoming: ServiceLineItem[],
+  existing: ServiceLineItem[] | null | undefined
+): ServiceLineItem[] {
+  const byId = new Map((existing || []).map((i) => [i.id, i]));
+  return incoming.map((item) => {
+    const prev = byId.get(item.id);
+    if (!prev?.voucherUrl) return item;
+    if (item.voucherUrl) return item;
+    return {
+      ...item,
+      voucherUrl: prev.voucherUrl,
+      voucherFilename: prev.voucherFilename || item.voucherFilename,
+      voucherBlobPathname:
+        prev.voucherBlobPathname || item.voucherBlobPathname,
+      fulfillmentStatus:
+        item.fulfillmentStatus || prev.fulfillmentStatus || "READY",
+    };
+  });
 }
 
 export function mergeExtrasPatch(
   existing: unknown,
   patch: Partial<AgentServicesExtras>
-): AgentServicesExtras {
+): Record<string, unknown> {
+  let baseObj: Record<string, unknown> = {};
+  if (typeof existing === "string") {
+    try {
+      baseObj = JSON.parse(existing) as Record<string, unknown>;
+    } catch {
+      baseObj = {};
+    }
+  } else if (existing && typeof existing === "object") {
+    baseObj = { ...(existing as Record<string, unknown>) };
+  }
   const base = parseOpsHubExtras(existing);
   return {
+    ...baseObj,
     agent_services:
       patch.agent_services !== undefined
         ? patch.agent_services
@@ -276,6 +448,10 @@ export function mergeExtrasPatch(
       patch.final_approved_price !== undefined
         ? patch.final_approved_price
         : base.final_approved_price ?? null,
+    price_mode:
+      patch.price_mode !== undefined
+        ? patch.price_mode
+        : base.price_mode ?? undefined,
     pending_discount_request:
       patch.pending_discount_request !== undefined
         ? patch.pending_discount_request
@@ -286,12 +462,18 @@ export function mergeExtrasPatch(
 export function agentServiceToInvoiceItem(item: ServiceLineItem): InvoiceItem {
   const qty = Math.max(1, Math.round(Number(item.quantity) || 1));
   const unit = item.isBonus ? 0 : item.finalPriceEur;
+  const maxUnit = item.isBonus
+    ? 0
+    : item.estimateMaxEur != null && Number.isFinite(item.estimateMaxEur)
+      ? Math.max(unit, Math.round(item.estimateMaxEur))
+      : Math.round(unit * 1.3);
   return {
     id: item.id,
     title: qty > 1 ? `${item.title} ×${qty}` : item.title,
     category: categoryLabel(item.category),
     status: item.status,
     basePriceEur: unit * qty,
+    estimateMaxEur: maxUnit * qty,
     notes:
       item.notes ||
       (item.isBonus
@@ -303,9 +485,27 @@ export function agentServiceToInvoiceItem(item: ServiceLineItem): InvoiceItem {
 }
 
 /**
+ * Guest invoice line-item resolver.
+ * - When Ops has saved `ops_hub.extras.agent_services`, those rows are the
+ *   PocketBase source of truth (guest prefers PB over local quote).
+ * - When Ops has saved none, guest keeps the local builder-derived estimate.
+ */
+export function resolveGuestInvoiceItems(
+  localItems: InvoiceItem[],
+  agentServices: ServiceLineItem[] | null | undefined
+): InvoiceItem[] {
+  const services = (agentServices || []).filter(Boolean);
+  if (services.length === 0) return localItems;
+  return services.map(agentServiceToInvoiceItem);
+}
+
+/**
  * Merge guest-built invoice rows with agent extras:
  * - overridesItemId / matching id → replace price / bonus
  * - other agent lines → append
+ *
+ * Prefer {@link resolveGuestInvoiceItems} for guest dossier invoices so a
+ * saved Ops cart fully replaces the local estimate.
  */
 export function mergeInvoiceWithAgentServices(
   baseItems: InvoiceItem[],
@@ -333,11 +533,19 @@ export function mergeInvoiceWithAgentServices(
   const merged = baseItems.map((item) => {
     const ov = overrideById.get(item.id);
     if (!ov) return item;
+    const qty = Math.max(1, Math.round(Number(ov.quantity) || 1));
+    const unit = ov.isBonus ? 0 : ov.finalPriceEur;
+    const maxUnit = ov.isBonus
+      ? 0
+      : ov.estimateMaxEur != null && Number.isFinite(ov.estimateMaxEur)
+        ? Math.max(unit, Math.round(ov.estimateMaxEur))
+        : Math.round(unit * 1.3);
     return {
       ...item,
       title: ov.title || item.title,
       status: ov.status,
-      basePriceEur: ov.isBonus ? 0 : ov.finalPriceEur,
+      basePriceEur: unit * qty,
+      estimateMaxEur: maxUnit * qty,
       isBonus: ov.isBonus,
       listPriceEur: ov.isBonus ? ov.basePriceEur || item.basePriceEur : undefined,
       notes:
@@ -363,6 +571,298 @@ export function sumAcceptedAgentServicesEur(
     const qty = Math.max(1, Math.round(Number(s.quantity) || 1));
     return acc + Math.max(0, Math.round(s.finalPriceEur || 0)) * qty;
   }, 0);
+}
+
+/**
+ * Guest / invoice exact-pricing detector.
+ * True when Ops locked exact mode, deal-lock price is set, or every accepted
+ * billable line already has min === max (collapsed ranges).
+ */
+export function isExactGuestPricing(input: {
+  priceMode?: PriceMode | string | null;
+  finalApprovedPrice?: number | null;
+  items?: Array<{
+    status?: string;
+    isBonus?: boolean;
+    basePriceEur?: number;
+    estimateMaxEur?: number;
+    minPrice?: number;
+    maxPrice?: number;
+  }> | null;
+}): boolean {
+  if (String(input.priceMode || "").trim().toLowerCase() === "exact") {
+    return true;
+  }
+  const approved = Number(input.finalApprovedPrice);
+  if (Number.isFinite(approved) && approved > 0) return true;
+
+  const rows = (input.items || []).filter((row) => {
+    const status = String(row.status || "ACCEPTED")
+      .trim()
+      .toUpperCase();
+    if (status !== "ACCEPTED") return false;
+    if (row.isBonus) return false;
+    return true;
+  });
+  if (rows.length === 0) return false;
+
+  return rows.every((row) => {
+    const min =
+      row.minPrice != null && Number.isFinite(Number(row.minPrice))
+        ? Math.max(0, Math.round(Number(row.minPrice)))
+        : Math.max(0, Math.round(Number(row.basePriceEur) || 0));
+    const maxRaw =
+      row.maxPrice != null && Number.isFinite(Number(row.maxPrice))
+        ? Math.round(Number(row.maxPrice))
+        : row.estimateMaxEur != null && Number.isFinite(Number(row.estimateMaxEur))
+          ? Math.round(Number(row.estimateMaxEur))
+          : null;
+    if (maxRaw == null) return false;
+    return Math.max(min, maxRaw) === min;
+  });
+}
+
+/**
+ * Locked package total for exact guest invoices.
+ * Prefer final_approved_price; else sum of accepted line mins.
+ */
+export function resolveExactPackageTotalEur(input: {
+  priceMode?: PriceMode | string | null;
+  finalApprovedPrice?: number | null;
+  packageMinEur?: number | null;
+  items?: Array<{
+    status?: string;
+    isBonus?: boolean;
+    basePriceEur?: number;
+    estimateMaxEur?: number;
+    minPrice?: number;
+    maxPrice?: number;
+  }> | null;
+}): number | null {
+  const approved = Number(input.finalApprovedPrice);
+  if (Number.isFinite(approved) && approved > 0) return Math.round(approved);
+  if (!isExactGuestPricing(input)) return null;
+  const fromPackage = Number(input.packageMinEur);
+  if (Number.isFinite(fromPackage) && fromPackage > 0) {
+    return Math.round(fromPackage);
+  }
+  const rows = input.items || [];
+  const sum = rows.reduce((acc, row) => {
+    const status = String(row.status || "ACCEPTED")
+      .trim()
+      .toUpperCase();
+    if (status !== "ACCEPTED" || row.isBonus) return acc;
+    const min =
+      row.minPrice != null && Number.isFinite(Number(row.minPrice))
+        ? Math.max(0, Math.round(Number(row.minPrice)))
+        : Math.max(0, Math.round(Number(row.basePriceEur) || 0));
+    return acc + min;
+  }, 0);
+  return sum > 0 ? sum : null;
+}
+
+/** Active cart lines for guest Day Services (exclude declined). */
+export function isActiveAgentService(item: ServiceLineItem): boolean {
+  return item.status !== "DECLINED";
+}
+
+function titleHaystack(item: ServiceLineItem): string {
+  return `${item.title || ""} ${item.notes || ""}`.toLowerCase();
+}
+
+/**
+ * Suica / Pasmo / entry tickets / vouchers — win over car/transit buckets.
+ * Matches TICKET / EXTRA categories and title heuristics; excludes private cars.
+ */
+export function isTicketServiceItem(item: ServiceLineItem): boolean {
+  const title = titleHaystack(item);
+  const cat = String(item.category || "").toUpperCase();
+
+  // Never treat private-vehicle transfers as tickets
+  if (
+    title.includes("alphard") ||
+    title.includes("hiace") ||
+    title.includes("chauffeur") ||
+    title.includes("private car") ||
+    (title.includes("airport") && title.includes("transfer")) ||
+    (title.includes("transfer") &&
+      (title.includes("van") || title.includes("vehicle") || title.includes("driver")))
+  ) {
+    return false;
+  }
+
+  if (
+    title.includes("suica") ||
+    title.includes("pasmo") ||
+    title.includes("icoca") ||
+    title.includes("ic card") ||
+    title.includes("ic-card") ||
+    title.includes("iccard") ||
+    title.includes("teamlab") ||
+    title.includes("museum pass") ||
+    title.includes("metro pass") ||
+    title.includes("train ticket") ||
+    title.includes("rail pass") ||
+    title.includes("jr pass") ||
+    title.includes("entry ticket") ||
+    title.includes("admission") ||
+    title.includes("voucher") ||
+    /\bticket(s)?\b/.test(title) ||
+    /\bentry\b/.test(title)
+  ) {
+    return true;
+  }
+
+  if (cat === "TICKET") return true;
+  if (cat === "CONCIERGE_EXTRA" || cat === "EXTRA") {
+    return (
+      title.includes("pass") ||
+      title.includes("entry") ||
+      title.includes("ticket") ||
+      title.includes("admission")
+    );
+  }
+  return false;
+}
+
+/** Private car / vehicle / transfer lines (Alphard, airport transfer, etc.). */
+export function isTransitServiceItem(item: ServiceLineItem): boolean {
+  // Tickets win — Suica titles often contain "transit" / "transport"
+  if (isTicketServiceItem(item)) return false;
+
+  const v = titleHaystack(item);
+  const cat = String(item.category || "").toUpperCase();
+
+  if (
+    v.includes("alphard") ||
+    v.includes("hiace") ||
+    v.includes("chauffeur") ||
+    v.includes("private car") ||
+    v.includes("private driver") ||
+    (v.includes("airport") && v.includes("transfer")) ||
+    (v.includes("transfer") &&
+      (v.includes("van") ||
+        v.includes("vehicle") ||
+        v.includes("car") ||
+        v.includes("driver")))
+  ) {
+    return true;
+  }
+
+  if (cat === "TRANSPORT" || cat === "TRANSIT") {
+    // Category alone is not enough when titles are ticket-like (handled above)
+    return (
+      v.includes("transfer") ||
+      v.includes("alphard") ||
+      v.includes("hiace") ||
+      v.includes("chauffeur") ||
+      v.includes("vehicle") ||
+      v.includes("van") ||
+      v.includes("driver") ||
+      v.includes("private") ||
+      v.includes("car") ||
+      // Generic transport/transit category without ticket keywords
+      (!v.includes("suica") &&
+        !v.includes("pasmo") &&
+        !v.includes("ticket") &&
+        !v.includes("pass"))
+    );
+  }
+
+  return (
+    (v.includes("transport") || v.includes("transit")) &&
+    (v.includes("private") ||
+      v.includes("car") ||
+      v.includes("van") ||
+      v.includes("vehicle") ||
+      v.includes("driver") ||
+      v.includes("transfer"))
+  );
+}
+
+/** Guided tour / guide experience lines (not pure tickets). */
+export function isGuideServiceItem(item: ServiceLineItem): boolean {
+  if (isTicketServiceItem(item)) return false;
+  if (isTransitServiceItem(item)) return false;
+  if (item.category === "TOUR") return true;
+  const v = titleHaystack(item);
+  return (
+    v.includes("guide") ||
+    v.includes("local host") ||
+    v.includes("experience with guide")
+  );
+}
+
+/** Guest-facing ticket readiness for Day Services rows. */
+export function isTicketServiceReady(
+  item: ServiceLineItem,
+  opts?: { opsTicketStatus?: string | null; hasVoucher?: boolean }
+): boolean {
+  if (String(item.voucherUrl || "").trim()) return true;
+  if (item.fulfillmentStatus === "READY") return true;
+  if (item.fulfillmentStatus === "PENDING") return false;
+  const notes = String(item.notes || "").toLowerCase();
+  if (
+    /\b(ready|delivered|issued|done)\b/.test(notes) &&
+    !/\bpending\b/.test(notes)
+  ) {
+    return true;
+  }
+  const ops = String(opts?.opsTicketStatus || "")
+    .trim()
+    .toLowerCase();
+  if (ops === "done" || opts?.hasVoucher) return true;
+  return false;
+}
+
+/** Public download URL for a cart ticket line when Ops attached a PDF. */
+export function ticketItemVoucherUrl(
+  item: ServiceLineItem | null | undefined
+): string | null {
+  const url = String(item?.voucherUrl || "").trim();
+  return url || null;
+}
+
+export type DayServicesFromCart = {
+  transitItems: ServiceLineItem[];
+  guideItems: ServiceLineItem[];
+  ticketItems: ServiceLineItem[];
+  transitTitle: string | null;
+  guideTitle: string | null;
+  ticketTitle: string | null;
+};
+
+/** Split accepted/optional agent cart into Day Services car / guide / tickets. */
+export function dayServicesFromAgentCart(
+  services: ServiceLineItem[] | null | undefined
+): DayServicesFromCart {
+  const active = (services || []).filter(isActiveAgentService);
+  // Exclusive buckets — tickets first so Suica never lands under Car
+  const ticketItems = active.filter(isTicketServiceItem);
+  const transitItems = active.filter(
+    (i) => isTransitServiceItem(i) && !isTicketServiceItem(i)
+  );
+  const guideItems = active.filter(
+    (i) =>
+      isGuideServiceItem(i) &&
+      !isTicketServiceItem(i) &&
+      !isTransitServiceItem(i)
+  );
+  const joinTitles = (items: ServiceLineItem[]) => {
+    const titles = items
+      .map((i) => String(i.title || "").trim())
+      .filter(Boolean);
+    if (titles.length === 0) return null;
+    return titles.join(" · ");
+  };
+  return {
+    transitItems,
+    guideItems,
+    ticketItems,
+    transitTitle: joinTitles(transitItems),
+    guideTitle: joinTitles(guideItems),
+    ticketTitle: joinTitles(ticketItems),
+  };
 }
 
 export function createCustomServiceLine(input: {

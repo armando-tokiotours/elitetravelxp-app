@@ -3,15 +3,21 @@ import type { ReactNode } from "react";
 export type BookingPassTripType = "single" | "multi";
 
 export type BookingPassStatus =
+  | "DRAFT"
+  | "PENDING_DEPOSIT"
+  | "PROCESSING"
+  | "DEPOSIT_PAID"
+  | "PENDING_BALANCE"
+  | "FULLY_PAID"
+  | "CANCELLED"
+  /** Legacy aliases still accepted from older payloads */
   | "IN_PROGRESS"
   | "INCOMING"
   | "QUOTED"
   | "CONFIRMED"
   | "IN_OPS"
   | "DONE"
-  | "CANCELLED"
-  | "REVIEW"
-  | "DRAFT";
+  | "REVIEW";
 
 export interface RouteBreakdownItem {
   city: string;

@@ -7,6 +7,7 @@ import { ArrowLeft, Lock } from "lucide-react";
 import type { PbAccommodation, PbCity } from "@/lib/pocketbase/client";
 import {
   normalizeCityHotelPref,
+  sanitizeHotelUrl,
   useBuilderStore,
   type CityHotelPref,
   type HotelRoomType,
@@ -862,6 +863,35 @@ function CityHotelCard({
                 {starRating}-star
               </span>
             </div>
+          </div>
+
+          <div>
+            <FieldLabel>Hotel / space</FieldLabel>
+            <input
+              type="text"
+              value={pref?.hotelName ?? ""}
+              onChange={(e) =>
+                onChange({ hotelName: e.target.value })
+              }
+              placeholder="Booked hotel name"
+              className="mt-1.5 w-full rounded-lg border border-zinc-700 bg-zinc-950 px-2.5 py-2 text-sm text-white placeholder:text-zinc-500"
+            />
+            <FieldLabel>Hotel link</FieldLabel>
+            <input
+              type="url"
+              value={pref?.hotelUrl ?? ""}
+              onChange={(e) =>
+                onChange({ hotelUrl: e.target.value })
+              }
+              onBlur={(e) => {
+                const next = sanitizeHotelUrl(e.target.value);
+                if (next !== (pref?.hotelUrl ?? "")) {
+                  onChange({ hotelUrl: next });
+                }
+              }}
+              placeholder="https://"
+              className="mt-1.5 w-full rounded-lg border border-zinc-700 bg-zinc-950 px-2.5 py-2 text-sm text-white placeholder:text-zinc-500"
+            />
           </div>
 
           <div>

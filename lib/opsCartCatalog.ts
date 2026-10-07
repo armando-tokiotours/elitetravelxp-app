@@ -121,12 +121,16 @@ export async function loadOpsCartCatalog(
       const title = String(t.title || "").trim();
       if (!id || !title || seen.has(id)) continue;
       seen.add(id);
+      const isCatalogBonus = Boolean(t.is_bonus);
       out.push({
         id,
         title,
         category: mapCatalogCategory(String(t.category || t.access_type || "tour")),
         priceEur: tourPrice(t),
-        subtitle: String(t.category || "Experience"),
+        subtitle: isCatalogBonus
+          ? "🎁 Bonus gift · agent-only"
+          : String(t.category || "Experience"),
+        isCatalogBonus,
       });
     }
   } catch {

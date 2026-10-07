@@ -20,6 +20,7 @@ import {
   tourIdsFromSelections,
 } from "@/lib/opsDemand";
 import { formatTransportType } from "@/lib/transportProducts";
+import { isTripWidePassText } from "@/lib/guestItineraryDays";
 
 export type OpsAccessLine = {
   tourId: string;
@@ -77,6 +78,86 @@ export type OpsRouteTimeline = {
   stays: OpsItineraryStop[];
 };
 
+/** Brand product titles used on Torii / Start Trip / nav. */
+export const OPS_PRODUCT_LABEL = {
+  single_day: "1-Day Express Pass",
+  multi_day: "Grand Japan Journey",
+  experience_only: "VIP Tickets & Local Access",
+} as const;
+
+/**
+ * Resolve Ops header product line from BAL type + selection heuristics.
+ * Prefer `type`; fall back to builder-e markers, then single/multi shape.
+ */
+export function opsProductLabelFromLead(opts: {
+  type?: string | null;
+  selections?: unknown;
+  durationLabel?: string | null;
+  durationValue?: number | null;
+}): string {
+  const t = String(opts.type || "")
+    .trim()
+    .toLowerCase()
+    .replace(/-/g, "_");
+  if (t === "single_day" || t === "single") {
+    return OPS_PRODUCT_LABEL.single_day;
+  }
+  if (t === "multi_day" || t === "multiday" || t === "multi") {
+    return OPS_PRODUCT_LABEL.multi_day;
+  }
+  if (
+    t === "experience_only" ||
+    t === "experience" ||
+    t === "builder_e" ||
+    t === "vip" ||
+    t === "vip_tickets"
+  ) {
+    return OPS_PRODUCT_LABEL.experience_only;
+  }
+
+  const sel =
+    opts.selections && typeof opts.selections === "object"
+      ? (opts.selections as Record<string, unknown>)
+      : null;
+  if (sel) {
+    const src = String(sel.source || "")
+      .trim()
+      .toLowerCase()
+      .replace(/-/g, "_");
+    const bt = String(sel.booking_type || "")
+      .trim()
+      .toLowerCase()
+      .replace(/-/g, "_");
+    if (
+      src === "builder_e" ||
+      src.includes("builder_e") ||
+      bt === "experience_only" ||
+      bt.includes("experience")
+    ) {
+      return OPS_PRODUCT_LABEL.experience_only;
+    }
+    const multi = asMulti(sel);
+    const single = asSingle(sel);
+    if (Boolean(single) && !multi) return OPS_PRODUCT_LABEL.single_day;
+    if (multi) return OPS_PRODUCT_LABEL.multi_day;
+  }
+
+  const dl = String(opts.durationLabel || "")
+    .trim()
+    .toLowerCase();
+  if (dl.includes("hour")) return OPS_PRODUCT_LABEL.single_day;
+  const days = Number(opts.durationValue);
+  if (Number.isFinite(days) && days >= 2) return OPS_PRODUCT_LABEL.multi_day;
+  if (dl.includes("day") && !dl.includes("1 day") && !dl.startsWith("1 ")) {
+    return OPS_PRODUCT_LABEL.multi_day;
+  }
+  if (dl.includes("1 day") || dl === "1-day" || dl.startsWith("1 day")) {
+    return OPS_PRODUCT_LABEL.single_day;
+  }
+
+  return "";
+}
+
 export type OpsGuestRequirements = {
   /** Guest profile */
   guestName: string;
@@ -90,6 +171,8 @@ export type OpsGuestRequirements = {
   guestHasICCard: boolean | null;
   guestNeedsTransitHelp: boolean | null;
   transportStrategy: string;
+  /** Brand product: 1-Day Express Pass / Grand Japan Journey / VIP Tickets… */
+  productLabel: string;
   /** Trip overview from BAL selections (no extra fetches) */
   totalDaysLabel: string;
   arrivalDateLabel: string;
@@ -315,19 +398,49 @@ function pickFlightLabel(
     const fn = String(driver.flightNumber || "").trim();
     if (fn) return `Flight ${fn}`;
   }
-  return "Pending";
+  return "(pending confirm)";
 }
 
 function formatArrivalDate(raw: string | null | undefined): string {
   const s = String(raw || "").trim();
   if (!s) return "—";
-  const d = new Date(s.includes("T") ? s : `${s}T12:00:00`);
-  if (Number.isNaN(d.getTime())) return s;
-  return d.toLocaleDateString(undefined, {
+
+  // Normalize "2026-10-28 00:00:00.000Z" → ISO with T
+  const normalized = s.includes("T")
+    ? s
+    : s.replace(/^(\d{4}-\d{2}-\d{2})\s+/, "$1T");
+  const d = new Date(
+    /^\d{4}-\d{2}-\d{2}$/.test(normalized)
+      ? `${normalized}T12:00:00`
+      : normalized
+  );
+  if (Number.isNaN(d.getTime())) {
+    // Last resort: date-only slice
+    const day = s.slice(0, 10);
+    return /^\d{4}-\d{2}-\d{2}$/.test(day) ? day : s;
+  }
+
+  const datePart = d.toLocaleDateString(undefined, {
     year: "numeric",
     month: "short",
     day: "numeric",
   });
+
+  // Midnight / date-only storage → never show 00:00:00
+  const hasRealTime =
+    !/T00:00:00(\.0+)?Z?$/i.test(normalized) &&
+    !(d.getUTCHours() === 0 && d.getUTCMinutes() === 0 && d.getUTCSeconds() === 0) &&
+    !/^\d{4}-\d{2}-\d{2}$/.test(s.slice(0, 10)) &&
+    /T\d{2}:\d{2}/.test(normalized) &&
+    !/T00:00/.test(normalized);
+
+  if (!hasRealTime) return datePart;
+
+  const timePart = d.toLocaleTimeString(undefined, {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+  return `${datePart} · ${timePart}`;
 }
 
 function hotelLabelFor(
@@ -342,6 +455,37 @@ function hotelLabelFor(
   }
   if (arrangement === "self") return "Self-Arranged";
   return "Unset";
+}
+
+/**
+ * True when lodging is required or selected for this stop.
+ * Gate rendering only — do not treat false as “delete hotels feature”.
+ *
+ * Show when:
+ * - TokioTours Books / Self-Arranged, or
+ * - nights > 0 (multi-day stay needs a hotel even if arrangement still Unset), or
+ * - a non-placeholder hotel label is present.
+ *
+ * Hide when Unset + 0 nights + no real label (single-day / Builder E / no lodging).
+ */
+export function stopHasRealAccommodation(stop: OpsItineraryStop): boolean {
+  if (stop.hotelArrangement === "tokiotours" || stop.hotelArrangement === "self") {
+    return true;
+  }
+  if (Math.max(0, Number(stop.nights) || 0) > 0) return true;
+  const label = String(stop.hotelLabel || "").trim();
+  if (label && label.toLowerCase() !== "unset") return true;
+  return false;
+}
+
+/**
+ * Stops to render as hotel cards in Hotel & Accommodation Summary.
+ * Empty → section 3 header still shows; UI uses a minimal empty shell (no fake Unset/0-night cards).
+ */
+export function accommodationSummaryStops(
+  stops: OpsItineraryStop[]
+): OpsItineraryStop[] {
+  return (stops || []).filter(stopHasRealAccommodation);
 }
 
 function formatStayDateRange(
@@ -462,19 +606,16 @@ function buildCityDays(opts: {
   const cityTours = (multi?.experienceSchedule || []).filter(
     (e) => e.cityId === cityId
   );
-  const cityTickets = (multi?.transportTickets || []).filter(
-    (t) => !t.cityId || t.cityId === cityId
-  );
-  const passTickets: OpsDayTicket[] = [];
-  if (multi?.guestHasICCard === false || multi?.guestNeedsTransitHelp) {
-    // Surface questionnaire-driven IC / rail demand once per city
-    if (multi?.guestHasICCard === false) {
-      passTickets.push({
-        title: "Suica / IC top-up",
-        type: formatTransportType("suica"),
-      });
-    }
-  }
+  // Day-bound catalog tickets only — Suica / PASMO / JR Pass stay in the
+  // trip-wide Ticket & access rollup, never nested under DAY 1 of each city.
+  const cityTickets = (multi?.transportTickets || []).filter((t) => {
+    // Require a city match — undated / no-city catalog (Suica…) → rollup only
+    if (String(t.cityId || "") !== cityId) return false;
+    const kind = String(t.transportType || "").toLowerCase();
+    if (kind === "suica") return false;
+    if (isTripWidePassText(t.name, t.transportType)) return false;
+    return true;
+  });
   const catalogTickets: OpsDayTicket[] = cityTickets.map((t) => ({
     title: cleanDisplayTitle(t.name, t.productId) || t.name,
     type: formatTransportType(t.transportType),
@@ -504,8 +645,20 @@ function buildCityDays(opts: {
       };
     });
 
+    // Entry tickets for experiences on this day (TeamLab, museum, …) — not IC passes
+    const entryTickets: OpsDayTicket[] = tours
+      .filter((t) =>
+        experienceNeedsEntryTicket({
+          title: t.title,
+        })
+      )
+      .map((t) => ({
+        title: t.title,
+        type: "Entry ticket",
+      }));
+
     const dayTickets: OpsDayTicket[] =
-      idx === 0 ? [...catalogTickets, ...passTickets] : [];
+      idx === 0 ? [...catalogTickets, ...entryTickets] : [...entryTickets];
 
     // Kamakura-style rail: when city name hints day trip + public local
     const local = multi?.localTransitByCity?.find((r) => r.cityId === cityId);
@@ -549,22 +702,34 @@ function buildRouteTimeline(
     .map((s) => s.trim())
     .filter(Boolean);
 
-  const arrivalHubLabel =
-    String(multi?.arrivalHubLabel || "").trim() ||
-    (multi?.arrivalTransferId ? "Arrival hub selected" : "Arrival hub");
-  const departureHubLabel =
-    String(multi?.departureHubLabel || "").trim() ||
-    (multi?.departureTransferId ? "Departure hub selected" : "Departure hub");
+  // Single-day: airport hubs N/A. Multi: real PB label, else pending confirm.
+  const isSingleDay = Boolean(single) && !multi;
+  const arrivalHubRaw = String(multi?.arrivalHubLabel || "").trim();
+  const departureHubRaw = String(multi?.departureHubLabel || "").trim();
+  const arrivalHubLabel = isSingleDay
+    ? "-"
+    : arrivalHubRaw ||
+      (multi?.arrivalTransferId ? "Arrival hub selected" : "(pending confirm)");
+  const departureHubLabel = isSingleDay
+    ? "-"
+    : departureHubRaw ||
+      (multi?.departureTransferId
+        ? "Departure hub selected"
+        : "(pending confirm)");
 
-  const arrivalVipLabel = multi?.airportPickup
-    ? "Airport Meet & Greet / VIP pickup"
-    : multi?.arrivalTransitType && multi.arrivalTransitType !== "unset"
-      ? `Arrival transfer: ${modeLabel(multi.arrivalTransitType) || multi.arrivalTransitType}`
-      : "Transfer not set";
+  const arrivalVipLabel = isSingleDay
+    ? "-"
+    : multi?.airportPickup
+      ? "Airport Meet & Greet / VIP pickup"
+      : multi?.arrivalTransitType && multi.arrivalTransitType !== "unset"
+        ? `Arrival transfer: ${modeLabel(multi.arrivalTransitType) || multi.arrivalTransitType}`
+        : "(pending confirm)";
 
-  const departureDropoffLabel = multi?.airportDropoff
-    ? "VIP departure drop-off"
-    : "Drop-off not configured";
+  const departureDropoffLabel = isSingleDay
+    ? "-"
+    : multi?.airportDropoff
+      ? "VIP departure drop-off"
+      : "(pending confirm)";
 
   const stays: OpsItineraryStop[] = [];
 
@@ -653,11 +818,11 @@ function buildRouteTimeline(
         const cityId = ids[i];
         const nextId = ids[i + 1];
         const hotelRaw = multi.hotelByCity?.[cityId];
+        // Only treat as lodging when hotelByCity has an explicit star/pref.
+        // Do not invent "self" for every city id — that falsely shows accommodation.
         const arrangement: OpsItineraryStop["hotelArrangement"] = hotelRaw
           ? "tokiotours"
-          : ids.length
-            ? "self"
-            : "unset";
+          : "unset";
         const cityName =
           cityNames[i] ||
           (i === 0 ? String(bal?.primary_city || "").trim() : "") ||
@@ -1043,15 +1208,21 @@ export async function loadOpsGuestRequirements(
   );
   const itineraryStops = routeTimeline.stays;
 
-  const arrivalFlightLabel = pickFlightLabel(selObj, [
-    "arrivalFlight",
-    "arrivalFlightNumber",
-    "flightNumber",
-  ]);
-  const departureFlightLabel = pickFlightLabel(selObj, [
-    "departureFlight",
-    "departureFlightNumber",
-  ]);
+  const isSingleDayTrip = Boolean(single) && !multi;
+
+  const arrivalFlightLabel = isSingleDayTrip
+    ? "-"
+    : pickFlightLabel(selObj, [
+        "arrivalFlight",
+        "arrivalFlightNumber",
+        "flightNumber",
+      ]);
+  const departureFlightLabel = isSingleDayTrip
+    ? "-"
+    : pickFlightLabel(selObj, [
+        "departureFlight",
+        "departureFlightNumber",
+      ]);
 
   const hasShinkansen = Boolean(
     multi?.transitByLeg?.some((l) =>
@@ -1064,20 +1235,24 @@ export async function loadOpsGuestRequirements(
       ) ||
       multi?.locationStops?.some((s) => s.needsTicket && s.ticketType === "shinkansen_reserved")
   );
-  const shinkansenLabel = hasShinkansen
-    ? "VIP / reserved Shinkansen seats requested"
-    : "Standard subway / train (no reserved Shinkansen flagged)";
+  const shinkansenLabel = isSingleDayTrip
+    ? "-"
+    : hasShinkansen
+      ? "VIP / reserved Shinkansen seats requested"
+      : "Standard subway / train (no reserved Shinkansen flagged)";
 
   const icCardsLabel =
     guestHasICCard === false || guestNeedsTransitHelp === true
       ? "Suica / PASMO assistance needed"
       : guestHasICCard === true
-        ? "Guest already has IC card"
-        : "No IC cards requested";
+        ? "Suica / PASMO guest already has IC card"
+        : "Suica / PASMO no IC cards requested";
 
-  const chauffeurPickupLabel = multi?.airportPickup
-    ? "Airport chauffeur pickup SET"
-    : "Airport chauffeur pickup unset";
+  const chauffeurPickupLabel = isSingleDayTrip
+    ? "-"
+    : multi?.airportPickup
+      ? "Airport chauffeur pickup SET"
+      : "(pending confirm)";
 
   const serviceCount = itineraryStops.reduce(
     (sum, stop) =>
@@ -1121,6 +1296,13 @@ export async function loadOpsGuestRequirements(
     }
   }
 
+  const productLabel = opsProductLabelFromLead({
+    type: bal?.type,
+    selections: bal?.selections,
+    durationLabel: bal?.duration_label || durationLabel,
+    durationValue: bal?.duration_value,
+  });
+
   return {
     guestName,
     guestEmail,
@@ -1132,6 +1314,7 @@ export async function loadOpsGuestRequirements(
     guestHasICCard,
     guestNeedsTransitHelp,
     transportStrategy,
+    productLabel,
     totalDaysLabel,
     arrivalDateLabel,
     travelPaceLabel,

@@ -4,7 +4,9 @@ import {
   mergeExtrasPatch,
   normalizeServiceLineItem,
   parseOpsHubExtras,
+  preserveVoucherFieldsOnReplace,
   sumAcceptedAgentServicesEur,
+  type PriceMode,
   type ServiceLineItem,
 } from "@/lib/agentServices";
 
@@ -49,6 +51,7 @@ export async function GET(request: Request) {
         pnr,
         services: [] as ServiceLineItem[],
         finalApprovedPrice: null,
+        priceMode: "estimate" as PriceMode,
       });
     }
 
@@ -58,6 +61,7 @@ export async function GET(request: Request) {
       opsHubId: hub.id,
       services: extras.agent_services || [],
       finalApprovedPrice: extras.final_approved_price ?? null,
+      priceMode: extras.price_mode === "exact" ? "exact" : "estimate",
       estimatedTotalEur: Number(hub.estimated_total_eur) || 0,
       assignedAgent: hub.assigned_agent || null,
     });
@@ -71,8 +75,10 @@ export async function GET(request: Request) {
 
 /**
  * POST /api/bookings/agent-services
- * { pnr, services?, finalApprovedPrice?, agentName? }
- * Replaces agent_services list and optionally bumps estimated_total_eur.
+ * { pnr, services?, finalApprovedPrice?, agentName?, mode? }
+ * mode=replace (default): replaces agent_services list.
+ * mode=seed_if_empty: writes services only when extras.agent_services is empty
+ *   (guest estimate → Ops Pricing Studio); never overwrites Ops edits.
  */
 export async function POST(request: Request) {
   try {
@@ -80,11 +86,15 @@ export async function POST(request: Request) {
       pnr?: string;
       services?: unknown[];
       finalApprovedPrice?: number | null;
+      /** estimate | exact — Ops Pricing Studio price mode */
+      priceMode?: PriceMode | string | null;
       agentName?: string;
       /** Absolute package base (guest + agent) to cache */
       estimatedTotalEur?: number | null;
       /** Guest catalog base before agent extras — used to recompute cache */
       guestBaseTotalEur?: number | null;
+      /** replace (default) | seed_if_empty */
+      mode?: "replace" | "seed_if_empty";
     };
 
     const pnr = normalizePnr(body.pnr);
@@ -101,21 +111,84 @@ export async function POST(request: Request) {
         estimated_total_eur?: number;
       }>(`pnr="${pnr}"`, { requestKey: null });
 
-    const services: ServiceLineItem[] = Array.isArray(body.services)
-      ? body.services
-          .map((s) => normalizeServiceLineItem(s))
-          .filter((s): s is ServiceLineItem => Boolean(s))
-      : parseOpsHubExtras(hub.extras).agent_services || [];
+    const prev = parseOpsHubExtras(hub.extras);
+    const existingServices = prev.agent_services || [];
+    const seedIfEmpty = body.mode === "seed_if_empty";
+
+    if (seedIfEmpty && existingServices.length > 0) {
+      // Ops (or a prior guest seed) already owns the cart — do not wipe.
+      const patch: Record<string, unknown> = {};
+      if (
+        body.estimatedTotalEur != null &&
+        Number.isFinite(Number(body.estimatedTotalEur)) &&
+        !(Math.max(0, Math.round(Number(hub.estimated_total_eur) || 0)) > 0)
+      ) {
+        patch.estimated_total_eur = Math.max(
+          0,
+          Math.round(Number(body.estimatedTotalEur))
+        );
+        await pb
+          .collection("ops_hub")
+          .update(hub.id, patch, { requestKey: null });
+      }
+      return NextResponse.json({
+        ok: true,
+        pnr,
+        seeded: false,
+        services: existingServices,
+        finalApprovedPrice: prev.final_approved_price ?? null,
+        priceMode: prev.price_mode === "exact" ? "exact" : "estimate",
+        estimatedTotalEur:
+          patch.estimated_total_eur ?? hub.estimated_total_eur,
+      });
+    }
+
+    let services: ServiceLineItem[] = Array.isArray(body.services)
+      ? preserveVoucherFieldsOnReplace(
+          body.services
+            .map((s) => normalizeServiceLineItem(s))
+            .filter((s): s is ServiceLineItem => Boolean(s)),
+          existingServices
+        )
+      : existingServices;
+
+    const priceMode: PriceMode | undefined =
+      body.priceMode === "exact"
+        ? "exact"
+        : body.priceMode === "estimate"
+          ? "estimate"
+          : undefined;
+
+    // Exact mode: collapse ranges on every ACCEPTED line and ensure deal-lock total.
+    let finalApprovedPrice =
+      body.finalApprovedPrice !== undefined
+        ? body.finalApprovedPrice
+        : undefined;
+    if (priceMode === "exact") {
+      services = services.map((item) => {
+        if (item.isBonus) {
+          return { ...item, finalPriceEur: 0, estimateMaxEur: 0 };
+        }
+        const exact = Math.max(0, Math.round(Number(item.finalPriceEur) || 0));
+        return { ...item, finalPriceEur: exact, estimateMaxEur: exact };
+      });
+      const exactSum = sumAcceptedAgentServicesEur(services);
+      if (
+        (finalApprovedPrice == null ||
+          !Number.isFinite(Number(finalApprovedPrice)) ||
+          Number(finalApprovedPrice) <= 0) &&
+        exactSum > 0
+      ) {
+        finalApprovedPrice = exactSum;
+      }
+    }
 
     const nextExtras = mergeExtrasPatch(hub.extras, {
       agent_services: services,
-      final_approved_price:
-        body.finalApprovedPrice !== undefined
-          ? body.finalApprovedPrice
-          : undefined,
+      final_approved_price: finalApprovedPrice,
+      price_mode: priceMode,
     });
 
-    const prev = parseOpsHubExtras(hub.extras);
     const prevAgentSum = sumAcceptedAgentServicesEur(prev.agent_services);
     const cached = Math.max(
       0,
@@ -143,18 +216,42 @@ export async function POST(request: Request) {
         0,
         Math.round(Number(body.estimatedTotalEur))
       );
-    } else {
+    } else if (!seedIfEmpty) {
       patch.estimated_total_eur =
         guestBase + sumAcceptedAgentServicesEur(services);
+    } else if (!(cached > 0)) {
+      patch.estimated_total_eur = sumAcceptedAgentServicesEur(services);
     }
 
     await pb.collection("ops_hub").update(hub.id, patch, { requestKey: null });
 
+    // Keep per-day guide_jobs in sync when tour lines change.
+    if (!seedIfEmpty) {
+      try {
+        const { syncGuideJobsForBooking } = await import("@/lib/guideJobs");
+        const { loadOpsGuestRequirements } = await import(
+          "@/lib/opsGuestRequirements"
+        );
+        const reqs = await loadOpsGuestRequirements(pb, pnr).catch(() => null);
+        await syncGuideJobsForBooking(pb, {
+          pnr,
+          reqs,
+          hub: { ...hub, extras: nextExtras } as never,
+          services,
+        });
+      } catch {
+        /* guide_jobs optional until migration applied */
+      }
+    }
+
+    const saved = parseOpsHubExtras(nextExtras);
     return NextResponse.json({
       ok: true,
       pnr,
-      services: nextExtras.agent_services || [],
-      finalApprovedPrice: nextExtras.final_approved_price ?? null,
+      seeded: seedIfEmpty,
+      services: saved.agent_services || [],
+      finalApprovedPrice: saved.final_approved_price ?? null,
+      priceMode: saved.price_mode === "exact" ? "exact" : "estimate",
       estimatedTotalEur: patch.estimated_total_eur ?? hub.estimated_total_eur,
     });
   } catch (err) {

@@ -21,7 +21,7 @@ export type RecordPaymentInput = {
 
 export async function recordPaymentSuccess(
   input: RecordPaymentInput
-): Promise<{ ok: boolean; id?: string; error?: string }> {
+): Promise<{ ok: boolean; id?: string; totalPaidEur?: number; error?: string }> {
   try {
     const res = await fetch("/api/payments/record", {
       method: "POST",
@@ -44,12 +44,20 @@ export async function recordPaymentSuccess(
     const data = (await res.json().catch(() => ({}))) as {
       ok?: boolean;
       id?: string;
+      totalPaidEur?: number;
       error?: string;
     };
     if (!res.ok) {
       return { ok: false, error: data.error || "Could not record payment." };
     }
-    return { ok: true, id: data.id };
+    return {
+      ok: true,
+      id: data.id,
+      totalPaidEur:
+        data.totalPaidEur != null && Number.isFinite(Number(data.totalPaidEur))
+          ? Math.round(Number(data.totalPaidEur))
+          : undefined,
+    };
   } catch (e) {
     return {
       ok: false,
