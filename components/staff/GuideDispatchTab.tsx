@@ -261,7 +261,7 @@ export function GuideDispatchTab({
     else setSelectedJobIds(selectableJobIds);
   };
 
-  const run = async (jobId: string, fn: () => Promise<void>) => {
+  const run = async (jobId: string, fn: () => Promise<unknown>) => {
     setBusyId(jobId);
     setError(null);
     try {

@@ -9,6 +9,7 @@ import {
   type PriceMode,
   type ServiceLineItem,
 } from "@/lib/agentServices";
+import type { OpsHubRow } from "@/components/staff/opsHubClient";
 
 function normalizePnr(raw: string | null | undefined): string {
   return String(raw || "")
@@ -105,11 +106,7 @@ export async function POST(request: Request) {
     const pb = await getAdminPocketBase();
     const hub = await pb
       .collection("ops_hub")
-      .getFirstListItem<{
-        id: string;
-        extras?: unknown;
-        estimated_total_eur?: number;
-      }>(`pnr="${pnr}"`, { requestKey: null });
+      .getFirstListItem<OpsHubRow>(`pnr="${pnr}"`, { requestKey: null });
 
     const prev = parseOpsHubExtras(hub.extras);
     const existingServices = prev.agent_services || [];
@@ -232,11 +229,14 @@ export async function POST(request: Request) {
         const { loadOpsGuestRequirements } = await import(
           "@/lib/opsGuestRequirements"
         );
-        const reqs = await loadOpsGuestRequirements(pb, pnr).catch(() => null);
+        const hubForSync: OpsHubRow = { ...hub, extras: nextExtras };
+        const reqs = await loadOpsGuestRequirements(pb, hubForSync).catch(
+          () => null
+        );
         await syncGuideJobsForBooking(pb, {
           pnr,
           reqs,
-          hub: { ...hub, extras: nextExtras } as never,
+          hub: hubForSync,
           services,
         });
       } catch {
