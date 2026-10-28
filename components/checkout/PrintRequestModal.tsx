@@ -27,7 +27,6 @@ import { BookingTermsModal } from "@/components/checkout/BookingTermsModal";
 import { TokioClockLoader } from "@/components/common/TokioClockLoader";
 import { activeBookingRef } from "@/utils/pnr";
 import { useModalDismiss } from "@/hooks/useModalDismiss";
-import { EMAIL_CONFIG_DEFAULTS } from "@/config/emailDefaults";
 import { getSystemMessage } from "@/lib/systemMessages";
 
 export type PrintRequestResult = {
@@ -53,10 +52,6 @@ function resolveKnownName(): string {
   const it = useItineraryStore.getState();
   const pre = usePreBuilderStore.getState();
   return (it.clientName || pre.fullName || pre.lastPayload?.fullName || "").trim();
-}
-
-function teamBccLabel(): string {
-  return EMAIL_CONFIG_DEFAULTS.routing.bccRecipient || "armando@tokiotours.nl";
 }
 
 /**
@@ -377,7 +372,6 @@ export function PrintRequestModal({
 
       dualWriteLead();
 
-      const bcc = teamBccLabel();
       const parts = [
         sendDocs.dossier ? "dossier" : null,
         sendDocs.invoice ? "invoice" : null,
@@ -385,7 +379,7 @@ export function PrintRequestModal({
         .filter(Boolean)
         .join(" + ");
       setSuccess(
-        `✓ ${parts} PDF emailed to you (team copy → ${bcc}). Status: In Progress.`
+        `✓ ${parts} PDF emailed to you. A copy was sent to the TokioTours team. Status: In Progress.`
       );
       if (showLocalPrint) {
         try {
@@ -400,7 +394,7 @@ export function PrintRequestModal({
         mailSent: Boolean(data.mailSent ?? data.success),
         message:
           data.message ||
-          `Emailed ${parts} to ${to} (BCC ${bcc}). Reference: ${ref}`,
+          `Emailed ${parts} to ${to}. A copy was sent to the TokioTours team. Reference: ${ref}`,
       });
       // Close immediately so Done sheet is not trapped under this modal
       onClose();

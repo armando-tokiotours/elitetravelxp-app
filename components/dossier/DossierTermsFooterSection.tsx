@@ -38,9 +38,9 @@ export function DossierTermsFooterSection({
   return (
     <>
       <section
-        className={`relative mx-auto my-6 w-full max-w-2xl rounded-3xl border-2 border-dashed border-white/40 bg-black/20 p-4 print:break-inside-avoid print:rounded-none print:border print:border-gray-300 print:bg-transparent ${className}`}
+        className={`relative mx-auto my-6 w-full max-w-2xl rounded-3xl border-2 border-dashed border-slate-300 bg-slate-50 p-4 print:break-inside-avoid print:rounded-none print:border print:border-gray-300 print:bg-transparent ${className}`}
       >
-        <span className="absolute -top-3 left-4 z-20 rounded border border-white/30 bg-zinc-800 px-2 py-0.5 font-mono text-[9px] tracking-widest text-amber-400 uppercase print:border-gray-300 print:bg-white print:text-gray-900">
+        <span className="absolute -top-3 left-4 z-20 rounded border border-slate-300 bg-white px-2 py-0.5 font-mono text-[9px] tracking-widest text-amber-600 uppercase print:border-gray-300 print:bg-white print:text-gray-900">
           Trip Terms
         </span>
 

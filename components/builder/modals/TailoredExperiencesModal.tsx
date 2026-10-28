@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
-import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import { ArrowLeft, Car, Sparkles, Ticket } from "lucide-react";
 import type {
@@ -57,6 +56,7 @@ import { HorizontalHelpAccordion } from "../HorizontalHelpAccordion";
 import { FieldLabel } from "../ui";
 import { CityTransportModal } from "./CityTransportModal";
 import { GoldLight } from "@/components/branding/GoldLight";
+import { WidgetCallingPulse } from "@/components/branding/WidgetCallingPulse";
 
 export function TailoredExperiencesModal({
   open,
@@ -82,7 +82,6 @@ export function TailoredExperiencesModal({
   /** When true, only show experiences (drivers live in Builder Step 6). */
   hideTransport?: boolean;
 }) {
-  const router = useRouter();
   const locations = useBuilderStore((s) => s.locations);
   const arrivalDate = useBuilderStore((s) => s.arrivalDate);
   const committedTours = useBuilderStore((s) => s.selectedTours);
@@ -601,10 +600,6 @@ export function TailoredExperiencesModal({
                   showProfile={false}
                   onOpenQuiz={() => setQuizOpen(true)}
                   onWatch={() => setReelOpen(true)}
-                  onDiscover={() => {
-                    handleDone();
-                    router.push("/discover");
-                  }}
                 />
 
                 {experienceProfile ? (
@@ -824,6 +819,7 @@ function CityExperienceAccordion({
   hideTransport?: boolean;
 }) {
   const [transportOpen, setTransportOpen] = useState(false);
+  const [hasClickedDiscover, setHasClickedDiscover] = useState(false);
 
   const filename = city ? cityPhoto(city) : "";
   const img =
@@ -843,6 +839,51 @@ function CityExperienceAccordion({
       .filter((d) => isBillableChauffeurDay(daySelections[d.date]))
       .map((d) => dayShortLabel(d.label));
   }, [dayOptions, daySelections]);
+
+  /** Pulse until Discover is clicked or this city has at least one experience. */
+  const discoverPulseActive = !hasClickedDiscover && experienceCount === 0;
+
+  const handleDiscover = () => {
+    setHasClickedDiscover(true);
+    onBrowse();
+  };
+
+  const cityExperiencesWidget = (
+    <button
+      type="button"
+      onClick={handleDiscover}
+      aria-label={`Discover activities in ${cityName}`}
+      className={`group relative h-full w-full overflow-visible rounded-[18px] bg-[#0A1017]/90 p-4 text-left shadow-xl transition-all hover:border-amber-500/40 active:scale-[0.98] ${
+        discoverPulseActive
+          ? "z-[1] border border-white/70 animate-widget-call-glow"
+          : "border border-white/10"
+      }`}
+    >
+      <WidgetCallingPulse
+        active={discoverPulseActive}
+        roundedClass="rounded-[18px]"
+      />
+      <span className="relative z-10 flex h-9 w-9 items-center justify-center rounded-full bg-[#F29727]/15 text-[#F29727] ring-1 ring-[#F29727]/25 transition group-hover:bg-[#F29727]/25">
+        <Ticket className="h-4 w-4" aria-hidden />
+      </span>
+      <p className="relative z-10 mt-2.5 text-sm font-bold text-white md:text-base">
+        City Experiences
+      </p>
+      <p className="relative z-10 mt-1 text-xs text-zinc-400">
+        {experienceCount} selected
+      </p>
+      <span
+        className={`relative z-10 mt-3 inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-wider shadow-md transition-all sm:text-[11px] ${
+          discoverPulseActive
+            ? "border-[#F6A724]/70 bg-[#F6A724]/25 text-[#F6A724] shadow-[0_0_14px_rgba(246,167,36,0.35)]"
+            : "border-[#F6A724]/40 bg-[#F6A724]/15 text-[#F6A724] group-hover:border-[#F6A724]/60 group-hover:bg-[#F6A724]/25"
+        }`}
+      >
+        <Sparkles className="h-3.5 w-3.5 text-[#F6A724]" aria-hidden />
+        Discover Activities
+      </span>
+    </button>
+  );
 
   const dayItineraryList = (
     <div className="h-full rounded-xl border border-white/5 bg-black/40 px-3 py-3">
@@ -947,21 +988,7 @@ function CityExperienceAccordion({
           {hideTransport ? (
             <div className="mt-0 flex w-full flex-col items-stretch gap-4 sm:flex-row">
               <div className="w-full flex-shrink-0 sm:w-1/3">
-                <button
-                  type="button"
-                  onClick={onBrowse}
-                  className="h-full w-full cursor-pointer rounded-xl border border-zinc-800 bg-zinc-900 p-4 text-left transition-all hover:bg-zinc-800"
-                >
-                  <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#F29727]/15 text-[#F29727]">
-                    <Ticket className="h-4 w-4" aria-hidden />
-                  </span>
-                  <p className="mt-2 text-sm font-bold text-white md:text-base">
-                    City Experiences
-                  </p>
-                  <p className="mt-1 text-xs text-zinc-400">
-                    {experienceCount} selected
-                  </p>
-                </button>
+                {cityExperiencesWidget}
               </div>
               <div className="w-full flex-grow sm:w-2/3">
                 {dayItineraryList}
@@ -970,21 +997,7 @@ function CityExperienceAccordion({
           ) : (
             <>
               <div className="mb-4 grid grid-cols-2 gap-3">
-                <button
-                  type="button"
-                  onClick={onBrowse}
-                  className="cursor-pointer rounded-xl border border-zinc-800 bg-zinc-900 p-4 text-left transition-all hover:bg-zinc-800"
-                >
-                  <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#F29727]/15 text-[#F29727]">
-                    <Ticket className="h-4 w-4" aria-hidden />
-                  </span>
-                  <p className="mt-2 text-sm font-bold text-white md:text-base">
-                    City Experiences
-                  </p>
-                  <p className="mt-1 text-xs text-zinc-400">
-                    {experienceCount} selected
-                  </p>
-                </button>
+                {cityExperiencesWidget}
                 <button
                   type="button"
                   onClick={() => setTransportOpen(true)}

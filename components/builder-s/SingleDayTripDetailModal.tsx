@@ -10,6 +10,11 @@ import { SeasonalityDetailModal } from "@/components/builder/modals/SeasonalityD
 import { DatePickerField } from "@/components/ui/CalendarModal";
 import { parseItineraryData } from "@/lib/preEliteBuilder";
 import {
+  TOUR_HOURS_CUSTOM_MAX,
+  TOUR_HOURS_CUSTOM_MIN,
+  clampCustomTourHours,
+} from "@/lib/tourHoursTier";
+import {
   TOUR_HOUR_PRESETS,
   formatSingleDayDisplayDate,
   useSingleDayBuilderStore,
@@ -46,7 +51,6 @@ export function SingleDayTripDetailModal({
   const setStartTime = useSingleDayBuilderStore((s) => s.setStartTime);
 
   const [mounted, setMounted] = useState(false);
-  const [customDraft, setCustomDraft] = useState(String(tourHours));
   const [activeSeasonTier, setActiveSeasonTier] =
     useState<SeasonTierName | null>(null);
   const [activeSeasonCrowds, setActiveSeasonCrowds] = useState<string | null>(
@@ -54,16 +58,21 @@ export function SingleDayTripDetailModal({
   );
   const [activeSeasonNote, setActiveSeasonNote] = useState<string | null>(null);
   const [seasonModalOpen, setSeasonModalOpen] = useState(false);
+  const [doneClickCount, setDoneClickCount] = useState(0);
 
-  const canDone = Boolean(tourDate) && tourHours >= 1;
+  const hoursOk = tourHours >= TOUR_HOURS_CUSTOM_MIN;
+  const canSucceed = Boolean(tourDate) && hoursOk;
+  const showPickDateHint = doneClickCount >= 1 && !tourDate;
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
   useEffect(() => {
-    if (!open) return;
-    setCustomDraft(String(tourHours));
+    if (!open) {
+      setDoneClickCount(0);
+      return;
+    }
 
     const pre = usePreBuilderStore.getState();
     const brief = pre.lastPayload?.itineraryData
@@ -80,7 +89,11 @@ export function SingleDayTripDetailModal({
         useSingleDayBuilderStore.setState({ tourDate: start });
       }
     }
-  }, [open, tourHours]);
+  }, [open]);
+
+  useEffect(() => {
+    if (tourDate) setDoneClickCount(0);
+  }, [tourDate]);
 
   useEffect(() => {
     if (!tourDate) {
@@ -104,20 +117,15 @@ export function SingleDayTripDetailModal({
   const selectPreset = (h: TourDurationHours) => {
     setTourHoursCustom(false);
     setTourHours(h);
-    setCustomDraft(String(h));
   };
 
   const selectCustom = () => {
     setTourHoursCustom(true);
-    setCustomDraft(String(tourHours));
+    setTourHours(clampCustomTourHours(tourHours));
   };
 
-  const applyCustom = (raw: string) => {
-    setCustomDraft(raw);
-    const parsed = Number.parseInt(raw, 10);
-    if (Number.isFinite(parsed) && parsed >= 1 && parsed <= 16) {
-      setTourHours(parsed);
-    }
+  const bumpCustom = (delta: number) => {
+    setTourHours(clampCustomTourHours(tourHours + delta));
   };
 
   return (
@@ -127,36 +135,44 @@ export function SingleDayTripDetailModal({
         onClose={onClose}
         title="Hours & Date"
         mounted={mounted}
+        variant="fullPage"
         footer={
           <button
             type="button"
             onClick={() => {
-              if (!canDone) return;
+              if (!tourDate) {
+                setDoneClickCount((c) => c + 1);
+                return;
+              }
+              if (!hoursOk) return;
               onConfirmed?.();
               onClose();
             }}
-            disabled={!canDone}
-            className="w-full rounded-full bg-[#054F70] py-3 text-sm font-semibold text-white transition hover:bg-[#043d57] disabled:cursor-not-allowed disabled:opacity-40"
+            disabled={Boolean(tourDate) && !hoursOk}
+            aria-disabled={!canSucceed}
+            className={`w-full rounded-full bg-[#054F70] py-3 text-sm font-semibold text-white transition hover:bg-[#043d57] disabled:cursor-not-allowed disabled:opacity-40 ${
+              !canSucceed && hoursOk ? "opacity-40" : ""
+            }`}
           >
-            Done
+            Done →
           </button>
         }
       >
-        <div className="space-y-5">
-          <div>
-            <p className="text-[10px] font-bold uppercase tracking-widest text-[#1BA58A]">
+        <div className="box-border w-full max-w-full space-y-8 overflow-x-hidden">
+          <section className="box-border w-full max-w-full">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-[#054F70]">
               Tour Duration (Hours)
             </p>
-            <div className="mt-2 flex flex-wrap gap-2">
+            <div className="mt-3 flex w-full flex-wrap gap-2">
               {TOUR_HOUR_PRESETS.map((h) => (
                 <button
                   key={h}
                   type="button"
                   onClick={() => selectPreset(h)}
-                  className={`rounded-full px-3.5 py-2 text-xs font-semibold transition ${
+                  className={`box-border min-w-0 shrink rounded-full px-3.5 py-2 text-xs font-semibold transition ${
                     !tourHoursCustom && tourHours === h
-                      ? "bg-[#075473] text-white"
-                      : "border border-white/15 bg-[#0D1117]/70 text-white/70 backdrop-blur-md hover:border-white/30"
+                      ? "border border-[#0080A3] bg-[#0D141C] text-white"
+                      : "border border-transparent bg-[#0D141C] text-white/70 hover:border-white/20"
                   }`}
                 >
                   {h} Hours
@@ -165,47 +181,53 @@ export function SingleDayTripDetailModal({
               <button
                 type="button"
                 onClick={selectCustom}
-                className={`rounded-full px-3.5 py-2 text-xs font-semibold transition ${
+                className={`box-border min-w-0 shrink rounded-full px-3.5 py-2 text-xs font-semibold transition ${
                   tourHoursCustom
-                    ? "bg-[#075473] text-white"
-                    : "border border-white/15 bg-[#0D1117]/70 text-white/70 backdrop-blur-md hover:border-white/30"
+                    ? "border border-[#0080A3] bg-[#0D141C] text-white"
+                    : "border border-transparent bg-[#0D141C] text-white/70 hover:border-white/20"
                 }`}
               >
                 Custom
               </button>
             </div>
             {tourHoursCustom ? (
-              <div className="mt-3 rounded-xl border border-white/10 bg-[#0D1117]/70 p-3 backdrop-blur-md">
-                <p className="text-[10px] font-bold uppercase tracking-widest text-white/45">
-                  Enter hours
+              <div className="mt-4">
+                <p className="mb-2 text-[10px] font-bold uppercase tracking-widest text-[#64748b]">
+                  Custom hours
                 </p>
-                <div className="mt-1.5 flex items-center gap-3">
-                  <input
-                    type="number"
-                    min={1}
-                    max={16}
-                    step={1}
-                    inputMode="numeric"
-                    value={customDraft}
-                    onChange={(e) => applyCustom(e.target.value)}
-                    onBlur={() => {
-                      const parsed = Number.parseInt(customDraft, 10);
-                      const next =
-                        Number.isFinite(parsed) && parsed >= 1 ? parsed : 6;
-                      setTourHours(next);
-                      setCustomDraft(String(next));
-                    }}
-                    className="w-28 rounded-xl border border-white/15 bg-[#121212] px-3 py-2.5 text-sm text-white outline-none focus:border-[#075473]"
-                  />
-                  <span className="text-xs text-white/45">
-                    1–16 hours · no overnight stay
+                <div className="flex h-11 w-28 items-stretch overflow-hidden rounded-xl border border-white/15 bg-[#121212]">
+                  <span
+                    className="flex min-w-0 flex-1 items-center justify-center text-base font-semibold tabular-nums text-white"
+                    aria-live="polite"
+                  >
+                    {tourHours}
                   </span>
+                  <div className="flex w-9 shrink-0 flex-col border-l border-white/15">
+                    <button
+                      type="button"
+                      onClick={() => bumpCustom(1)}
+                      disabled={tourHours >= TOUR_HOURS_CUSTOM_MAX}
+                      className="flex flex-1 items-center justify-center text-[10px] leading-none text-white/70 transition hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-30"
+                      aria-label="Increase hours"
+                    >
+                      ▲
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => bumpCustom(-1)}
+                      disabled={tourHours <= TOUR_HOURS_CUSTOM_MIN}
+                      className="flex flex-1 items-center justify-center border-t border-white/15 text-[10px] leading-none text-white/70 transition hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-30"
+                      aria-label="Decrease hours"
+                    >
+                      ▼
+                    </button>
+                  </div>
                 </div>
               </div>
             ) : null}
-          </div>
+          </section>
 
-          <div className="flex flex-col gap-4 md:grid md:grid-cols-2 md:gap-4">
+          <section className="box-border flex w-full max-w-full flex-col gap-4">
             <DatePickerField
               value={tourDate}
               onChange={(next) => {
@@ -216,7 +238,8 @@ export function SingleDayTripDetailModal({
               }}
               label="Tour date"
               title="CHOOSE TOUR DATE"
-              labelClassName="text-[14px] font-medium uppercase tracking-[0.14em] text-white"
+              labelClassName="text-[13px] font-medium uppercase tracking-[0.14em] text-[#0A1017]"
+              bare
             />
 
             <SeasonalityCard
@@ -224,24 +247,26 @@ export function SingleDayTripDetailModal({
               tier={activeSeasonTier}
               crowds={activeSeasonCrowds}
               note={activeSeasonNote}
+              showPickDateHint={showPickDateHint}
               onOpenExplain={() => {
                 if (activeSeasonTier && activeSeasonNote) {
                   setSeasonModalOpen(true);
                 }
               }}
             />
-          </div>
 
-          <AlarmClockPicker
-            value={startTime || "09:00"}
-            onChange={setStartTime}
-            label="Tour start time"
-          />
+            <AlarmClockPicker
+              value={startTime || "09:00"}
+              onChange={setStartTime}
+              label="Tour start time"
+              bare
+            />
+          </section>
 
           {tourDate ? (
-            <p className="text-xs text-white/55">
+            <p className="text-xs text-[#64748b]">
               {tourHours}h starting {startTime || "09:00"} on{" "}
-              <span className="font-semibold text-white">
+              <span className="font-semibold text-[#0A1017]">
                 {formatSingleDayDisplayDate(tourDate)}
               </span>
             </p>

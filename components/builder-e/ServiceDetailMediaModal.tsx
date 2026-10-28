@@ -125,7 +125,13 @@ export function ServiceDetailMediaModal({
         summary: [targetDate, timeSlot, selectedLang]
           .filter(Boolean)
           .join(" · ") || service.duration || "Experience",
-        payload: { subServiceId: service.id, language: selectedLang, ...patch },
+        payload: {
+          subServiceId: service.id,
+          tourId: service.tourId || undefined,
+          access_type: service.access_type || "",
+          language: selectedLang,
+          ...patch,
+        },
       });
     } else {
       const passMap: Record<string, BuilderETransitPayload["passType"]> = {

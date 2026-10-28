@@ -41,9 +41,10 @@ import {
 import { GuestTalkBubble } from "@/components/dossier/GuestTalkBubble";
 import { ThankYouPassMascot } from "@/components/branding/PandaFlexibleMascot";
 import { TicketVoucherDownloadBanner } from "@/components/dossier/TicketVoucherDownloadBanner";
-import { LiquidGlassHero } from "@/components/guest/LiquidGlassHero";
-import { ItineraryTopActions } from "@/components/navigation/ItineraryTopActions";
-import { MobileTopChrome } from "@/components/navigation/MobileTopChrome";
+import {
+  BookingSocialProfile,
+  formatSocialTourDates,
+} from "@/components/guest/BookingSocialProfile";
 import { SaveRequiredContactModal } from "@/components/builder/SaveRequiredContactModal";
 import {
   dismissSystemMessage,
@@ -61,15 +62,29 @@ import {
   multiDayIncompleteFoxMessage,
 } from "@/lib/itineraryGates";
 import { SystemMessageFox } from "@/components/branding/SystemMessageFox";
+import {
+  BUILDER_ROUTES,
+  journeyItineraryHref,
+} from "@/lib/builderRoutes";
+import { useJourneyKindGuard } from "@/lib/bookingKindGuard";
 
 import { PriceSummaryFooter } from "@/components/builder/PriceSummaryFooter";
-import { DossierSectionOutline } from "@/components/builder/DossierSectionOutline";
 
 type ViewMode = "dossier" | "invoice";
 
 export default function ItineraryPageClient() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  // BAL-verified counterpart to the tripMode redirect below: a bound
+  // single_day PNR (e.g. JPN-5CC72J) opened on the multi-day dossier —
+  // even with a stale persisted tripMode — belongs on the day-pass dossier.
+  useJourneyKindGuard("multi_day", searchParams.get("ref"), {
+    redirectHref: (ref, kind) =>
+      journeyItineraryHref(ref, {
+        type: kind,
+        view: searchParams.get("view") === "invoice" ? "invoice" : "dossier",
+      }),
+  });
   const state = useBuilderStore((s) => s);
   const departureDate = useBuilderStore((s) => s.departureDate);
   const ensureTempBookingRef = useBuilderStore((s) => s.ensureTempBookingRef);
@@ -153,6 +168,21 @@ export default function ItineraryPageClient() {
     };
   }, [ensureTempBookingRef]);
 
+  // Server pre-hydration by ?ref= (parity with day-pass itinerary):
+  // saved multi-day booking wins over persisted defaults; once-per-ref
+  // guard in the helper protects same-session edits.
+  useEffect(() => {
+    const ref = String(searchParams.get("ref") || "").trim();
+    if (!ref) return;
+    void import("@/lib/multiDayBookingHydrate").then(
+      ({ hydrateMultiDayBookingByRef, isMultiDayRefHydrated }) => {
+        if (!isMultiDayRefHydrated(ref)) {
+          void hydrateMultiDayBookingByRef(ref);
+        }
+      }
+    );
+  }, [searchParams]);
+
   useEffect(() => {
     const v = searchParams.get("view");
     if (v === "invoice" || v === "print") setActiveView("invoice");
@@ -184,16 +214,22 @@ export default function ItineraryPageClient() {
   }, [showFeeModal, balanceOpen]);
 
   // Keep multi-day itinerary isolated — send Builder S traffic to its own dossier.
+  // Preserve ?ref= (PNR) + view so a single-day booking (e.g. JPN-5CC72J)
+  // loaded via Manage/Retrieve keeps its identity on the Single-Day page
+  // instead of falling back to whatever the persisted store last held.
   useEffect(() => {
     if (state.tripMode === "single_day") {
       const view = searchParams.get("view");
-      const q =
-        view === "invoice" || view === "print"
-          ? "?view=invoice"
-          : view === "dossier"
-            ? "?view=dossier"
-            : "";
-      router.replace(`/builder-single/itinerary${q}`);
+      const href = journeyItineraryHref(searchParams.get("ref"), {
+        type: "single_day",
+        view:
+          view === "invoice" || view === "print"
+            ? "invoice"
+            : view === "dossier"
+              ? "dossier"
+              : null,
+      });
+      router.replace(href);
     }
   }, [state.tripMode, router, searchParams]);
 
@@ -212,6 +248,17 @@ export default function ItineraryPageClient() {
 
   const totalPax = state.adults + state.children;
   const depIso = departureDate();
+
+  /** Primary/focus stay city — social cover uses its `{cityId}_1` catalog slot. */
+  const coverCityId = useMemo(() => {
+    const primary =
+      state.locations.find((l) => !l.visitType || l.visitType === "stay") ||
+      state.locations[0];
+    return primary?.cityId?.trim() || "";
+  }, [state.locations]);
+  const coverCityName = coverCityId
+    ? getCityName(coverCityId, buildCityMap(config?.cities))
+    : "Tokyo";
 
   const arrivalHub = resolveHub(config, state.arrivalTransferId);
   const departureHub = resolveHub(config, state.departureTransferId);
@@ -232,9 +279,10 @@ export default function ItineraryPageClient() {
     setActiveView(mode);
     const params = new URLSearchParams(searchParams.toString());
     params.set("view", mode);
-    router.replace(`/builder/itinerary?${params.toString()}`, {
-      scroll: false,
-    });
+    router.replace(
+      `${BUILDER_ROUTES.japanJourneyItinerary}?${params.toString()}`,
+      { scroll: false }
+    );
   };
 
   const requestInvoiceView = async () => {
@@ -371,10 +419,6 @@ export default function ItineraryPageClient() {
       });
     };
     requireContactOr("save", run);
-  };
-
-  const requestPrintOnly = () => {
-    window.print();
   };
 
   const openBalanceCheckout = () => {
@@ -698,68 +742,54 @@ export default function ItineraryPageClient() {
   };
 
   return (
-    <div className="builder-theme relative z-10 min-h-screen w-full overflow-x-hidden bg-transparent pb-28 text-white md:pb-20">
+    <div className="builder-theme relative z-10 min-h-screen w-full overflow-x-clip bg-[#faf9f4] pb-28 text-slate-900 md:pb-20">
       {showFeeModal || balanceOpen ? null : <SystemMessageFox />}
-      <MobileTopChrome
-        brandTitle="Itinerary"
-        ctaHref="/builder"
-        ctaLabel="Builder"
-        actions={
-          <ItineraryTopActions
-            locked={!contactReady}
-            invoiceActive={activeView === "invoice"}
-            onPlan={() => setMode("dossier")}
-            onInvoice={() => {
-              if (activeView === "invoice") setMode("dossier");
-              else void requestInvoiceView();
-            }}
-          />
-        }
-      />
-      <div className="mx-auto w-full max-w-md px-4 py-6 md:max-w-lg lg:max-w-2xl">
-          {/* Section 1 — Hero + Save/Send/Print */}
-          <DossierSectionOutline
-            label="Section 1: Hero & Nav"
-            className="no-print my-4"
-          >
-            <LiquidGlassHero
+      {/* Top chrome lives inside BookingSocialProfile cover (hamburger + city + Plan/Invoice). */}
+      <div className="mx-auto w-full max-w-md md:max-w-lg lg:max-w-2xl">
+          {/* Section 1 — edge-to-edge social hero (no outer px trapping cover) */}
+          <div className="no-print">
+            <BookingSocialProfile
               pnr={activeBookingRef({
                 tempBookingRef: state.tempBookingRef,
                 confirmedBookingRef: state.confirmedBookingRef,
                 bookingStatus: state.bookingStatus,
               })}
               bookingType="MULTI_DAY"
-              title="Grand Japan Journey · Itinerary"
+              brandTitle="Itinerary"
               guestName={customerName !== "Guest" ? customerName : undefined}
+              guestEmail={guestEmail || undefined}
+              cityId={coverCityId}
+              cityName={coverCityName}
+              tourDate={formatSocialTourDates(state.arrivalDate, depIso)}
               depositAmount={Math.max(totalPaidEur, feeCreditEur)}
               packageTotalEur={quote?.max ?? quote?.min ?? 0}
               payLabel={dossierPrimaryCtaLabel(feeCreditEur, {
                 amountPaidEur: Math.max(totalPaidEur, feeCreditEur),
                 packageTotalEur: quote?.max ?? quote?.min ?? 0,
               })}
-              payPulse={!costPulsarDone}
-              continueHref="/builder"
               locked={!contactReady}
-              onSave={() => void requestSaveOnly()}
-              onSend={() => void requestSendPdf()}
-              onPrint={requestPrintOnly}
-              onPlanInvoice={() => {
+              invoiceActive={activeView === "invoice"}
+              onPlan={() => setMode("dossier")}
+              onInvoice={() => {
                 if (activeView === "invoice") setMode("dossier");
                 else void requestInvoiceView();
               }}
+              onSave={() => void requestSaveOnly()}
               onPayContinue={handleRequestPay}
             />
-            <TicketVoucherDownloadBanner
-              pnr={activeBookingRef({
-                tempBookingRef: state.tempBookingRef,
-                confirmedBookingRef: state.confirmedBookingRef,
-                bookingStatus: state.bookingStatus,
-              })}
-              className="mb-3"
-            />
-          </DossierSectionOutline>
+            <div className="px-4 pt-2">
+              <TicketVoucherDownloadBanner
+                pnr={activeBookingRef({
+                  tempBookingRef: state.tempBookingRef,
+                  confirmedBookingRef: state.confirmedBookingRef,
+                  bookingStatus: state.bookingStatus,
+                })}
+                className="mb-3"
+              />
+            </div>
+          </div>
 
-          <main className="mt-6 w-full overflow-x-hidden pb-8">
+          <main className="mt-3 w-full overflow-x-hidden px-0 pb-8">
             <div
               className={
                 activeView === "dossier"

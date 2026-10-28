@@ -20,13 +20,20 @@ import {
   type OpsHubRow,
 } from "@/components/staff/opsHubClient";
 
-function parseTicketLines(raw: unknown): TransportTicketLine[] {
+type TicketerLine = TransportTicketLine & {
+  accessType?: string;
+  timingIntent?: string;
+  ticketDate?: string | null;
+  opsNote?: string;
+};
+
+function parseTicketLines(raw: unknown): TicketerLine[] {
   if (!raw) return [];
-  if (Array.isArray(raw)) return raw as TransportTicketLine[];
+  if (Array.isArray(raw)) return raw as TicketerLine[];
   if (typeof raw === "string") {
     try {
       const parsed = JSON.parse(raw);
-      return Array.isArray(parsed) ? (parsed as TransportTicketLine[]) : [];
+      return Array.isArray(parsed) ? (parsed as TicketerLine[]) : [];
     } catch {
       return [];
     }
@@ -144,33 +151,53 @@ function TicketerInner() {
                   return (
                     <ul className="mt-3 space-y-2 rounded-xl border border-cyan-500/20 bg-cyan-950/20 p-3">
                       <li className="text-[10px] font-bold uppercase tracking-wider text-cyan-400">
-                        Transport tickets
+                        Ticket lines
                       </li>
-                      {lines.map((line) => (
-                        <li
-                          key={line.productId}
-                          className="flex flex-wrap items-baseline justify-between gap-2 text-sm"
-                        >
-                          <span className="font-medium text-white">
-                            {line.name}
-                            <span className="ml-2 text-[11px] text-zinc-500">
-                              {formatTransportType(line.transportType)}
-                              {line.quantity > 1 ? ` · ×${line.quantity}` : ""}
+                      {lines.map((line, idx) => {
+                        const isTransport = Boolean(line.transportType);
+                        return (
+                          <li
+                            key={
+                              line.productId ||
+                              `${line.name || "line"}-${idx}`
+                            }
+                            className="flex flex-wrap items-baseline justify-between gap-2 text-sm"
+                          >
+                            <span className="font-medium text-white">
+                              {line.name}
+                              {isTransport ? (
+                                <span className="ml-2 text-[11px] text-zinc-500">
+                                  {formatTransportType(line.transportType)}
+                                  {line.quantity > 1
+                                    ? ` · ×${line.quantity}`
+                                    : ""}
+                                </span>
+                              ) : line.accessType ? (
+                                <span className="ml-2 text-[11px] text-zinc-500">
+                                  {line.accessType}
+                                  {line.ticketDate
+                                    ? ` · ${String(line.ticketDate).slice(0, 10)}`
+                                    : ""}
+                                </span>
+                              ) : null}
                             </span>
-                          </span>
-                          <span className="font-mono text-xs text-zinc-300">
-                            €{Number(line.pricePerPerson || 0).toFixed(0)}/pp
-                            {line.durationHours
-                              ? ` · ${line.durationHours}h`
-                              : ""}
-                          </span>
-                          {line.hoursNote ? (
-                            <p className="w-full text-[11px] text-zinc-500">
-                              {line.hoursNote}
-                            </p>
-                          ) : null}
-                        </li>
-                      ))}
+                            {isTransport ? (
+                              <span className="font-mono text-xs text-zinc-300">
+                                €{Number(line.pricePerPerson || 0).toFixed(0)}
+                                /pp
+                                {line.durationHours
+                                  ? ` · ${line.durationHours}h`
+                                  : ""}
+                              </span>
+                            ) : null}
+                            {line.hoursNote || line.opsNote ? (
+                              <p className="w-full text-[11px] text-amber-300/90">
+                                {line.opsNote || line.hoursNote}
+                              </p>
+                            ) : null}
+                          </li>
+                        );
+                      })}
                     </ul>
                   );
                 })()}

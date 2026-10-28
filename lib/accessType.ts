@@ -108,6 +108,12 @@ export type ExperienceAccessTicketLine = {
   qty?: number;
   accessType?: string;
   purchaseMode?: TicketPurchaseMode;
+  /** during_tour | after_tour | other_day */
+  timingIntent?: string;
+  /** ISO date Ticketer should buy for (esp. other_day) */
+  ticketDate?: string | null;
+  /** Internal Ops/Ticketer note */
+  opsNote?: string;
 };
 
 /**

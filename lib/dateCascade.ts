@@ -33,9 +33,17 @@ const MONTHS_SHORT = [
   "Dec",
 ] as const;
 
+/** Bare YYYY-MM-DD prefix — tolerates PB datetimes ("2026-11-02 00:00:00.000Z"). */
+function ymdPrefix(iso: string): string | null {
+  const m = String(iso || "").trim().match(/^(\d{4})-(\d{2})-(\d{2})/);
+  return m ? `${m[1]}-${m[2]}-${m[3]}` : null;
+}
+
 /** Add N calendar days to YYYY-MM-DD (local). */
 export function addDaysIso(iso: string, days: number): string {
-  const [y, m, d] = iso.split("-").map(Number);
+  const ymd = ymdPrefix(iso);
+  if (!ymd) return "";
+  const [y, m, d] = ymd.split("-").map(Number);
   const dt = new Date(y, m - 1, d);
   dt.setDate(dt.getDate() + days);
   const yy = dt.getFullYear();
@@ -45,7 +53,9 @@ export function addDaysIso(iso: string, days: number): string {
 }
 
 function parseIso(iso: string): { y: number; m: number; d: number } | null {
-  const [y, m, d] = iso.split("-").map(Number);
+  const ymd = ymdPrefix(iso);
+  if (!ymd) return null;
+  const [y, m, d] = ymd.split("-").map(Number);
   if (!y || !m || !d) return null;
   return { y, m, d };
 }
@@ -81,7 +91,7 @@ export function calculateCityDateRanges(
 ): CityDateRange[] {
   if (!arrivalDate || locations.length === 0) return [];
 
-  let cursor = arrivalDate;
+  let cursor = ymdPrefix(arrivalDate) ?? arrivalDate;
   return locations.map((loc) => {
     const nights = Math.max(0, Math.round(Number(loc.nights) || 0));
     const startDate = cursor;

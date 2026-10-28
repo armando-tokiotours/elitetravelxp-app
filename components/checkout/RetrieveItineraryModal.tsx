@@ -9,6 +9,7 @@ import {
   normalizeBookingPNR,
   type BookingStatus,
 } from "@/utils/pnr";
+import { journeyItineraryHref } from "@/lib/builderRoutes";
 
 /**
  * Reload a saved itinerary into the builder using email + booking PNR.
@@ -134,7 +135,9 @@ export function RetrieveItineraryModal({
         }
         onSuccess?.(cleanPnr);
         onClose();
-        router.push("/builder/itinerary?view=dossier");
+        router.push(
+          journeyItineraryHref(cleanPnr, { type: lead.type })
+        );
         return;
       }
       const st = (data.state || {}) as Record<string, unknown>;
@@ -158,7 +161,16 @@ export function RetrieveItineraryModal({
       }
       onSuccess?.(data.bookingRef);
       onClose();
-      router.push("/builder/itinerary?view=dossier");
+      router.push(
+        journeyItineraryHref(data.bookingRef, {
+          type: data.type || st.tripMode,
+          tripMode:
+            typeof st.tripMode === "string" ? st.tripMode : undefined,
+          hasSingleDay: Boolean(
+            data.singleDay && typeof data.singleDay === "object"
+          ),
+        })
+      );
     } catch (err) {
       setError(err instanceof Error ? err.message : "Retrieve failed.");
     } finally {

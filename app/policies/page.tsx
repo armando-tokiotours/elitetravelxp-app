@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { AppShell } from "@/components/layout/AppShell";
 import { BoxGradingGlow } from "@/components/branding/BoxGradingGlow";
+import { FaqLinkSuspense } from "@/components/navigation/FaqLink";
 
 export const metadata: Metadata = {
   title: "Terms & Policies",
@@ -68,12 +68,9 @@ export default function PoliciesPage() {
 
           <p className="mt-10 text-center text-sm text-zinc-500">
             More travel questions?{" "}
-            <Link
-              href="/faq"
-              className="font-semibold text-[#F6A724] underline-offset-2 hover:underline"
-            >
+            <FaqLinkSuspense className="font-semibold text-[#F6A724] underline-offset-2 hover:underline">
               Browse the FAQ
-            </Link>
+            </FaqLinkSuspense>
           </p>
         </div>
       </div>

@@ -6,6 +6,11 @@ import * as XLSX from "xlsx";
 import { formatPbError } from "@/lib/pocketbase/admin-schema";
 import type { PbCity } from "@/lib/pocketbase/client";
 import { normalizeTourLanguages } from "@/lib/tourLanguages";
+import {
+  catalogCsvImageRef,
+  ensureCatalogPlaceholder,
+  pullCatalogImageFromUrl,
+} from "@/lib/catalogMedia";
 
 type PbClient = PocketBase;
 
@@ -26,11 +31,12 @@ const CSV_HEADERS = [
   "crowd_tag", // e.g. hidden_gem | classic_highlight
   "is_niche", // true | false
   "is_bonus", // true | false — agent-only until added to package
-  "price_1_pax",
-  "price_2_pax",
-  "price_3_pax",
-  "price_4_pax",
-  "price_extra_pax",
+  "price_1_pax", // SELL price to the customer (€) — only price required
+  "price_2_pax", // blank → auto = price_1_pax on upload
+  "price_3_pax", // blank → auto = price_1_pax
+  "price_4_pax", // blank → auto = price_1_pax
+  "price_extra_pax", // blank → auto = price_1_pax (extra pax = same as 1 pax)
+  "base_price_eur", // OUR COST (€) — independent of sell price, blank = unset
   "duration_hours",
   "languages",
   "is_customizable_duration",
@@ -265,6 +271,7 @@ export function ToursCsvSync({
           price_3_pax: Number(r.price_3_pax) || "",
           price_4_pax: Number(r.price_4_pax) || "",
           price_extra_pax: Number(r.price_extra_pax) || "",
+          base_price_eur: Number(r.base_price_eur) || "",
           duration_hours: Number(r.duration_hours) || "",
           languages: languagesToCsv(r.languages),
           is_customizable_duration: r.is_customizable_duration === true,
@@ -368,20 +375,32 @@ export function ToursCsvSync({
           if (paceTag) payload.pace_tag = paceTag;
           if (crowdTag) payload.crowd_tag = crowdTag;
 
+          // Only price_1_pax (sell price to the customer) is required.
+          // Blank 2/3/4/extra tiers auto-fill with price_1_pax — storing
+          // 0 would make the pricing engine charge €0 for those sizes.
+          // base_price_eur is OUR COST: only written when the CSV carries
+          // a value, never copied from price_1_pax.
           const p1 = num(row, "price_1_pax", "price1", "price");
           const p2 = num(row, "price_2_pax", "price2");
           const p3 = num(row, "price_3_pax", "price3");
           const p4 = num(row, "price_4_pax", "price4");
           const px = num(row, "price_extra_pax", "price_extra", "extra_pax");
+          const baseCost = num(row, "base_price_eur", "basepriceeur", "cost_eur");
           if (p1 != null) {
             payload.price_1_pax = p1;
             payload.price = p1;
             payload.price_per_person = p1;
+            payload.price_2_pax = p2 ?? p1;
+            payload.price_3_pax = p3 ?? p1;
+            payload.price_4_pax = p4 ?? p1;
+            payload.price_extra_pax = px ?? p1;
+          } else {
+            if (p2 != null) payload.price_2_pax = p2;
+            if (p3 != null) payload.price_3_pax = p3;
+            if (p4 != null) payload.price_4_pax = p4;
+            if (px != null) payload.price_extra_pax = px;
           }
-          if (p2 != null) payload.price_2_pax = p2;
-          if (p3 != null) payload.price_3_pax = p3;
-          if (p4 != null) payload.price_4_pax = p4;
-          if (px != null) payload.price_extra_pax = px;
+          if (baseCost != null) payload.base_price_eur = baseCost;
 
           const mediaType = cell(row, "media_type");
           if (mediaType === "Image" || mediaType === "Video") {
@@ -389,15 +408,38 @@ export function ToursCsvSync({
           }
 
           // id present + exists in PB → update; empty/missing/unknown id → create
+          // CSV schema has no image column; if a row carries an image URL,
+          // pull it into the record's `{id}_1` catalog slot (no PB write).
           const existingRow = csvId ? byId.get(csvId) : undefined;
+          let savedId = "";
+          let isCreated = false;
           if (existingRow) {
             await pb.collection("tours").update(csvId, payload);
             updated += 1;
             byId.set(csvId, existingRow);
+            savedId = csvId;
           } else {
             const created = await pb.collection("tours").create(payload);
             added += 1;
             byId.set(String(created.id), created);
+            savedId = String(created.id);
+            isCreated = true;
+          }
+          const imageRef = catalogCsvImageRef(
+            Object.fromEntries(
+              Object.entries(row).map(([k, v]) => [k.toLowerCase(), String(v ?? "")])
+            )
+          );
+          if (imageRef && savedId) {
+            await pullCatalogImageFromUrl(savedId, imageRef, pb.authStore.token).catch(
+              () => false
+            );
+          } else if (isCreated && savedId) {
+            // New record with no image URL: born with the auto-placeholder
+            // `{id}_1` slot. Best-effort — never fail the sync for it.
+            await ensureCatalogPlaceholder(savedId, title, pb.authStore.token).catch(
+              () => false
+            );
           }
         }
 

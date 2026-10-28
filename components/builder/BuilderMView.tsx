@@ -1,7 +1,13 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from "react";
 import type {
   BuilderConfig,
   PbAccommodation,
@@ -16,11 +22,20 @@ import { matchSeasonalHighlights } from "@/lib/seasonalMatcher";
 import { resolveSeasonInsight } from "@/lib/seasonality";
 import { travelPaceLabel } from "@/lib/travelPace";
 import {
+  guestSpecialRequirementsChoicesComplete,
+  guestSpecialRequirementsNotesValid,
+} from "@/lib/guestSpecialRequirements";
+import {
   BUILDER_ALL_STEPS_COMPLETE,
   canOpenBuilderStep,
   isBuilderStepComplete,
   type BuilderStepSnapshot,
 } from "@/lib/builderSteps";
+import { journeyItineraryHref } from "@/lib/builderRoutes";
+import {
+  OPEN_DISCOVER_EVENT,
+  type OpenDiscoverEventDetail,
+} from "@/components/navigation/AppNavDock";
 import { overnightNightsTotal, isTransitHubStop } from "@/lib/transitHubs";
 import {
   calculateRoomRequirements,
@@ -30,6 +45,7 @@ import {
   coerceTransitType,
   formatDisplayDate,
   normalizeCityHotelPref,
+  normalizeDateIso,
   useBuilderStore,
   type HubTravelMode,
   type LocationStop,
@@ -45,10 +61,17 @@ import {
   type HotelArrangeKind,
   type TransportArrangeKind,
 } from "./DynamicWidgetBackground";
-import { ProgressBar } from "./ProgressBar";
+import { TimelineMascotRow } from "@/components/branding/TimelineMascotRow";
+import { BoxGradingGlow } from "@/components/branding/BoxGradingGlow";
 import { useLazyModalMount } from "./modals/useLazyModalMount";
 import { getSystemMessage } from "@/lib/systemMessages";
 import { showSystemMessage } from "@/store/useSystemMessageStore";
+import { SaveRequiredContactModal } from "./SaveRequiredContactModal";
+import {
+  hasGuestContact,
+  saveContactAndCreateDraft,
+} from "@/lib/saveContactGate";
+import { persistMultiDayDraft } from "@/lib/syncBookingLead";
 
 const DaysDateEditorModal = dynamic(
   () =>
@@ -89,6 +112,13 @@ const TailoredExperiencesModal = dynamic(
   () =>
     import("./modals/TailoredExperiencesModal").then((m) => ({
       default: m.TailoredExperiencesModal,
+    })),
+  { ssr: false }
+);
+const DiscoverOverlay = dynamic(
+  () =>
+    import("@/components/discover/DiscoverOverlay").then((m) => ({
+      default: m.DiscoverOverlay,
     })),
   { ssr: false }
 );
@@ -147,12 +177,22 @@ function modalToStep(
 export function BuilderMView({
   config,
   onAccommodationsLoaded,
+  headerSlot,
+  stripTitleSlot,
+  stripTrailingSlot,
 }: {
   config: BuilderConfig;
   onAccommodationsLoaded?: (rows: PbAccommodation[]) => void;
+  /** Rendered in the sticky dark header (with mascot) in place of the old timeline. */
+  headerSlot?: ReactNode;
+  /** Centred title inside the guest strip, on the guest-name line. */
+  stripTitleSlot?: ReactNode;
+  /** Control to the right of the strip mascot (e.g. restart). */
+  stripTrailingSlot?: ReactNode;
 }) {
   const [activeEditModal, setActiveEditModal] =
     useState<BuilderEditModalId>(null);
+  const [showDiscover, setShowDiscover] = useState(false);
 
   const durationMounted = useLazyModalMount(activeEditModal === "duration");
   const guestsMounted = useLazyModalMount(activeEditModal === "guests");
@@ -169,6 +209,12 @@ export function BuilderMView({
   const adults = useBuilderStore((s) => s.adults);
   const children = useBuilderStore((s) => s.children);
   const travelPace = useBuilderStore((s) => s.travelPace);
+  const guestSpecialRequirements = useBuilderStore(
+    (s) => s.guestSpecialRequirements
+  );
+  const guestSpecialRequirementsAcked = useBuilderStore(
+    (s) => s.guestSpecialRequirementsAcked
+  );
   const arrivalTransferId = useBuilderStore((s) => s.arrivalTransferId);
   const departureTransferId = useBuilderStore((s) => s.departureTransferId);
   const arrivalMode = useBuilderStore((s) => s.arrivalMode);
@@ -214,6 +260,8 @@ export function BuilderMView({
   const [pickerOpen, setPickerOpen] = useState(false);
   const [expandedKey, setExpandedKey] = useState<string | null>(null);
   const [routeToast, setRouteToast] = useState<string | null>(null);
+  const [saveContactOpen, setSaveContactOpen] = useState(false);
+  const [savingItinerary, setSavingItinerary] = useState(false);
 
   const hubs = config.hubs;
   const cities = config.cities;
@@ -271,6 +319,18 @@ export function BuilderMView({
     return () => window.clearTimeout(t);
   }, [routeToast]);
 
+  // AppNavDock Discover → same overlay as Tours & Experiences (ack so dock
+  // does not also navigate to /discover).
+  useEffect(() => {
+    const onOpen = (e: Event) => {
+      const detail = (e as CustomEvent<OpenDiscoverEventDetail>).detail;
+      detail?.acknowledge?.();
+      setShowDiscover(true);
+    };
+    window.addEventListener(OPEN_DISCOVER_EVENT, onOpen);
+    return () => window.removeEventListener(OPEN_DISCOVER_EVENT, onOpen);
+  }, []);
+
   const snapshot = useMemo<BuilderStepSnapshot>(
     () => ({
       arrivalDate,
@@ -309,6 +369,19 @@ export function BuilderMView({
         if (!svc && !useBuilderStore.getState().isEliteConcierge) {
           setExperienceService("tailored");
         }
+        // Empty pick → Discover Reels overlay; filled / concierge → manage modal
+        const selected = useBuilderStore.getState().selectedTours;
+        const hasTours = Object.values(selected).some(
+          (rows) => (rows?.length ?? 0) > 0
+        );
+        if (
+          !hasTours &&
+          !useBuilderStore.getState().isEliteConcierge &&
+          useBuilderStore.getState().experienceService !== "concierge"
+        ) {
+          setShowDiscover(true);
+          return;
+        }
       }
       if (id === "hotels_transport") {
         ensureCityHotels(
@@ -321,6 +394,21 @@ export function BuilderMView({
     },
     [ensureCityHotels, highestUnlockedStep, locations, setExperienceService]
   );
+
+  const cityNamesForSync = useCallback((): Record<string, string> => {
+    const map = buildCityMap(cities);
+    const out: Record<string, string> = {};
+    for (const loc of useBuilderStore.getState().locations) {
+      if (!loc.cityId) continue;
+      out[loc.cityId] = getCityName(loc.cityId, map);
+    }
+    return out;
+  }, [cities]);
+
+  /** Flush builder → bookings_and_leads when guest contact exists (Builder S pattern). */
+  const flushDraftToCollection = useCallback(() => {
+    void persistMultiDayDraft({ cityNames: cityNamesForSync() });
+  }, [cityNamesForSync]);
 
   const closeAndAdvance = useCallback(
     (closed: Exclude<BuilderEditModalId, null>) => {
@@ -337,10 +425,47 @@ export function BuilderMView({
           unlockBuilderStep(step + 1);
         }
       }
+      // Persist each completed step so refresh / ?ref= rehydrate matches UI.
+      flushDraftToCollection();
       // Stay on the widget grid — pulsar rings the next card; user taps to open.
     },
-    [unlockBuilderStep]
+    [flushDraftToCollection, unlockBuilderStep]
   );
+
+  const saveAndViewItinerary = useCallback(async () => {
+    if (savingItinerary) return;
+    if (!hasGuestContact()) {
+      setSaveContactOpen(true);
+      return;
+    }
+    setSavingItinerary(true);
+    try {
+      const result = await persistMultiDayDraft({
+        cityNames: cityNamesForSync(),
+        status: "lead",
+      });
+      if (!result.ok) {
+        showSystemMessage({
+          text:
+            result.reason === "missing_email"
+              ? "Add your email before saving."
+              : "Could not save itinerary. Try again.",
+          tone: "error",
+        });
+        if (result.reason === "missing_email") setSaveContactOpen(true);
+        return;
+      }
+      showSystemMessage({
+        text: "Itinerary saved.",
+        tone: "info",
+      });
+      window.location.href = journeyItineraryHref(result.bookingRef, {
+        type: "multi_day",
+      });
+    } finally {
+      setSavingItinerary(false);
+    }
+  }, [cityNamesForSync, savingItinerary]);
 
   const locked = useMemo(() => {
     const L: Partial<Record<Exclude<BuilderEditModalId, null>, boolean>> = {};
@@ -365,6 +490,10 @@ export function BuilderMView({
   const startDateText = arrivalDate ? formatDisplayDate(arrivalDate) : null;
   const guestCount = adults + children;
   const paceLabel = travelPaceLabel(travelPace);
+  const guestsRequirementsComplete =
+    guestSpecialRequirementsChoicesComplete(guestSpecialRequirements) &&
+    guestSpecialRequirementsAcked &&
+    guestSpecialRequirementsNotesValid(guestSpecialRequirements);
   const arrivalAirport = hubShort(hubs, arrivalTransferId);
   const departureAirport = hubShort(hubs, departureTransferId);
 
@@ -595,6 +724,28 @@ export function BuilderMView({
     selectedToursMap,
   ]);
 
+  const discoverCityId = useMemo(() => {
+    const stay = locations.find(
+      (l) => !isTransitHubStop(l) && (l.nights || 0) > 0
+    );
+    return stay?.cityId || locations[0]?.cityId || null;
+  }, [locations]);
+
+  const discoverCityName = discoverCityId
+    ? cityNames[discoverCityId] ?? getCityName(discoverCityId, cityLabelMap)
+    : "";
+
+  const discoverTours = useMemo(() => {
+    const cityIds = new Set(
+      locations.map((l) => l.cityId).filter(Boolean) as string[]
+    );
+    if (cityIds.size === 0) return config.tours;
+    const scoped = config.tours.filter((t) =>
+      t.city_id ? cityIds.has(t.city_id) : true
+    );
+    return scoped.length > 0 ? scoped : config.tours;
+  }, [config.tours, locations]);
+
   // —— Locations modal helpers ——
   const arrivalHubs = useMemo(
     () => hubs.filter((h) => h.type === hubTypeForMode(arrivalMode)),
@@ -715,9 +866,9 @@ export function BuilderMView({
 
   const hotelsComplete = isBuilderStepComplete(4, snapshot);
   const monthName = (() => {
-    if (!arrivalDate) return null;
-    const parts = arrivalDate.split("-").map(Number);
-    const month = parts[1];
+    const ymd = normalizeDateIso(arrivalDate);
+    if (!ymd) return null;
+    const month = Number(ymd.slice(5, 7));
     if (!month || month < 1 || month > 12) return null;
     return [
       "January",
@@ -749,7 +900,30 @@ export function BuilderMView({
 
   return (
     <BuilderEditModalProvider value={editCtx}>
-      <ProgressBar />
+      {headerSlot ? (
+        <div className="sticky top-[3.75rem] z-40 w-[100dvw] max-w-[100dvw] [margin-left:calc(50%-50dvw)] [margin-right:calc(50%-50dvw)] overflow-visible bg-[#0D1117]/70 px-2 py-2.5 backdrop-blur-md lg:top-0 sm:px-4 sm:py-3 lg:w-[calc(100dvw-4rem)] lg:max-w-[calc(100dvw-4rem)] lg:[margin-left:calc(50%_-_50dvw_+_2rem)] lg:[margin-right:calc(50%_-_50dvw_+_2rem)]">
+          {/* Blue-only grading clipped to the bar (mascot overflows
+              below, so the outer strip stays overflow-visible) —
+              same glass + glow treatment as Builder S / E.
+              Full-bleed: breaks out of the centred column to span
+              the whole viewport width on web + mobile. */}
+          <div
+            className="pointer-events-none absolute inset-0 overflow-hidden"
+            aria-hidden
+          >
+            <BoxGradingGlow variant="blue-only" />
+          </div>
+          <div className="relative z-10">
+            <TimelineMascotRow
+              variant="multi"
+              centerSlot={stripTitleSlot}
+              trailingSlot={stripTrailingSlot}
+            >
+              {headerSlot}
+            </TimelineMascotRow>
+          </div>
+        </div>
+      ) : null}
       <BuilderMWidgetGrid
         onOpen={openEditModal}
         tripDays={durationDays}
@@ -757,6 +931,7 @@ export function BuilderMView({
         startDateText={startDateText}
         guestCount={guestCount}
         paceLabel={paceLabel ? `${paceLabel} Pace` : null}
+        guestsRequirementsComplete={guestsRequirementsComplete}
         arrivalAirport={arrivalAirport}
         departureAirport={departureAirport}
         arrivalMode={arrivalMode}
@@ -775,17 +950,37 @@ export function BuilderMView({
         locked={locked}
       />
 
-      {/* Itinerary CTA when all steps unlocked */}
+      {/* Itinerary CTA when all steps unlocked — await PB upsert (parity with
+          Builder S Save & View). Never navigate on a failed/missing save. */}
       {highestUnlockedStep >= 6 ? (
         <div className="mx-auto w-full max-w-2xl px-4 pb-8">
-          <a
-            href="/builder/itinerary"
-            className="flex w-full items-center justify-center rounded-full bg-[#054F70] py-3.5 text-sm font-semibold text-white transition hover:bg-[#043d57]"
+          <button
+            type="button"
+            disabled={savingItinerary}
+            onClick={() => void saveAndViewItinerary()}
+            className="flex w-full items-center justify-center rounded-full bg-[#054F70] py-3.5 text-sm font-semibold text-white transition hover:bg-[#043d57] disabled:opacity-60"
           >
-            Save &amp; View Itinerary
-          </a>
+            {savingItinerary ? "Saving…" : "Save & View Itinerary"}
+          </button>
         </div>
       ) : null}
+
+      <SaveRequiredContactModal
+        open={saveContactOpen}
+        onClose={() => setSaveContactOpen(false)}
+        onSaved={async (contact) => {
+          // Builder M guests may skip Pre-Elite — ensure tripType before draft create.
+          const { usePreBuilderStore } = await import(
+            "@/store/usePreBuilderStore"
+          );
+          if (!usePreBuilderStore.getState().tripType) {
+            usePreBuilderStore.getState().setTripType("multi_day");
+          }
+          await saveContactAndCreateDraft(contact);
+          setSaveContactOpen(false);
+          await saveAndViewItinerary();
+        }}
+      />
 
       {durationMounted ? (
         <DaysDateEditorModal
@@ -915,6 +1110,22 @@ export function BuilderMView({
           hideTransport
         />
       ) : null}
+
+      <DiscoverOverlay
+        open={showDiscover}
+        onClose={() => {
+          setShowDiscover(false);
+          const selected = useBuilderStore.getState().selectedTours;
+          const hasTours = Object.values(selected).some(
+            (rows) => (rows?.length ?? 0) > 0
+          );
+          if (hasTours) closeAndAdvance("tours");
+        }}
+        tours={discoverTours}
+        cityName={discoverCityName}
+        cityId={discoverCityId}
+        guests={{ adults, children }}
+      />
 
       {driversMounted ? (
         <DriversEditorModal

@@ -22,12 +22,12 @@ import { useBuilderStore } from "@/store/useBuilderStore";
 import { useActiveMatchProfile } from "@/store/useQuizStore";
 import { TravelProfileBadge } from "@/components/quiz/TravelProfileBadge";
 import { ExperienceProfilerModal } from "@/components/quiz/ExperienceProfilerModal";
-import { CityLanguageSelect } from "@/components/builder/CityLanguageSelect";
-
-function tourCategory(tour: PbTour): "tour" | "activity" {
-  const cat = String(tour.category || "tour").toLowerCase();
-  return cat === "activity" ? "activity" : "tour";
-}
+import {
+  CATALOG_KIND_LABELS,
+  catalogKind,
+  type CatalogKind,
+} from "@/lib/experiencesPlaces";
+import { Compass, MapPinned, Ticket } from "lucide-react";
 
 export function ExperiencesDrawer({
   open,
@@ -62,14 +62,9 @@ export function ExperiencesDrawer({
   const [toast, setToast] = useState<string | null>(null);
   const [pickingTourId, setPickingTourId] = useState<string | null>(null);
   const [pendingLanguage, setPendingLanguage] = useState("");
-  const [activeTab, setActiveTab] = useState<"tours" | "experiences">(
-    "tours"
-  );
+  const [activeTab, setActiveTab] = useState<CatalogKind>("tour");
   const [quizOpen, setQuizOpen] = useState(false);
   const preferredTourLanguage = useBuilderStore((s) => s.preferredTourLanguage);
-  const setPreferredTourLanguage = useBuilderStore(
-    (s) => s.setPreferredTourLanguage
-  );
 
   useEffect(() => {
     setMounted(true);
@@ -79,7 +74,7 @@ export function ExperiencesDrawer({
     if (!open) {
       setPickingTourId(null);
       setPendingLanguage("");
-      setActiveTab("tours");
+      setActiveTab("tour");
       return;
     }
     const prev = document.body.style.overflow;
@@ -103,12 +98,7 @@ export function ExperiencesDrawer({
   const experienceProfile = useActiveMatchProfile();
 
   const filteredTours = useMemo(() => {
-    const list = tours.filter((t) => {
-      const cat = tourCategory(t);
-      return activeTab === "experiences"
-        ? cat === "activity"
-        : cat === "tour";
-    });
+    const list = tours.filter((t) => catalogKind(t) === activeTab);
     return rankToursByProfile(list, experienceProfile);
   }, [activeTab, tours, experienceProfile]);
 
@@ -178,14 +168,15 @@ export function ExperiencesDrawer({
               <div
                 role="tablist"
                 aria-label="Filter by category"
-                className="mt-4 grid grid-cols-2 gap-1 rounded-full border border-[#E5DFD4] bg-[#F7F3EB] p-1"
+                className="mt-4 grid grid-cols-3 gap-1 rounded-full border border-[#E5DFD4] bg-[#F7F3EB] p-1"
               >
                 {(
                   [
-                    ["tours", "Tours"],
-                    ["experiences", "Experiences"],
+                    ["tour", "Tours", Compass],
+                    ["activity", "Experiences", Ticket],
+                    ["cluster", "Areas", MapPinned],
                   ] as const
-                ).map(([id, label]) => {
+                ).map(([id, label, Icon]) => {
                   const selected = activeTab === id;
                   return (
                     <button
@@ -193,13 +184,15 @@ export function ExperiencesDrawer({
                       type="button"
                       role="tab"
                       aria-selected={selected}
+                      title={CATALOG_KIND_LABELS[id].full}
                       onClick={() => setActiveTab(id)}
-                      className={`rounded-full py-2 text-sm font-semibold transition ${
+                      className={`inline-flex items-center justify-center gap-1 rounded-full py-2 text-sm font-semibold transition ${
                         selected
                           ? "bg-[#0B1F3A] text-white shadow-sm"
                           : "text-[#5C6570] hover:text-[#0B1F3A]"
                       }`}
                     >
+                      <Icon className="h-3.5 w-3.5 shrink-0" aria-hidden />
                       {label}
                     </button>
                   );
@@ -217,19 +210,14 @@ export function ExperiencesDrawer({
             ) : null}
 
             <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-4 py-4 pb-[max(7rem,env(safe-area-inset-bottom))]">
-              <CityLanguageSelect
-                cityName={cityName}
-                availableLanguages={availableLanguages}
-                value={preferredTourLanguage}
-                onChange={setPreferredTourLanguage}
-              />
               {filteredTours.length === 0 ? (
                 <p className="py-12 text-center text-sm text-[#8A8278]">
-                  {activeTab === "tours"
-                    ? `No tours listed for ${cityName} yet.`
-                    : `No experiences listed for ${cityName} yet.`}{" "}
-                  Add them in Team Access and set Category to{" "}
-                  {activeTab === "tours" ? "tour" : "activity"}.
+                  {activeTab === "tour"
+                    ? `No guided tours listed for ${cityName} yet.`
+                    : activeTab === "activity"
+                      ? `No experiences & tickets listed for ${cityName} yet.`
+                      : `No areas & neighborhoods listed for ${cityName} yet.`}{" "}
+                  Add them in Team Access and set Category to {activeTab}.
                 </p>
               ) : (
                 filteredTours.map((tour, index) => {

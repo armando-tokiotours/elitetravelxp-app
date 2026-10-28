@@ -8,6 +8,13 @@ import {
   formatDurationLabel,
 } from "@/lib/bookingLeadAudit";
 import { chauffeurDaysFromSelections, migrateLegacyChauffeurDays } from "@/lib/chauffeurSelections";
+import {
+  guestReqsFromLegacySpecialNeeds,
+  guestSpecialRequirementsChoicesComplete,
+  normalizeGuestSpecialRequirements,
+  serializeGuestSpecialRequirements,
+  type GuestSpecialRequirements,
+} from "@/lib/guestSpecialRequirements";
 import { getAdminPocketBase } from "@/lib/pocketbase/admin";
 import type { BuilderState } from "@/store/useBuilderStore";
 import type { SingleDayBuilderState } from "@/store/useSingleDayBuilderStore";
@@ -86,6 +93,15 @@ export interface MultiDaySelections {
   experienceService?: string | null;
   /** Special mobility / party needs for ops staff */
   specialNeeds?: string[];
+  /** Structured dietary / mobility / extras / notes (also top-level PB JSON) */
+  guestSpecialRequirements?: GuestSpecialRequirements;
+  /** City-level preferred guided language */
+  preferredTourLanguage?: string;
+  meetingPointName?: string;
+  meetingPointAddress?: string;
+  meetingPointLat?: number | null;
+  meetingPointLng?: number | null;
+  meetingPointPlaceId?: string;
   /** Public transit pass questionnaire — Tours step + Ticketer */
   guestHasJRPass?: boolean | null;
   guestHasICCard?: boolean | null;
@@ -94,6 +110,10 @@ export interface MultiDaySelections {
   preEliteTravelStyle?: string | null;
   /** Pre-quiz interest ids */
   preEliteInterests?: string[];
+  /** Pre-quiz motivation id */
+  preEliteMotivation?: string | null;
+  /** Pre-quiz concern / preference ids */
+  preElitePainPoints?: string[];
   /** In-city transport mode per stay city */
   localTransitByCity?: Array<{
     cityId: string;
@@ -120,10 +140,29 @@ export interface SingleDaySelections {
   pace?: string | null;
   guidePreference?: string;
   selectedExperienceIds: string[];
+  /** Full experience rows (timing intent + ticket date for Ticketer) */
+  selectedExperiencesDetail?: Array<{
+    tourId: string;
+    title?: string;
+    selectedLanguage?: string;
+    duration_hours?: number;
+    price?: number;
+    access_type?: string;
+    category?: string;
+    entry_type?: string;
+    is_extra?: boolean;
+    timingIntent?: string;
+    ticketDate?: string | null;
+    opsTimingNote?: string;
+  }>;
   transitOption?: string;
   /** subway Suica prepare + preload € / guest */
   suicaNeeded?: boolean;
   suicaValueEur?: number;
+  /** Public transit pass questionnaire (JR / IC / assistance) */
+  guestHasJRPass?: boolean | null;
+  guestHasICCard?: boolean | null;
+  guestNeedsTransitHelp?: boolean | null;
   tourHours?: number;
   meetingPointName?: string;
   meetingPointAddress?: string;
@@ -131,6 +170,15 @@ export interface SingleDaySelections {
   meetingPointLng?: number | null;
   meetingPointPlaceId?: string;
   preferredTourLanguage?: string;
+  /** Pre-quiz travel style id (vip_bespoke / premium_comfort / classic_explorer) */
+  preEliteTravelStyle?: string | null;
+  preEliteInterests?: string[];
+  preEliteMotivation?: string | null;
+  preElitePainPoints?: string[];
+  /** Special mobility / party needs (legacy ids) */
+  specialNeeds?: string[];
+  /** Structured dietary / mobility / extras / notes */
+  guestSpecialRequirements?: GuestSpecialRequirements;
 }
 
 /** Builder E micro-service payload (DRIVER / EXPERIENCE / TRANSIT). */
@@ -169,6 +217,11 @@ export interface BookingsAndLeadsUpsertInput {
   meetingPointLat?: number | null;
   meetingPointLng?: number | null;
   meetingPointPlaceId?: string;
+  /** Top-level PB field on bookings + bookings_and_leads */
+  guestSpecialRequirements?: GuestSpecialRequirements | null;
+  /** Guest contact (Pre-Elite) — embedded into selections; mirrored to bookings */
+  guestName?: string;
+  whatsapp?: string;
 }
 
 export interface BookingsAndLeadsRecord {
@@ -184,6 +237,7 @@ export interface BookingsAndLeadsRecord {
   duration_label?: string;
   cities_list?: string;
   selections: BookingLeadSelections;
+  guest_special_requirements?: GuestSpecialRequirements;
   dossier_pdf_url?: string;
   first_email_sent_at?: string;
   last_email_sent_at?: string;
@@ -283,11 +337,20 @@ export function buildMultiDaySelections(
     | "durationDays"
     | "experienceService"
     | "specialNeeds"
+    | "guestSpecialRequirements"
+    | "preferredTourLanguage"
+    | "meetingPoint"
+    | "meetingPointName"
+    | "meetingPointLat"
+    | "meetingPointLng"
+    | "meetingPointPlaceId"
     | "guestHasJRPass"
     | "guestHasICCard"
     | "guestNeedsTransitHelp"
     | "preEliteTravelStyle"
     | "preEliteInterests"
+    | "preEliteMotivation"
+    | "preElitePainPoints"
     | "chauffeurSelections"
     | "selectedTransportProducts"
   >,
@@ -483,12 +546,26 @@ export function buildMultiDaySelections(
     specialNeeds: Array.isArray(state.specialNeeds)
       ? [...state.specialNeeds]
       : [],
+    guestSpecialRequirements: serializeGuestSpecialRequirements(
+      state.guestSpecialRequirements
+    ),
+    preferredTourLanguage: state.preferredTourLanguage || undefined,
+    meetingPointName:
+      state.meetingPointName || state.meetingPoint || undefined,
+    meetingPointAddress: state.meetingPoint || undefined,
+    meetingPointLat: state.meetingPointLat ?? null,
+    meetingPointLng: state.meetingPointLng ?? null,
+    meetingPointPlaceId: state.meetingPointPlaceId || undefined,
     guestHasJRPass: state.guestHasJRPass ?? null,
     guestHasICCard: state.guestHasICCard ?? null,
     guestNeedsTransitHelp: state.guestNeedsTransitHelp ?? null,
     preEliteTravelStyle: state.preEliteTravelStyle ?? null,
     preEliteInterests: Array.isArray(state.preEliteInterests)
       ? [...state.preEliteInterests]
+      : [],
+    preEliteMotivation: state.preEliteMotivation ?? null,
+    preElitePainPoints: Array.isArray(state.preElitePainPoints)
+      ? [...state.preElitePainPoints]
       : [],
   };
 }
@@ -505,6 +582,10 @@ export function buildSingleDaySelections(
     | "tourHours"
     | "suicaNeeded"
     | "suicaValueEur"
+    | "guestSpecialRequirements"
+    | "guestHasJRPass"
+    | "guestHasICCard"
+    | "guestNeedsTransitHelp"
   > & {
     cityId?: string;
     transitOption?: string;
@@ -515,6 +596,11 @@ export function buildSingleDaySelections(
     meetingPointLng?: number | null;
     meetingPointPlaceId?: string;
     preferredTourLanguage?: string;
+    preEliteTravelStyle?: string | null;
+    preEliteInterests?: string[];
+    preEliteMotivation?: string | null;
+    preElitePainPoints?: string[];
+    specialNeeds?: string[];
   }
 ): SingleDaySelections {
   return {
@@ -526,12 +612,39 @@ export function buildSingleDaySelections(
     selectedExperienceIds: (state.selectedExperiences || []).map(
       (e) => e.tourId
     ),
+    selectedExperiencesDetail: (state.selectedExperiences || []).map((e) => ({
+      tourId: e.tourId,
+      title: e.title,
+      selectedLanguage: e.selectedLanguage,
+      duration_hours: e.duration_hours,
+      price: e.price,
+      access_type: e.access_type,
+      category: e.category,
+      entry_type: e.entry_type,
+      is_extra: e.is_extra,
+      timingIntent: e.timingIntent,
+      ticketDate: e.ticketDate ?? null,
+      opsTimingNote: e.opsTimingNote,
+    })),
     transitOption:
       state.transitOption ||
       state.preferredMovement ||
       state.guidePreference,
     suicaNeeded: Boolean(state.suicaNeeded),
     suicaValueEur: Math.max(0, Number(state.suicaValueEur) || 0),
+    guestHasJRPass:
+      state.guestHasJRPass === true || state.guestHasJRPass === false
+        ? state.guestHasJRPass
+        : null,
+    guestHasICCard:
+      state.guestHasICCard === true || state.guestHasICCard === false
+        ? state.guestHasICCard
+        : null,
+    guestNeedsTransitHelp:
+      state.guestNeedsTransitHelp === true ||
+      state.guestNeedsTransitHelp === false
+        ? state.guestNeedsTransitHelp
+        : null,
     tourHours: state.tourHours,
     meetingPointName:
       state.meetingPointName || state.meetingPoint || undefined,
@@ -540,6 +653,20 @@ export function buildSingleDaySelections(
     meetingPointLng: state.meetingPointLng ?? null,
     meetingPointPlaceId: state.meetingPointPlaceId || undefined,
     preferredTourLanguage: state.preferredTourLanguage || undefined,
+    preEliteTravelStyle: state.preEliteTravelStyle ?? null,
+    preEliteInterests: Array.isArray(state.preEliteInterests)
+      ? [...state.preEliteInterests]
+      : [],
+    preEliteMotivation: state.preEliteMotivation ?? null,
+    preElitePainPoints: Array.isArray(state.preElitePainPoints)
+      ? [...state.preElitePainPoints]
+      : [],
+    specialNeeds: Array.isArray(state.specialNeeds)
+      ? [...state.specialNeeds]
+      : undefined,
+    guestSpecialRequirements: serializeGuestSpecialRequirements(
+      state.guestSpecialRequirements
+    ),
   };
 }
 
@@ -552,6 +679,82 @@ export function primaryCityFromMultiDay(
   );
   if (!first) return "";
   return cityNames?.[first.cityId] || first.cityId || "";
+}
+
+const GUEST_CONTACT_SEL_KEYS = [
+  "guestName",
+  "fullName",
+  "contactName",
+  "whatsapp",
+  "guestPhone",
+  "contactPhone",
+  "phone",
+] as const;
+
+function embedGuestContactInSelections(
+  selections: Record<string, unknown>,
+  guestName?: string | null,
+  whatsapp?: string | null
+): Record<string, unknown> {
+  const name = String(guestName || "").trim();
+  const phone = String(whatsapp || "").trim();
+  if (name) {
+    selections.guestName = name;
+    selections.fullName = name;
+    selections.contactName = name;
+  }
+  if (phone) {
+    selections.whatsapp = phone;
+    selections.guestPhone = phone;
+    selections.contactPhone = phone;
+  }
+  return selections;
+}
+
+function preserveGuestContactKeys(
+  next: Record<string, unknown>,
+  prev: Record<string, unknown> | null | undefined
+): void {
+  if (!prev) return;
+  for (const key of GUEST_CONTACT_SEL_KEYS) {
+    const cur = String(next[key] || "").trim();
+    const old = String(prev[key] || "").trim();
+    if (!cur && old) next[key] = old;
+  }
+}
+
+/**
+ * Mirror guest fields onto `bookings` by booking_ref when a row exists.
+ * Does not create a bookings row (Pre-Elite / draft paths own creation).
+ */
+async function syncGuestFieldsToBookings(
+  pb: Awaited<ReturnType<typeof getAdminPocketBase>>,
+  bookingRef: string,
+  opts: {
+    requirements?: GuestSpecialRequirements | null;
+    fullName?: string | null;
+    whatsapp?: string | null;
+  }
+): Promise<void> {
+  const patch: Record<string, unknown> = {};
+  if (opts.requirements) {
+    patch.guest_special_requirements = opts.requirements;
+  }
+  const fullName = String(opts.fullName || "").trim();
+  const whatsapp = String(opts.whatsapp || "").trim();
+  if (fullName) patch.full_name = fullName;
+  if (whatsapp) patch.whatsapp = whatsapp;
+  if (Object.keys(patch).length === 0) return;
+  try {
+    const row = await pb
+      .collection("bookings")
+      .getFirstListItem<{ id: string }>(`booking_ref="${bookingRef}"`, {
+        requestKey: null,
+      });
+    await pb.collection("bookings").update(row.id, patch, { requestKey: null });
+  } catch {
+    /* no bookings row yet — BAL holds the source until Pre-Elite/create */
+  }
 }
 
 /**
@@ -574,12 +777,17 @@ export async function upsertBookingsAndLeads(
   };
 
   // PocketBase treats `{}` as blank for required JSON — always send a real object.
-  const selectionsPayload =
+  const selectionsPayload: Record<string, unknown> =
     input.selections &&
     typeof input.selections === "object" &&
     Object.keys(input.selections as object).length > 0
-      ? input.selections
+      ? { ...(input.selections as Record<string, unknown>) }
       : { _v: 1 };
+  embedGuestContactInSelections(
+    selectionsPayload,
+    input.guestName,
+    input.whatsapp
+  );
 
   const tourDateRaw = input.tourDate ? String(input.tourDate).slice(0, 10) : "";
   const requestedStatus: BookingLeadStatus = input.status || "lead";
@@ -652,6 +860,32 @@ export async function upsertBookingsAndLeads(
     fields.guest_needs_transit_help = selObj.guestNeedsTransitHelp;
   }
 
+  const guestSpecialRequirements = serializeGuestSpecialRequirements(
+    input.guestSpecialRequirements ??
+      selObj.guestSpecialRequirements ??
+      selObj.guest_special_requirements
+  );
+  fields.guest_special_requirements = guestSpecialRequirements;
+  // Keep a copy inside selections for older readers / local cache.
+  selectionsPayload.guestSpecialRequirements = guestSpecialRequirements;
+  fields.selections = selectionsPayload;
+
+  const guestNameFromSel = String(
+    input.guestName ||
+      selObj.guestName ||
+      selObj.fullName ||
+      selObj.contactName ||
+      ""
+  ).trim();
+  const whatsappFromSel = String(
+    input.whatsapp ||
+      selObj.whatsapp ||
+      selObj.guestPhone ||
+      selObj.contactPhone ||
+      selObj.phone ||
+      ""
+  ).trim();
+
   const STATUS_RANK: Record<string, number> = {
     draft: 1,
     lead: 1,
@@ -673,6 +907,7 @@ export async function upsertBookingsAndLeads(
       save_version?: number;
       email_sent_count?: number;
       first_email_sent_at?: string;
+      selections?: unknown;
     } | null = null;
     try {
       // Prefer exact PNR + email; fall back to PNR-only (unique index).
@@ -705,6 +940,14 @@ export async function upsertBookingsAndLeads(
         nextStatus = String(existing.status);
       }
 
+      // Don't wipe guest name/phone when a later autosave omits them.
+      const prevSel =
+        existing.selections && typeof existing.selections === "object"
+          ? (existing.selections as Record<string, unknown>)
+          : null;
+      preserveGuestContactKeys(selectionsPayload, prevSel);
+      fields.selections = selectionsPayload;
+
       const prevVersion = Number(existing.save_version) || 0;
       const patch: Record<string, unknown> = {
         ...fields,
@@ -727,6 +970,17 @@ export async function upsertBookingsAndLeads(
         patch,
         { requestKey: null }
       );
+      void syncGuestFieldsToBookings(pb, bookingRef, {
+        requirements: guestSpecialRequirements,
+        fullName:
+          guestNameFromSel ||
+          String(selectionsPayload.guestName || selectionsPayload.fullName || ""),
+        whatsapp:
+          whatsappFromSel ||
+          String(
+            selectionsPayload.whatsapp || selectionsPayload.guestPhone || ""
+          ),
+      });
       void syncOpsHubFromBal({
         pnr: bookingRef,
         detailId: updated.id,
@@ -735,7 +989,7 @@ export async function upsertBookingsAndLeads(
         tourDate: tourDateRaw || null,
         durationDays: durationNum || null,
         guests,
-        selections: selectionsPayload,
+        selections: selectionsPayload as BookingLeadSelections,
       });
       return { ok: true, id: updated.id, created: false };
     }
@@ -753,6 +1007,11 @@ export async function upsertBookingsAndLeads(
     const created = await pb
       .collection("bookings_and_leads")
       .create(createFields, { requestKey: null });
+    void syncGuestFieldsToBookings(pb, bookingRef, {
+      requirements: guestSpecialRequirements,
+      fullName: guestNameFromSel,
+      whatsapp: whatsappFromSel,
+    });
     void syncOpsHubFromBal({
       pnr: bookingRef,
       detailId: created.id,
@@ -761,7 +1020,7 @@ export async function upsertBookingsAndLeads(
       tourDate: tourDateRaw || null,
       durationDays: durationNum || null,
       guests,
-      selections: selectionsPayload,
+      selections: selectionsPayload as BookingLeadSelections,
     });
     return { ok: true, id: created.id, created: true };
   } catch (err) {
@@ -965,6 +1224,13 @@ export function expandMultiDaySelectionsToState(
 ): Record<string, unknown> {
   const sel = (record.selections || {}) as MultiDaySelections;
   const guests = record.guests || { adults: 2, kids: 0 };
+  // PB date fields may return "2026-11-02 00:00:00.000Z" — the builder
+  // store/calendar only accepts a bare YYYY-MM-DD (same slice+validate
+  // expandSingleDaySelectionsToState applies to tour_date below).
+  const tourDateRaw = String(record.tour_date || "").slice(0, 10);
+  const tourDate = /^\d{4}-\d{2}-\d{2}$/.test(tourDateRaw)
+    ? tourDateRaw
+    : null;
   const localByCity = new Map(
     (sel.localTransitByCity || []).map((r) => [
       r.cityId,
@@ -975,14 +1241,28 @@ export function expandMultiDaySelectionsToState(
     (sel.transitByLeg || []).map((r) => [r.fromCityId, r.transitType])
   );
 
-  const locations = (sel.locationCityIds || []).map((cityId, i, arr) => {
-    const nextId = arr[i + 1];
+  // locationStops (written by buildMultiDaySelections) is authoritative
+  // for per-city nights. The legacy locationCityIds-only fallback cannot
+  // recover them, so it keeps the old first-city approximation.
+  const savedStops = (sel.locationStops || []).filter((s) => s?.cityId);
+  const locations = (
+    savedStops.length > 0
+      ? savedStops.map((s) => ({ cityId: s.cityId, nights: s.nights }))
+      : (sel.locationCityIds || []).map((cityId, i) => ({
+          cityId,
+          nights:
+            i === 0
+              ? Math.max(0, (sel.durationDays || record.duration_value || 1) - 1)
+              : 0,
+        }))
+  ).map(({ cityId, nights }, i, arr) => {
+    const nextId = arr[i + 1]?.cityId;
     const transitRaw = nextId ? transitByFrom.get(cityId) : undefined;
     const localRaw = localByCity.get(cityId);
     return {
       key: `loc_${cityId}_${i}`,
       cityId,
-      nights: i === 0 ? Math.max(0, (sel.durationDays || 1) - 1) : 0,
+      nights: Math.max(0, Math.round(Number(nights) || 0)),
       visitType: "stay" as const,
       transitType:
         transitRaw === "self" ||
@@ -1018,7 +1298,7 @@ export function expandMultiDaySelectionsToState(
       tourId: row.tourId,
       title: String(row.title || "").trim() || row.tourId,
       duration_hours: Number(row.durationHours) || 0,
-      scheduledDate: row.date || record.tour_date || "",
+      scheduledDate: row.date || tourDate || "",
       selectedLanguage: row.language || "",
       price: 0,
       access_type: row.accessType,
@@ -1026,13 +1306,47 @@ export function expandMultiDaySelectionsToState(
     selectedTours[row.cityId] = list;
   }
 
+  // Hotel prefs live on locationStops — restore them so a retrieved
+  // booking does not fall back to "no hotel preference" per city.
+  const cityHotels: Record<string, unknown> = {};
+  for (const stop of savedStops) {
+    if (stop.hotelArrangement !== "self" && stop.hotelArrangement !== "tokiotours") {
+      continue;
+    }
+    const star = Number(stop.hotelStar);
+    cityHotels[stop.cityId] = {
+      cityId: stop.cityId,
+      needsHotel: stop.hotelArrangement === "tokiotours",
+      starRating: star === 3 || star === 5 ? star : 4,
+      rooms: {
+        standard: Math.max(0, Math.round(Number(stop.roomsReserved) || 0)),
+        twin: 0,
+        superior: 0,
+      },
+      standardOccupancy: 2,
+      breakfast: true,
+      ...(stop.hotelName ? { hotelName: stop.hotelName } : {}),
+      ...(stop.hotelUrl ? { hotelUrl: stop.hotelUrl } : {}),
+    };
+  }
+
   return {
     tripMode: "multi_day",
-    adults: guests.adults,
-    children: guests.kids,
-    arrivalDate: record.tour_date || null,
+    adults: Math.max(1, Number(guests.adults) || 1),
+    children: Math.max(0, Number(guests.kids) || 0),
+    arrivalDate: tourDate,
     durationDays: sel.durationDays || record.duration_value || 1,
     locations,
+    ...(Object.keys(cityHotels).length > 0 ? { cityHotels } : {}),
+    ...(typeof sel.airportPickup === "boolean"
+      ? { airportPickup: sel.airportPickup }
+      : {}),
+    ...(typeof sel.airportDropoff === "boolean"
+      ? { airportDropoff: sel.airportDropoff }
+      : {}),
+    ...(sel.arrivalTransitType
+      ? { arrivalTransitType: sel.arrivalTransitType }
+      : {}),
     selectedTours,
     selectedTourIds: sel.experienceIds || [],
     travelPace: sel.pace ?? null,
@@ -1061,6 +1375,50 @@ export function expandMultiDaySelectionsToState(
       sel.guestNeedsTransitHelp === false
         ? sel.guestNeedsTransitHelp
         : null,
+    // Travel Brief fields — only when the saved lead carries them, so a
+    // brief saved in the dossier survives a fresh Retrieve/hydrate and an
+    // older lead never clobbers a locally persisted brief.
+    ...(sel.preEliteTravelStyle
+      ? { preEliteTravelStyle: sel.preEliteTravelStyle }
+      : {}),
+    ...(Array.isArray(sel.preEliteInterests) && sel.preEliteInterests.length
+      ? { preEliteInterests: [...sel.preEliteInterests] }
+      : {}),
+    ...(sel.preEliteMotivation
+      ? { preEliteMotivation: sel.preEliteMotivation }
+      : {}),
+    ...(Array.isArray(sel.preElitePainPoints) && sel.preElitePainPoints.length
+      ? { preElitePainPoints: [...sel.preElitePainPoints] }
+      : {}),
+    ...(sel.preferredTourLanguage
+      ? { preferredTourLanguage: sel.preferredTourLanguage }
+      : {}),
+    // Dietary/mobility may live in BAL top-level column, selections, or
+    // legacy specialNeeds — check all (bookings column is mirrored to BAL
+    // top-level on upsert). Server-saved serialized No/No is an explicit
+    // answer, so carry acked=true or mergePersistedBuilderState's
+    // migrateUnset would erase it back to null ("None specified").
+    ...(() => {
+      const raw =
+        record.guest_special_requirements ?? sel.guestSpecialRequirements;
+      if (raw != null) {
+        const reqs = normalizeGuestSpecialRequirements(raw);
+        return {
+          guestSpecialRequirements: reqs,
+          guestSpecialRequirementsAcked:
+            guestSpecialRequirementsChoicesComplete(reqs),
+        };
+      }
+      if (Array.isArray(sel.specialNeeds) && sel.specialNeeds.length > 0) {
+        const reqs = guestReqsFromLegacySpecialNeeds(sel.specialNeeds);
+        return {
+          guestSpecialRequirements: reqs,
+          guestSpecialRequirementsAcked:
+            guestSpecialRequirementsChoicesComplete(reqs),
+        };
+      }
+      return {};
+    })(),
     confirmedBookingRef: record.booking_ref,
     bookingStatus:
       record.status === "confirmed"
@@ -1077,19 +1435,61 @@ export function expandSingleDaySelectionsToState(
 ): Record<string, unknown> {
   const sel = (record.selections || {}) as SingleDaySelections;
   const guests = record.guests || { adults: 2, kids: 0 };
+  // PB date fields may return "2026-11-01 00:00:00.000Z" — the builder
+  // calendar (`TripRangeMiniCalendar`, DatePickerField) only accepts a
+  // bare YYYY-MM-DD, so always slice to the date part.
+  const tourDateRaw = String(record.tour_date || "").slice(0, 10);
+  const tourDate = /^\d{4}-\d{2}-\d{2}$/.test(tourDateRaw)
+    ? tourDateRaw
+    : null;
+  const tourHoursRaw = Math.round(
+    Number(sel.tourHours) || Number(record.duration_value) || 6
+  );
+  const tourHours = Math.max(5, Math.min(10, tourHoursRaw));
+  const startRaw = String(sel.startHour || "09:00").slice(0, 5);
+  const row = record as unknown as Record<string, unknown>;
+  const meetingPointName =
+    sel.meetingPointName ||
+    (typeof row.meeting_point_name === "string"
+      ? row.meeting_point_name
+      : undefined);
+  const meetingPointAddress =
+    sel.meetingPointAddress ||
+    (typeof row.meeting_point_address === "string"
+      ? row.meeting_point_address
+      : undefined);
+  // Dietary/mobility sources (in priority order): BAL top-level column
+  // (mirror of bookings.guest_special_requirements on upsert), then
+  // selections, then legacy specialNeeds ids. A present serialized
+  // No/No object is an explicit answer — acked must travel with it or
+  // downstream migrateUnset (persist merge / single-day hydrate) erases
+  // it to null and the dossier reads "None specified".
+  const guestReqsRaw =
+    record.guest_special_requirements ?? sel.guestSpecialRequirements;
+  const guestReqs =
+    guestReqsRaw != null
+      ? normalizeGuestSpecialRequirements(guestReqsRaw)
+      : Array.isArray(sel.specialNeeds) && sel.specialNeeds.length > 0
+        ? guestReqsFromLegacySpecialNeeds(sel.specialNeeds)
+        : normalizeGuestSpecialRequirements(guestReqsRaw);
+  const guestReqsAcked =
+    guestSpecialRequirementsChoicesComplete(guestReqs);
   return {
-    tourDate: record.tour_date || null,
-    adults: guests.adults,
-    children: guests.kids,
+    tourDate,
+    adults: Math.max(1, Number(guests.adults) || 1),
+    children: Math.max(0, Number(guests.kids) || 0),
     cityFocus: sel.cityFocus || record.primary_city || "",
-    startTime: sel.startHour || "09:00",
-    tourHours: sel.tourHours || record.duration_value || 6,
+    startTime: /^\d{2}:\d{2}$/.test(startRaw) ? startRaw : "09:00",
+    tourHours,
+    tourHoursCustom: !(tourHours === 6 || tourHours === 8),
+    needsAgentConfirmation: tourHours >= 9,
     travelPace: sel.pace ?? null,
     guidePreference: sel.guidePreference || "private_guide",
     preferredMovement:
       sel.transitOption === "walk" ||
       sel.transitOption === "subway" ||
-      sel.transitOption === "private_driver"
+      sel.transitOption === "private_driver" ||
+      sel.transitOption === "mix"
         ? sel.transitOption
         : null,
     suicaNeeded: Boolean(sel.suicaNeeded),
@@ -1097,11 +1497,101 @@ export function expandSingleDaySelectionsToState(
       typeof sel.suicaValueEur === "number" && sel.suicaValueEur > 0
         ? sel.suicaValueEur
         : 15,
-    selectedExperiences: (sel.selectedExperienceIds || []).map((tourId) => ({
-      tourId,
-      title: "",
-      selectedLanguage: "",
-      duration_hours: 0,
-    })),
+    guestHasJRPass:
+      sel.guestHasJRPass === true || sel.guestHasJRPass === false
+        ? sel.guestHasJRPass
+        : null,
+    guestHasICCard:
+      sel.guestHasICCard === true || sel.guestHasICCard === false
+        ? sel.guestHasICCard
+        : sel.suicaNeeded === true
+          ? false
+          : null,
+    guestNeedsTransitHelp:
+      sel.guestNeedsTransitHelp === true ||
+      sel.guestNeedsTransitHelp === false
+        ? sel.guestNeedsTransitHelp
+        : sel.suicaNeeded === true
+          ? true
+          : null,
+    selectedExperiences: (() => {
+      const detail = Array.isArray(sel.selectedExperiencesDetail)
+        ? sel.selectedExperiencesDetail
+        : [];
+      if (detail.length > 0) {
+        return detail.map((e) => ({
+          tourId: e.tourId,
+          title: e.title || "",
+          selectedLanguage: e.selectedLanguage || "",
+          duration_hours: Number(e.duration_hours) || 0,
+          price: e.price,
+          access_type: e.access_type,
+          category: e.category,
+          entry_type: e.entry_type,
+          is_extra: e.is_extra,
+          timingIntent: e.timingIntent as
+            | "during_tour"
+            | "after_tour"
+            | "other_day"
+            | undefined,
+          ticketDate: e.ticketDate ?? null,
+          opsTimingNote: e.opsTimingNote,
+        }));
+      }
+      return (sel.selectedExperienceIds || []).map((tourId) => ({
+        tourId,
+        title: "",
+        selectedLanguage: "",
+        duration_hours: 0,
+      }));
+    })(),
+    // Meeting / language / guest-reqs live in selections (mirrored by
+    // buildSingleDaySelections) — without these the restored builder
+    // leaves the Meeting + Guests & Pace steps permanently incomplete.
+    meetingPoint: meetingPointAddress || meetingPointName || "",
+    meetingPointName: meetingPointName || meetingPointAddress || "",
+    meetingPointLat:
+      typeof sel.meetingPointLat === "number"
+        ? sel.meetingPointLat
+        : typeof row.meeting_point_lat === "number"
+          ? row.meeting_point_lat
+          : null,
+    meetingPointLng:
+      typeof sel.meetingPointLng === "number"
+        ? sel.meetingPointLng
+        : typeof row.meeting_point_lng === "number"
+          ? row.meeting_point_lng
+          : null,
+    meetingPointPlaceId:
+      sel.meetingPointPlaceId ||
+      (typeof row.meeting_point_place_id === "string"
+        ? row.meeting_point_place_id
+        : ""),
+    meetingLogisticsConfirmed: Boolean(
+      meetingPointName || meetingPointAddress
+    ),
+    preferredTourLanguage: sel.preferredTourLanguage || "EN",
+    guestSpecialRequirements: guestReqs,
+    guestSpecialRequirementsAcked: guestReqsAcked,
+    // Travel Brief (Pre-Elite) fields — only when the saved lead actually
+    // carries them, so an older lead without a brief never clobbers a
+    // locally persisted one on restore/hydrate.
+    ...(sel.preEliteTravelStyle
+      ? { preEliteTravelStyle: sel.preEliteTravelStyle }
+      : {}),
+    ...(Array.isArray(sel.preEliteInterests) && sel.preEliteInterests.length
+      ? { preEliteInterests: [...sel.preEliteInterests] }
+      : {}),
+    ...(sel.preEliteMotivation
+      ? { preEliteMotivation: sel.preEliteMotivation }
+      : {}),
+    ...(Array.isArray(sel.preElitePainPoints) && sel.preElitePainPoints.length
+      ? { preElitePainPoints: [...sel.preElitePainPoints] }
+      : {}),
+    experiencesStepDone:
+      (Array.isArray(sel.selectedExperiencesDetail) &&
+        sel.selectedExperiencesDetail.length > 0) ||
+      (Array.isArray(sel.selectedExperienceIds) &&
+        sel.selectedExperienceIds.length > 0),
   };
 }

@@ -7,7 +7,12 @@ import { Ticket } from "lucide-react";
 import dynamic from "next/dynamic";
 import Image from "next/image";
 import { BrandLogoIcon } from "@/components/branding/BrandLogoIcon";
+import { HeaderSelectors } from "@/components/navigation/HeaderSelectors";
+import { FaqLinkSuspense } from "@/components/navigation/FaqLink";
 import { BRAND_LOGO_ICON } from "@/lib/brand";
+import { BUILDER_ROUTES, journeyItineraryHref } from "@/lib/builderRoutes";
+import { bookingBoundRef } from "@/lib/bookingKindGuard";
+import { useBuilderStore } from "@/store/useBuilderStore";
 
 const ManageBookingModal = dynamic(
   () =>
@@ -45,9 +50,13 @@ export function AppShell({
   const [manageOpen, setManageOpen] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const pathname = usePathname();
+  const confirmedBookingRef = useBuilderStore((s) => s.confirmedBookingRef);
+  const tripMode = useBuilderStore((s) => s.tripMode);
 
   useEffect(() => {
     setOpen(false);
+    // Clear sticky body lock when navigating (edit ↔ itinerary, etc.)
+    document.body.style.overflow = "";
   }, [pathname]);
 
   useEffect(() => {
@@ -103,6 +112,7 @@ export function AppShell({
             <>
               <BrandMark logoSrc={logoSrc} />
               <div className="min-w-0 flex-1" />
+              <HeaderSelectors tone={dark ? "dark" : "light"} />
               <button
                 type="button"
                 onClick={() => setManageOpen(true)}
@@ -118,10 +128,8 @@ export function AppShell({
                 aria-label="Open menu"
                 aria-expanded={open}
                 onClick={() => setOpen(true)}
-                className={`flex h-10 w-10 items-center justify-center rounded-xl transition lg:hidden ${
-                  dark
-                    ? "border border-zinc-700 bg-zinc-900 text-white hover:border-[#075473]"
-                    : "border border-[#D9D2C7] bg-white text-[#0B1F3A] hover:border-[#075473]"
+                className={`flex h-10 w-10 items-center justify-center border-0 bg-transparent shadow-none transition hover:bg-transparent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#075473]/60 lg:hidden ${
+                  dark ? "text-white" : "text-[#0B1F3A]"
                 }`}
               >
                 <HamburgerIcon />
@@ -134,10 +142,8 @@ export function AppShell({
                 aria-label="Open menu"
                 aria-expanded={open}
                 onClick={() => setOpen(true)}
-                className={`flex h-10 w-10 items-center justify-center rounded-xl transition lg:hidden ${
-                  dark
-                    ? "border border-zinc-700 bg-zinc-900 text-white hover:border-[#075473]"
-                    : "border border-[#D9D2C7] bg-white text-[#0B1F3A] hover:border-[#075473]"
+                className={`flex h-10 w-10 items-center justify-center border-0 bg-transparent shadow-none transition hover:bg-transparent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#075473]/60 lg:hidden ${
+                  dark ? "text-white" : "text-[#0B1F3A]"
                 }`}
               >
                 <HamburgerIcon />
@@ -156,6 +162,7 @@ export function AppShell({
                   </h1>
                 ) : null}
               </div>
+              <HeaderSelectors tone={dark ? "dark" : "light"} />
               <button
                 type="button"
                 onClick={() => setManageOpen(true)}
@@ -252,9 +259,21 @@ export function AppShell({
               Manage Booking
             </button>
             <Link
-              href="/builder/itinerary"
+              href={
+                pathname.startsWith("/builder-single") ||
+                pathname.startsWith("/builder/day-pass")
+                  ? journeyItineraryHref(
+                      tripMode === "single_day"
+                        ? bookingBoundRef(confirmedBookingRef)
+                        : null,
+                      { type: "single_day" }
+                    )
+                  : BUILDER_ROUTES.japanJourneyItinerary
+              }
               className={`rounded-xl px-4 py-3.5 text-sm tracking-wide transition ${
                 pathname.startsWith("/builder/itinerary") ||
+                pathname.startsWith("/builder/japan-journey/itinerary") ||
+                pathname.startsWith("/builder/day-pass/itinerary") ||
                 pathname.startsWith("/builder-single/itinerary")
                   ? "bg-[#075473]/20 text-[#075473]"
                   : "text-white/85 hover:bg-white/8"
@@ -262,8 +281,7 @@ export function AppShell({
             >
               Itinerary
             </Link>
-            <Link
-              href="/faq"
+            <FaqLinkSuspense
               className={`rounded-xl px-4 py-3.5 text-sm tracking-wide transition ${
                 pathname.startsWith("/faq")
                   ? "bg-[#075473]/20 text-[#075473]"
@@ -271,7 +289,7 @@ export function AppShell({
               }`}
             >
               FAQ &amp; Transport Guide
-            </Link>
+            </FaqLinkSuspense>
           </nav>
           <p className="border-t border-white/10 px-5 py-4 text-xs text-white/40">
             tokiotours-app.com

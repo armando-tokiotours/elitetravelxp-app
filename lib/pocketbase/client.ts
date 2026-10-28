@@ -81,6 +81,14 @@ export function pbFileUrl(
   thumbOrOpts?: string | PbFileUrlOpts
 ): string {
   if (!filename) return "";
+  // VPS / CDN pointer already stored on the record — serve as-is (no PB files proxy).
+  const trimmed = String(filename).trim();
+  if (
+    trimmed.startsWith("/uploads/") ||
+    /^https?:\/\//i.test(trimmed)
+  ) {
+    return trimmed;
+  }
   const base = `${getPbBaseUrl()}/api/files/${collectionIdOrName}/${recordId}/${encodeURIComponent(filename)}`;
   const opts: PbFileUrlOpts =
     typeof thumbOrOpts === "string"
@@ -99,6 +107,8 @@ export function cityPhoto(city: PbCity): string {
 }
 
 export function tourPhoto(tour: PbTour): string {
+  const coverUrl = String(tour.cover_url || "").trim();
+  if (coverUrl) return coverUrl;
   if (tourMediaType(tour) === "Video") {
     return tour.cover_photo || tour.image || "";
   }
@@ -106,6 +116,8 @@ export function tourPhoto(tour: PbTour): string {
 }
 
 export function tourMediaFile(tour: PbTour): string {
+  const mediaUrl = String(tour.media_url || "").trim();
+  if (mediaUrl) return mediaUrl;
   return tour.media_file || tour.cover_photo || tour.image || "";
 }
 
@@ -113,6 +125,8 @@ export function tourMediaType(tour: PbTour): "Image" | "Video" {
   const file = tourMediaFile(tour);
   // Always trust video file extensions (legacy rows often leave media_type blank)
   if (/\.(mp4|webm|mov|m4v)(\?|$)/i.test(file)) return "Video";
+  const cover = String(tour.cover_url || tour.cover_photo || "");
+  if (/\.(mp4|webm|mov|m4v)(\?|$)/i.test(cover)) return "Video";
   if (tour.media_type === "Video") return "Video";
   if (tour.media_type === "Image") return "Image";
   return "Image";
@@ -386,6 +400,8 @@ export interface PbBrandingUiItem {
   title?: string;
   subtitle?: string;
   description?: string;
+  /** Version stamp for stable /uploads/branding slots (?v= cache-buster). */
+  media_version?: string;
   media?: string;
   /** Video poster / hero still · also Pre-Builder story slide 2 */
   poster?: string;
@@ -401,6 +417,8 @@ export interface PbBrandingUiItem {
   slide2_poster?: string;
   /** Fast preload still for slide 3 video (`slide3`) */
   slide3_poster?: string;
+  /** Card background photo (Site Branding → ICONS; JPG/WebP, 800×400px, ≤300KB) */
+  icon?: string;
   cta_primary?: string;
   cta_secondary?: string;
   inclusion_title?: string;
@@ -521,6 +539,18 @@ export function brandingUiSlide3PosterUrl(
   return brandingUiStillFileUrl(row, row?.slide3_poster, thumb);
 }
 
+/** Uploaded icon for a branding row (Site Branding → ICONS), or "". */
+export function brandingUiIconUrl(
+  row: PbBrandingUiItem | null | undefined
+): string {
+  if (!row?.icon || !row.id) return "";
+  return pbFileUrl(
+    String(row.collectionId ?? "branding_ui_items"),
+    row.id,
+    row.icon
+  );
+}
+
 /** Pre-Builder selected-card background (image or video). */
 export function brandingUiCardUrl(
   row: PbBrandingUiItem | null | undefined,
@@ -579,8 +609,12 @@ export interface PbTour {
   /** What’s included and excluded */
   inclusions_exclusions?: string;
   cover_photo?: string;
+  /** VPS/CDN public path e.g. /uploads/catalog/... — preferred over cover_photo */
+  cover_url?: string;
   media_type?: "Image" | "Video";
   media_file?: string;
+  /** VPS/CDN public path for video/gallery media */
+  media_url?: string;
   /** Group rate for 1 passenger */
   price_1_pax?: number;
   /** Group rate for 2 passengers */
@@ -604,6 +638,10 @@ export interface PbTour {
   /** Optional storefront badge override */
   display_badge?: "FREE / LOW-COST" | "POPULAR" | "SELF-GUIDED" | string;
   duration_hours?: number;
+  /** Tour family: id of the master tour (master points to itself). */
+  family_id?: string;
+  /** True on the family master row (owns title/story/photo). */
+  is_family_master?: boolean;
   /** Guided languages offered for this experience */
   languages?: string[];
   /** Tailor-made: guest can override duration at booking time */
@@ -777,6 +815,23 @@ export interface PbSiteBranding {
   hero_card_single_photo?: string;
   hero_card_experience_photo?: string;
   hero_card_multiday_photo?: string;
+  /** Per-card uploaded accordion video (Media = Video Upload, mp4/webm ≤50MB) */
+  hero_card_single_video?: string;
+  hero_card_experience_video?: string;
+  hero_card_multiday_video?: string;
+  /** Hero grid panels p1–p6 uploaded media (migration 1791310000) */
+  hero_panel_p1_image?: string;
+  hero_panel_p2_image?: string;
+  hero_panel_p3_image?: string;
+  hero_panel_p4_image?: string;
+  hero_panel_p5_image?: string;
+  hero_panel_p6_image?: string;
+  hero_panel_p1_video?: string;
+  hero_panel_p2_video?: string;
+  hero_panel_p3_video?: string;
+  hero_panel_p4_video?: string;
+  hero_panel_p5_video?: string;
+  hero_panel_p6_video?: string;
   collectionId: string;
 }
 
@@ -1047,6 +1102,8 @@ export type HomepageHeroOverlayLayout = {
   orientation: HomepageHeroTextOrientation;
 };
 
+export type HomepageHeroCardMediaType = "image" | "video" | "youtube_link";
+
 export type HomepageHeroCardConfig = {
   id: HomepageHeroCardId;
   title: string;
@@ -1056,22 +1113,128 @@ export type HomepageHeroCardConfig = {
   japaneseTextPosition: HomepageHeroJpPosition;
   overlay: HomepageHeroOverlayLayout;
   heroPhotoUrl: string;
+  /** Cache-buster for stable-slot heroPhotoUrl (JSON only). */
+  heroPhotoVersion?: string;
+  /** Accordion media kind; unset/"image" = legacy photo behaviour. */
+  mediaType?: HomepageHeroCardMediaType;
+  /** Uploaded video file URL (site_branding hero_card_{id}_video), like heroPhotoUrl. */
+  mediaVideoUrl?: string;
+  /** External YouTube/Vimeo/direct-mp4 URL as entered by admin; normalized at render. */
+  mediaEmbedUrl?: string;
   route: string;
   order: number;
   tripType?: "multi_day" | "single_day";
 };
+
+export type ParsedVideoEmbed =
+  | { provider: "youtube"; id: string; embedUrl: string }
+  | { provider: "vimeo"; id: string; embedUrl: string }
+  | { provider: "file"; id: string; embedUrl: string };
+
+/**
+ * Parse a YouTube / Vimeo / direct-mp4 URL into an autoplay embed URL.
+ * Accepts watch, youtu.be, embed, shorts and live YouTube forms,
+ * vimeo.com/<id> and player.vimeo.com/video/<id>, and .mp4/.webm files.
+ * Embed URLs are built at render time (not stored), so old saved raw
+ * URLs keep working unchanged. Returns null for anything unrecognized.
+ */
+export function parseVideoEmbed(raw: string | undefined | null): ParsedVideoEmbed | null {
+  const url = String(raw || "").trim();
+  if (!url) return null;
+  if (/\.(mp4|webm)(\?|#|$)/i.test(url)) {
+    return { provider: "file", id: url, embedUrl: url };
+  }
+  const yt =
+    url.match(/(?:youtube\.com\/(?:watch\?[^#]*v=|embed\/|shorts\/|live\/|v\/)|youtu\.be\/)([A-Za-z0-9_-]{6,})/i) ||
+    url.match(/youtube-nocookie\.com\/embed\/([A-Za-z0-9_-]{6,})/i);
+  if (yt) {
+    const id = yt[1];
+    return {
+      provider: "youtube",
+      id,
+      embedUrl: `https://www.youtube-nocookie.com/embed/${id}?autoplay=1&mute=1&loop=1&playlist=${id}&controls=0&playsinline=1&rel=0`,
+    };
+  }
+  const vm =
+    url.match(/player\.vimeo\.com\/video\/(\d+)/i) ||
+    url.match(/vimeo\.com\/(\d+)/i);
+  if (vm) {
+    const id = vm[1];
+    return {
+      provider: "vimeo",
+      id,
+      embedUrl: `https://player.vimeo.com/video/${id}?autoplay=1&muted=1&loop=1&controls=0&playsinline=1&background=1`,
+    };
+  }
+  return null;
+}
+
+export function parseHomepageHeroMediaType(raw: unknown): HomepageHeroCardMediaType {
+  const v = String(raw || "").trim().toLowerCase();
+  if (v === "video" || v === "youtube_link") return v;
+  return "image";
+}
 
 export type HomepageHeroIntroTextId =
   | "mainTitle"
   | "scriptTitle"
   | "tagline";
 
+export type HomepageHeroGridPanelId = "p1" | "p2" | "p3" | "p4" | "p5" | "p6";
+
+export const HOMEPAGE_HERO_GRID_PANEL_IDS: HomepageHeroGridPanelId[] = [
+  "p1",
+  "p2",
+  "p3",
+  "p4",
+  "p5",
+  "p6",
+];
+
+export type HomepageHeroGridPanelMedia = {
+  mediaType: HomepageHeroCardMediaType;
+  /** External YouTube/Vimeo/direct-mp4 URL as entered by admin. */
+  mediaEmbedUrl: string;
+  /**
+   * Resolved uploaded-image URL. New uploads live OUTSIDE PocketBase in a
+   * stable per-panel slot (/uploads/hero-panels/hero-panel-p{n}.…) and the
+   * bare URL is stored in hero_intro_config JSON; a `?v=` cache-buster is
+   * appended at resolve/display time only. Legacy panels fall back to the
+   * PocketBase `hero_panel_p{n}_image` file field. "" = built-in artwork.
+   */
+  mediaImageUrl: string;
+  /** Resolved uploaded-video URL (same storage scheme as mediaImageUrl). */
+  mediaVideoUrl: string;
+  /** Cache-buster stored beside mediaImageUrl in JSON (not part of the URL). */
+  mediaImageVersion?: string;
+  /** Cache-buster stored beside mediaVideoUrl in JSON (not part of the URL). */
+  mediaVideoVersion?: string;
+};
+
+export function defaultHomepageHeroGridPanels(): Record<
+  HomepageHeroGridPanelId,
+  HomepageHeroGridPanelMedia
+> {
+  const blank = (): HomepageHeroGridPanelMedia => ({
+    mediaType: "image",
+    mediaEmbedUrl: "",
+    mediaImageUrl: "",
+    mediaVideoUrl: "",
+  });
+  return { p1: blank(), p2: blank(), p3: blank(), p4: blank(), p5: blank(), p6: blank() };
+}
+
 export type HomepageHeroIntroBranding = {
   mainTitle: string;
   scriptTitle: string;
   tagline: string;
+  /** Purple grid panel background (hex). Admin-driven, default #9333EA. */
+  panelColor: string;
+  /** Purple grid panel text. Empty = derived from scriptTitle headline. */
+  panelText: string;
   textLayouts: Record<HomepageHeroIntroTextId, HomepageHeroTextSlot>;
   cards: HomepageHeroCardConfig[];
+  gridPanels: Record<HomepageHeroGridPanelId, HomepageHeroGridPanelMedia>;
 };
 
 export const DEFAULT_HOMEPAGE_HERO_TEXT_SLOTS: Record<
@@ -1198,6 +1361,8 @@ export const DEFAULT_HOMEPAGE_HERO_INTRO: HomepageHeroIntroBranding = {
   // Order on page: 1) highlight  2) main H1  3) supporting
   mainTitle: "YOUR DREAM JAPAN TRIP\nIN 60 SECONDS",
   scriptTitle: "DESIGN",
+  panelColor: "#9333EA",
+  panelText: "",
   tagline:
     "Tap what you love—secret food spots, private day tours, or exclusive Japan tickets—and build your bespoke VIP experience instantly.",
   textLayouts: {
@@ -1216,18 +1381,24 @@ export const DEFAULT_HOMEPAGE_HERO_INTRO: HomepageHeroIntroBranding = {
         japaneseTextPosition: m.japaneseTextPosition,
         overlay: { ...m.overlay },
         heroPhotoUrl: m.defaultPhoto,
+        mediaType: "image",
+        mediaVideoUrl: "",
+        mediaEmbedUrl: "",
         route: m.route,
         order: m.order,
         tripType: m.tripType,
       };
     }
   ),
+  gridPanels: defaultHomepageHeroGridPanels(),
 };
 
 type HeroIntroJson = {
   mainTitle?: string;
   scriptTitle?: string;
   tagline?: string;
+  panelColor?: string;
+  panelText?: string;
   /** legacy single block */
   textLayout?: Partial<{ left: number; top: number; maxWidth: number }>;
   textLayouts?: Partial<
@@ -1243,10 +1414,68 @@ type HeroIntroJson = {
         japaneseTextPosition?: string;
         order?: number;
         overlay?: Partial<HomepageHeroOverlayLayout>;
+        mediaType?: string;
+        mediaEmbedUrl?: string;
+        /** Stable external slot URL (/uploads/branding/home-card-…) */
+        heroPhotoUrl?: string;
+        heroPhotoVersion?: string;
+      }
+    >
+  >;
+  gridPanels?: Partial<
+    Record<
+      HomepageHeroGridPanelId,
+      {
+        mediaType?: string;
+        mediaEmbedUrl?: string;
+        mediaImageUrl?: string;
+        mediaVideoUrl?: string;
+        mediaImageVersion?: string;
+        mediaVideoVersion?: string;
       }
     >
   >;
 };
+
+/**
+ * Split a panel media URL into its bare stored reference + cache-buster.
+ * Only external-storage URLs (/uploads/…) and absolute http(s) URLs are
+ * persistable in JSON; blob:/data: previews and PocketBase file URLs are
+ * NOT stored (PB files keep resolving via the legacy file-field fallback).
+ */
+function splitPanelMediaUrl(raw: unknown): { url: string; version: string } {
+  const trimmed = String(raw || "").trim();
+  if (!trimmed || /^(blob:|data:)/i.test(trimmed)) return { url: "", version: "" };
+  let url = trimmed;
+  let version = "";
+  try {
+    const parsed = new URL(trimmed, "http://local.invalid");
+    version = String(parsed.searchParams.get("v") || "").trim();
+    parsed.searchParams.delete("v");
+    const qs = parsed.searchParams.toString();
+    url =
+      parsed.origin === "http://local.invalid"
+        ? `${parsed.pathname}${qs ? `?${qs}` : ""}${parsed.hash}`
+        : parsed.toString();
+  } catch {
+    /* keep raw */
+  }
+  if (!url.startsWith("/uploads/") && !/^https?:\/\//i.test(url)) {
+    return { url: "", version: "" };
+  }
+  // PocketBase file URLs must not be baked into JSON — the file-field
+  // fallback in resolveHomepageHeroIntro owns those.
+  if (/\/api\/files\//i.test(url)) return { url: "", version: "" };
+  return { url, version };
+}
+
+/** Append the stored cache-buster at display time (stored URL stays bare). */
+function withMediaVersion(url: string, version: string | undefined): string {
+  const u = String(url || "").trim();
+  const v = String(version || "").trim();
+  if (!u || !v) return u;
+  return `${u}${u.includes("?") ? "&" : "?"}v=${encodeURIComponent(v)}`;
+}
 
 function parseHeroJpPosition(raw: unknown): HomepageHeroJpPosition {
   const v = String(raw || "").trim();
@@ -1379,6 +1608,12 @@ export function resolveHomepageHeroIntro(
     multiday: "hero_card_multiday_photo",
   };
 
+  const videoField: Record<HomepageHeroCardId, keyof PbSiteBranding> = {
+    single: "hero_card_single_video",
+    experience: "hero_card_experience_video",
+    multiday: "hero_card_multiday_video",
+  };
+
   const cards: HomepageHeroCardConfig[] = (
     ["single", "experience", "multiday"] as HomepageHeroCardId[]
   ).map((id) => {
@@ -1403,11 +1638,24 @@ export function resolveHomepageHeroIntro(
         meta.japaneseText,
       japaneseTextPosition: overlayToJpPreset(overlay),
       overlay,
-      heroPhotoUrl: brandingFileOrFallback(
-        b,
-        photoField[id],
-        meta.defaultPhoto
-      ),
+      heroPhotoUrl: (() => {
+        const jsonPhoto = splitPanelMediaUrl(override.heroPhotoUrl);
+        // Preferred: stable external slot stored in JSON. Legacy
+        // PocketBase file field still resolves until re-uploaded.
+        return jsonPhoto.url
+          ? withMediaVersion(
+              jsonPhoto.url,
+              String(override.heroPhotoVersion || "").trim() ||
+                jsonPhoto.version
+            )
+          : brandingFileOrFallback(b, photoField[id], meta.defaultPhoto);
+      })(),
+      heroPhotoVersion:
+        String(override.heroPhotoVersion || "").trim() ||
+        splitPanelMediaUrl(override.heroPhotoUrl).version,
+      mediaType: parseHomepageHeroMediaType(override.mediaType),
+      mediaVideoUrl: brandingFileOrFallback(b, videoField[id], ""),
+      mediaEmbedUrl: String(override.mediaEmbedUrl || "").trim(),
       route: meta.route,
       order:
         Number.isFinite(orderRaw) && orderRaw >= 1 && orderRaw <= 3
@@ -1424,6 +1672,39 @@ export function resolveHomepageHeroIntro(
     return String(raw);
   };
 
+  const gridPanels = defaultHomepageHeroGridPanels();
+  for (const id of HOMEPAGE_HERO_GRID_PANEL_IDS) {
+    const override = parsed.gridPanels?.[id] || {};
+    // Preferred: external-storage URL stored in JSON (stable /uploads/…
+    // slot). Backward compat: legacy PocketBase file fields still resolve.
+    const jsonImage = splitPanelMediaUrl(override.mediaImageUrl);
+    const jsonVideo = splitPanelMediaUrl(override.mediaVideoUrl);
+    const imageVersion =
+      String(override.mediaImageVersion || "").trim() || jsonImage.version;
+    const videoVersion =
+      String(override.mediaVideoVersion || "").trim() || jsonVideo.version;
+    gridPanels[id] = {
+      mediaType: parseHomepageHeroMediaType(override.mediaType),
+      mediaEmbedUrl: String(override.mediaEmbedUrl || "").trim(),
+      mediaImageUrl: jsonImage.url
+        ? withMediaVersion(jsonImage.url, imageVersion)
+        : brandingFileOrFallback(
+            b,
+            `hero_panel_${id}_image` as keyof PbSiteBranding,
+            ""
+          ),
+      mediaVideoUrl: jsonVideo.url
+        ? withMediaVersion(jsonVideo.url, videoVersion)
+        : brandingFileOrFallback(
+            b,
+            `hero_panel_${id}_video` as keyof PbSiteBranding,
+            ""
+          ),
+      mediaImageVersion: imageVersion,
+      mediaVideoVersion: videoVersion,
+    };
+  }
+
   return {
     mainTitle: pickCopy(parsed.mainTitle, DEFAULT_HOMEPAGE_HERO_INTRO.mainTitle),
     scriptTitle: pickCopy(
@@ -1431,8 +1712,13 @@ export function resolveHomepageHeroIntro(
       DEFAULT_HOMEPAGE_HERO_INTRO.scriptTitle
     ),
     tagline: pickCopy(parsed.tagline, DEFAULT_HOMEPAGE_HERO_INTRO.tagline),
+    panelColor: /^#[0-9a-fA-F]{6}$/.test(String(parsed.panelColor || "").trim())
+      ? String(parsed.panelColor).trim()
+      : DEFAULT_HOMEPAGE_HERO_INTRO.panelColor,
+    panelText: String(parsed.panelText ?? "").trim(),
     textLayouts: resolveTextLayouts(parsed),
     cards,
+    gridPanels,
   };
 }
 
@@ -1440,6 +1726,8 @@ export function serializeHomepageHeroIntroConfig(input: {
   mainTitle: string;
   scriptTitle: string;
   tagline: string;
+  panelColor?: string;
+  panelText?: string;
   textLayouts: Record<HomepageHeroIntroTextId, HomepageHeroTextSlot>;
   cards: Pick<
     HomepageHeroCardConfig,
@@ -1450,10 +1738,48 @@ export function serializeHomepageHeroIntroConfig(input: {
     | "japaneseTextPosition"
     | "overlay"
     | "order"
+    | "mediaType"
+    | "mediaEmbedUrl"
+    | "heroPhotoUrl"
+    | "heroPhotoVersion"
   >[];
+  gridPanels?: Partial<
+    Record<
+      HomepageHeroGridPanelId,
+      Pick<
+        HomepageHeroGridPanelMedia,
+        | "mediaType"
+        | "mediaEmbedUrl"
+        | "mediaImageUrl"
+        | "mediaVideoUrl"
+        | "mediaImageVersion"
+        | "mediaVideoVersion"
+      >
+    >
+  >;
 }): string {
+  const gridPanels: HeroIntroJson["gridPanels"] = {};
+  for (const id of HOMEPAGE_HERO_GRID_PANEL_IDS) {
+    const p = input.gridPanels?.[id];
+    const image = splitPanelMediaUrl(p?.mediaImageUrl);
+    const video = splitPanelMediaUrl(p?.mediaVideoUrl);
+    gridPanels[id] = {
+      // Only bare external-storage URLs (/uploads/…) are serialized —
+      // never image bytes, blob previews, or PocketBase file URLs (legacy
+      // PB-file panels keep resolving via the file-field fallback).
+      mediaType: parseHomepageHeroMediaType(p?.mediaType),
+      mediaEmbedUrl: String(p?.mediaEmbedUrl || "").trim(),
+      mediaImageUrl: image.url,
+      mediaVideoUrl: video.url,
+      mediaImageVersion:
+        String(p?.mediaImageVersion || "").trim() || image.version,
+      mediaVideoVersion:
+        String(p?.mediaVideoVersion || "").trim() || video.version,
+    };
+  }
   const cards: HeroIntroJson["cards"] = {};
   for (const c of input.cards) {
+    const photo = splitPanelMediaUrl(c.heroPhotoUrl);
     cards[c.id] = {
       title: c.title,
       subtitle: c.subtitle,
@@ -1461,12 +1787,24 @@ export function serializeHomepageHeroIntroConfig(input: {
       japaneseTextPosition: overlayToJpPreset(c.overlay),
       order: c.order,
       overlay: mergeOverlay(DEFAULT_HOMEPAGE_HERO_OVERLAY, c.overlay),
+      // Raw URL as entered; render normalizes via parseVideoEmbed.
+      mediaType: parseHomepageHeroMediaType(c.mediaType),
+      mediaEmbedUrl: String(c.mediaEmbedUrl || "").trim(),
+      // Only bare external-storage URLs (/uploads/…) — never blob or
+      // PocketBase file URLs (legacy PB photos keep the field fallback).
+      heroPhotoUrl: photo.url,
+      heroPhotoVersion:
+        String(c.heroPhotoVersion || "").trim() || photo.version,
     };
   }
   return JSON.stringify({
     mainTitle: input.mainTitle,
     scriptTitle: input.scriptTitle,
     tagline: input.tagline,
+    panelColor: /^#[0-9a-fA-F]{6}$/.test(String(input.panelColor || "").trim())
+      ? String(input.panelColor).trim()
+      : DEFAULT_HOMEPAGE_HERO_INTRO.panelColor,
+    panelText: String(input.panelText ?? "").trim(),
     textLayouts: {
       mainTitle: mergeTextSlot(
         DEFAULT_HOMEPAGE_HERO_TEXT_SLOTS.mainTitle,
@@ -1482,6 +1820,7 @@ export function serializeHomepageHeroIntroConfig(input: {
       ),
     },
     cards,
+    gridPanels,
   });
 }
 

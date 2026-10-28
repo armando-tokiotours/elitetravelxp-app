@@ -2,43 +2,42 @@
 
 import { useEffect, useState } from "react";
 import Image from "next/image";
+import { ChevronDown } from "lucide-react";
+import type { PbSiteBranding } from "@/lib/pocketbase/client";
 import {
-  DEFAULT_HERO_IMAGE,
-  brandingHeroUrl,
-  fetchPublicBrandAssets,
-  type PbSiteBranding,
-} from "@/lib/pocketbase/client";
+  brandingSlotSrcSet,
+  brandingSlotWebUrl,
+  builderHeroSlot,
+} from "@/lib/brandingImageSlots";
 
 const HERO_SUBTITLE_DEFAULT =
   "Full Bespoke Vacation across Tokyo, Kyoto & Beyond";
 
 const HERO_CHARACTER_SRC = "/images/peek-character.webp";
 
-const HERO_MEDIA_STUBS = new Set([
-  "/brand/tokiotours-logo-icon.png",
-  "/brand/hero-single-day.jpg",
-  "/brand/hero-background.jpg",
-  "/brand/hero-japan-pagoda.jpg",
-  "/brand/site-logo.png",
-]);
-
-function realHeroMedia(url: string): string {
-  const u = (url || "").trim();
-  if (!u || HERO_MEDIA_STUBS.has(u)) return "";
-  return u;
-}
+// The ONE Multi-Day hero slot — same ID in Site Branding and in
+// Layout & Characters → Heroes. No media_version stamp source exists
+// for this hero (site_branding has no such field), so the bare slot
+// URL is used; replaces overwrite the same file in place.
 
 /**
  * Multi-day builder hero — admin still (or public brand fallback) + character + copy.
  * Empty media → plain grey (never logo stub filler).
  */
-export function BuilderHero({ branding }: { branding: PbSiteBranding | null }) {
+export function BuilderHero({
+  branding,
+  onStartBuilding,
+}: {
+  branding: PbSiteBranding | null;
+  onStartBuilding?: () => void;
+}) {
   const [subtitle, setSubtitle] = useState(
     () =>
       branding?.hero_subtitle?.trim() ||
       HERO_SUBTITLE_DEFAULT
   );
-  const [heroSrc, setHeroSrc] = useState(() => realHeroMedia(DEFAULT_HERO_IMAGE));
+  const [heroOk, setHeroOk] = useState(true);
+  const heroSrc = brandingSlotWebUrl(builderHeroSlot("multiday"));
 
   useEffect(() => {
     setSubtitle(
@@ -46,27 +45,19 @@ export function BuilderHero({ branding }: { branding: PbSiteBranding | null }) {
     );
   }, [branding]);
 
-  useEffect(() => {
-    let cancelled = false;
-    void fetchPublicBrandAssets().then((assets) => {
-      if (cancelled) return;
-      setHeroSrc(realHeroMedia(brandingHeroUrl(branding, assets)));
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [branding]);
-
   return (
     <section
-      className="builder-hero relative z-10 h-[65vh] w-full min-h-[280px] overflow-hidden bg-[#05080C] sm:h-[80vh] md:min-h-[420px]"
+      className="builder-hero relative z-10 flex h-[calc(100dvh-3.75rem)] w-full flex-col overflow-hidden bg-[#05080C] pb-24 lg:h-[100dvh]"
       aria-label="Hero"
     >
-      {heroSrc ? (
+      {heroOk ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
           src={heroSrc}
+          srcSet={brandingSlotSrcSet(builderHeroSlot("multiday"))}
+          sizes="100vw"
           alt=""
+          onError={() => setHeroOk(false)}
           className="absolute inset-0 z-0 h-full w-full object-cover"
         />
       ) : (
@@ -103,6 +94,39 @@ export function BuilderHero({ branding }: { branding: PbSiteBranding | null }) {
           {subtitle || HERO_SUBTITLE_DEFAULT}
         </p>
       </div>
+
+      {onStartBuilding ? (
+        // In-flow at the end of the flex column (mt-auto) + section pb-24,
+        // so the cue always sits above the mobile bottom nav / fold,
+        // whatever the screen height.
+        <div className="relative z-30 mt-auto flex justify-center">
+          <button
+            type="button"
+            onClick={onStartBuilding}
+            aria-label="Start building your journey"
+            className="flex flex-col items-center gap-3 text-zinc-300 transition-colors hover:text-white"
+          >
+            <span className="text-sm font-bold tracking-[0.25em] uppercase">
+              Start Building
+            </span>
+            <span className="relative flex h-12 w-12 items-center justify-center">
+              <span
+                aria-hidden
+                className="pointer-events-none absolute inset-0 rounded-full border border-white/45 animate-hero-start-cta-ring"
+              />
+              <span
+                aria-hidden
+                className="pointer-events-none absolute inset-0 rounded-full border border-white/25 animate-hero-start-cta-ring [animation-delay:1s]"
+              />
+              <span className="absolute inset-0 animate-bounce">
+                <span className="flex h-full w-full items-center justify-center rounded-full border border-white/30 bg-black/40 animate-widget-call-glow">
+                  <ChevronDown className="h-6 w-6" />
+                </span>
+              </span>
+            </span>
+          </button>
+        </div>
+      ) : null}
     </section>
   );
 }

@@ -1,30 +1,35 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import { X } from "lucide-react";
 import { useModalDismiss } from "@/hooks/useModalDismiss";
 import { PandaFlexibleMascot } from "@/components/branding/PandaFlexibleMascot";
 import {
-  calculateSingleDayQuote,
   formatEur,
-  formatYen,
+  resolveSingleDayDisplayQuote,
   singleDayPerPersonEur,
   singleDayPerPersonHourEur,
+  type LockedAdminPricingSnapshot,
 } from "@/lib/singleDayPricing";
 import { useSingleDayBuilderStore } from "@/store/useSingleDayBuilderStore";
 import { useBuilderStore } from "@/store/useBuilderStore";
+import { activeBookingRef } from "@/utils/pnr";
 
 /**
  * Compact budget breakdown for Builder S sticky bar.
+ * Draft → live catalog estimate; confirmed + Ops lock → approved package lines.
  */
 export function SingleDayBudgetModal({
   open,
   onClose,
+  /** Optional prefetched Ops lock from the itinerary page (avoids a second fetch). */
+  adminPricing,
 }: {
   open: boolean;
   onClose: () => void;
+  adminPricing?: LockedAdminPricingSnapshot | null;
 }) {
   useModalDismiss(open, onClose);
 
@@ -40,21 +45,82 @@ export function SingleDayBudgetModal({
   const preferredMovement = useSingleDayBuilderStore((s) => s.preferredMovement);
   const suicaNeeded = useSingleDayBuilderStore((s) => s.suicaNeeded);
   const suicaValueEur = useSingleDayBuilderStore((s) => s.suicaValueEur);
+  const tempBookingRef = useBuilderStore((s) => s.tempBookingRef);
+  const confirmedBookingRef = useBuilderStore((s) => s.confirmedBookingRef);
+  const bookingStatus = useBuilderStore((s) => s.bookingStatus);
   const conciergeActive =
     isEliteConcierge || experienceService === "concierge";
 
-  const quote = useMemo(
+  const pnr = activeBookingRef({
+    tempBookingRef,
+    confirmedBookingRef,
+    bookingStatus,
+  });
+
+  const [fetchedLock, setFetchedLock] =
+    useState<LockedAdminPricingSnapshot | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    if (adminPricing != null) {
+      setFetchedLock(adminPricing);
+      return;
+    }
+    const ref = String(pnr || "").trim();
+    if (!ref || ref.startsWith("TMP-") || ref.startsWith("DRAFT-")) {
+      setFetchedLock(null);
+      return;
+    }
+    let cancelled = false;
+    void fetch(`/api/bookings/agent-services?pnr=${encodeURIComponent(ref)}`, {
+      cache: "no-store",
+    })
+      .then((r) => (r.ok ? r.json() : null))
+      .then(
+        (data: {
+          services?: LockedAdminPricingSnapshot["services"];
+          finalApprovedPrice?: number | null;
+          priceMode?: string | null;
+          estimatedTotalEur?: number;
+        } | null) => {
+          if (cancelled || !data) return;
+          setFetchedLock({
+            services: data.services || [],
+            finalApprovedPrice: data.finalApprovedPrice ?? null,
+            priceMode: data.priceMode ?? null,
+            estimatedTotalEur: data.estimatedTotalEur ?? null,
+          });
+        }
+      )
+      .catch(() => {
+        if (!cancelled) setFetchedLock(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, adminPricing, pnr]);
+
+  const lock = adminPricing ?? fetchedLock;
+
+  const { quote, locked } = useMemo(
     () =>
-      calculateSingleDayQuote({
-        guidePreference,
-        tourHours,
-        experiencePrices: selectedExperiences.map((e) => Number(e.price) || 0),
-        conciergeActive,
-        preferredMovement,
-        suicaNeeded,
-        suicaValueEur,
-        guests: Math.max(1, adults + children),
-      }),
+      resolveSingleDayDisplayQuote(
+        {
+          guidePreference,
+          tourHours,
+          experiencePrices: selectedExperiences.map((e) => Number(e.price) || 0),
+          conciergeActive,
+          preferredMovement,
+          suicaNeeded,
+          suicaValueEur,
+          guests: Math.max(1, adults + children),
+        },
+        {
+          bookingStatus,
+          confirmedBookingRef,
+          lock,
+        }
+      ),
     [
       guidePreference,
       tourHours,
@@ -65,6 +131,9 @@ export function SingleDayBudgetModal({
       suicaValueEur,
       adults,
       children,
+      bookingStatus,
+      confirmedBookingRef,
+      lock,
     ]
   );
 
@@ -119,8 +188,9 @@ export function SingleDayBudgetModal({
               Price composition
             </h3>
             <p className="mt-2 text-sm text-white/55">
-              Estimate for {guests} guest{guests === 1 ? "" : "s"} · {tourHours}h
-              private day. Inclusions update as you add experiences.
+              {locked
+                ? `Approved package for ${guests} guest${guests === 1 ? "" : "s"} · ${tourHours}h private day.`
+                : `Estimate for ${guests} guest${guests === 1 ? "" : "s"} · ${tourHours}h private day. Inclusions update as you add experiences.`}
             </p>
 
             <ul className="mt-5 space-y-2.5 text-sm">
@@ -139,10 +209,12 @@ export function SingleDayBudgetModal({
 
             <div className="mt-5 rounded-2xl border border-[#075473]/50 bg-[#075473]/15 px-4 py-4">
               <p className="text-[10px] font-bold uppercase tracking-wider text-[#00B4D8]">
-                Estimated · per person
+                {locked ? "Approved · per person" : "Estimated · per person"}
               </p>
               <p className="mt-1 text-2xl font-bold tabular-nums text-white">
-                {formatEur(perPerson)}
+                {quote.min !== quote.max
+                  ? `${formatEur(singleDayPerPersonEur(quote.min, guests))} ~ ${formatEur(singleDayPerPersonEur(quote.max, guests))}`
+                  : formatEur(perPerson)}
                 <span className="ml-1.5 text-sm font-semibold text-white/50">
                   /pp
                 </span>
@@ -151,7 +223,10 @@ export function SingleDayBudgetModal({
                 {tourHours}h · {formatEur(perPersonHour)} /pp/h
               </p>
               <p className="mt-1 text-[11px] tabular-nums text-zinc-500">
-                Party {formatEur(quote.totalEur)} · ≈ {formatYen(quote.totalYen)}
+                Party total{" "}
+                {quote.min !== quote.max
+                  ? `${formatEur(quote.min)} ~ ${formatEur(quote.max)}`
+                  : formatEur(quote.totalEur)}
               </p>
             </div>
 

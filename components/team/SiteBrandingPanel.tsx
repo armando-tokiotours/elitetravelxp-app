@@ -4,13 +4,9 @@ import type PocketBase from "pocketbase";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { formatPbError } from "@/lib/pocketbase/admin-schema";
-import { optimizeFileForUpload } from "@/lib/optimizeUploadClient";
 import {
   DEFAULT_SITE_BRANDING,
-  brandingHeroUrl,
   brandingLogoUrl,
-  brandingUiMediaUrl,
-  brandingUiPosterUrl,
   fetchPublicBrandAssets,
   type PbBrandingUiItem,
   type PbSiteBranding,
@@ -23,16 +19,23 @@ import { PreBuilderQuizBrandingAdmin } from "@/components/team/PreBuilderQuizBra
 import { TransportCardsBrandingAdmin } from "@/components/team/TransportCardsBrandingAdmin";
 import { BrandingUiKeysAdmin } from "@/components/team/BrandingUiKeysAdmin";
 import { MultiTransportExplainersAdmin } from "@/components/team/MultiTransportExplainersAdmin";
+import { SiteBrandingIcons } from "@/components/team/SiteBrandingIcons";
 import { BRAND_LOGO, BRAND_DESCRIPTION, BRAND_TITLE, LOCAL_FONTS } from "@/lib/brand";
 import {
-  SINGLE_DAY_BUILDER_CONFIG,
   SINGLE_DAY_BUILDER_HERO_KEY,
-  SINGLE_DAY_HERO_PUBLIC_FALLBACK,
   writeBuilderSHeroLocalCache,
 } from "@/config/mediaConfig";
 import { BUILDER_S_HERO_CONFIG } from "@/config/teamConfig";
-import { BRANDING_UI_FALLBACKS, isVideoFilename } from "@/lib/brandingUi";
+import { BRANDING_UI_FALLBACKS } from "@/lib/brandingUi";
 import { useSiteBrandingStore } from "@/store/useSiteBrandingStore";
+import { uploadToVps } from "@/lib/vpsUploadClient";
+import {
+  BUILDER_ACTIVITIES_HERO_KEY,
+  brandingSlotVersionedUrl,
+  brandingSlotWebUrl,
+  builderHeroSlot,
+} from "@/lib/brandingImageSlots";
+import { preEliteMediaVersion } from "@/lib/preEliteBranding";
 
 type PbClient = PocketBase;
 
@@ -98,7 +101,6 @@ export function SiteBrandingPanel({ getClient }: { getClient: () => PbClient }) 
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [heroFile, setHeroFile] = useState<File | null>(null);
   const [faviconFile, setFaviconFile] = useState<File | null>(null);
-  const [saveHeroToPublic, setSaveHeroToPublic] = useState(true);
   const [saveLogoToPublic, setSaveLogoToPublic] = useState(false);
   const [saveFaviconToPublic, setSaveFaviconToPublic] = useState(true);
   const [logoPreview, setLogoPreview] = useState("");
@@ -122,15 +124,36 @@ export function SiteBrandingPanel({ getClient }: { getClient: () => PbClient }) 
   );
   const [sdFile, setSdFile] = useState<File | null>(null);
   const [sdPreview, setSdPreview] = useState("");
-  const [sdPosterFile, setSdPosterFile] = useState<File | null>(null);
-  const [sdPosterPreview, setSdPosterPreview] = useState("");
-  const [saveSdToPublic, setSaveSdToPublic] = useState(true);
   const [sdSaving, setSdSaving] = useState(false);
   const [sdMsg, setSdMsg] = useState<string | null>(null);
   const [sdError, setSdError] = useState<string | null>(null);
+  // —— Activities hero (Builder E) via branding_ui_items + slot ——
+  const [actRecord, setActRecord] = useState<PbBrandingUiItem | null>(null);
+  const [actFile, setActFile] = useState<File | null>(null);
+  const [actPreview, setActPreview] = useState(() =>
+    brandingSlotWebUrl(builderHeroSlot("activities"))
+  );
+  const [actSaving, setActSaving] = useState(false);
+  const [actMsg, setActMsg] = useState<string | null>(null);
+  const [actError, setActError] = useState<string | null>(null);
   const [brandingTab, setBrandingTab] = useState<
-    "heroes" | "torii" | "prebuilder" | "transport" | "pace" | "explanations"
+    | "heroes"
+    | "torii"
+    | "prebuilder"
+    | "transport"
+    | "pace"
+    | "explanations"
+    | "icons"
   >("heroes");
+  const [heroesSubTab, setHeroesSubTab] = useState<
+    "site" | "multiday" | "singleday" | "activities" | "typography" | "value"
+  >("site");
+  const [transportSubTab, setTransportSubTab] = useState<
+    "cards" | "movement"
+  >("cards");
+  const [explanationsSubTab, setExplanationsSubTab] = useState<
+    "movement" | "pace" | "multi"
+  >("movement");
 
   const load = async () => {
     setLoading(true);
@@ -190,7 +213,9 @@ export function SiteBrandingPanel({ getClient }: { getClient: () => PbClient }) 
           DEFAULT_CONCIERGE_ESTIMATE_COPY.feeModalTitle
       );
       setLogoPreview(brandingLogoUrl(row, assets));
-      setHeroPreview(brandingHeroUrl(row, assets));
+      // Multi-Day hero: the ONE slot (no media_version source on
+      // site_branding, so bare slot URL — replaces overwrite in place).
+      setHeroPreview(brandingSlotWebUrl(builderHeroSlot("multiday")));
       setFaviconPreview(assets.favicon || "/brand/favicon.png");
       setLogoFile(null);
       setHeroFile(null);
@@ -230,15 +255,28 @@ export function SiteBrandingPanel({ getClient }: { getClient: () => PbClient }) 
           SD_FALLBACK?.subtitle ||
           BUILDER_S_HERO_CONFIG.tagline
       );
-      const sdMedia =
-        brandingUiMediaUrl(sd) ||
-        assets.hero_single ||
-        SINGLE_DAY_BUILDER_CONFIG.hero.fallbackImage ||
-        SINGLE_DAY_HERO_PUBLIC_FALLBACK;
-      setSdPreview(sdMedia);
+      setSdPreview(
+        brandingSlotVersionedUrl(
+          builderHeroSlot("single"),
+          preEliteMediaVersion(sd)
+        )
+      );
       setSdFile(null);
-      setSdPosterPreview(brandingUiPosterUrl(sd) || "");
-      setSdPosterFile(null);
+      // Activities hero row (created on first save if missing)
+      const actRows = await pb
+        .collection("branding_ui_items")
+        .getFullList<PbBrandingUiItem>({
+          filter: `key = "${BUILDER_ACTIVITIES_HERO_KEY}"`,
+        });
+      const act = actRows[0] || null;
+      setActRecord(act);
+      setActPreview(
+        brandingSlotVersionedUrl(
+          builderHeroSlot("activities"),
+          preEliteMediaVersion(act)
+        )
+      );
+      setActFile(null);
     } catch (e) {
       setError(formatPbError(e));
     } finally {
@@ -314,7 +352,12 @@ export function SiteBrandingPanel({ getClient }: { getClient: () => PbClient }) 
       fd.append("concierge_fee_policy_text", feePolicy);
       fd.append("concierge_fee_modal_title", feeModalTitle);
       if (logoFile) fd.append("logo_image", logoFile);
-      if (heroFile) fd.append("hero_background_image", heroFile);
+      // Hero image → the ONE multiday slot (never a PB binary / public/brand copy)
+      if (heroFile) {
+        await uploadToVps(heroFile, "branding", pb.authStore.token || "", {
+          stableKey: builderHeroSlot("multiday"),
+        });
+      }
 
       let saved: PbSiteBranding;
       if (record?.id) {
@@ -330,12 +373,10 @@ export function SiteBrandingPanel({ getClient }: { getClient: () => PbClient }) 
       const notes: string[] = [];
       let nextAssets = { ...publicAssets };
 
-      if (heroFile && saveHeroToPublic) {
-        const result = await savePublicAsset("hero", heroFile);
-        if (result.path) {
-          nextAssets = { ...nextAssets, hero: result.path };
-          notes.push(`Hero also saved to ${result.absolute || result.path}`);
-        }
+      if (heroFile) {
+        notes.push(
+          `Multi-Day hero saved to slot ${builderHeroSlot("multiday")} (/uploads/branding/${builderHeroSlot("multiday")}.webp)`
+        );
       }
       if (logoFile && saveLogoToPublic) {
         const result = await savePublicAsset("logo", logoFile);
@@ -355,7 +396,11 @@ export function SiteBrandingPanel({ getClient }: { getClient: () => PbClient }) 
       setPublicAssets(nextAssets);
       setRecord(saved);
       setLogoPreview(brandingLogoUrl(saved, nextAssets));
-      setHeroPreview(brandingHeroUrl(saved, nextAssets));
+      setHeroPreview(
+        heroFile
+          ? `${brandingSlotWebUrl(builderHeroSlot("multiday"))}?v=${Date.now()}`
+          : brandingSlotWebUrl(builderHeroSlot("multiday"))
+      );
       setFaviconPreview(nextAssets.favicon || "/brand/favicon.png");
       setLogoFile(null);
       setHeroFile(null);
@@ -384,6 +429,13 @@ export function SiteBrandingPanel({ getClient }: { getClient: () => PbClient }) 
     setSdError(null);
     try {
       const pb = getClient();
+      // Image → the ONE single-day slot; clear PB media + stamp version
+      const stamp = sdFile ? String(Date.now()) : "";
+      if (sdFile) {
+        await uploadToVps(sdFile, "branding", pb.authStore.token || "", {
+          stableKey: builderHeroSlot("single"),
+        });
+      }
       const fd = new FormData();
       fd.append("title", sdScript);
       fd.append("cta_primary", sdPrefix);
@@ -391,16 +443,9 @@ export function SiteBrandingPanel({ getClient }: { getClient: () => PbClient }) 
       fd.append("key", SINGLE_DAY_BUILDER_HERO_KEY);
       fd.append("category", "builder");
       if (sdFile) {
-        const opt = await optimizeFileForUpload(sdFile);
-        fd.append("media", opt.file);
-        // Auto first-frame poster when admin did not upload a custom still
-        if (!sdPosterFile && opt.posterFile) {
-          fd.append("poster", opt.posterFile);
-        }
-      }
-      if (sdPosterFile) {
-        const optPoster = await optimizeFileForUpload(sdPosterFile);
-        fd.append("poster", optPoster.file);
+        fd.append("media", "");
+        fd.append("poster", "");
+        fd.append("media_version", stamp);
       }
 
       let saved: PbBrandingUiItem;
@@ -415,38 +460,13 @@ export function SiteBrandingPanel({ getClient }: { getClient: () => PbClient }) 
           .create(fd)) as unknown as PbBrandingUiItem;
       }
 
-      const notes: string[] = [];
-      let nextAssets = { ...publicAssets };
-      if (
-        sdFile &&
-        saveSdToPublic &&
-        !isVideoFilename(sdFile.name)
-      ) {
-        const result = await savePublicAsset("hero_single", sdFile);
-        if (result.path) {
-          nextAssets = { ...nextAssets, hero_single: result.path };
-          notes.push(
-            `Single-day hero also saved to ${result.absolute || result.path}`
-          );
-        }
-      } else if (sdFile && saveSdToPublic && isVideoFilename(sdFile.name)) {
-        notes.push(
-          "Video kept in PocketBase only (public/brand accepts images)."
-        );
-      }
-
-      const usedCustomPoster = Boolean(sdPosterFile);
-      const usedAutoPoster = Boolean(sdFile && !sdPosterFile);
-      setPublicAssets(nextAssets);
+      const resolvedMedia = brandingSlotVersionedUrl(
+        builderHeroSlot("single"),
+        stamp || preEliteMediaVersion(saved)
+      );
       setSdRecord(saved);
-      const resolvedMedia =
-        brandingUiMediaUrl(saved) ||
-        nextAssets.hero_single ||
-        SINGLE_DAY_BUILDER_CONFIG.hero.fallbackImage;
       setSdPreview(resolvedMedia);
       setSdFile(null);
-      setSdPosterPreview(brandingUiPosterUrl(saved) || sdPosterPreview);
-      setSdPosterFile(null);
       writeBuilderSHeroLocalCache({
         scriptAccent: sdScript,
         mainTitlePrefix: sdPrefix,
@@ -455,17 +475,7 @@ export function SiteBrandingPanel({ getClient }: { getClient: () => PbClient }) 
       });
       useSiteBrandingStore.setState({ loaded: false, itemsByKey: {} });
       setSdMsg(
-        [
-          "Builder S hero saved.",
-          usedCustomPoster
-            ? "Using your uploaded preload poster."
-            : usedAutoPoster
-              ? "Auto frame saved as preload poster (upload a still to override)."
-              : "",
-          ...notes,
-        ]
-          .filter(Boolean)
-          .join(" ")
+        `Builder S hero saved to slot ${builderHeroSlot("single")} (/uploads/branding/${builderHeroSlot("single")}.webp).`
       );
     } catch (e) {
       setSdError(formatPbError(e));
@@ -474,12 +484,61 @@ export function SiteBrandingPanel({ getClient }: { getClient: () => PbClient }) 
     }
   };
 
+  const saveActivitiesHero = async () => {
+    setActSaving(true);
+    setActMsg(null);
+    setActError(null);
+    try {
+      const pb = getClient();
+      const stamp = actFile ? String(Date.now()) : "";
+      if (actFile) {
+        await uploadToVps(actFile, "branding", pb.authStore.token || "", {
+          stableKey: builderHeroSlot("activities"),
+        });
+      }
+      const fd = new FormData();
+      fd.append("key", BUILDER_ACTIVITIES_HERO_KEY);
+      fd.append("category", "builder");
+      fd.append("title", "VIP Tickets");
+      fd.append("subtitle", "VIP Tickets & Local Access");
+      if (actFile) {
+        fd.append("media", "");
+        fd.append("media_version", stamp);
+      }
+      let saved: PbBrandingUiItem;
+      if (actRecord?.id) {
+        saved = (await pb
+          .collection("branding_ui_items")
+          .update(actRecord.id, fd)) as unknown as PbBrandingUiItem;
+      } else {
+        fd.append("sort_order", "0");
+        saved = (await pb
+          .collection("branding_ui_items")
+          .create(fd)) as unknown as PbBrandingUiItem;
+      }
+      setActRecord(saved);
+      setActPreview(
+        brandingSlotVersionedUrl(
+          builderHeroSlot("activities"),
+          stamp || preEliteMediaVersion(saved)
+        )
+      );
+      setActFile(null);
+      useSiteBrandingStore.setState({ loaded: false, itemsByKey: {} });
+      setActMsg(
+        `Activities hero saved to slot ${builderHeroSlot("activities")} (/uploads/branding/${builderHeroSlot("activities")}.webp).`
+      );
+    } catch (e) {
+      setActError(formatPbError(e));
+    } finally {
+      setActSaving(false);
+    }
+  };
+
   if (loading && brandingTab === "heroes") {
     return <p className="text-sm text-zinc-400">Loading site branding…</p>;
   }
 
-  const sdPreviewIsVideo =
-    (sdFile && isVideoFilename(sdFile.name)) || isVideoFilename(sdPreview);
 
   return (
     <div className="space-y-6">
@@ -492,6 +551,7 @@ export function SiteBrandingPanel({ getClient }: { getClient: () => PbClient }) 
             ["transport", "Transport"],
             ["pace", "Travel Pace"],
             ["explanations", "Explanations"],
+            ["icons", "ICONS"],
           ] as const
         ).map(([id, label]) => {
           const active = brandingTab === id;
@@ -506,7 +566,9 @@ export function SiteBrandingPanel({ getClient }: { getClient: () => PbClient }) 
                     ? "rounded-full border border-[#DC6E8A]/70 bg-[#DC6E8A]/15 px-4 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-[#f9a8c0]"
                     : id === "explanations"
                       ? "rounded-full border border-white/30 bg-white/10 px-4 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-white"
-                      : "rounded-full border border-[#075473] bg-[#075473]/25 px-4 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-[#7dd3fc]";
+                      : id === "icons"
+                        ? "rounded-full border border-[#F6A724]/70 bg-[#F6A724]/15 px-4 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-[#F6A724]"
+                        : "rounded-full border border-[#075473] bg-[#075473]/25 px-4 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-[#7dd3fc]";
           return (
             <button
               key={id}
@@ -524,7 +586,9 @@ export function SiteBrandingPanel({ getClient }: { getClient: () => PbClient }) 
         })}
       </div>
 
-      {brandingTab === "prebuilder" ? (
+      {brandingTab === "icons" ? (
+        <SiteBrandingIcons getClient={getClient} />
+      ) : brandingTab === "prebuilder" ? (
         <PreBuilderQuizBrandingAdmin getClient={getClient} />
       ) : brandingTab === "torii" ? (
         <HomepageHeroCardsAdminStudio getClient={getClient} />
@@ -537,15 +601,44 @@ export function SiteBrandingPanel({ getClient }: { getClient: () => PbClient }) 
               Single-day Preferred Movement (Walking / Subway / Private Driver).
             </p>
           </div>
-          <TransportCardsBrandingAdmin getClient={getClient} />
-          <BrandingUiKeysAdmin
-            getClient={getClient}
-            keys={["transit_walk", "transit_subway", "transit_private_driver"]}
-            title="Single-day · Preferred movement"
-            description="Photo, title, and subtitle on the three boxes in Builder S Transport. Detail-page copy is under Explanations."
-            fieldMode="card"
-            accent="#075473"
-          />
+          <div className="flex flex-wrap gap-2 overflow-x-auto border-b border-zinc-800 pb-4">
+            {(
+              [
+                ["cards", "Transport Cards"],
+                ["movement", "Preferred Movement"],
+              ] as const
+            ).map(([id, label]) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => setTransportSubTab(id)}
+                className={
+                  transportSubTab === id
+                    ? "rounded-full border border-[#F6A724]/70 bg-[#F6A724]/15 px-4 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-[#F6A724]"
+                    : "rounded-full border border-zinc-700 bg-zinc-950 px-4 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-zinc-400 hover:border-zinc-500"
+                }
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          {transportSubTab === "cards" ? (
+            <TransportCardsBrandingAdmin getClient={getClient} />
+          ) : (
+            <BrandingUiKeysAdmin
+              getClient={getClient}
+              keys={[
+                "transit_subway",
+                "transit_private_driver",
+                "transit_mix",
+                "transit_walk",
+              ]}
+              title="Single-day · Preferred movement"
+              description="Photo, title, and subtitle on the three boxes in Builder S Transport. Detail-page copy is under Explanations."
+              fieldMode="card"
+              accent="#075473"
+            />
+          )}
         </div>
       ) : brandingTab === "pace" ? (
         <div className="space-y-6">
@@ -574,26 +667,84 @@ export function SiteBrandingPanel({ getClient }: { getClient: () => PbClient }) 
               page. Keep card photos/titles in Transport and Travel Pace tabs.
             </p>
           </div>
-          <BrandingUiKeysAdmin
-            getClient={getClient}
-            keys={["transit_walk", "transit_subway", "transit_private_driver"]}
-            title="Single-day · Movement detail pages"
-            description="Body text on Walking / Subway / Private Driver detail modals."
-            fieldMode="explanation"
-            accent="#075473"
-          />
-          <BrandingUiKeysAdmin
-            getClient={getClient}
-            keys={["pace_fast", "pace_moderate", "pace_relaxed"]}
-            title="Travel Pace · Detail pages"
-            description="Body text on Fast / Moderate / Relaxed pace detail modals."
-            fieldMode="explanation"
-            accent="#DC6E8A"
-          />
-          <MultiTransportExplainersAdmin getClient={getClient} />
+          <div className="flex flex-wrap gap-2 overflow-x-auto border-b border-zinc-800 pb-4">
+            {(
+              [
+                ["movement", "Movement Details"],
+                ["pace", "Pace Details"],
+                ["multi", "Multi Transport"],
+              ] as const
+            ).map(([id, label]) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => setExplanationsSubTab(id)}
+                className={
+                  explanationsSubTab === id
+                    ? "rounded-full border border-white/30 bg-white/10 px-4 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-white"
+                    : "rounded-full border border-zinc-700 bg-zinc-950 px-4 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-zinc-400 hover:border-zinc-500"
+                }
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          {explanationsSubTab === "movement" ? (
+            <BrandingUiKeysAdmin
+              getClient={getClient}
+              keys={[
+                "transit_subway",
+                "transit_private_driver",
+                "transit_mix",
+                "transit_walk",
+              ]}
+              title="Single-day · Movement detail pages"
+              description="Body text on Walking / Subway / Private Driver detail modals."
+              fieldMode="explanation"
+              accent="#075473"
+            />
+          ) : explanationsSubTab === "pace" ? (
+            <BrandingUiKeysAdmin
+              getClient={getClient}
+              keys={["pace_fast", "pace_moderate", "pace_relaxed"]}
+              title="Travel Pace · Detail pages"
+              description="Body text on Fast / Moderate / Relaxed pace detail modals."
+              fieldMode="explanation"
+              accent="#DC6E8A"
+            />
+          ) : (
+            <MultiTransportExplainersAdmin getClient={getClient} />
+          )}
         </div>
       ) : (
         <>
+      <div className="flex flex-wrap gap-2 overflow-x-auto border-b border-zinc-800 pb-4">
+        {(
+          [
+            ["site", "Site Branding"],
+            ["multiday", "Builder M Hero"],
+            ["singleday", "Builder S Hero"],
+            ["activities", "Activities Hero"],
+            ["typography", "Typography"],
+            ["value", "Value Proposition"],
+          ] as const
+        ).map(([id, label]) => (
+          <button
+            key={id}
+            type="button"
+            onClick={() => setHeroesSubTab(id)}
+            className={
+              heroesSubTab === id
+                ? "rounded-full border border-[#1CA67F]/60 bg-[#1CA67F]/20 px-4 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-[#6ee7b7]"
+                : "rounded-full border border-zinc-700 bg-zinc-950 px-4 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-zinc-400 hover:border-zinc-500"
+            }
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {heroesSubTab === "site" ? (
       <div className="rounded-2xl border border-zinc-800/80 bg-zinc-900/60 p-5 sm:p-6">
         <h2 className="font-display text-2xl text-zinc-100">Site Branding</h2>
         <p className="mt-1 text-sm text-zinc-400">
@@ -733,8 +884,9 @@ export function SiteBrandingPanel({ getClient }: { getClient: () => PbClient }) 
           </div>
         </div>
       </div>
+      ) : null}
 
-      {/* —— MULTI-DAY HERO (BUILDER M) —— */}
+      {heroesSubTab === "multiday" ? (
       <div className="rounded-2xl border border-zinc-800/80 bg-zinc-900/60 p-5 sm:p-6">
         <div className="flex flex-wrap items-center gap-2">
           <h2 className="font-display text-2xl text-zinc-100">
@@ -751,52 +903,28 @@ export function SiteBrandingPanel({ getClient }: { getClient: () => PbClient }) 
         <div className="mt-6">
           <UploadField
             label="Hero background"
-            hint="Wide landscape · ideal 2400×1400 JPG/WebP — empty = plain grey on Builder M"
+            hint={`Slot ${builderHeroSlot("multiday")} · /uploads/branding/${builderHeroSlot("multiday")}.webp · wide landscape · image only — numbered placeholder until you upload`}
             preview={heroPreview}
             previewClass="aspect-[16/9] w-full object-cover"
+            accept="image/*"
             onFile={(f) => {
               setHeroFile(f);
               if (f) setHeroPreview(URL.createObjectURL(f));
             }}
-            publicOption={{
-              checked: saveHeroToPublic,
-              onChange: setSaveHeroToPublic,
-              pathHint: publicAssets.hero
-                ? `Current public file: ${publicAssets.hero}`
-                : "Saves a copy to public/brand/hero-background.*",
-            }}
           />
-          {heroPreview || publicAssets.hero ? (
-            <button
-              type="button"
-              className="mt-2 text-xs font-semibold uppercase tracking-wider text-[#E60F43] hover:underline"
-              onClick={() => {
-                void (async () => {
-                  try {
-                    const pb = getClient();
-                    if (record?.id) {
-                      await pb.collection("site_branding").update(record.id, {
-                        hero_background_image: null,
-                      });
-                    }
-                    setHeroFile(null);
-                    setHeroPreview("");
-                    setPublicAssets((a) => {
-                      const next = { ...a };
-                      delete next.hero;
-                      return next;
-                    });
-                    setMsg("Multi-day hero cleared — Builder M shows grey until you upload.");
-                  } catch (e) {
-                    setError(formatPbError(e));
-                  }
-                })();
-              }}
-            >
-              Remove image (grey until upload)
-            </button>
-          ) : null}
+          <p className="mt-2 text-[11px] text-zinc-500">
+            Slot ID: {builderHeroSlot("multiday")} — this same image is edited
+            in Layout &amp; Characters → Heroes. One image, one ID, everywhere.
+          </p>
         </div>
+        <button
+          type="button"
+          disabled={saving}
+          onClick={() => void save()}
+          className="mt-6 rounded-full bg-[#1CA67F] px-6 py-3 text-sm font-semibold text-zinc-100 shadow-sm transition hover:bg-[#178f6d] disabled:opacity-50"
+        >
+          {saving ? "Saving…" : "Save Multi-Day Hero"}
+        </button>
 
         <div className="mt-6 grid gap-4">
           <label className="block text-xs uppercase tracking-wider text-zinc-400">
@@ -828,8 +956,9 @@ export function SiteBrandingPanel({ getClient }: { getClient: () => PbClient }) 
           </label>
         </div>
       </div>
+      ) : null}
 
-      {/* —— SINGLE-DAY HERO (BUILDER S) —— */}
+      {heroesSubTab === "singleday" ? (
       <div className="rounded-2xl border border-zinc-800/80 bg-zinc-900/60 p-5 sm:p-6">
         <div className="flex flex-wrap items-center gap-2">
           <h2 className="font-display text-xl text-zinc-100 sm:text-2xl">
@@ -858,78 +987,13 @@ export function SiteBrandingPanel({ getClient }: { getClient: () => PbClient }) 
         <div className="mt-6">
           <UploadField
             label="Hero media"
-            hint="Landscape photo (.jpg, .webp) or video (.mp4) · ideal 2400×1400 — empty = plain grey on Builder S"
+            hint={`Slot ${builderHeroSlot("single")} · /uploads/branding/${builderHeroSlot("single")}.webp · landscape photo · image only — numbered placeholder until you upload. Same image in Layout & Characters → Heroes.`}
             preview={sdPreview}
-            previewClass="aspect-[16/9] w-full object-cover"
-            accept="image/*,video/mp4,video/webm,video/quicktime,.m4v"
-            previewIsVideo={sdPreviewIsVideo}
-            onFile={(f) => {
-              setSdFile(f);
-              if (f) setSdPreview(URL.createObjectURL(f));
-            }}
-            publicOption={{
-              checked: saveSdToPublic,
-              onChange: setSaveSdToPublic,
-              label:
-                "Also save to project public assets (/brand/hero-single-day.jpg)",
-              pathHint: publicAssets.hero_single
-                ? `Current public file: ${publicAssets.hero_single}`
-                : "Images only · video stays in PocketBase",
-            }}
-          />
-          {sdPreview || publicAssets.hero_single ? (
-            <button
-              type="button"
-              className="mt-2 text-xs font-semibold uppercase tracking-wider text-[#E60F43] hover:underline"
-              onClick={() => {
-                void (async () => {
-                  try {
-                    const pb = getClient();
-                    if (sdRecord?.id) {
-                      await pb.collection("branding_ui_items").update(sdRecord.id, {
-                        media: null,
-                        poster: null,
-                      });
-                    }
-                    setSdFile(null);
-                    setSdPreview("");
-                    setSdPosterFile(null);
-                    setSdPosterPreview("");
-                    writeBuilderSHeroLocalCache({
-                      scriptAccent: sdScript,
-                      mainTitlePrefix: sdPrefix,
-                      tagline: sdSubtitle,
-                      mediaUrl: "",
-                    });
-                    setPublicAssets((a) => {
-                      const next = { ...a };
-                      delete next.hero_single;
-                      return next;
-                    });
-                    setSdMsg(
-                      "Single-day hero cleared — Builder S shows grey until you upload."
-                    );
-                  } catch (e) {
-                    setSdError(formatPbError(e));
-                  }
-                })();
-              }}
-            >
-              Remove media (grey until upload)
-            </button>
-          ) : null}
-        </div>
-
-        <div className="mt-4">
-          <UploadField
-            label="Fast preload poster (required for video)"
-            hint="Still shown before video plays · upload your pick or leave empty to auto-grab ~0.05s frame"
-            preview={sdPosterPreview}
             previewClass="aspect-[16/9] w-full object-cover"
             accept="image/*"
             onFile={(f) => {
-              setSdPosterFile(f);
-              if (f) setSdPosterPreview(URL.createObjectURL(f));
+              setSdFile(f);
+              if (f) setSdPreview(URL.createObjectURL(f));
             }}
           />
         </div>
@@ -976,7 +1040,58 @@ export function SiteBrandingPanel({ getClient }: { getClient: () => PbClient }) 
           {sdSaving ? "Saving…" : "Save Builder S Hero"}
         </button>
       </div>
+      ) : null}
 
+      {heroesSubTab === "activities" ? (
+      <div className="rounded-2xl border border-zinc-800/80 bg-zinc-900/60 p-5 sm:p-6">
+        <div className="flex flex-wrap items-center gap-2">
+          <h2 className="font-display text-xl text-zinc-100 sm:text-2xl">
+            Activities Hero (Builder E)
+          </h2>
+          <span className="rounded-md border border-[#F6A724]/50 bg-[#F6A724]/15 px-2 py-0.5 font-geosans text-[0.65rem] font-semibold uppercase tracking-[0.18em] text-[#F6A724]">
+            Builder E
+          </span>
+        </div>
+        <p className="mt-1 text-sm text-zinc-400">
+          Photo hero on <code className="text-zinc-300">/builder-e</code>.
+          Slot {builderHeroSlot("activities")} ·{" "}
+          <code className="text-zinc-300">
+            /uploads/branding/{builderHeroSlot("activities")}.webp
+          </code>{" "}
+          — numbered placeholder until you upload. Same image in Layout
+          &amp; Characters → Heroes.
+        </p>
+        {actError ? (
+          <p className="mt-3 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+            {actError}
+          </p>
+        ) : null}
+        {actMsg ? <p className="mt-3 text-sm text-emerald-700">{actMsg}</p> : null}
+        <div className="mt-6">
+          <UploadField
+            label="Hero background"
+            hint="Wide landscape · image only"
+            preview={actPreview}
+            previewClass="aspect-[16/9] w-full object-cover"
+            accept="image/*"
+            onFile={(f) => {
+              setActFile(f);
+              if (f) setActPreview(URL.createObjectURL(f));
+            }}
+          />
+        </div>
+        <button
+          type="button"
+          disabled={actSaving}
+          onClick={() => void saveActivitiesHero()}
+          className="mt-6 rounded-full bg-[#F6A724] px-6 py-3 text-sm font-semibold text-zinc-950 shadow-sm transition hover:bg-[#e0951a] disabled:opacity-50"
+        >
+          {actSaving ? "Saving…" : "Save Activities Hero"}
+        </button>
+      </div>
+      ) : null}
+
+      {heroesSubTab === "typography" ? (
       <div className="rounded-2xl border border-zinc-800/80 bg-zinc-900/60 p-5 sm:p-6">
         <h2 className="font-display text-2xl text-zinc-100">
           Typography Settings
@@ -1052,16 +1167,10 @@ export function SiteBrandingPanel({ getClient }: { getClient: () => PbClient }) 
           </div>
         </div>
       </div>
+      ) : null}
 
-      <button
-        type="button"
-        disabled={saving}
-        onClick={() => void save()}
-        className="rounded-full bg-[#1CA67F] px-6 py-3 text-sm font-semibold text-zinc-100 shadow-sm transition hover:bg-[#178f6d] disabled:opacity-50"
-      >
-        {saving ? "Saving…" : "Save Branding Updates"}
-      </button>
-
+      {heroesSubTab === "value" ? (
+      <>
       <div className="rounded-2xl border border-[#075473]/35 bg-[#075473]/10 p-4">
         <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#075473]">
           Promote · Value Proposition
@@ -1094,6 +1203,17 @@ export function SiteBrandingPanel({ getClient }: { getClient: () => PbClient }) 
       </div>
 
       <BrandingUiCardsAdmin getClient={getClient} />
+      </>
+      ) : null}
+
+      <button
+        type="button"
+        disabled={saving}
+        onClick={() => void save()}
+        className="rounded-full bg-[#1CA67F] px-6 py-3 text-sm font-semibold text-zinc-100 shadow-sm transition hover:bg-[#178f6d] disabled:opacity-50"
+      >
+        {saving ? "Saving…" : "Save Branding Updates"}
+      </button>
         </>
       )}
     </div>

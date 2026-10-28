@@ -50,9 +50,19 @@ backend/LICENSE.md
 scripts/.seed-tmp/
 backend/.pb_backups/
 
-# Local ticket voucher PDFs (VPS / Docker volume)
+# Local VPS media (ticket PDFs, catalog, comms, profiles)
 /public/uploads/tickets/**
 !/public/uploads/tickets/.gitkeep
+/public/uploads/vouchers/**
+!/public/uploads/vouchers/.gitkeep
+/public/uploads/comms/**
+!/public/uploads/comms/.gitkeep
+/public/uploads/catalog/**
+!/public/uploads/catalog/.gitkeep
+/public/uploads/profiles/**
+!/public/uploads/profiles/.gitkeep
+/public/uploads/general/**
+!/public/uploads/general/.gitkeep
 /data/ticket-uploads/
 
 # Local toolchain binaries / scratch

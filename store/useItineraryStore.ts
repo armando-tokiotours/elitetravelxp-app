@@ -307,12 +307,11 @@ export const useItineraryStore = create<ItineraryState & ItineraryActions>()(
         const s = get();
         const raw = String(s.tempBookingRef || "").trim();
         if (raw) {
-          if (isTempBookingRef(raw)) {
-            const next = normalizeBookingPNR(raw);
-            set({ tempBookingRef: next });
-            return next;
-          }
           const normalized = normalizeBookingPNR(raw);
+          if (isTempBookingRef(normalized)) {
+            if (normalized !== raw) set({ tempBookingRef: normalized });
+            return normalized;
+          }
           if (TK_PNR_RE.test(normalized)) {
             const next = generateTempPNR();
             set({ tempBookingRef: next });
@@ -329,8 +328,10 @@ export const useItineraryStore = create<ItineraryState & ItineraryActions>()(
       },
 
       confirmBookingRef: (ref, status = "in_progress") => {
+        const official = promoteTempToOfficial(ref);
         set({
-          confirmedBookingRef: promoteTempToOfficial(ref),
+          tempBookingRef: official,
+          confirmedBookingRef: official,
           bookingStatus: normalizeBookingStatus(status),
         });
       },

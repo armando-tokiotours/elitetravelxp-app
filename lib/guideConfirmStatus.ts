@@ -65,13 +65,13 @@ export function normalizeGuideConfirmStatus(
 export function guideConfirmStaffLabel(status: GuideConfirmStatus): string {
   switch (status) {
     case "pending_guide_acceptance":
-      return "Sent — Pending Guide Approval";
+      return "Pending Acceptance";
     case "posted_open_board":
       return "Posted on Open Board";
     case "guide_confirmed":
-      return "Confirmed by Guide";
+      return "Confirmed";
     case "refused":
-      return "Guide Refused — Reassign";
+      return "Refused — Reassign";
     default:
       return "Unassigned";
   }

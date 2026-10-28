@@ -6,7 +6,7 @@ import { ArrowRight, X } from "lucide-react";
 import { MobileTopChrome } from "@/components/navigation/MobileTopChrome";
 import { BookingRefBadge } from "@/components/builder/BookingRefBadge";
 import { NewBookingResetButton } from "@/components/builder/NewBookingResetButton";
-import { GoldLight } from "@/components/branding/GoldLight";
+import { BoxGradingGlow } from "@/components/branding/BoxGradingGlow";
 import { IdleHeroMascot } from "@/components/branding/IdleHeroMascot";
 import { SystemMessageFox } from "@/components/branding/SystemMessageFox";
 import { useBuilderEStore } from "@/store/useBuilderEStore";
@@ -16,6 +16,7 @@ import { BuilderEServiceGrid } from "@/components/builder-e/BuilderEServiceGrid"
 import { ServiceDetailMediaModal } from "@/components/builder-e/ServiceDetailMediaModal";
 import { AttractionsDiscoveryModal } from "@/components/builder-e/AttractionsDiscoveryModal";
 import type { SubServiceItem } from "@/components/builder-e/subServices";
+import { useSiteBrandingStore } from "@/store/useSiteBrandingStore";
 
 export function BuilderEView() {
   const bookingRef = useBuilderEStore((s) => s.bookingRef);
@@ -32,6 +33,10 @@ export function BuilderEView() {
     null
   );
   const [attractionsOpen, setAttractionsOpen] = useState(false);
+  const ensureBranding = useSiteBrandingStore((s) => s.ensureLoaded);
+  useEffect(() => {
+    void ensureBranding();
+  }, [ensureBranding]);
 
   useEffect(() => {
     ensureBookingRef();
@@ -73,7 +78,7 @@ export function BuilderEView() {
   ]);
 
   return (
-    <div className="builder-theme relative z-10 min-h-screen overflow-x-hidden bg-transparent pb-28 text-white">
+    <div className="builder-theme relative z-10 min-h-screen overflow-x-clip bg-transparent pb-28 text-white">
       <SystemMessageFox />
       <div className="no-print">
         <MobileTopChrome
@@ -83,46 +88,75 @@ export function BuilderEView() {
         />
       </div>
 
-      <div className="mx-auto w-full max-w-lg px-4 pt-20 lg:max-w-xl lg:pt-10">
-        <header className="relative mb-6 overflow-hidden rounded-3xl border border-white/10 bg-[#0D1117]/80 p-5">
-          <GoldLight color="#F6A724" placement="left-center" />
-          <div className="relative z-10 flex flex-wrap items-start justify-between gap-4">
-            <div>
-              <p className="text-[10px] font-bold tracking-[0.2em] text-[#F6A724] uppercase">
-                VIP Tickets & Local Access
-              </p>
-              <h1 className="font-godiva mt-1 text-2xl tracking-wide text-white uppercase sm:text-3xl">
-                VIP Tickets
-                <br />
-                &amp; Local
-                <br />
-                Access
-              </h1>
-              <p className="mt-2 max-w-xs text-xs font-light leading-snug text-zinc-400">
-                Hard-to-get tickets, restaurant reservations &amp; local specs
-              </p>
+      <div className="mx-auto w-full max-w-lg px-4 pt-0 lg:max-w-xl">
+        {/* Title + restart used to live in a header card above the strip;
+            both now live inside the guest strip below (centred title,
+            restart left of the mascot), so the card is removed. */}
+
+        {/* Booking Ref — sticky dark container directly under the header
+            (Builder E has no timeline/progress row). Client name above the
+            ref box; Builder E's existing IdleHeroMascot at the far right. */}
+        <div className="sticky top-[3.75rem] z-40 mb-6 w-[100dvw] max-w-[100dvw] [margin-left:calc(50%-50dvw)] [margin-right:calc(50%-50dvw)] overflow-visible bg-[#0D1117]/70 px-3 py-3.5 backdrop-blur-md lg:top-0 sm:px-6 lg:w-[calc(100dvw-4rem)] lg:max-w-[calc(100dvw-4rem)] lg:[margin-left:calc(50%_-_50dvw_+_2rem)] lg:[margin-right:calc(50%_-_50dvw_+_2rem)]">
+          {/* Blue-only grading clipped to the bar (mascot overflows
+              below). Full-bleed: breaks out of the centred column to
+              span the whole viewport width on web + mobile. */}
+          <div
+            className="pointer-events-none absolute inset-0 overflow-hidden"
+            aria-hidden
+          >
+            <BoxGradingGlow variant="blue-only" />
+          </div>
+          <div className="relative z-10 mx-auto w-full max-w-lg overflow-visible lg:max-w-xl">
+            {/* Centred title on the exact same line as the guest name, at all widths (h-9 line). */}
+            <div className="pointer-events-none absolute inset-x-0 top-0 z-20 mx-auto flex h-9 min-w-0 max-w-[48%] items-center justify-center text-center sm:max-w-[60%]">
+              <div className="flex w-full min-w-0 items-center justify-center">
+                <h1 className="min-w-0 truncate font-godiva text-2xl tracking-wide text-white uppercase sm:text-3xl">
+                  VIP Tickets
+                </h1>
+              </div>
             </div>
-            <div className="flex flex-col items-end gap-2">
-              <IdleHeroMascot className="h-24 w-auto" />
-              <div className="flex w-full max-w-[16rem] items-stretch gap-2">
-                <div className="min-w-0 flex-1">
-                  <BookingRefBadge
-                    bookingStatus="draft"
-                    tempBookingRef={bookingRef}
-                    confirmedBookingRef={null}
-                  />
-                </div>
-                <NewBookingResetButton scope="builder-e" />
+            <div className="flex items-start">
+              <div className="flex min-w-0 flex-1 flex-col items-start gap-1.5">
+                {/* Client name above the Booking Ref box */}
+                {/* leading-9 (36px at all widths) = the h-9 strip-title line, so the centred title shares its exact vertical centre */}
+                <span className="ml-1 text-xs font-bold tracking-widest text-white uppercase leading-9">
+                  {guestName || "Guest Brief"}
+                </span>
+                <BookingRefBadge
+                  bookingStatus="draft"
+                  tempBookingRef={bookingRef}
+                  confirmedBookingRef={null}
+                  paymentLabel={null}
+                />
+              </div>
+              {/* Restart — slim/thin, immediately left of the mascot */}
+              <div className="flex shrink-0 translate-x-1 translate-y-8 items-center self-center pr-0.5">
+                <NewBookingResetButton scope="builder-e" variant="strip" />
+              </div>
+              <div className="flex shrink-0 items-end overflow-visible pt-0.5">
+                <IdleHeroMascot className="h-24 w-auto translate-y-4" />
               </div>
             </div>
           </div>
-        </header>
+        </div>
 
         <p className="mb-1 text-xs font-bold tracking-widest text-gray-400 uppercase">
           Tap a mini app to explore &amp; add
         </p>
 
         <BuilderEServiceGrid
+          selectedIds={
+            new Set(
+              cart.flatMap((item) => {
+                const ids: string[] = [];
+                const sub = item.payload?.subServiceId;
+                const tour = item.payload?.tourId;
+                if (typeof sub === "string" && sub) ids.push(sub);
+                if (typeof tour === "string" && tour) ids.push(tour);
+                return ids;
+              })
+            )
+          }
           onSelect={(item) => {
             ensureBookingRef();
             setActiveService(item);

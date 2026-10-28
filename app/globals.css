@@ -413,6 +413,17 @@ h1 .font-beauty,
   animation: fade-up 0.65s ease-out both;
 }
 
+@keyframes drawer-slide-in {
+  from {
+    opacity: 0;
+    transform: translateX(-100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
 /* Locations help ? — intermittent white glow until first tap */
 @keyframes locations-help-glow {
   0%,
@@ -479,6 +490,58 @@ h1 .font-beauty,
 
 .animate-widget-call-ring {
   animation: widget-call-ring 1.45s ease-out infinite;
+}
+
+/* Cyan approval pulse (Express Pass sequential flow) */
+@keyframes widget-call-glow-cyan {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(0, 128, 163, 0.25);
+    border-color: rgba(0, 128, 163, 0.55);
+  }
+  50% {
+    box-shadow:
+      0 0 0 3px rgba(0, 128, 163, 0.28),
+      0 0 22px 4px rgba(0, 128, 163, 0.55);
+    border-color: rgba(0, 128, 163, 0.95);
+  }
+}
+
+@keyframes widget-call-ring-cyan {
+  0% {
+    transform: scale(1);
+    opacity: 0.85;
+    border-color: rgba(0, 128, 163, 0.9);
+  }
+  100% {
+    transform: scale(1.045);
+    opacity: 0;
+    border-color: rgba(0, 128, 163, 0);
+  }
+}
+
+.animate-widget-call-glow-cyan {
+  animation: widget-call-glow-cyan 1.45s ease-in-out infinite;
+}
+
+.animate-widget-call-ring-cyan {
+  animation: widget-call-ring-cyan 1.45s ease-out infinite;
+}
+
+/* Builder hero "Start Building" chevron — soft expanding ring (small target) */
+@keyframes hero-start-cta-ring {
+  0% {
+    transform: scale(1);
+    opacity: 0.5;
+  }
+  100% {
+    transform: scale(1.7);
+    opacity: 0;
+  }
+}
+
+.animate-hero-start-cta-ring {
+  animation: hero-start-cta-ring 2s ease-out infinite;
 }
 
 @keyframes mascotSwap {
@@ -881,4 +944,195 @@ body.print-capturing #itinerary-dossier-view [class*="text-[#075473]"] {
 
 .animate-calling-pulsar {
   animation: callingPulsar 2.5s ease-in-out infinite alternate;
+}
+
+/* Google Translate — keep Element mounted, hide default chrome (we drive via HeaderSelectors) */
+.google-translate-host {
+  position: absolute !important;
+  left: -9999px !important;
+  top: 0 !important;
+  width: 1px !important;
+  height: 1px !important;
+  overflow: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+.goog-te-banner-frame,
+.goog-te-balloon-frame,
+.goog-te-menu-frame,
+#goog-gt-tt,
+.goog-tooltip,
+.goog-te-spinner-pos,
+iframe.skiptranslate {
+  display: none !important;
+  visibility: hidden !important;
+  height: 0 !important;
+  width: 0 !important;
+  border: none !important;
+}
+
+/* Neutralize Translate highlight wash on restored native text */
+.goog-text-highlight {
+  background-color: transparent !important;
+  box-shadow: none !important;
+}
+
+/* Translate injects body{top:40px} when the banner would show — keep layout flush */
+body {
+  top: 0 !important;
+}
+
+.goog-logo-link,
+.goog-te-gadget span {
+  display: none !important;
+}
+
+.goog-te-gadget {
+  font-size: 0 !important;
+  height: 0 !important;
+  overflow: hidden !important;
+}
+
+/* Pre-Elite option cards — 3D flip (front: title+icon / back: copy+Know More) */
+.pre-elite-option-flip {
+  perspective: 1000px;
+}
+.pre-elite-option-flip-inner {
+  position: relative;
+  width: 100%;
+  min-height: 7rem;
+  transform-style: preserve-3d;
+  transition: transform 0.45s ease;
+}
+.pre-elite-option-flip-face {
+  position: absolute;
+  inset: 0;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  border-radius: inherit;
+}
+.pre-elite-option-flip-back {
+  transform: rotateY(180deg);
+}
+.pre-elite-option-flip.is-flipped .pre-elite-option-flip-inner {
+  transform: rotateY(180deg);
+}
+@media (hover: hover) and (pointer: fine) {
+  .pre-elite-option-flip:hover .pre-elite-option-flip-inner {
+    transform: rotateY(180deg);
+  }
+  .pre-elite-option-select-tap {
+    display: none;
+  }
+}
+
+/*
+ * Magic Navigation — sliding cutout (components/navigation/AppNavDock.tsx)
+ * ------------------------------------------------------------------------
+ * One Framer Motion `layoutId` element per orientation (.magic-cutout)
+ * travels between nav items. No ::before/::after inverted-curve
+ * pseudo-elements — the disc alone slides along the nav edge.
+ *
+ * Colour contract (single source of truth — nav surface and cutout can
+ * never drift apart because both read the same custom properties):
+ *   --nav-bg   #0A1017 — desktop left rail surface. The rail paints
+ *                         `background: var(--nav-bg)` (see .magic-nav).
+ *   --page-bg  #05080c — measured app background: computed
+ *                         `background-color` of <body> and of
+ *                         .tokio-ambient-bg is rgb(5, 8, 12) (verified
+ *                         live via CDP getComputedStyle), and the disc —
+ *                         painted var(--page-bg) — samples identically.
+ *                         The ambient radial gradients sit on top of this
+ *                         base; at the far-left rail edge / dock top edge
+ *                         they are near-flat (sampled #06080b–#0a1218 in
+ *                         dark regions), so #05080c is the flat value the
+ *                         disc must match. (The reference snippet's
+ *                         #0B1015 is *its* app's page colour — adopting it
+ *                         here would make the disc lighter than this
+ *                         app's measured page and reintroduce a seam.)
+ *   --magic-accent #D91147 — active raised pill (crimson).
+ *   Mobile bottom dock (`.magic-nav--dock`): frosted charcoal glass
+ *                         matching MobileTopChrome — #0A1017/70 +
+ *                         backdrop-blur-xl / saturate-150, inset gloss
+ *                         highlights, soft upward elevation. Desktop
+ *                         left rail stays opaque `var(--nav-bg)`.
+ *
+ * Geometry (refactored — replaces the old 20px / ±10–20px hole-coloured
+ * shadows that painted black quarter-disc wedges inside the rail):
+ *   disc 64×64, accent bubble 48×48 centred in it (8px page-bg halo).
+ *   Disc centre lies EXACTLY on the nav edge (desktop: left edge of the
+ *   disc's centre line = rail's right edge; mobile: disc centre line =
+ *   dock's top edge).
+ */
+.magic-nav {
+  --nav-bg: #0a1017;
+  --page-bg: #05080c;
+  --magic-accent: #d91147;
+  background: var(--nav-bg);
+}
+
+/*
+ * Mobile bottom bar — same frosted glass family as MobileTopChrome
+ * (dark charcoal translucency + blur). Mirrors the scrolled header's
+ * inset gloss / backdrop-blur-xl / saturate-150, with #0A1017/70 fill
+ * instead of the blue wash so it matches the top chrome charcoal look.
+ */
+.magic-nav--dock {
+  background: rgb(10 16 23 / 0.7);
+  -webkit-backdrop-filter: blur(24px) saturate(1.5);
+  backdrop-filter: blur(24px) saturate(1.5);
+  border-top-color: rgb(255 255 255 / 0.1);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.22),
+    inset 0 -1px 0 rgb(255 255 255 / 0.14),
+    0 -12px 32px -16px rgb(0 0 0 / 0.55);
+}
+
+.magic-cutout {
+  position: absolute;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  background: var(--page-bg);
+  pointer-events: none;
+}
+
+.magic-bubble {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 9999px;
+  background: var(--magic-accent);
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  box-shadow:
+    0 0 14px rgba(217, 17, 71, 0.85),
+    0 4px 12px rgba(217, 17, 71, 0.35);
+}
+
+.magic-bubble--mobile {
+  width: 48px;
+  height: 48px;
+}
+
+/* Desktop rail (w-16 / 64px): 64px disc centred on the rail's right edge
+ * (item's left:100% is the rail edge; disc centre = 100% − 32 + 32). */
+.magic-cutout--vertical {
+  width: 64px;
+  height: 64px;
+  top: calc(50% - 32px);
+  left: calc(100% - 32px);
+}
+
+/* Mobile bottom dock: 64px disc centred on the dock's top edge
+ * (top:-32 of the full-height item, whose top is the dock's top edge). */
+.magic-cutout--horizontal {
+  width: 64px;
+  height: 64px;
+  top: -32px;
+  left: calc(50% - 32px);
 }

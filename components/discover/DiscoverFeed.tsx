@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
   cityPhoto,
@@ -32,7 +32,6 @@ import {
   useSingleDayBuilderStore,
 } from "@/store/useSingleDayBuilderStore";
 import { useActiveMatchProfile } from "@/store/useQuizStore";
-import { BottomNav } from "@/components/builder/BottomNav";
 import { ExperienceProfilerModal } from "@/components/quiz/ExperienceProfilerModal";
 import { ScheduleTourDaySheet } from "@/components/builder/ScheduleTourDaySheet";
 import { TourDetailModal } from "@/components/builder/TourDetailModal";
@@ -43,18 +42,36 @@ import { buildMatchReelSlides } from "@/lib/matchReel";
 import { rankToursByProfile, isBestMatchTour } from "@/lib/experienceProfiler";
 import { useItineraryStore } from "@/store/useItineraryStore";
 import { Play } from "lucide-react";
+import { CatalogSlotImg } from "@/components/catalog/CatalogSlotPhoto";
+import { groupToursByFamily } from "@/lib/tourFamilies";
+import { MobileAppNav } from "@/components/navigation/AppSidebar";
 import {
-  AppSidebar,
-  APP_SIDEBAR_RAIL_PAD,
-  MobileAppNav,
-} from "@/components/navigation/AppSidebar";
+  MOBILE_HEADER_SCROLLED_GLOSS,
+  useMobileHeaderScrolled,
+} from "@/components/navigation/MobileTopChrome";
 import { CrimsonGlow } from "@/components/branding/CrimsonGlow";
-import { createPortal } from "react-dom";
-import { AnimatePresence, motion } from "framer-motion";
+import { FoxConfirmModal } from "@/components/branding/FoxConfirmModal";
 
 type ProfileTab = "tours" | "experiences" | "matches" | "places";
 
+/** Fox city gates on Discover — entry (no trip city) or cross-city Add. */
+type FoxCityGate =
+  | {
+      kind: "no_city";
+      /** Set when Add was attempted before a trip city exists. */
+      tour?: PbTour;
+      language?: string;
+    }
+  | {
+      kind: "cross_city";
+      tour: PbTour;
+      language: string;
+      cityName: string;
+    };
+
 export function DiscoverFeed() {
+  // Same mobile glossy-blue-on-scroll as MobileTopChrome (shared hook).
+  const headerScrolled = useMobileHeaderScrolled();
   const [config, setConfig] = useState<DiscoverConfig | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedCityId, setSelectedCityId] = useState<string | null>(null);
@@ -65,11 +82,10 @@ export function DiscoverFeed() {
   const [toast, setToast] = useState<string | null>(null);
   const [quizOpen, setQuizOpen] = useState(false);
   const [reelOpen, setReelOpen] = useState(false);
-  const [cityMismatch, setCityMismatch] = useState<{
-    tour: PbTour;
-    language: string;
-    cityName: string;
-  } | null>(null);
+  const [foxGate, setFoxGate] = useState<FoxCityGate | null>(null);
+  const [storesHydrated, setStoresHydrated] = useState(false);
+  /** Entry "no city" prompt once per Discover visit (Cancel must not loop). */
+  const entryNoCityPromptedRef = useRef(false);
 
   const tripMode = useBuilderStore((s) => s.tripMode);
   const locations = useBuilderStore((s) => s.locations);
@@ -94,19 +110,55 @@ export function DiscoverFeed() {
   const addExperience = useSingleDayBuilderStore((s) => s.addExperience);
   const removeExperience = useSingleDayBuilderStore((s) => s.removeExperience);
   const setCityFocus = useSingleDayBuilderStore((s) => s.setCityFocus);
+  const changeCityFocus = useSingleDayBuilderStore((s) => s.changeCityFocus);
 
   const isSingle = tripMode === "single_day";
 
+  const hasTripCity = useMemo(() => {
+    if (isSingle) return Boolean(sdCityFocus.trim());
+    return locations.some((l) => Boolean(l.cityId));
+  }, [isSingle, locations, sdCityFocus]);
+
   useEffect(() => {
-    useBuilderStore.persist.rehydrate();
+    let cancelled = false;
+    void (async () => {
+      await Promise.all([
+        Promise.resolve(useBuilderStore.persist.rehydrate()),
+        Promise.resolve(useSingleDayBuilderStore.persist.rehydrate()),
+      ]).catch(() => undefined);
+      if (!cancelled) setStoresHydrated(true);
+    })();
     fetchDiscoverConfig()
       .then((data) => {
+        if (cancelled) return;
         setConfig(data);
         if (data.cities[0]) setSelectedCityId(data.cities[0].id);
       })
-      .catch(() => setConfig(null))
-      .finally(() => setLoading(false));
+      .catch(() => {
+        if (!cancelled) setConfig(null);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []);
+
+  // Entering Discover with no trip city → fox asks to confirm/pick.
+  useEffect(() => {
+    if (
+      loading ||
+      !storesHydrated ||
+      !config ||
+      entryNoCityPromptedRef.current
+    ) {
+      return;
+    }
+    if (hasTripCity) return;
+    entryNoCityPromptedRef.current = true;
+    setFoxGate({ kind: "no_city" });
+  }, [config, hasTripCity, loading, storesHydrated]);
 
   useEffect(() => {
     if (!toast) return;
@@ -206,6 +258,21 @@ export function DiscoverFeed() {
       : profileTab === "places"
         ? placeItems
         : tourItems;
+
+  // One card per tour FAMILY (master product); durations live inside
+  // the card as variants — never 6 near-identical cards for 4h/6h/8h.
+  const gridFamilies = useMemo(
+    () => groupToursByFamily(gridTours),
+    [gridTours]
+  );
+  const tourFamilyCount = useMemo(
+    () => groupToursByFamily(tourItems).length,
+    [tourItems]
+  );
+  const experienceFamilyCount = useMemo(
+    () => groupToursByFamily(experienceTours).length,
+    [experienceTours]
+  );
 
   const reelSlides = useMemo(
     () =>
@@ -324,16 +391,23 @@ export function DiscoverFeed() {
       if (!result.ok && result.message) setToast(result.message);
       return;
     }
-    if (!arrivalDate || dayOptions.length === 0) {
+    // Read store after optional city apply so day options aren't stale.
+    const cityId = selectedCityId || tour.city_id || null;
+    const snap = useBuilderStore.getState();
+    const days = cityId
+      ? chauffeurDaysForCity(snap.arrivalDate, snap.locations, cityId)
+      : [];
+    const cityRows = cityId ? snap.selectedTours[cityId] ?? [] : [];
+    if (!snap.arrivalDate || days.length === 0) {
       setToast(
         "Add this city and set arrival dates in the Builder before scheduling."
       );
       return;
     }
-    if (dayOptions.length === 1) {
-      const day = dayOptions[0];
+    if (days.length === 1) {
+      const day = days[0];
       const hours = tourDurationHours(tour);
-      const available = getAvailableHours(selectedTours, day.date);
+      const available = getAvailableHours(cityRows, day.date);
       if (hours > available) {
         setToast(TOUR_DAY_PACKED_MESSAGE);
         return;
@@ -346,6 +420,37 @@ export function DiscoverFeed() {
     setModalSlide(null);
     setPickingTour(tour);
   };
+
+  const applyDiscoverCityToTrip = useCallback(() => {
+    if (!selectedCity) return false;
+    if (isSingle) {
+      const same =
+        sdCityFocus.trim().toLowerCase() ===
+        selectedCity.name.trim().toLowerCase();
+      if (same) {
+        setCityFocus(selectedCity.name);
+      } else if (sdCityFocus.trim()) {
+        // Builder already had a different city — reset city-bound picks.
+        changeCityFocus(selectedCity.name);
+      } else {
+        setCityFocus(selectedCity.name);
+      }
+      return true;
+    }
+    if (!selectedCity.id) return false;
+    if (!locations.some((l) => l.cityId === selectedCity.id)) {
+      addLocation(selectedCity.id);
+    }
+    return true;
+  }, [
+    addLocation,
+    changeCityFocus,
+    isSingle,
+    locations,
+    sdCityFocus,
+    selectedCity,
+    setCityFocus,
+  ]);
 
   const handleAddFromModal = (tour: PbTour, selectedLanguage: string) => {
     if (isSingle) {
@@ -367,8 +472,19 @@ export function DiscoverFeed() {
       setToast("Select a preferred language before adding this experience.");
       return;
     }
+    // No trip city yet → confirm/pick before adding.
+    if (!hasTripCity) {
+      setFoxGate({
+        kind: "no_city",
+        tour,
+        language: selectedLanguage,
+      });
+      return;
+    }
+    // Builder has a city; Discover city differs → change city + add?
     if (!bookingHasCity) {
-      setCityMismatch({
+      setFoxGate({
+        kind: "cross_city",
         tour,
         language: selectedLanguage,
         cityName: selectedCity?.name ?? "this city",
@@ -376,6 +492,31 @@ export function DiscoverFeed() {
       return;
     }
     proceedAdd(tour, selectedLanguage);
+  };
+
+  const dismissFoxGate = () => setFoxGate(null);
+
+  const confirmFoxGatePrimary = () => {
+    const gate = foxGate;
+    if (!gate) return;
+    setFoxGate(null);
+    const ok = applyDiscoverCityToTrip();
+    if (!ok) {
+      setToast("Missing city on this experience.");
+      return;
+    }
+    if (gate.kind === "no_city") {
+      if (gate.tour && gate.language) {
+        proceedAdd(gate.tour, gate.language);
+      } else {
+        setToast(
+          `Trip city set · ${selectedCity?.name ?? "city"}. Browse and add when ready.`
+        );
+      }
+      return;
+    }
+    // cross_city: change city + add
+    proceedAdd(gate.tour, gate.language);
   };
 
   const cityImg = selectedCity
@@ -396,29 +537,41 @@ export function DiscoverFeed() {
 
   return (
     <div className="builder-theme tokio-ambient-bg relative min-h-[100dvh] bg-transparent text-white">
-      <AppSidebar
-        brandEyebrow="TOKIOTOURS"
-        brandTitle="Discover"
-        expandOnHover
-      />
-
-      <div className={`${APP_SIDEBAR_RAIL_PAD} min-h-[100dvh] bg-transparent`}>
-        <header className="sticky top-0 z-40 border-b border-white/10 bg-[#0D1117]/70 text-white backdrop-blur-md lg:hidden">
+      {/* No AppSidebar / legacy BottomNav here: app/discover/layout.tsx
+          mounts the same magic-nav AppNavDock as the builders (desktop
+          rail + mobile bottom dock; disc on Discover for 1-Day or Explore
+          for VIP). Rail/dock clearance comes from that layout
+          (lg:pl-16 / pb-20), not a pad here. */}
+      <div className="min-h-[100dvh] bg-transparent">
+        <header
+          data-scrolled={headerScrolled ? "true" : "false"}
+          className={`sticky top-0 z-40 text-white transition-[background-color,box-shadow,backdrop-filter] duration-300 ease-out lg:hidden ${
+            headerScrolled
+              ? `border-b border-white/10 ${MOBILE_HEADER_SCROLLED_GLOSS}`
+              : "border-b border-transparent bg-transparent"
+          }`}
+        >
           <div className="mx-auto flex max-w-lg items-center justify-between px-4 py-3 lg:max-w-xl">
             <div className="flex min-w-0 items-center gap-3">
               <MobileAppNav
                 brandEyebrow="TOKIOTOURS"
                 brandTitle="Discover"
+                hideManageBooking
               />
               <div className="min-w-0">
-                <p className="text-[0.6rem] font-semibold uppercase tracking-[0.28em] text-[#075473]">
+                <p className="text-[0.6rem] font-semibold uppercase tracking-[0.28em] text-[#D91147]">
                   TOKIOTOURS
                 </p>
                 <h1 className="font-display text-xl leading-tight">Discover</h1>
               </div>
             </div>
+            {/* Builder → homepage journey-type / sector option selection
+                (Single Day · VIP Tickets · Multi Day cards, screenshot 3).
+                `/#options` lands directly on that finale — GridSequenceHero
+                scrolls to the option cards when the hash is present.
+                Previously this went straight to /builder (Multi-Day). */}
             <Link
-              href="/builder"
+              href="/#options"
               className="rounded-full border border-white/20 px-3 py-1.5 text-xs font-semibold text-white/90"
             >
               Builder
@@ -494,13 +647,13 @@ export function DiscoverFeed() {
                 <div className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-sm">
                   <span>
                     <span className="font-semibold text-white">
-                      {tourItems.length}
+                      {tourFamilyCount}
                     </span>{" "}
                     <span className="text-zinc-400">Tours</span>
                   </span>
                   <span>
                     <span className="font-semibold text-white">
-                      {experienceTours.length}
+                      {experienceFamilyCount}
                     </span>{" "}
                     <span className="text-zinc-400">Experiences</span>
                   </span>
@@ -561,7 +714,7 @@ export function DiscoverFeed() {
               />
             ) : (
               <>
-                {gridTours.length === 0 ? (
+                {gridFamilies.length === 0 ? (
                   <p className="px-4 py-10 text-center text-sm text-zinc-500">
                     No{" "}
                     {profileTab === "experiences" ? "experiences" : "tours"}{" "}
@@ -569,15 +722,30 @@ export function DiscoverFeed() {
                   </p>
                 ) : (
                   <div className="grid grid-cols-3 gap-1">
-                    {gridTours.map((tour, index) => (
-                      <TourThumb
-                        key={tour.id || `tour-${index}`}
-                        tour={tour}
-                        booked={bookedTourIds.includes(tour.id)}
-                        recommended={isBestMatchTour(tour, experienceProfile)}
-                        onClick={() => setModalSlide(index)}
-                      />
-                    ))}
+                    {gridFamilies.map((family) => {
+                      const masterIndex = gridTours.findIndex(
+                        (t) => t.id === family.master.id
+                      );
+                      return (
+                        <TourThumb
+                          key={family.key}
+                          tour={family.master}
+                          displayTitle={family.title}
+                          durations={family.variants
+                            .map((v) => Number(v.duration_hours) || 0)
+                            .filter((h) => h > 0)}
+                          booked={family.variants.some((v) =>
+                            bookedTourIds.includes(v.id)
+                          )}
+                          recommended={family.variants.some((v) =>
+                            isBestMatchTour(v, experienceProfile)
+                          )}
+                          onClick={() =>
+                            setModalSlide(masterIndex >= 0 ? masterIndex : 0)
+                          }
+                        />
+                      );
+                    })}
                   </div>
                 )}
 
@@ -608,6 +776,7 @@ export function DiscoverFeed() {
         tours={gridTours}
         initialSlide={modalSlide ?? 0}
         guests={guests}
+        cityName={cityName}
         hidePrice
         isTourSelected={(id) => bookedTourIds.includes(id)}
         scheduledLabelFor={(id) => {
@@ -656,109 +825,44 @@ export function DiscoverFeed() {
         onToast={setToast}
       />
 
-      {typeof document !== "undefined"
-        ? createPortal(
-            <AnimatePresence>
-              {cityMismatch ? (
-                <motion.div
-                  key="city-mismatch-fox"
-                  className="fixed inset-0 z-[120] flex items-end justify-center bg-black/70 px-4 pb-8 sm:items-center"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  role="dialog"
-                  aria-modal="true"
-                  aria-label="City not on your trip"
-                >
-                  <motion.div
-                    className="relative w-full max-w-md overflow-hidden rounded-3xl border border-white/15 bg-[#0D1117] p-5 shadow-2xl"
-                    initial={{ y: 24, opacity: 0 }}
-                    animate={{ y: 0, opacity: 1 }}
-                    exit={{ y: 24, opacity: 0 }}
-                  >
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src="/brand/fox-peek.webp"
-                      alt=""
-                      className="mx-auto h-28 w-auto object-contain"
-                    />
-                    <p className="mt-3 text-center font-godiva text-lg uppercase tracking-wide text-white">
-                      {cityMismatch.cityName} isn&apos;t on your trip
-                    </p>
-                    <p className="mt-2 text-center text-sm text-zinc-400">
-                      Yes = add this city / another day. No = change your tour
-                      city to {cityMismatch.cityName}.
-                    </p>
-                    <div className="mt-5 grid grid-cols-2 gap-2">
-                      <button
-                        type="button"
-                        className="rounded-xl bg-[#075473] px-3 py-3 text-xs font-bold uppercase tracking-wider text-white"
-                        onClick={() => {
-                          const pending = cityMismatch;
-                          setCityMismatch(null);
-                          if (!pending.tour.city_id) {
-                            setToast("Missing city on this experience.");
-                            return;
-                          }
-                          if (isSingle) {
-                            const city = cities.find(
-                              (c) => c.id === pending.tour.city_id
-                            );
-                            if (city) setCityFocus(city.name);
-                            proceedAdd(pending.tour, pending.language);
-                            return;
-                          }
-                          addLocation(pending.tour.city_id);
-                          proceedAdd(pending.tour, pending.language);
-                        }}
-                      >
-                        Yes · add
-                      </button>
-                      <button
-                        type="button"
-                        className="rounded-xl border border-white/20 bg-black/40 px-3 py-3 text-xs font-bold uppercase tracking-wider text-white"
-                        onClick={() => {
-                          const pending = cityMismatch;
-                          setCityMismatch(null);
-                          const city = cities.find(
-                            (c) => c.id === pending.tour.city_id
-                          );
-                          if (isSingle) {
-                            if (city) setCityFocus(city.name);
-                            proceedAdd(pending.tour, pending.language);
-                            return;
-                          }
-                          // Change city: if not on route, add it then schedule
-                          if (
-                            city &&
-                            !locations.some((l) => l.cityId === city.id)
-                          ) {
-                            addLocation(city.id);
-                          }
-                          proceedAdd(pending.tour, pending.language);
-                        }}
-                      >
-                        No · change city
-                      </button>
-                    </div>
-                    <button
-                      type="button"
-                      className="mt-3 w-full text-center text-[11px] text-zinc-500 underline"
-                      onClick={() => setCityMismatch(null)}
-                    >
-                      Cancel
-                    </button>
-                  </motion.div>
-                </motion.div>
-              ) : null}
-            </AnimatePresence>,
-            document.body
-          )
-        : null}
+      <FoxConfirmModal
+        open={foxGate?.kind === "no_city"}
+        title="No city on your trip yet"
+        body={`Yes = use ${cityName} for your trip${
+          foxGate?.kind === "no_city" && foxGate.tour
+            ? " and add this experience"
+            : ""
+        }. Cancel = keep browsing.`}
+        primaryLabel={
+          foxGate?.kind === "no_city" && foxGate.tour
+            ? "Yes · use city & add"
+            : "Yes · use city"
+        }
+        onPrimary={confirmFoxGatePrimary}
+        onCancel={dismissFoxGate}
+        ariaLabel="No city on your trip yet"
+      />
 
-      <div className="lg:hidden">
-        <BottomNav />
-      </div>
+      <FoxConfirmModal
+        open={foxGate?.kind === "cross_city"}
+        title={
+          foxGate?.kind === "cross_city"
+            ? `${foxGate.cityName} isn't on your trip`
+            : "Another city"
+        }
+        body={
+          foxGate?.kind === "cross_city"
+            ? `This activity is for ${foxGate.cityName}. Change your trip city to ${foxGate.cityName} and add this tour?`
+            : ""
+        }
+        primaryLabel="Yes · change & add"
+        secondaryLabel="No · keep city"
+        onPrimary={confirmFoxGatePrimary}
+        onSecondary={dismissFoxGate}
+        onCancel={dismissFoxGate}
+        ariaLabel="City not on your trip"
+      />
+
       <ExperienceProfilerModal
         open={quizOpen}
         onClose={() => setQuizOpen(false)}
@@ -769,11 +873,17 @@ export function DiscoverFeed() {
 
 function TourThumb({
   tour,
+  displayTitle,
+  durations = [],
   booked,
   recommended = false,
   onClick,
 }: {
   tour: PbTour;
+  /** Clean family title (hours stripped) — one card per product. */
+  displayTitle?: string;
+  /** Variant durations inside this family, e.g. [6, 8]. */
+  durations?: number[];
   booked: boolean;
   recommended?: boolean;
   onClick: () => void;
@@ -795,20 +905,12 @@ function TourThumb({
       aria-label={tour.title}
       className="group relative aspect-[3/4] cursor-pointer overflow-hidden rounded-sm border border-zinc-800/60 bg-[#0D1117]/60 backdrop-blur-sm"
     >
-      {thumbUrl ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={thumbUrl}
-          alt=""
-          width={600}
-          height={400}
-          loading="lazy"
-          decoding="async"
-          className="h-full w-full object-cover transition-all duration-300 group-hover:scale-105 group-hover:brightness-90"
-        />
-      ) : (
-        <div className="h-full w-full bg-gradient-to-br from-[#1a3355] to-[#0B1F3A] transition-all duration-300 group-hover:brightness-90" />
-      )}
+      <CatalogSlotImg
+        recordId={tour.id}
+        fallbackSrc={thumbUrl}
+        className="h-full w-full object-cover transition-all duration-300 group-hover:scale-105 group-hover:brightness-90"
+        emptyClassName="h-full w-full bg-gradient-to-br from-[#1a3355] to-[#0B1F3A] transition-all duration-300 group-hover:brightness-90"
+      />
 
       {/* Base dim + bottom scrim for title contrast; +10% darken on hover */}
       <div
@@ -823,9 +925,21 @@ function TourThumb({
       {/* Pure white title — high contrast on hover / touch */}
       <div className="pointer-events-none absolute inset-0 z-10 flex items-end justify-center p-2.5 pb-3 text-center opacity-0 transition-all duration-300 group-hover:opacity-100 group-active:opacity-100 sm:items-center sm:pb-2.5">
         <h4 className="line-clamp-3 break-words text-[10px] font-extrabold uppercase leading-tight tracking-wider text-white drop-shadow-md whitespace-normal [text-shadow:0_1px_3px_rgba(0,0,0,0.85),0_2px_8px_rgba(0,0,0,0.55)] sm:text-xs">
-          {tour.title}
+          {displayTitle || tour.title}
         </h4>
       </div>
+      {durations.length > 1 ? (
+        <div className="absolute bottom-1.5 left-1.5 z-20 flex gap-1">
+          {durations.map((h) => (
+            <span
+              key={h}
+              className="rounded-full bg-black/60 px-1.5 py-0.5 text-[9px] font-bold text-white backdrop-blur-sm"
+            >
+              {h}h
+            </span>
+          ))}
+        </div>
+      ) : null}
       {recommended ? (
         <span className="absolute left-1 top-1 z-20 flex items-center gap-1 rounded-full bg-accent-500/90 px-2 py-0.5 text-[10px] font-bold text-white shadow-md">
           ⭐ Match
@@ -886,23 +1000,12 @@ function CityStory({
         }`}
       >
         <span className="block rounded-full bg-[#05080C]/90 p-[2px] backdrop-blur-sm">
-          {src ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={src}
-              alt=""
-              width={64}
-              height={64}
-              loading={eager ? "eager" : "lazy"}
-              decoding="async"
-              fetchPriority={eager ? "high" : "auto"}
-              className="h-14 w-14 rounded-full object-cover transition-transform duration-300 group-hover:scale-110 sm:h-16 sm:w-16"
-            />
-          ) : (
-            <span className="flex h-14 w-14 items-center justify-center rounded-full bg-[#1a3355] font-display text-lg text-[#075473] sm:h-16 sm:w-16">
-              {city.name.slice(0, 1)}
-            </span>
-          )}
+          <CatalogSlotImg
+            recordId={city.id}
+            fallbackSrc={src}
+            className="h-14 w-14 rounded-full object-cover transition-transform duration-300 group-hover:scale-110 sm:h-16 sm:w-16"
+            emptyClassName="h-14 w-14 rounded-full bg-[#1a3355] sm:h-16 sm:w-16"
+          />
         </span>
       </span>
       <span

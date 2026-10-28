@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { formatPbError } from "@/lib/pocketbase/admin-schema";
 import {
   loadBookingMasterByPnr,
@@ -10,6 +11,7 @@ import { canAccessOpsBoard } from "@/lib/staffRoles";
 import { useTeamAuth } from "@/store/useTeamAuth";
 import { StaffPortalShell } from "@/components/staff/StaffPortalShell";
 import { OpsStatusBadge } from "@/components/staff/opsHubClient";
+import { journeyItineraryHref } from "@/lib/builderRoutes";
 
 type Tab = "hub" | "dispatch" | "money" | "tickets";
 
@@ -22,6 +24,7 @@ export function BookingMasterApp() {
 }
 
 function MasterInner() {
+  const searchParams = useSearchParams();
   const getClient = useTeamAuth((s) => s.getClient);
   const canMoney = useTeamAuth((s) => s.role === "owner");
   const [pnrInput, setPnrInput] = useState("");
@@ -29,14 +32,17 @@ function MasterInner() {
   const [bundle, setBundle] = useState<BookingMasterBundle | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const deepLinkApplied = useRef(false);
 
-  const load = async () => {
+  const load = useCallback(async (pnrOverride?: string) => {
+    const pnr = String(pnrOverride ?? pnrInput).trim();
+    if (!pnr) return;
     setLoading(true);
     setError(null);
     try {
-      const data = await loadBookingMasterByPnr(getClient(), pnrInput);
+      const data = await loadBookingMasterByPnr(getClient(), pnr);
       if (!data.hub && !data.dispatch && !data.money && !data.tickets) {
-        setError(`No pockets found for ${data.pnr || pnrInput}`);
+        setError(`No pockets found for ${data.pnr || pnr}`);
         setBundle(null);
       } else {
         setBundle(data);
@@ -48,7 +54,18 @@ function MasterInner() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [getClient, pnrInput]);
+
+  useEffect(() => {
+    if (deepLinkApplied.current) return;
+    const raw = String(searchParams.get("pnr") || "")
+      .trim()
+      .toUpperCase();
+    if (!raw) return;
+    deepLinkApplied.current = true;
+    setPnrInput(raw);
+    void load(raw);
+  }, [searchParams, load]);
 
   const tabs: Array<{ id: Tab; label: string; hide?: boolean }> = [
     { id: "hub", label: "Hub" },
@@ -91,6 +108,16 @@ function MasterInner() {
           <div className="flex flex-wrap items-center gap-2">
             <span className="font-mono text-lg text-white">{bundle.pnr}</span>
             <OpsStatusBadge status={bundle.hub?.status} />
+            <a
+              href={journeyItineraryHref(bundle.pnr, {
+                type: bundle.leadType,
+              })}
+              target="_blank"
+              rel="noreferrer"
+              className="rounded-lg bg-[#F6A724] px-3 py-1.5 text-xs font-bold tracking-wide text-black uppercase transition hover:bg-[#ffb63e]"
+            >
+              View Journey
+            </a>
           </div>
           <div className="flex flex-wrap gap-2">
             {tabs

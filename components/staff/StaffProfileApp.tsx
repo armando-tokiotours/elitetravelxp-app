@@ -25,6 +25,7 @@ import {
   serializeStaffLanguages,
 } from "@/lib/staffLanguages";
 import { LanguagePills } from "@/components/staff/LanguagePills";
+import { uploadToVps } from "@/lib/vpsUploadClient";
 
 function allowProfile(role: Parameters<typeof canAccessOpsBoard>[0]) {
   return Boolean(role);
@@ -262,7 +263,18 @@ function ProfileInner() {
               e.target.value = "";
               if (!f) return;
               void optimizeCredentialPhoto(f)
-                .then(setPhotoFile)
+                .then(async (optimized) => {
+                  setPhotoFile(optimized);
+                  // Mirror to VPS /uploads/profiles for Media Inspector + fast URL access.
+                  try {
+                    const token = getClient().authStore.token;
+                    if (token) {
+                      await uploadToVps(optimized, "profiles", token);
+                    }
+                  } catch {
+                    /* PB avatar remains source of truth if VPS mirror fails */
+                  }
+                })
                 .catch((err) =>
                   setError(
                     err instanceof Error ? err.message : "Photo could not be read."

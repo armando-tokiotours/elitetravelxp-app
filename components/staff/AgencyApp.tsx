@@ -1,8 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { AliasDisguiseBanner } from "@/components/ops/AliasDisguiseBanner";
+import { useAliasSession } from "@/components/ops/useAliasSession";
 import { formatPbError } from "@/lib/pocketbase/admin-schema";
-import { canAccessAgency } from "@/lib/staffRoles";
+import { canAccessAgency, canAccessOpsBoard } from "@/lib/staffRoles";
 import { generatePNR } from "@/utils/pnr";
 import { useTeamAuth } from "@/store/useTeamAuth";
 import { StaffPortalShell } from "@/components/staff/StaffPortalShell";
@@ -55,6 +57,15 @@ function AgencyInner() {
   const role = useTeamAuth((s) => s.role);
   const agencyId = useTeamAuth((s) => s.agencyId);
   const email = useTeamAuth((s) => s.email);
+  const { alias, clearAlias } = useAliasSession();
+
+  const isAliasPreview =
+    canAccessOpsBoard(role) &&
+    !!alias &&
+    alias.roleType === "agency" &&
+    !!alias.userId;
+
+  const effectiveAgencyId = isAliasPreview ? alias.userId : agencyId;
 
   const [orders, setOrders] = useState<AgencyOrder[]>([]);
   const [agencies, setAgencies] = useState<AgencyRow[]>([]);
@@ -64,8 +75,12 @@ function AgencyInner() {
   const [saving, setSaving] = useState(false);
 
   const [agencyName, setAgencyName] = useState("");
-  const [selectedAgencyId, setSelectedAgencyId] = useState(agencyId || "");
-  const [contactEmail, setContactEmail] = useState(email || "");
+  const [selectedAgencyId, setSelectedAgencyId] = useState(
+    effectiveAgencyId || agencyId || ""
+  );
+  const [contactEmail, setContactEmail] = useState(
+    isAliasPreview ? alias.userEmail || email || "" : email || ""
+  );
   const [primaryCity, setPrimaryCity] = useState("Tokyo");
   const [tourDate, setTourDate] = useState("");
   const [adults, setAdults] = useState("2");
@@ -80,6 +95,8 @@ function AgencyInner() {
       let filter = "";
       if (role === "agency" && agencyId) {
         filter = `agency_id="${agencyId}"`;
+      } else if (isAliasPreview && effectiveAgencyId) {
+        filter = `agency_id="${effectiveAgencyId}"`;
       }
       const list = await pb.collection("agency_orders").getFullList<AgencyOrder>({
         sort: "-created",
@@ -101,15 +118,27 @@ function AgencyInner() {
     } finally {
       setLoading(false);
     }
-  }, [getClient, role, agencyId]);
+  }, [
+    effectiveAgencyId,
+    getClient,
+    isAliasPreview,
+    role,
+    agencyId,
+  ]);
 
   useEffect(() => {
     void reload();
   }, [reload]);
 
   useEffect(() => {
-    if (agencyId) setSelectedAgencyId(agencyId);
-  }, [agencyId]);
+    if (effectiveAgencyId) setSelectedAgencyId(effectiveAgencyId);
+  }, [effectiveAgencyId]);
+
+  useEffect(() => {
+    if (isAliasPreview && alias?.userEmail) {
+      setContactEmail(alias.userEmail);
+    }
+  }, [alias?.userEmail, isAliasPreview]);
 
   const submitInquire = async () => {
     setSaving(true);
@@ -191,10 +220,24 @@ function AgencyInner() {
 
   return (
     <div className="space-y-8">
-      {(role === "agency" && agencyId) || role === "owner" || role === "ops" ? (
+      {isAliasPreview && alias ? (
+        <AliasDisguiseBanner
+          alias={alias}
+          compact
+          onExit={() => {
+            clearAlias();
+            setMsg(null);
+            void reload();
+          }}
+        />
+      ) : null}
+      {(role === "agency" && agencyId) ||
+      role === "owner" ||
+      role === "ops" ||
+      isAliasPreview ? (
         <AgencyCompanyCard
           getClient={getClient}
-          agencyId={selectedAgencyId || agencyId || ""}
+          agencyId={selectedAgencyId || effectiveAgencyId || agencyId || ""}
           agencies={agencies}
           onSaved={() => void reload()}
         />
@@ -208,7 +251,7 @@ function AgencyInner() {
           bookings.
         </p>
         <div className="mt-4 space-y-3">
-          {role !== "agency" || !agencyId ? (
+          {(role !== "agency" || !agencyId) && !isAliasPreview ? (
             <>
               {agencies.length > 0 ? (
                 <label className="block text-xs uppercase tracking-wider text-zinc-500">

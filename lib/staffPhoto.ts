@@ -41,6 +41,60 @@ function loadImage(file: File): Promise<HTMLImageElement> {
   });
 }
 
+export type CroppedAreaPixels = {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+};
+
+function loadImageFromSrc(src: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () =>
+      reject(new Error("Could not read that photo. Use JPG or PNG."));
+    img.src = src;
+  });
+}
+
+/**
+ * Draw a user-positioned 1:1 crop region onto a 480×480 JPEG.
+ * Do NOT pass the result through optimizeCredentialPhoto — that would
+ * re-crop to portrait and undo the user's positioning.
+ */
+export async function getCroppedSquareFile(
+  imageSrc: string,
+  areaPixels: CroppedAreaPixels
+): Promise<File> {
+  if (!imageSrc) throw new Error("Choose a photo first.");
+  const { x, y, width, height } = areaPixels;
+  if (!width || !height) throw new Error("Photo has no dimensions.");
+
+  const img = await loadImageFromSrc(imageSrc);
+
+  const size = 480;
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("Could not process photo.");
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
+  ctx.drawImage(img, x, y, width, height, 0, 0, size, size);
+
+  const blob = await new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob(
+      (b) => (b ? resolve(b) : reject(new Error("Could not encode JPEG."))),
+      "image/jpeg",
+      0.85
+    );
+  });
+  return new File([blob], `avatar-${Date.now()}.jpg`, {
+    type: "image/jpeg",
+  });
+}
+
 /** Cover-crop to passport 360×480 JPEG (fast, PB-safe mime). */
 export async function optimizeCredentialPhoto(file: File): Promise<File> {
   if (!file || file.size === 0) throw new Error("Choose a photo first.");

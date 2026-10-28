@@ -17,7 +17,10 @@ import {
 import { TripRangeMiniCalendar } from "@/components/builder/TripRangeMiniCalendar";
 import { DynamicWidgetBackground } from "@/components/builder/DynamicWidgetBackground";
 import { addDaysIso } from "@/lib/dateCascade";
-import { formatDisplayDate } from "@/store/useBuilderStore";
+import {
+  formatDisplayDate,
+  normalizeDateIso,
+} from "@/store/useBuilderStore";
 
 /** Outer shell — overflow-visible so white calling pulse is not clipped. */
 const WIDGET_SHELL =
@@ -71,6 +74,7 @@ export function BuilderMWidgetGrid({
   startDateText,
   guestCount,
   paceLabel,
+  guestsRequirementsComplete = true,
   arrivalAirport,
   departureAirport,
   arrivalMode,
@@ -95,6 +99,8 @@ export function BuilderMWidgetGrid({
   startDateText: string | null;
   guestCount: number;
   paceLabel: string | null;
+  /** False until Party & Pace guest requirements are acknowledged and notes valid. */
+  guestsRequirementsComplete?: boolean;
   arrivalAirport: string | null;
   departureAirport: string | null;
   arrivalMode: "airport" | "cruise";
@@ -123,11 +129,15 @@ export function BuilderMWidgetGrid({
   const DepartureIcon = departureMode === "cruise" ? Ship : Plane;
 
   const dateRangeLabel = useMemo(() => {
-    if (!arrivalDate) return startDateText || "Set Arrival Date";
+    const ymd = normalizeDateIso(arrivalDate);
+    if (!ymd) return startDateText || "Set Arrival Date";
     const days = Math.max(1, tripDays || 1);
-    const endIso = addDaysIso(arrivalDate, days - 1);
-    const start = formatDisplayDate(arrivalDate);
+    const endIso = addDaysIso(ymd, days - 1);
+    const start = formatDisplayDate(ymd);
     const end = formatDisplayDate(endIso);
+    if (!start || start === "—" || !end || end === "—") {
+      return startDateText || "Set Arrival Date";
+    }
     return start === end ? start : `${start} – ${end}`;
   }, [arrivalDate, tripDays, startDateText]);
 
@@ -142,7 +152,9 @@ export function BuilderMWidgetGrid({
 
   const nextPulsar = useMemo((): PulsarStep | null => {
     if (!startDateText) return "duration";
-    if (!paceLabel || guestCount <= 0) return "guests";
+    if (!paceLabel || guestCount <= 0 || !guestsRequirementsComplete) {
+      return "guests";
+    }
     if (!arrivalAirport || !departureAirport) return "transit";
     // Stay on Locations until cities exist AND Locations Continue unlocked Hotels (step 4)
     if (cityBands.length === 0 || highestUnlockedStep < 4) {
@@ -159,6 +171,7 @@ export function BuilderMWidgetGrid({
     startDateText,
     paceLabel,
     guestCount,
+    guestsRequirementsComplete,
     arrivalAirport,
     departureAirport,
     cityBands.length,

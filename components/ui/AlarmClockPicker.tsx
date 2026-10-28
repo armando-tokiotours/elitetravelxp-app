@@ -31,10 +31,13 @@ export function AlarmClockPicker({
   value,
   onChange,
   label = "Start time",
+  /** Strip outer border/fill so dial + controls sit flat on the page canvas. */
+  bare = false,
 }: {
   value: string;
   onChange: (hhmm: string) => void;
   label?: string;
+  bare?: boolean;
 }) {
   const uid = useId();
   const { hour, minute } = parseTime(value);
@@ -99,26 +102,43 @@ export function AlarmClockPicker({
   const hx = 100 + handLen * Math.cos(rad);
   const hy = 100 + handLen * Math.sin(rad);
 
-  return (
-    <div className="rounded-2xl border border-white/10 bg-[#0D1117]/80 p-4">
-      <p className="text-[10px] font-bold uppercase tracking-widest text-white">
-        {label}
-      </p>
+  const labelClass = bare
+    ? "text-[10px] font-bold uppercase tracking-widest text-[#0A1017]"
+    : "text-[10px] font-bold uppercase tracking-widest text-white";
+  const digitIdle = bare
+    ? "text-[#64748b] hover:text-[#0A1017]"
+    : "text-white/50 hover:text-white";
+  const colonClass = bare ? "text-[#94a3b8]" : "text-white/40";
+  const hintClass = bare
+    ? "mt-2 text-center font-mono text-[11px] text-[#64748b]"
+    : "mt-2 text-center font-mono text-[11px] text-white/45";
 
-      <div className="mt-3 flex items-center justify-center gap-1 font-godiva text-4xl tracking-wider text-white">
+  return (
+    <div
+      className={
+        bare
+          ? "border-0 bg-transparent p-0"
+          : "rounded-2xl border border-white/10 bg-[#0D1117]/80 p-4"
+      }
+    >
+      <p className={labelClass}>{label}</p>
+
+      <div
+        className={`mt-3 flex items-center justify-center gap-1 font-godiva text-4xl tracking-wider ${
+          bare ? "text-[#0A1017]" : "text-white"
+        }`}
+      >
         <button
           type="button"
           aria-pressed={mode === "hour"}
           onClick={() => setMode("hour")}
           className={`rounded-lg px-2 py-1 transition ${
-            mode === "hour"
-              ? "bg-[#054F70] text-white"
-              : "text-white/50 hover:text-white"
+            mode === "hour" ? "bg-[#054F70] text-white" : digitIdle
           }`}
         >
           {String(hour).padStart(2, "0")}
         </button>
-        <span className="text-white/40" aria-hidden>
+        <span className={colonClass} aria-hidden>
           :
         </span>
         <button
@@ -126,9 +146,7 @@ export function AlarmClockPicker({
           aria-pressed={mode === "minute"}
           onClick={() => setMode("minute")}
           className={`rounded-lg px-2 py-1 transition ${
-            mode === "minute"
-              ? "bg-[#054F70] text-white"
-              : "text-white/50 hover:text-white"
+            mode === "minute" ? "bg-[#054F70] text-white" : digitIdle
           }`}
         >
           {String(minute).padStart(2, "0")}
@@ -197,7 +215,7 @@ export function AlarmClockPicker({
         </svg>
       </div>
 
-      <p className="mt-2 text-center font-mono text-[11px] text-white/45">
+      <p className={hintClass}>
         Drag the dial · {mode === "hour" ? "set hour" : "set minutes (15′)"} ·
         default 09:00
       </p>

@@ -44,7 +44,10 @@ function AgentInner() {
 
   const saveHub = async (
     row: OpsHubRow,
-    patch: { payment_confirmed?: boolean; status?: string }
+    patch: {
+      payment_confirmed?: boolean;
+      status?: string;
+    }
   ) => {
     setSavingId(row.id);
     setMsg(null);

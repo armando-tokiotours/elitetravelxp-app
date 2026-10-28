@@ -265,8 +265,8 @@ export const BRANDING_UI_FALLBACKS: Record<string, BrandingUiFallback> = {
   transit_subway: {
     key: "transit_subway",
     category: "builder",
-    title: "Subway",
-    subtitle: "IC card + guided transfers",
+    title: "Public Transport",
+    subtitle: "IC card + guided subway & rail transfers",
     description:
       "We provide (or top up) a Suica/Pasmo IC card and escort every transfer. Your host handles ticket gates, platform changes, and station exits so you never guess which stairs to take.\n\nBest for covering distant districts in one day while staying light and flexible.",
     mediaFallback: "",
@@ -276,11 +276,21 @@ export const BRANDING_UI_FALLBACKS: Record<string, BrandingUiFallback> = {
     key: "transit_private_driver",
     category: "builder",
     title: "Private Driver",
-    subtitle: "Door-to-door vehicle",
+    subtitle: "Door-to-door chartered vehicle",
     description:
       "A licensed private driver meets you at your hotel or station hub and relocates you between stops. Drop-off at each experience; rejoin after for the next leg.\n\nBest for families, luggage days, rain, or when you want zero station friction between icons.",
     mediaFallback: "",
     sortOrder: 12,
+  },
+  transit_mix: {
+    key: "transit_mix",
+    category: "builder",
+    title: "Mix (Private & Public)",
+    subtitle: "Balanced combination of private transfers & local rail",
+    description:
+      "Combine door-to-door private transfers for longer hops with guided subway / rail for compact neighborhoods. Your host plans which legs need a car and which stay on IC rail.\n\nIdeal when you want comfort between hubs without booking a full-day chauffeur for every stop.",
+    mediaFallback: "",
+    sortOrder: 13,
   },
 };
 

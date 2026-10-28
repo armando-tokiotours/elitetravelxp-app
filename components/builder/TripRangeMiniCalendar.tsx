@@ -17,10 +17,12 @@ export function TripRangeMiniCalendar({
   tripDays: number;
 }) {
   const model = useMemo(() => {
-    if (!arrivalDate || !/^\d{4}-\d{2}-\d{2}$/.test(arrivalDate)) return null;
+    // Tolerate PB datetimes ("2026-11-02 00:00:00.000Z") like the store does.
+    const ymd = arrivalDate?.match(/^(\d{4}-\d{2}-\d{2})/)?.[1];
+    if (!ymd) return null;
     const days = Math.max(1, tripDays || 1);
-    const endIso = addDaysIso(arrivalDate, days - 1);
-    const [y, m] = arrivalDate.split("-").map(Number);
+    const endIso = addDaysIso(ymd, days - 1);
+    const [y, m] = ymd.split("-").map(Number);
     const monthStart = new Date(y, m - 1, 1);
     const daysInMonth = new Date(y, m, 0).getDate();
     const startPad = monthStart.getDay(); // 0 = Sunday
@@ -30,11 +32,11 @@ export function TripRangeMiniCalendar({
 
     const inRange = (day: number) => {
       const iso = `${y}-${String(m).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-      return iso >= arrivalDate && iso <= endIso;
+      return iso >= ymd && iso <= endIso;
     };
     const isStart = (day: number) => {
       const iso = `${y}-${String(m).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-      return iso === arrivalDate;
+      return iso === ymd;
     };
     const isEnd = (day: number) => {
       const iso = `${y}-${String(m).padStart(2, "0")}-${String(day).padStart(2, "0")}`;

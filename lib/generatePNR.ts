@@ -1,21 +1,35 @@
 /**
  * Canonical TokioTours booking reference (PNR).
- * Format: JPN- + 6 chars from alphabet excluding 0/O/1/I.
+ * - Pre-contact drafts: DRAFT-XXXXXX (local canvas until guest email/name).
+ * - Official: JPN-XXXXXX (same 6-char body after promote).
  * Never mint TMP- or TK- for new bookings.
  */
 
 const PNR_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 
-export function generatePNR(): string {
-  let pnr = "JPN-";
+function mintBody(): string {
+  let body = "";
   for (let i = 0; i < 6; i++) {
-    pnr += PNR_CHARS.charAt(Math.floor(Math.random() * PNR_CHARS.length));
+    body += PNR_CHARS.charAt(Math.floor(Math.random() * PNR_CHARS.length));
   }
-  return pnr;
+  return body;
+}
+
+/** Official / locked booking ref. */
+export function generatePNR(): string {
+  return `JPN-${mintBody()}`;
+}
+
+/** Instant local draft ref before guest contact is known. */
+export function generateDraftPNR(): string {
+  return `DRAFT-${mintBody()}`;
 }
 
 /** Canonical official JPN-XXXXXX. */
 export const JPN_PNR_RE = /^JPN-[A-Z2-9]{6}$/;
+
+/** Pre-contact draft DRAFT-XXXXXX. */
+export const DRAFT_PNR_RE = /^DRAFT-[A-Z2-9]{6}$/;
 
 /** @deprecated Alias — same as JPN_PNR_RE. */
 export const LEGACY_JPN_PNR_RE = JPN_PNR_RE;

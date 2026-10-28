@@ -87,6 +87,39 @@ export async function PATCH(
     if ("video_url" in body) {
       profilePatch.video_url = String(body.video_url || "").trim();
     }
+    if ("cover_url" in body) {
+      profilePatch.cover_url = String(body.cover_url || "").trim();
+    }
+    if ("specialties" in body) {
+      profilePatch.specialties = String(body.specialties || "").trim();
+    }
+    if ("max_group_size" in body) {
+      profilePatch.max_group_size = Math.max(
+        0,
+        Math.round(Number(body.max_group_size) || 0)
+      );
+    }
+    if ("pace_comfort" in body) {
+      profilePatch.pace_comfort = String(body.pace_comfort || "").trim();
+    }
+    if ("transit_comfort" in body) {
+      profilePatch.transit_comfort = String(body.transit_comfort || "").trim();
+    }
+    if ("bank_name" in body) {
+      profilePatch.bank_name = String(body.bank_name || "").trim();
+    }
+    if ("bank_branch" in body) {
+      profilePatch.bank_branch = String(body.bank_branch || "").trim();
+    }
+    if ("account_type" in body) {
+      profilePatch.account_type = String(body.account_type || "").trim();
+    }
+    if ("account_holder" in body) {
+      profilePatch.account_holder = String(body.account_holder || "").trim();
+    }
+    if ("account_number" in body) {
+      profilePatch.account_number = String(body.account_number || "").trim();
+    }
     if ("bank_info" in body) {
       profilePatch.bank_info = String(body.bank_info || "").trim();
     }
@@ -95,6 +128,56 @@ export async function PATCH(
     }
     if ("payout_notes" in body) {
       profilePatch.payout_notes = String(body.payout_notes || "").trim();
+    }
+    // Tokiotours Guide Questionnaire — Kanto (migration 1791280000).
+    const questionnaireTextFields = [
+      "guiding_tenure",
+      "base_location",
+      "strength_regions",
+      "tour_specialties",
+      "tours_to_avoid",
+      "preferred_clients",
+      "challenging_clients",
+      "biggest_strength",
+      "improvement_areas",
+      "early_starts",
+      "full_day_tours",
+      "physical_limitations",
+    ] as const;
+    for (const field of questionnaireTextFields) {
+      if (field in body) {
+        profilePatch[field] = String(body[field] || "").trim();
+      }
+    }
+    if ("language_fluency" in body) {
+      const raw = String(body.language_fluency || "").trim();
+      if (!raw) {
+        profilePatch.language_fluency = "";
+      } else {
+        try {
+          JSON.parse(raw);
+          profilePatch.language_fluency = raw;
+        } catch {
+          // Not JSON-parseable — store as-is per spec.
+          profilePatch.language_fluency = raw;
+        }
+      }
+    }
+    const skillFields = [
+      "skill_storytelling",
+      "skill_logistics",
+      "skill_problem_solving",
+      "skill_kids_patience",
+      "skill_conflict_resolution",
+      "skill_stamina",
+    ] as const;
+    for (const field of skillFields) {
+      if (field in body) {
+        profilePatch[field] = Math.min(
+          5,
+          Math.max(0, Math.round(Number(body[field]) || 0))
+        );
+      }
     }
 
     const profile = await updateStaffProfile(pb, id, profilePatch);

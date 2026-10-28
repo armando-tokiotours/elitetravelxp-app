@@ -20,7 +20,18 @@ export const BOX_GRADING = {
   amberOpacity: 0.36,
 } as const;
 
-export function BoxGradingGlow({ className = "" }: { className?: string }) {
+export function BoxGradingGlow({
+  className = "",
+  variant = "dual",
+}: {
+  className?: string;
+  /**
+   * `dual` (default) = locked blue-left + amber-right grading.
+   * `blue-only` = the exact same locked blue layer, amber omitted
+   * (builder guest strips — user-requested blue-only menus).
+   */
+  variant?: "dual" | "blue-only";
+}) {
   const { blue, amber, blueSizePx, amberSizePx, blueOpacity, amberOpacity } =
     BOX_GRADING;
 
@@ -36,16 +47,18 @@ export function BoxGradingGlow({ className = "" }: { className?: string }) {
         }}
         aria-hidden
       />
-      <div
-        className={`pointer-events-none absolute -top-8 -right-8 z-0 select-none rounded-full blur-2xl print:hidden ${className}`}
-        style={{
-          width: amberSizePx,
-          height: amberSizePx,
-          opacity: amberOpacity,
-          background: `radial-gradient(circle, ${amber} 0%, rgba(246,167,36,0) 70%)`,
-        }}
-        aria-hidden
-      />
+      {variant === "blue-only" ? null : (
+        <div
+          className={`pointer-events-none absolute -top-8 -right-8 z-0 select-none rounded-full blur-2xl print:hidden ${className}`}
+          style={{
+            width: amberSizePx,
+            height: amberSizePx,
+            opacity: amberOpacity,
+            background: `radial-gradient(circle, ${amber} 0%, rgba(246,167,36,0) 70%)`,
+          }}
+          aria-hidden
+        />
+      )}
     </>
   );
 }

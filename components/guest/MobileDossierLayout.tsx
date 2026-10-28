@@ -6,9 +6,9 @@ import type { ReactNode } from "react";
  * Mobile guest Invoice Brief / dossier — strict 3-independent-box architecture.
  *
  * Renders ONLY three sibling bordered containers (md:hidden):
- *  1. Trip details (flat divide-y rows)
+ *  1. Trip details — white card (matches desktop InvoiceMetaList)
  *  2. Invoice highlight (caller supplies InvoiceBriefEstimateBox)
- *  3. Itemized services & totals (caller supplies FlatInvoiceBrief — no outer wrap)
+ *  3. Itemized services & totals (caller supplies FlatInvoiceBrief — white card)
  *
  * Zero nested cards. Desktop composition stays with the parent.
  * Print: ink-friendly white paper; invoice ordered last in the PDF stack.
@@ -34,9 +34,9 @@ export function MobileDossierLayout({
     <div
       className={`flex flex-col space-y-6 print:flex print:space-y-4 print:bg-white print:text-black md:hidden ${className}`.trim()}
     >
-      {/* BOX 1 — Trip details */}
-      <section className="relative overflow-hidden rounded-3xl border border-white/10 bg-[#0A1017] print:break-inside-avoid print:rounded-none print:border print:border-gray-300 print:bg-transparent print:shadow-none">
-        <div className="divide-y divide-white/10 px-5 print:divide-gray-200">
+      {/* BOX 1 — Trip details (white card, same as desktop InvoiceMetaList) */}
+      <section className="relative overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_12px_28px_rgba(0,0,0,0.08)] print:break-inside-avoid print:rounded-none print:border print:border-gray-300 print:bg-transparent print:shadow-none">
+        <div className="divide-y divide-slate-200 px-5 print:divide-gray-200">
           {tripDetails}
         </div>
         {onChatClick ? (
@@ -44,7 +44,7 @@ export function MobileDossierLayout({
             type="button"
             onClick={onChatClick}
             aria-label="Open chat"
-            className="absolute right-3 bottom-3 flex h-10 w-10 items-center justify-center rounded-full border border-white/15 bg-[#075473] text-white shadow-lg print:hidden"
+            className="absolute right-3 bottom-3 flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-[#075473] text-white shadow-lg print:hidden"
           >
             <svg
               viewBox="0 0 24 24"

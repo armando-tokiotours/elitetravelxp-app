@@ -96,7 +96,13 @@ export function FoxMessagesEditor() {
     }
   };
 
-  const groups = ["pre_elite", "builder_m", "builder_s", "itinerary"] as const;
+  const groups = [
+    "pre_elite",
+    "builder_m",
+    "builder_s",
+    "itinerary",
+    "dispatch",
+  ] as const;
 
   return (
     <div className="relative min-h-[22rem] space-y-5">
@@ -148,25 +154,45 @@ export function FoxMessagesEditor() {
           </p>
           <ul className="mt-3 space-y-3">
             {SYSTEM_MESSAGE_CATALOG.filter((m) => m.group === group).map(
-              (m) => (
-                <li key={m.key} className="grid gap-1 sm:grid-cols-[11rem_1fr]">
-                  <label
-                    htmlFor={`sys-${m.key}`}
-                    className="text-xs text-zinc-400 sm:pt-2"
+              (m) => {
+                const multiline =
+                  group === "dispatch" && m.key.endsWith("_body");
+                return (
+                  <li
+                    key={m.key}
+                    className="grid gap-1 sm:grid-cols-[11rem_1fr]"
                   >
-                    {m.label}
-                  </label>
-                  <input
-                    id={`sys-${m.key}`}
-                    value={drafts[m.key] ?? ""}
-                    placeholder={m.defaultText}
-                    onChange={(e) =>
-                      setDrafts((d) => ({ ...d, [m.key]: e.target.value }))
-                    }
-                    className="rounded-xl border border-zinc-700 bg-black/40 px-3 py-2 text-sm text-white placeholder:text-zinc-600"
-                  />
-                </li>
-              )
+                    <label
+                      htmlFor={`sys-${m.key}`}
+                      className="text-xs text-zinc-400 sm:pt-2"
+                    >
+                      {m.label}
+                    </label>
+                    {multiline ? (
+                      <textarea
+                        id={`sys-${m.key}`}
+                        value={drafts[m.key] ?? ""}
+                        placeholder={m.defaultText}
+                        rows={5}
+                        onChange={(e) =>
+                          setDrafts((d) => ({ ...d, [m.key]: e.target.value }))
+                        }
+                        className="rounded-xl border border-zinc-700 bg-black/40 px-3 py-2 text-sm text-white placeholder:text-zinc-600"
+                      />
+                    ) : (
+                      <input
+                        id={`sys-${m.key}`}
+                        value={drafts[m.key] ?? ""}
+                        placeholder={m.defaultText}
+                        onChange={(e) =>
+                          setDrafts((d) => ({ ...d, [m.key]: e.target.value }))
+                        }
+                        className="rounded-xl border border-zinc-700 bg-black/40 px-3 py-2 text-sm text-white placeholder:text-zinc-600"
+                      />
+                    )}
+                  </li>
+                );
+              }
             )}
           </ul>
         </div>

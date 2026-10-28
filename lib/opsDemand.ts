@@ -19,6 +19,10 @@ import {
   experienceNeedsEntryTicket,
   type ExperienceAccessTicketLine,
 } from "@/lib/accessType";
+import {
+  formatExperienceTimingOpsNote,
+  type ExperienceTimingIntent,
+} from "@/lib/experienceTiming";
 import { ensureDispatchRow } from "@/lib/opsDispatch";
 import { ensureTicketsRow, updateTicketsByPnr } from "@/lib/opsTickets";
 
@@ -34,7 +38,11 @@ function experienceTicketLinesFromRows(
     tourId?: string;
     title?: string;
     access_type?: string;
-  }>
+    timingIntent?: string;
+    ticketDate?: string | null;
+    opsTimingNote?: string;
+  }>,
+  tourDate?: string | null
 ): ExperienceAccessTicketLine[] {
   const out: ExperienceAccessTicketLine[] = [];
   for (const e of rows) {
@@ -51,12 +59,27 @@ function experienceTicketLinesFromRows(
       (experienceNeedsEntryTicket({ title: e.title })
         ? "direct_ticket"
         : "");
+    const title = String(e.title || "Experience").trim() || "Experience";
+    const intent = e.timingIntent as ExperienceTimingIntent | undefined;
+    const opsNote =
+      e.opsTimingNote ||
+      (intent
+        ? formatExperienceTimingOpsNote({
+            title,
+            timingIntent: intent,
+            ticketDate: e.ticketDate,
+            tourDate,
+          })
+        : undefined);
     out.push({
       tourId: e.tourId,
-      name: String(e.title || "Experience").trim() || "Experience",
+      name: opsNote || title,
       qty: 1,
       accessType: resolved || "direct_ticket",
       purchaseMode: accessTypePurchaseMode(resolved || "direct_ticket"),
+      timingIntent: intent,
+      ticketDate: e.ticketDate ?? null,
+      opsNote,
     });
   }
   return out;
@@ -141,6 +164,7 @@ export function demandFromSingleDay(
     | "guidePreference"
     | "selectedTransportProducts"
     | "tourHours"
+    | "tourDate"
     | "suicaNeeded"
     | "guestHasICCard"
   >
@@ -154,20 +178,27 @@ export function demandFromSingleDay(
       tourId: e.tourId,
       title: e.title,
       access_type: e.access_type,
-    }))
+      timingIntent: e.timingIntent,
+      ticketDate: e.ticketDate,
+      opsTimingNote: e.opsTimingNote,
+    })),
+    state.tourDate
   );
   if (expLines.length > 0) ticketLines.push(...expLines);
 
+  const usesPublicRail =
+    transit.includes("subway") || transit === "mix" || transit.includes("public");
   const prepareSuica =
     Boolean(state.suicaNeeded) ||
-    (transit.includes("subway") && state.guestHasICCard === false);
+    (usesPublicRail && state.guestHasICCard === false);
 
   const ticketsNeeded = ticketLines.length > 0 || prepareSuica;
 
   const driverNeeded =
     transit.includes("private") ||
     transit.includes("chauffeur") ||
-    transit.includes("driver");
+    transit.includes("driver") ||
+    transit === "mix";
   // 3h / 6h / 8h (and any single-day tour) always need guide desk — Ops decides assign or not.
   const guideNeeded = true;
 
@@ -282,12 +313,34 @@ export async function applyOpsDemandForPnr(
 
   await ensureTicketsRow(pb, pnr);
   const lines = demand.ticketLines || [];
+  const timingNotes = lines
+    .map((l) => {
+      const note = String(
+        (l as ExperienceAccessTicketLine).opsNote || ""
+      ).trim();
+      return note;
+    })
+    .filter(Boolean);
+  const timingBlock =
+    timingNotes.length > 0
+      ? `EXPERIENCE TIMING\n${timingNotes.map((n) => `• ${n}`).join("\n")}`
+      : "";
+
   if (demand.ticketsNeeded) {
     const row = await ensureTicketsRow(pb, pnr);
     const cur = String(row.ticket_status || "none");
+    const prevNotes = String(row.ticket_notes || "");
+    const withoutTiming = prevNotes
+      .replace(/\n?EXPERIENCE TIMING[\s\S]*?(?=\n[A-Z]|$)/, "")
+      .trim();
     const patch: Record<string, unknown> = {
       ticket_lines: lines,
     };
+    if (timingBlock) {
+      patch.ticket_notes = withoutTiming
+        ? `${withoutTiming}\n\n${timingBlock}`
+        : timingBlock;
+    }
     if (cur === "none" || cur === "") {
       patch.ticket_status = "needed";
     }

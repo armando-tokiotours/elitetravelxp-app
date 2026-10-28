@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { JapanKeyword } from "@/components/branding/JapanKeyword";
 import { ManageBookingModal } from "@/components/modals/ManageBookingModal";
+import { HeaderSelectors } from "@/components/navigation/HeaderSelectors";
 import { BRAND_LOGO_ICON } from "@/lib/brand";
 import { performFullBookingReset } from "@/lib/useBookingSync";
 import { usePreBuilderStore } from "@/store/usePreBuilderStore";
@@ -174,13 +175,16 @@ export function ToriiGatePortalHero() {
             Tokiotours
           </p>
         </div>
-        <button
-          type="button"
-          onClick={() => setManageOpen(true)}
-          className="rounded-full border border-white/15 bg-white/5 px-3 py-1.5 text-[10px] font-bold tracking-wider text-zinc-300 uppercase transition hover:border-white/30 hover:text-white"
-        >
-          Manage
-        </button>
+        <div className="flex items-center gap-1.5 sm:gap-2">
+          <HeaderSelectors tone="dark" />
+          <button
+            type="button"
+            onClick={() => setManageOpen(true)}
+            className="rounded-full border border-white/15 bg-white/5 px-3 py-1.5 text-[10px] font-bold tracking-wider text-zinc-300 uppercase transition hover:border-white/30 hover:text-white"
+          >
+            Manage
+          </button>
+        </div>
       </header>
 
       <div className="relative z-10 mx-auto w-full max-w-5xl shrink-0 px-4 pt-1 sm:px-10 sm:pt-2">

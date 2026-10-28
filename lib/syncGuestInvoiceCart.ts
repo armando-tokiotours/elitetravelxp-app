@@ -69,7 +69,7 @@ export async function syncGuestInvoiceCart(input: {
   const pnr = String(input.pnr || "")
     .trim()
     .toUpperCase();
-  if (!pnr || pnr.startsWith("TMP-")) {
+  if (!pnr || pnr.startsWith("TMP-") || pnr.startsWith("DRAFT-")) {
     return { ok: false, error: "official pnr required" };
   }
   const services = invoiceItemsToServiceLines(input.items);

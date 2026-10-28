@@ -23,6 +23,7 @@ export function ScheduleTourDaySheet({
   onClose,
   onSelectDay,
   onToast,
+  zIndexClass = "z-[110]",
 }: {
   open: boolean;
   tour: PbTour | null;
@@ -32,12 +33,14 @@ export function ScheduleTourDaySheet({
   onClose: () => void;
   onSelectDay: (date: string) => { ok: boolean; message?: string };
   onToast: (message: string) => void;
+  /** Above Discover overlay + dock (z-[999]/z-[1000]) when scheduling from reels */
+  zIndexClass?: string;
 }) {
   return (
     <AnimatePresence>
       {open && tour ? (
         <motion.div
-          className="fixed inset-0 z-[110] flex items-end justify-center bg-black/45"
+          className={`fixed inset-0 ${zIndexClass} flex items-end justify-center bg-black/45`}
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}

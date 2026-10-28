@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type PocketBase from "pocketbase";
 import {
   CANONICAL_STATUSES,
@@ -18,6 +18,8 @@ import {
 } from "@/lib/opsFinancialAudit";
 import { EditableInvoiceStudio } from "@/components/staff/EditableInvoiceStudio";
 import { useTeamAuth } from "@/store/useTeamAuth";
+import { conciergeAssigneeRoleLabel } from "@/lib/staffRoles";
+import { staffAvatarSrc } from "@/lib/staffPhoto";
 
 export type TourPayStatusUi =
   | "UNPAID"
@@ -168,6 +170,56 @@ export function BookingStatusTab({
   );
   const staffRole = useTeamAuth((s) => s.role);
   const staffId = useTeamAuth((s) => s.staffId);
+  const authEmail = useTeamAuth((s) => s.email);
+  const authRecord = useTeamAuth((s) => s.record);
+  const selfName =
+    String(authRecord?.name || "").trim() ||
+    String(authEmail || "").trim() ||
+    "Me";
+  const canSelfAssign =
+    Boolean(staffId) && (staffRole === "owner" || staffRole === "ops");
+
+  const selfRoleLabel = conciergeAssigneeRoleLabel(staffRole);
+
+  /** Agent + Ops + Owner list + optional self-option + currently assigned (if missing). */
+  const agentOptions = useMemo(() => {
+    const byId = new Map<string, StaffOption>();
+    for (const a of agents) {
+      if (a?.id) {
+        byId.set(a.id, {
+          ...a,
+          role: conciergeAssigneeRoleLabel(a.role) || a.role,
+        });
+      }
+    }
+    if (canSelfAssign && staffId && !byId.has(staffId)) {
+      byId.set(staffId, {
+        id: staffId,
+        email: String(authEmail || ""),
+        name: selfName,
+        role: selfRoleLabel || "Super User",
+      });
+    }
+    const assignedId = String(row.assigned_agent_id || "").trim();
+    if (assignedId && !byId.has(assignedId)) {
+      byId.set(assignedId, {
+        id: assignedId,
+        email: "",
+        name: String(row.assigned_agent || "").trim() || assignedId,
+        role: "Assigned",
+      });
+    }
+    return Array.from(byId.values());
+  }, [
+    agents,
+    canSelfAssign,
+    staffId,
+    authEmail,
+    selfName,
+    selfRoleLabel,
+    row.assigned_agent_id,
+    row.assigned_agent,
+  ]);
 
   useEffect(() => {
     setBookingStatus(row.status || "incoming");
@@ -298,8 +350,26 @@ export function BookingStatusTab({
   const statusDirty = bookingStatus !== savedStatus;
   const savedAgentId = row.assigned_agent_id || "";
   const agentDirty = selectedAgentId !== savedAgentId;
-  const currentAgent = agents.find((a) => a.id === selectedAgentId);
-  const pendingAgent = agents.find((a) => a.id === selectedAgentId);
+  const currentAgent = agentOptions.find((a) => a.id === selectedAgentId);
+  const pendingAgent = agentOptions.find((a) => a.id === selectedAgentId);
+  const [failedAvatarAgentId, setFailedAvatarAgentId] = useState<string | null>(
+    null
+  );
+  // Prefer explicit avatar/photo fields; otherwise probe the staff avatar API
+  // (404s when no profile photo — onError then restores the letter fallback).
+  const currentAgentAvatarSrc = currentAgent
+    ? String(currentAgent.avatarUrl || currentAgent.photoUrl || "").trim() ||
+      (String(currentAgent.photo || "").trim()
+        ? staffAvatarSrc(currentAgent.id, { photo: currentAgent.photo })
+        : currentAgent.id
+          ? `/api/staff/avatar/${encodeURIComponent(currentAgent.id)}`
+          : null)
+    : null;
+  const showAgentPhoto = Boolean(
+    currentAgentAvatarSrc &&
+      currentAgent &&
+      failedAvatarAgentId !== currentAgent.id
+  );
 
   const confirmStatusPersist = (pending: string): boolean => {
     const warning = buildStatusFinancialWarning({
@@ -582,43 +652,55 @@ export function BookingStatusTab({
         ) : null}
       </div>
 
-      {/* Agent assignment */}
+      {/* In-charge assignment (agent / ops / owner) */}
       <div className="space-y-4 rounded-2xl border border-white/10 bg-[#0D1117] p-5">
         <h2 className="border-b border-white/10 pb-2 font-sans text-sm font-semibold tracking-wider text-cyan-300 uppercase">
-          2. Assigned concierge agent
+          2. Assigned in-charge
         </h2>
 
         {isAgency ? (
           <p className="text-[10px] tracking-wider text-zinc-500 uppercase">
-            Concierge · Ops (agency booking — agent assignment managed via
-            agency desk)
+            Concierge · Ops (agency booking — assignment managed via agency
+            desk)
           </p>
         ) : (
           <div className="grid grid-cols-1 items-center gap-6 md:grid-cols-2">
             <div className="flex items-center gap-4 rounded-2xl border border-white/10 bg-black/50 p-4">
               <div className="relative flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-white/20 bg-gray-800">
-                <span className="text-xl font-bold text-gray-400">
-                  {currentAgent
-                    ? (currentAgent.name || currentAgent.email || "?")
-                        .trim()
-                        .charAt(0)
-                        .toUpperCase()
-                    : "?"}
-                </span>
+                {showAgentPhoto && currentAgentAvatarSrc ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={currentAgentAvatarSrc}
+                    alt=""
+                    className="h-full w-full object-cover"
+                    onError={() =>
+                      setFailedAvatarAgentId(currentAgent?.id || null)
+                    }
+                  />
+                ) : (
+                  <span className="text-xl font-bold text-gray-400">
+                    {currentAgent
+                      ? (currentAgent.name || currentAgent.email || "?")
+                          .trim()
+                          .charAt(0)
+                          .toUpperCase()
+                      : "?"}
+                  </span>
+                )}
               </div>
               <div className="min-w-0 space-y-0.5">
                 <div className="text-[10px] font-bold tracking-wider text-[#F6A724] uppercase">
-                  {currentAgent ? "Assigned agent" : "Unassigned"}
+                  {currentAgent ? "Assigned in-charge" : "Unassigned"}
                 </div>
                 <h3 className="truncate text-sm font-bold text-white uppercase">
                   {currentAgent
                     ? currentAgent.name || currentAgent.email
-                    : "No agent assigned"}
+                    : "No one assigned"}
                 </h3>
                 <p className="truncate text-[11px] text-gray-400">
                   {currentAgent
-                    ? currentAgent.role || "Concierge specialist"
-                    : "Select an agent from the dropdown"}
+                    ? currentAgent.role || "Agent or Operation Manager"
+                    : "Select an agent or Operation Manager"}
                 </p>
                 {currentAgent?.email ? (
                   <p className="truncate text-[10px] text-zinc-500">
@@ -630,7 +712,7 @@ export function BookingStatusTab({
 
             <div className="space-y-2">
               <label className="block text-[10px] font-bold text-gray-400 uppercase">
-                Assign / change concierge agent
+                Assign / change — Agent or Operation Manager
               </label>
               <select
                 value={selectedAgentId}
@@ -641,13 +723,21 @@ export function BookingStatusTab({
                 }}
                 className="w-full rounded-xl border border-white/10 bg-[#0A1017] p-3 text-xs text-white"
               >
-                <option value="">— Select agent —</option>
-                {agents.map((agent) => (
-                  <option key={agent.id} value={agent.id}>
-                    {agent.name || agent.email}
-                    {agent.role ? ` (${agent.role})` : ""}
+                <option value="">— Select agent or Ops —</option>
+                {canSelfAssign && staffId ? (
+                  <option value={staffId}>
+                    Assign Myself ({selfName}
+                    {selfRoleLabel ? ` – ${selfRoleLabel}` : ""})
                   </option>
-                ))}
+                ) : null}
+                {agentOptions
+                  .filter((agent) => !(canSelfAssign && agent.id === staffId))
+                  .map((agent) => (
+                    <option key={agent.id} value={agent.id}>
+                      {agent.name || agent.email}
+                      {agent.role ? ` (${agent.role})` : ""}
+                    </option>
+                  ))}
               </select>
               {agentDirty ? (
                 <button
@@ -656,7 +746,7 @@ export function BookingStatusTab({
                   onClick={() => setAgentConfirmOpen(true)}
                   className="w-full rounded-xl bg-[#075473] py-2.5 text-[11px] font-bold tracking-wider text-white uppercase transition hover:bg-[#075473]/80 disabled:opacity-40"
                 >
-                  Save agent assignment
+                  Save assignment
                 </button>
               ) : null}
             </div>
@@ -711,9 +801,9 @@ export function BookingStatusTab({
               <span className="font-semibold text-white">
                 {pendingAgent?.name ||
                   pendingAgent?.email ||
-                  "no agent (clear)"}
+                  "no one (clear)"}
               </span>{" "}
-              as concierge for this booking.
+              as in-charge for this booking.
             </p>
             <div className="flex gap-2">
               <button

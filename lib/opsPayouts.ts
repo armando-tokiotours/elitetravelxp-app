@@ -16,6 +16,8 @@ export type OpsPayoutRow = {
   amount_jpy?: number;
   status?: PayoutStatus | string;
   notes?: string;
+  created?: string;
+  updated?: string;
 };
 
 function safePnr(pnr: string): string {

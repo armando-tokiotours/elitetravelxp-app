@@ -22,6 +22,7 @@ export type ItineraryStopTicketProps = {
 
 export function resolveItineraryStopKind(input: {
   category?: string | null;
+  entry_type?: string | null;
   access_type?: string | null;
   is_self_guided?: boolean | null;
   is_extra?: boolean | null;
@@ -29,6 +30,16 @@ export function resolveItineraryStopKind(input: {
   description?: string | null;
 }): ItineraryStopKind {
   const category = String(input.category || "").toLowerCase();
+  const entry = String(input.entry_type || "").toLowerCase();
+  // Areas / places use paper skin (badge = Area / Neighborhood via kind label)
+  if (
+    category === "cluster" ||
+    category === "place" ||
+    entry === "cluster" ||
+    entry === "place"
+  ) {
+    return "activity";
+  }
   if (
     experienceNeedsEntryTicket({
       title: input.title,

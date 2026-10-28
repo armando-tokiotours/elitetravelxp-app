@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Image from "next/image";
+import { ChevronDown } from "lucide-react";
 import {
   BUILDER_S_HERO_CONFIG,
   resolveBuilderSHeroCopy,
@@ -14,8 +15,12 @@ import {
   readBuilderSHeroLocalCache,
   type BuilderSHeroLocalCache,
 } from "@/config/mediaConfig";
-import { isVideoFilename } from "@/lib/brandingUi";
-import { LazyVideo } from "@/components/ui/LazyVideo";
+import {
+  brandingSlotSrcSet,
+  brandingSlotVersionedUrl,
+  builderHeroSlot,
+} from "@/lib/brandingImageSlots";
+import { preEliteMediaVersion } from "@/lib/preEliteBranding";
 import { useSiteBrandingStore } from "@/store/useSiteBrandingStore";
 import {
   fetchPublicBrandAssets,
@@ -24,26 +29,21 @@ import {
 /** Single-day peek character (1-Day Pass ticket) */
 const HERO_CHARACTER_SRC = "/images/peek-character-1day.webp";
 
-/** Logo / ENOENT stubs — never use as full-bleed hero (plain grey instead). */
-const HERO_MEDIA_STUBS = new Set([
-  "/brand/tokiotours-logo-icon.png",
-  "/brand/hero-single-day.jpg",
-  "/brand/hero-background.jpg",
-  "/brand/hero-japan-pagoda.jpg",
-  "/brand/site-logo.png",
-]);
-
-function realHeroMedia(url: string | undefined | null): string {
-  const u = (url || "").trim();
-  if (!u || HERO_MEDIA_STUBS.has(u)) return "";
-  return u;
-}
+/* Hero renders the builder-single-hero slot; missing slot → grey. */
 
 /**
  * Builder S hero — Team Branding still/video (poster-first) + peek character + copy.
  * Prefer admin poster / public still; empty → plain grey (never logo filler).
+ *
+ * Section 1 of the two-section builder landing: full-screen (100dvh).
+ * `onStartBuilding` renders the bottom "Start Building" scroll cue that
+ * smooth-scrolls to Section 2 (the builder UI).
  */
-export function SingleDayBuilderHero() {
+export function SingleDayBuilderHero({
+  onStartBuilding,
+}: {
+  onStartBuilding?: () => void;
+}) {
   const ensureLoaded = useSiteBrandingStore((s) => s.ensureLoaded);
   const getItem = useSiteBrandingStore((s) => s.getItem);
   const brandingItems = useSiteBrandingStore((s) => s.itemsByKey);
@@ -92,56 +92,39 @@ export function SingleDayBuilderHero() {
   const heroLine1 = team.heroLine1;
   const heroLine2 = team.heroLine2;
 
-  const mediaUrl = realHeroMedia(
-    localCache?.mediaUrl ||
-      item.mediaUrl ||
-      publicHero ||
-      SINGLE_DAY_BUILDER_CONFIG.hero.fallbackImage
+  void publicHero;
+  void item;
+  // The ONE Single-Day hero slot (version from the hero record's
+  // media_version, or the local cache written on save in admin).
+  const slotVersion = preEliteMediaVersion(
+    brandingItems[SINGLE_DAY_BUILDER_HERO_KEY]
   );
-  const isVideo = isVideoFilename(mediaUrl);
-  const posterUrl = realHeroMedia(
-    item.posterUrl ||
-      publicHero ||
-      SINGLE_DAY_BUILDER_CONFIG.hero.fallbackImage
-  );
-
-  const stillSrc = mediaUrl || posterUrl;
-  const stillIsLocal =
-    Boolean(stillSrc) &&
-    stillSrc!.startsWith("/") &&
-    !stillSrc!.startsWith("//");
+  const localSlot =
+    localCache?.mediaUrl &&
+    localCache.mediaUrl.includes(builderHeroSlot("single"))
+      ? localCache.mediaUrl
+      : "";
+  const stillSrc =
+    localSlot ||
+    brandingSlotVersionedUrl(builderHeroSlot("single"), slotVersion);
+  const [heroOk, setHeroOk] = useState(true);
 
   return (
     <section
-      className="builder-hero relative z-10 h-[65vh] w-full min-h-[280px] overflow-hidden bg-[#05080C] sm:h-[80vh] md:min-h-[420px]"
+      className="builder-hero relative z-10 flex h-[calc(100dvh-3.75rem)] w-full flex-col overflow-hidden bg-[#05080C] pb-24 lg:h-[100dvh]"
       aria-label="Single-day builder hero"
     >
-      {isVideo && mediaUrl ? (
-        <LazyVideo
-          src={mediaUrl}
-          poster={posterUrl || undefined}
-          className="absolute inset-0 z-0 h-full w-full object-cover"
-          muted
-          loop
-          playsInline
-          autoPlay
-        />
-      ) : stillSrc && stillIsLocal ? (
-        <Image
-          src={stillSrc}
-          alt=""
-          fill
-          priority
-          sizes="100vw"
-          className="absolute inset-0 z-0 object-cover"
-        />
-      ) : stillSrc ? (
+      {heroOk ? (
+        // Plain <img>: versioned /uploads/ URLs must never go to next/image.
         // eslint-disable-next-line @next/next/no-img-element
         <img
           src={stillSrc}
+          srcSet={brandingSlotSrcSet(builderHeroSlot("single"))}
+          sizes="100vw"
           alt=""
           width={1600}
           height={900}
+          onError={() => setHeroOk(false)}
           className="absolute inset-0 z-0 h-full w-full object-cover"
         />
       ) : (
@@ -179,6 +162,39 @@ export function SingleDayBuilderHero() {
           {heroSubtitle}
         </p>
       </div>
+
+      {onStartBuilding ? (
+        // In-flow at the end of the flex column (mt-auto) + section pb-24,
+        // so the cue always sits above the mobile bottom nav / fold,
+        // whatever the screen height.
+        <div className="relative z-30 mt-auto flex justify-center">
+          <button
+            type="button"
+            onClick={onStartBuilding}
+            aria-label="Start building your day"
+            className="flex flex-col items-center gap-3 text-zinc-300 transition-colors hover:text-white"
+          >
+            <span className="text-sm font-bold tracking-[0.25em] uppercase">
+              Start Building
+            </span>
+            <span className="relative flex h-12 w-12 items-center justify-center">
+              <span
+                aria-hidden
+                className="pointer-events-none absolute inset-0 rounded-full border border-white/45 animate-hero-start-cta-ring"
+              />
+              <span
+                aria-hidden
+                className="pointer-events-none absolute inset-0 rounded-full border border-white/25 animate-hero-start-cta-ring [animation-delay:1s]"
+              />
+              <span className="absolute inset-0 animate-bounce">
+                <span className="flex h-full w-full items-center justify-center rounded-full border border-white/30 bg-black/40 animate-widget-call-glow">
+                  <ChevronDown className="h-6 w-6" />
+                </span>
+              </span>
+            </span>
+          </button>
+        </div>
+      ) : null}
     </section>
   );
 }

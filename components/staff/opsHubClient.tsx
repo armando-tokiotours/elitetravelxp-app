@@ -22,6 +22,8 @@ export type OpsHubRow = {
   assigned_ticketer_id?: string;
   assigned_agent_id?: string;
   assigned_agent?: string;
+  /** Concierge agent accept: none | pending | accepted */
+  agent_response?: string;
   ticket_status?: string;
   ticket_notes?: string;
   pickup_notes?: string;
@@ -73,7 +75,47 @@ export type StaffOption = {
   email: string;
   name?: string;
   role?: string;
+  /** Profile photo URL (e.g. /api/staff/avatar/[id]?v=…) when staff_profiles.photo is set. */
+  avatarUrl?: string;
+  photoUrl?: string;
+  /** Raw staff_profiles.photo filename, when loaded. */
+  photo?: string;
 };
+
+/** Attach /api/staff/avatar URLs from staff_profiles.photo (GuideDispatchTab pattern). */
+async function enrichStaffOptionsWithAvatars(
+  pb: PocketBase,
+  list: StaffOption[]
+): Promise<StaffOption[]> {
+  if (!list.length) return list;
+  try {
+    const profiles = await pb
+      .collection("staff_profiles")
+      .getFullList<{ staff_id?: string; photo?: string }>({
+        requestKey: null,
+      })
+      .catch(() => []);
+    const photoByStaff = new Map<string, string>();
+    for (const sp of profiles) {
+      const sid = String(sp.staff_id || "").trim();
+      const file = String(sp.photo || "").trim();
+      if (!sid || !file) continue;
+      photoByStaff.set(
+        sid,
+        `/api/staff/avatar/${encodeURIComponent(sid)}?v=${encodeURIComponent(file)}`
+      );
+    }
+    if (!photoByStaff.size) return list;
+    return list.map((s) => {
+      const avatarUrl =
+        String(s.avatarUrl || s.photoUrl || "").trim() ||
+        photoByStaff.get(s.id);
+      return avatarUrl ? { ...s, avatarUrl } : s;
+    });
+  } catch {
+    return list;
+  }
+}
 
 export async function loadOpsHub(
   pb: PocketBase,
@@ -88,7 +130,7 @@ export async function loadOpsHub(
 
 export async function loadStaffByRole(
   pb: PocketBase,
-  role: "guide" | "driver" | "ticketer" | "agent"
+  role: "guide" | "driver" | "ticketer" | "agent" | "ops" | "owner"
 ): Promise<StaffOption[]> {
   try {
     return await pb.collection("staff").getFullList<StaffOption>({
@@ -101,24 +143,80 @@ export async function loadStaffByRole(
   }
 }
 
-export function OpsStatusBadge({ status }: { status?: string }) {
+/** Agent + Ops + Owner staff for booking in-charge assignment. */
+export async function loadAssignableConciergeStaff(
+  pb: PocketBase
+): Promise<StaffOption[]> {
+  try {
+    const list = await pb.collection("staff").getFullList<StaffOption>({
+      filter:
+        `(role="agent" || role="ops" || role="owner") && active != false`,
+      sort: "name,email",
+      requestKey: null,
+    });
+    return enrichStaffOptionsWithAvatars(pb, list);
+  } catch {
+    // Fallback: role filter may fail on older schemas — merge per-role lists
+    const [agents, ops, owners] = await Promise.all([
+      loadStaffByRole(pb, "agent"),
+      loadStaffByRole(pb, "ops"),
+      loadStaffByRole(pb, "owner"),
+    ]);
+    const byId = new Map<string, StaffOption>();
+    for (const s of [...agents, ...ops, ...owners]) {
+      if (s?.id) byId.set(s.id, s);
+    }
+    const merged = Array.from(byId.values()).sort((a, b) =>
+      String(a.name || a.email || "").localeCompare(
+        String(b.name || b.email || "")
+      )
+    );
+    return enrichStaffOptionsWithAvatars(pb, merged);
+  }
+}
+
+export function OpsStatusBadge({
+  status,
+  compact = false,
+  surface = "dark",
+}: {
+  status?: string;
+  /** Smaller sizing for Ops sidebar list cards only */
+  compact?: boolean;
+  /** Cream list rows need darker badge text; dark is the default elsewhere */
+  surface?: "dark" | "cream";
+}) {
   const canonical = toCanonicalStatus(status || "draft");
   const label = canonical.replace(/_/g, " ");
+  const onCream = surface === "cream";
   const tone =
     canonical === "draft"
-      ? "border-gray-500/30 bg-gray-500/20 text-gray-400"
+      ? onCream
+        ? "border-slate-300 bg-slate-100 text-slate-600"
+        : "border-gray-500/30 bg-gray-500/20 text-gray-400"
       : canonical === "incoming"
-        ? "border-amber-500/30 bg-amber-500/20 text-amber-300"
+        ? onCream
+          ? "border-amber-700/35 bg-amber-100 text-amber-900"
+          : "border-amber-500/30 bg-amber-500/20 text-amber-300"
         : canonical === "cancelled"
-          ? "border-red-500/40 bg-red-500/20 text-red-300"
+          ? onCream
+            ? "border-red-600/40 bg-red-50 text-red-700"
+            : "border-red-500/40 bg-red-500/20 text-red-300"
           : canonical === "confirmed" ||
               canonical === "in_ops" ||
               canonical === "done"
-            ? "border-emerald-500/30 bg-emerald-500/15 text-emerald-300"
-            : "border-zinc-700 bg-zinc-900 text-zinc-400";
+            ? onCream
+              ? "border-emerald-700/35 bg-emerald-50 text-emerald-800"
+              : "border-emerald-500/30 bg-emerald-500/15 text-emerald-300"
+            : onCream
+              ? "border-slate-300 bg-slate-100 text-slate-600"
+              : "border-zinc-700 bg-zinc-900 text-zinc-400";
+  const size = compact
+    ? "px-1 py-0.5 text-[7.5px]"
+    : "px-2 py-0.5 text-[10px]";
   return (
     <span
-      className={`rounded-md border px-2 py-0.5 text-[10px] tracking-wider uppercase ${tone}`}
+      className={`rounded-md border tracking-wider uppercase ${size} ${tone}`}
     >
       {label}
     </span>

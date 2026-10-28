@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
-import { ArrowLeft, X } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { useModalDismiss } from "@/hooks/useModalDismiss";
 import { BrandMedia } from "@/components/ui/BrandMedia";
 import { LazyVideo } from "@/components/ui/LazyVideo";
@@ -19,10 +19,11 @@ const KEY_BY_ID: Record<IntraCityTransport, string> = {
   walk: "transit_walk",
   subway: "transit_subway",
   private_driver: "transit_private_driver",
+  mix: "transit_mix",
 };
 
 /**
- * Explains Walking / Subway / Private Driver.
+ * Explains Public Transport / Private Driver / Mix.
  * Back / Close / Keep return to the 3-option Logistics screen (parent keeps that open).
  */
 export function MovementDetailModal({
@@ -67,7 +68,7 @@ export function MovementDetailModal({
 
   const keep = () => {
     if (!movementId) return;
-    if (movementId === "subway") {
+    if (movementId === "subway" || movementId === "mix") {
       onSelect(movementId, { needsSuica, suicaValueEur });
       return;
     }
@@ -79,7 +80,7 @@ export function MovementDetailModal({
       {open && movementId && item ? (
         <motion.div
           key="movement-detail"
-          className="fixed inset-0 z-[130] flex items-stretch justify-center bg-[#05080C]/70 backdrop-blur-sm"
+          className="fixed inset-0 z-[130] flex h-full w-full flex-col bg-[#0A1017] p-6"
           role="dialog"
           aria-modal="true"
           aria-label={item.title}
@@ -87,38 +88,24 @@ export function MovementDetailModal({
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
         >
-          <button
-            type="button"
-            aria-label="Close"
-            className="absolute inset-0 cursor-default"
-            onClick={onClose}
-          />
-          <motion.div
-            className="relative z-[1] flex h-[100dvh] max-h-[100dvh] w-full max-w-lg flex-col overflow-hidden border border-white/10 bg-[#0D1117]/95 shadow-2xl backdrop-blur-xl sm:rounded-2xl md:max-w-2xl"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 20 }}
-          >
-            <div className="absolute top-3 right-3 left-3 z-20 flex items-center justify-between">
-              <button
-                type="button"
-                onClick={onClose}
-                className="flex items-center gap-1 rounded-full border border-white/20 bg-black/60 px-3 py-2 text-xs font-semibold text-white"
-              >
-                <ArrowLeft className="h-3.5 w-3.5" />
-                Back
-              </button>
-              <button
-                type="button"
-                onClick={onClose}
-                aria-label="Close"
-                className="flex h-10 w-10 items-center justify-center rounded-full border border-white/20 bg-black/60 text-white"
-              >
-                <X className="h-5 w-5" strokeWidth={2.5} />
-              </button>
-            </div>
+          <header className="relative mx-auto flex w-full max-w-2xl shrink-0 items-center justify-between border-b border-white/10 pb-4 pt-[max(0.5rem,env(safe-area-inset-top))]">
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Back"
+              className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-gray-300 transition hover:text-white"
+            >
+              <ArrowLeft className="h-4 w-4" aria-hidden />
+              <span>Back</span>
+            </button>
+            <h3 className="pointer-events-none absolute inset-x-0 truncate px-16 text-center text-xs font-bold uppercase tracking-widest text-[#0080A3]">
+              {item.title}
+            </h3>
+            <div className="w-12 shrink-0" aria-hidden />
+          </header>
 
-            <PinchZoomPhoto className="relative aspect-[16/10] w-full bg-zinc-900">
+          <div className="mx-auto flex min-h-0 w-full max-w-2xl flex-1 flex-col overflow-hidden pt-4">
+            <PinchZoomPhoto className="relative aspect-[16/10] w-full shrink-0 overflow-hidden bg-[#0D141C]">
               {item.isVideo && item.mediaUrl ? (
                 <LazyVideo
                   src={item.mediaUrl}
@@ -138,11 +125,11 @@ export function MovementDetailModal({
                   draggable={false}
                 />
               )}
-              <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#0D1117] via-transparent to-transparent" />
+              <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#0A1017] via-transparent to-transparent" />
             </PinchZoomPhoto>
 
-            <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-5 py-4 pb-[max(1.5rem,env(safe-area-inset-bottom))]">
-              <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-white">
+            <div className="min-h-0 flex-1 space-y-4 overflow-y-auto py-4">
+              <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/50">
                 Preferred movement
               </p>
               <h3 className="font-godiva text-2xl uppercase tracking-wider text-white">
@@ -154,14 +141,14 @@ export function MovementDetailModal({
               </p>
 
               {movementId === "walk" ? (
-                <div className="rounded-2xl border border-emerald-500/25 bg-emerald-500/10 p-3 text-xs text-emerald-200">
+                <div className="bg-emerald-500/10 p-3 text-xs text-emerald-200">
                   Neighborhood pace on foot · <strong>€0</strong> — no ticket or
                   chauffeur line items.
                 </div>
               ) : null}
 
-              {movementId === "subway" ? (
-                <div className="space-y-3 rounded-2xl border border-white/10 bg-black/40 p-4">
+              {movementId === "subway" || movementId === "mix" ? (
+                <div className="space-y-3 bg-[#0D141C] p-4">
                   <p className="text-[10px] font-bold tracking-wider text-[#F6A724] uppercase">
                     Suica / PASMO IC cards
                   </p>
@@ -169,7 +156,7 @@ export function MovementDetailModal({
                     Do you need us to provide &amp; pre-load physical Suica /
                     PASMO IC cards for your group?
                   </p>
-                  <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-white/10 bg-[#0A1017] p-3">
+                  <label className="flex cursor-pointer items-start gap-3 bg-[#0A1017] p-3">
                     <input
                       type="radio"
                       name="suica"
@@ -184,7 +171,7 @@ export function MovementDetailModal({
                       </span>
                     </span>
                   </label>
-                  <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-white/10 bg-[#0A1017] p-3">
+                  <label className="flex cursor-pointer items-start gap-3 bg-[#0A1017] p-3">
                     <input
                       type="radio"
                       name="suica"
@@ -213,8 +200,8 @@ export function MovementDetailModal({
                             onClick={() => setSuicaValueEur(val)}
                             className={`rounded-lg px-3 py-1.5 font-mono text-xs font-bold ${
                               suicaValueEur === val
-                                ? "bg-[#075473] text-white"
-                                : "bg-white/5 text-gray-400"
+                                ? "border border-[#0080A3] bg-[#0D141C] text-white"
+                                : "bg-[#0A1017] text-gray-400"
                             }`}
                           >
                             €{val}
@@ -231,10 +218,12 @@ export function MovementDetailModal({
                 </div>
               ) : null}
 
-              {movementId === "private_driver" ? (
-                <div className="space-y-2 rounded-2xl border border-white/10 bg-black/40 p-4 text-xs">
+              {movementId === "private_driver" || movementId === "mix" ? (
+                <div className="space-y-2 bg-[#0D141C] p-4 text-xs">
                   <p className="text-[10px] font-bold tracking-wider text-[#F6A724] uppercase">
-                    Fleet recommendation
+                    {movementId === "mix"
+                      ? "Private legs · fleet recommendation"
+                      : "Fleet recommendation"}
                   </p>
                   <div className="flex justify-between gap-3 text-zinc-400">
                     <span>Recommended fleet</span>
@@ -255,16 +244,20 @@ export function MovementDetailModal({
                   </p>
                 </div>
               ) : null}
+            </div>
 
+            <div className="shrink-0 pt-2 pb-[max(0.25rem,env(safe-area-inset-bottom))]">
               <button
                 type="button"
                 onClick={keep}
-                className="mt-2 w-full rounded-full bg-[#075473] py-3 text-sm font-semibold text-white"
+                className="w-full rounded-full bg-[#054F70] py-3 text-sm font-semibold text-white"
               >
-                {alreadySelected ? "Keep this option" : "Select this option"}
+                {alreadySelected
+                  ? "Keep this option →"
+                  : "Select this option →"}
               </button>
             </div>
-          </motion.div>
+          </div>
         </motion.div>
       ) : null}
     </AnimatePresence>,

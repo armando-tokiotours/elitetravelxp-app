@@ -5,9 +5,10 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Wallet } from "lucide-react";
 import { submitBookingRequest } from "@/lib/bookingRequest";
 import {
-  calculateSingleDayQuote,
   formatEur,
+  resolveSingleDayDisplayQuote,
   singleDayPerPersonEur,
+  type LockedAdminPricingSnapshot,
 } from "@/lib/singleDayPricing";
 import { useBuilderStore } from "@/store/useBuilderStore";
 import {
@@ -21,7 +22,10 @@ import {
 import { SingleDayItineraryView } from "@/components/builder-single/SingleDayItineraryView";
 import { GuestTalkBubble } from "@/components/dossier/GuestTalkBubble";
 import { ThankYouPassMascot } from "@/components/branding/PandaFlexibleMascot";
-import { LiquidGlassHero } from "@/components/guest/LiquidGlassHero";
+import {
+  BookingSocialProfile,
+  formatSocialTourDates,
+} from "@/components/guest/BookingSocialProfile";
 import { TicketVoucherDownloadBanner } from "@/components/dossier/TicketVoucherDownloadBanner";
 import { ActionPillButton } from "@/components/ui/ActionPillButton";
 import {
@@ -39,8 +43,19 @@ import {
 import { SingleDayInvoicePrint } from "@/components/builder-single/SingleDayInvoicePrint";
 import { SingleDayBudgetModal } from "@/components/builder-s/SingleDayBudgetModal";
 import { SaveRequiredContactModal } from "@/components/builder/SaveRequiredContactModal";
-import { TopNavBar } from "@/components/navigation/TopNavBar";
-import { BUILDER_ROUTES } from "@/lib/builderRoutes";
+import {
+  BUILDER_ROUTES,
+  journeyBuilderHref,
+  journeyItineraryHref,
+} from "@/lib/builderRoutes";
+import {
+  bookingBoundRef,
+  useJourneyKindGuard,
+} from "@/lib/bookingKindGuard";
+import {
+  hydrateSingleDayBookingByRef,
+  isSingleDayRefHydrated,
+} from "@/lib/singleDayBookingHydrate";
 import { SystemMessageFox } from "@/components/branding/SystemMessageFox";
 import {
   dismissSystemMessage,
@@ -60,12 +75,22 @@ import {
 } from "@/lib/itineraryGates";
 import { useItineraryStore } from "@/store/useItineraryStore";
 import { usePreBuilderStore } from "@/store/usePreBuilderStore";
+import { getPocketBase, type PbCity } from "@/lib/pocketbase/client";
 
 type ViewMode = "dossier" | "invoice";
 
 export default function SingleDayItineraryPageClient() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  // Mirror guard: a bound multi_day PNR on the day-pass dossier belongs
+  // on the Grand Japan Journey dossier (BAL type wins over local mode).
+  useJourneyKindGuard("single_day", searchParams.get("ref"), {
+    redirectHref: (ref, kind) =>
+      journeyItineraryHref(ref, {
+        type: kind,
+        view: searchParams.get("view") === "invoice" ? "invoice" : "dossier",
+      }),
+  });
   const setTripMode = useBuilderStore((s) => s.setTripMode);
   const ensureTempBookingRef = useBuilderStore((s) => s.ensureTempBookingRef);
   const officialBookingRef = useBuilderStore((s) => s.officialBookingRef);
@@ -140,6 +165,8 @@ export default function SingleDayItineraryPageClient() {
   const [balanceOption, setBalanceOption] =
     useState<BalancePayOption>("30_PERCENT");
   const [totalPaidEur, setTotalPaidEur] = useState(0);
+  /** Cities catalog — resolve cityFocus name → record id for cover slot. */
+  const [cities, setCities] = useState<PbCity[]>([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -155,6 +182,86 @@ export default function SingleDayItineraryPageClient() {
       cancelled = true;
     };
   }, [ensureTempBookingRef, setTripMode]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void getPocketBase()
+      .collection("cities")
+      .getFullList<PbCity>({ sort: "sort_order,name" })
+      .then((list) => {
+        if (!cancelled) setCities(list);
+      })
+      .catch(() => {
+        if (!cancelled) setCities([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const coverCityId = useMemo(() => {
+    const focus = (cityFocus || "Tokyo").trim().toLowerCase();
+    if (!focus) return "";
+    return (
+      cities.find((c) => c.name.trim().toLowerCase() === focus)?.id?.trim() ||
+      ""
+    );
+  }, [cities, cityFocus]);
+
+  // Direct ?ref= arrival (dossier / wallet / pass-preview link): hydrate
+  // the single-day stores from the saved booking on the server — same
+  // `hydrateSingleDayBookingByRef` the Builder S edit page uses. Without
+  // this, only the persisted local defaults / stale Pre-Elite brief were
+  // available here, so the Pass PARTY label stayed at the brief's
+  // original party size (e.g. "1 ADULT") after the builder guests edit
+  // had already saved 3 to the server for this PNR.
+  // No redirect to multi-day here: this page is the single-day dossier.
+  useEffect(() => {
+    if (!hydrated) return;
+    const ref = String(searchParams.get("ref") || "")
+      .trim()
+      .toUpperCase();
+    if (!ref) return;
+    // Server-hydrated (builder) state wins — in the same session the
+    // builder already fetched this ref, so fresh guests edits (which may
+    // not have reached / re-read the server yet) must never be clobbered
+    // by a refetch or by re-applying the stale brief party size.
+    if (isSingleDayRefHydrated(ref)) return;
+    let cancelled = false;
+    void (async () => {
+      const booking = await hydrateSingleDayBookingByRef(ref).catch(
+        () => null
+      );
+      if (cancelled) return;
+      if (booking) {
+        setTripMode("single_day");
+        return;
+      }
+      // No server row for this ref — fall back to the Pre-Elite brief
+      // for that exact PNR if it is on this device.
+      const pre = usePreBuilderStore.getState();
+      if (
+        pre.lastPayload?.bookingRef === ref &&
+        pre.lastPayload.itineraryData
+      ) {
+        const { hydrateStoresFromPreEliteBrief } = await import(
+          "@/lib/preEliteHydrate"
+        );
+        if (cancelled) return;
+        hydrateStoresFromPreEliteBrief({
+          bookingRef: ref,
+          fullName: pre.lastPayload!.fullName,
+          email: pre.lastPayload!.email,
+          itineraryData: pre.lastPayload!.itineraryData,
+        });
+        setTripMode("single_day");
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- run once per ref after hydration
+  }, [hydrated, searchParams]);
 
   useEffect(() => {
     if (!hydrated) return;
@@ -186,18 +293,75 @@ export default function SingleDayItineraryPageClient() {
   const conciergeActive =
     isEliteConcierge || experienceService === "concierge";
 
-  const quote = useMemo(
+  const pnrForPricing = activeBookingRef({
+    tempBookingRef,
+    confirmedBookingRef,
+    bookingStatus,
+  });
+
+  const [adminPricing, setAdminPricing] =
+    useState<LockedAdminPricingSnapshot | null>(null);
+
+  useEffect(() => {
+    const ref = String(pnrForPricing || "").trim();
+    if (!ref || ref.startsWith("TMP-") || ref.startsWith("DRAFT-")) {
+      setAdminPricing(null);
+      return;
+    }
+    let cancelled = false;
+    const load = () => {
+      void fetch(
+        `/api/bookings/agent-services?pnr=${encodeURIComponent(ref)}`,
+        { cache: "no-store" }
+      )
+        .then((r) => (r.ok ? r.json() : null))
+        .then(
+          (data: {
+            services?: LockedAdminPricingSnapshot["services"];
+            finalApprovedPrice?: number | null;
+            priceMode?: string | null;
+            estimatedTotalEur?: number;
+          } | null) => {
+            if (cancelled || !data) return;
+            setAdminPricing({
+              services: data.services || [],
+              finalApprovedPrice: data.finalApprovedPrice ?? null,
+              priceMode: data.priceMode ?? null,
+              estimatedTotalEur: data.estimatedTotalEur ?? null,
+            });
+          }
+        )
+        .catch(() => {
+          /* keep prior / null */
+        });
+    };
+    load();
+    const t = window.setInterval(load, 20_000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(t);
+    };
+  }, [pnrForPricing]);
+
+  const { quote } = useMemo(
     () =>
-      calculateSingleDayQuote({
-        guidePreference,
-        tourHours,
-        experiencePrices: selectedExperiences.map((e) => Number(e.price) || 0),
-        conciergeActive,
-        preferredMovement,
-        suicaNeeded,
-        suicaValueEur,
-        guests: Math.max(1, adults + children),
-      }),
+      resolveSingleDayDisplayQuote(
+        {
+          guidePreference,
+          tourHours,
+          experiencePrices: selectedExperiences.map((e) => Number(e.price) || 0),
+          conciergeActive,
+          preferredMovement,
+          suicaNeeded,
+          suicaValueEur,
+          guests: Math.max(1, adults + children),
+        },
+        {
+          bookingStatus,
+          confirmedBookingRef,
+          lock: adminPricing,
+        }
+      ),
     [
       guidePreference,
       tourHours,
@@ -208,6 +372,9 @@ export default function SingleDayItineraryPageClient() {
       suicaValueEur,
       adults,
       children,
+      bookingStatus,
+      confirmedBookingRef,
+      adminPricing,
     ]
   );
 
@@ -500,7 +667,7 @@ export default function SingleDayItineraryPageClient() {
     setActiveView(mode);
     const params = new URLSearchParams(searchParams.toString());
     params.set("view", mode);
-    router.replace(`/builder-single/itinerary?${params.toString()}`, {
+    router.replace(`${BUILDER_ROUTES.dayPassItinerary}?${params.toString()}`, {
       scroll: false,
     });
   };
@@ -607,10 +774,6 @@ export default function SingleDayItineraryPageClient() {
     });
   };
 
-  const requestPrintOnly = () => {
-    window.print();
-  };
-
   const handlePaymentSuccess = async (paymentDetails: {
     bookingRef: string;
     paymentType: string;
@@ -702,70 +865,69 @@ export default function SingleDayItineraryPageClient() {
     }
   };
 
+  // Back-to-builder links keep ?ref= so the builder reloads this booking.
+  const builderBackRef =
+    bookingBoundRef(searchParams.get("ref")) ??
+    bookingBoundRef(confirmedBookingRef);
+  const builderBackHref = builderBackRef
+    ? journeyBuilderHref(builderBackRef, { type: "single_day" })
+    : BUILDER_ROUTES.dayPass;
+
   if (!hydrated) {
     return (
-      <p className="p-10 text-center text-sm text-white/50">
+      <p className="p-10 text-center text-sm text-slate-500">
         Loading single-day itinerary…
       </p>
     );
   }
 
   return (
-    <div className="builder-theme relative z-10 min-h-screen overflow-x-hidden bg-transparent pb-44 text-white md:pb-36">
+    <div className="builder-theme relative z-10 min-h-screen overflow-x-clip bg-[#faf9f4] pb-44 text-slate-900 md:pb-36">
       {showFeeModal || balanceOpen ? null : <SystemMessageFox />}
-      <TopNavBar
-        brandTitle="1-Day Express Pass"
-        ctaHref={BUILDER_ROUTES.dayPass}
-        ctaLabel="Builder"
-        locked={!contactReady}
-        invoiceActive={activeView === "invoice"}
-        onSave={() => void requestSaveOnly()}
-        onPrint={requestPrintOnly}
-        onPlan={() => setMode("dossier")}
-        onInvoice={() => {
-          if (activeView === "invoice") setMode("dossier");
-          else void requestInvoiceView();
-        }}
-      />
-      <div className="no-print mx-auto max-w-3xl px-4 sm:px-5">
-        <LiquidGlassHero
+      {/* Top chrome lives inside BookingSocialProfile cover (hamburger + city + Plan/Invoice). */}
+      <div className="no-print mx-auto max-w-3xl">
+        <BookingSocialProfile
           pnr={activeBookingRef({
             tempBookingRef,
             confirmedBookingRef,
             bookingStatus,
           })}
           bookingType="SINGLE_DAY"
-          title="1-Day Express Pass · Itinerary"
+          brandTitle="1-Day Express Pass"
           guestName={customerName !== "Guest" ? customerName : undefined}
+          guestEmail={guestEmail || undefined}
+          cityId={coverCityId}
+          cityName={cityFocus || "Tokyo"}
+          tourDate={formatSocialTourDates(tourDate)}
           depositAmount={Math.max(totalPaidEur, feeCreditEur)}
           packageTotalEur={quote.totalEur || quote.max || quote.min || 0}
           payLabel={dossierPrimaryCtaLabel(feeCreditEur, {
             amountPaidEur: Math.max(totalPaidEur, feeCreditEur),
             packageTotalEur: quote.totalEur || quote.max || quote.min || 0,
           })}
-          payPulse={!costPulsarDone}
-          continueHref={BUILDER_ROUTES.dayPass}
           locked={!contactReady}
-          onSave={() => void requestSaveOnly()}
-          onSend={() => void requestSendPdf()}
-          onPrint={requestPrintOnly}
-          onPlanInvoice={() => {
+          invoiceActive={activeView === "invoice"}
+          onPlan={() => setMode("dossier")}
+          onInvoice={() => {
             if (activeView === "invoice") setMode("dossier");
             else void requestInvoiceView();
           }}
+          onSave={() => void requestSaveOnly()}
           onPayContinue={handleRequestPay}
         />
-        <TicketVoucherDownloadBanner
-          pnr={activeBookingRef({
-            tempBookingRef,
-            confirmedBookingRef,
-            bookingStatus,
-          })}
-          className="mb-2"
-        />
+        <div className="px-4 sm:px-5">
+          <TicketVoucherDownloadBanner
+            pnr={activeBookingRef({
+              tempBookingRef,
+              confirmedBookingRef,
+              bookingStatus,
+            })}
+            className="mb-2"
+          />
+        </div>
       </div>
 
-        <main className="mx-auto w-full max-w-3xl overflow-x-hidden px-4 py-6 pb-40 md:pb-28">
+        <main className="mx-auto w-full max-w-3xl overflow-x-hidden px-0 pt-3 pb-40 md:pb-28">
           <div
             className={
               activeView === "dossier"
@@ -821,24 +983,27 @@ export default function SingleDayItineraryPageClient() {
                 const pendingMax = Math.max(0, partyMax - paid);
                 const ppMin = singleDayPerPersonEur(pendingMin, totalGuests);
                 const ppMax = singleDayPerPersonEur(pendingMax, totalGuests);
+                const isEstimateRange = pendingMin !== pendingMax;
                 return (
                   <>
                     <p className="truncate text-[9px] font-bold uppercase tracking-wider text-[#054F70]/70">
-                      Remaining balance due
+                      {isEstimateRange
+                        ? "Estimated remaining"
+                        : "Remaining balance due"}
                     </p>
                     <p className="truncate text-sm font-extrabold text-[#054F70] sm:text-base">
-                      {ppMin === ppMax
-                        ? formatEur(ppMin)
-                        : `${formatEur(ppMin)} ~ ${formatEur(ppMax)}`}
+                      {isEstimateRange
+                        ? `${formatEur(ppMin)} ~ ${formatEur(ppMax)}`
+                        : formatEur(ppMin)}
                       <span className="ml-1 text-[10px] font-bold tracking-wide">
                         /pp
                       </span>
                     </p>
                     <p className="truncate text-[9px] text-[#054F70]/60">
                       Party{" "}
-                      {pendingMin === pendingMax
-                        ? formatEur(pendingMin)
-                        : `${formatEur(pendingMin)} ~ ${formatEur(pendingMax)}`}
+                      {isEstimateRange
+                        ? `${formatEur(pendingMin)} ~ ${formatEur(pendingMax)}`
+                        : formatEur(pendingMin)}
                       {paid > 0 ? ` · paid ${formatEur(paid)}` : ""}
                     </p>
                   </>
@@ -880,6 +1045,7 @@ export default function SingleDayItineraryPageClient() {
       <SingleDayBudgetModal
         open={budgetOpen}
         onClose={() => setBudgetOpen(false)}
+        adminPricing={adminPricing}
       />
 
       <SaveRequiredContactModal
@@ -1000,7 +1166,7 @@ export default function SingleDayItineraryPageClient() {
         }}
         onContinueEditing={() => {
           setSaveLaterOpen(false);
-          window.location.href = "/builder-single";
+          window.location.href = builderBackHref;
         }}
       />
 
@@ -1092,7 +1258,7 @@ export default function SingleDayItineraryPageClient() {
           })}
           guestName={customerName}
           guestEmail={guestEmail}
-          tripPath="/builder-single/itinerary"
+          tripPath={BUILDER_ROUTES.dayPassItinerary}
           feeCreditEur={feeCreditEur}
           totalPaidEur={totalPaidEur || feeCreditEur}
           conciergeFeeEur={conciergeFeeEur}

@@ -14,7 +14,7 @@ import {
   formatDisplayDate,
   useBuilderStore,
 } from "@/store/useBuilderStore";
-import { ChoicePill, FieldLabel } from "../ui";
+import { ChoicePill } from "../ui";
 import { SeasonalityDetailModal } from "@/components/builder/modals/SeasonalityDetailModal";
 import { HorizontalHelpAccordion } from "@/components/builder/HorizontalHelpAccordion";
 
@@ -46,7 +46,6 @@ export function DaysDateEditorModal({
   const setActiveSeason = useBuilderStore((s) => s.setActiveSeason);
 
   const [mounted, setMounted] = useState(false);
-  const [customDraft, setCustomDraft] = useState(String(durationDays));
   const [seasonModalOpen, setSeasonModalOpen] = useState(false);
 
   const canDone = durationDays > 0 && Boolean(arrivalDate);
@@ -72,10 +71,6 @@ export function DaysDateEditorModal({
   }, []);
 
   useEffect(() => {
-    if (durationCustom) setCustomDraft(String(durationDays));
-  }, [durationCustom, durationDays]);
-
-  useEffect(() => {
     const insight = resolveSeasonInsight(seasonTiers, arrivalDate);
     if (!insight) {
       setActiveSeason(null, null);
@@ -96,25 +91,6 @@ export function DaysDateEditorModal({
     setDurationCustom(true);
     const n = Math.max(1, durationDays || 1);
     setDurationDays(n);
-    setCustomDraft(String(n));
-  };
-
-  const applyCustom = (raw: string) => {
-    setCustomDraft(raw);
-    const parsed = Number.parseInt(raw, 10);
-    if (Number.isFinite(parsed) && parsed >= 1) {
-      setDurationDays(Math.min(MAX_DAYS, parsed));
-    }
-  };
-
-  const commitCustom = () => {
-    const parsed = Number.parseInt(customDraft, 10);
-    const next =
-      Number.isFinite(parsed) && parsed >= 1
-        ? Math.min(MAX_DAYS, parsed)
-        : 1;
-    setDurationDays(next);
-    setCustomDraft(String(next));
   };
 
   const bumpDays = (delta: number) => {
@@ -124,7 +100,6 @@ export function DaysDateEditorModal({
       Math.max(MIN_DAYS, (durationDays || 1) + delta)
     );
     setDurationDays(next);
-    setCustomDraft(String(next));
   };
 
   if (!mounted) return null;
@@ -235,36 +210,14 @@ export function DaysDateEditorModal({
                   </ChoicePill>
                 </div>
 
-                {durationCustom ? (
-                  <div className="mt-4 rounded-xl border border-zinc-800 bg-zinc-950 p-4">
-                    <FieldLabel>Enter days</FieldLabel>
-                    <div className="mt-1 flex items-center gap-3">
-                      <input
-                        type="number"
-                        min={MIN_DAYS}
-                        max={MAX_DAYS}
-                        step={1}
-                        inputMode="numeric"
-                        value={customDraft}
-                        onChange={(e) => applyCustom(e.target.value)}
-                        onBlur={commitCustom}
-                        placeholder="e.g. 7, 12, 18"
-                        className="w-36 rounded-xl border border-zinc-700 bg-zinc-900 px-3 py-2.5 text-sm text-white outline-none focus:border-[#075473]"
-                      />
-                      <span className="text-sm text-zinc-400">
-                        Min {MIN_DAYS} · max {MAX_DAYS} · Locations nights must
-                        total{" "}
-                        <strong className="text-white">
-                          {Math.max(1, durationDays)}
-                        </strong>
-                      </span>
-                    </div>
-                  </div>
-                ) : null}
               </div>
 
-              <div className="relative z-[1] overflow-visible md:grid md:grid-cols-2 md:gap-4">
-                <div className="flex flex-col gap-4 md:contents">
+              <div className="relative z-[1] box-border flex w-full max-w-full flex-col gap-4 overflow-visible">
+                {/* Arrival date box sized to the red reference in the brief:
+                    red stroke ≈ x96–360 (264px) over the full-width box
+                    ≈ x94–706 (612px) ≈ 43–44%; target 45% (within ±5%).
+                    Seasonality below stays full width. */}
+                <div className="w-[45%] max-w-full self-start [&_button]:text-xs [&_button_span]:whitespace-nowrap">
                   <DatePickerField
                     value={arrivalDate}
                     onChange={(next) => {
@@ -275,19 +228,19 @@ export function DaysDateEditorModal({
                     }}
                     label="Arrival date"
                   />
-
-                  <SeasonalityCard
-                    arrivalDate={arrivalDate}
-                    tier={activeSeasonTier}
-                    crowds={activeSeasonNote?.crowds}
-                    note={activeSeasonNote?.note}
-                    onOpenExplain={() => {
-                      if (activeSeasonTier && activeSeasonNote) {
-                        setSeasonModalOpen(true);
-                      }
-                    }}
-                  />
                 </div>
+
+                <SeasonalityCard
+                  arrivalDate={arrivalDate}
+                  tier={activeSeasonTier}
+                  crowds={activeSeasonNote?.crowds}
+                  note={activeSeasonNote?.note}
+                  onOpenExplain={() => {
+                    if (activeSeasonTier && activeSeasonNote) {
+                      setSeasonModalOpen(true);
+                    }
+                  }}
+                />
               </div>
 
               {arrivalDate && departureIso ? (

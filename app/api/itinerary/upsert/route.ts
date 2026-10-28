@@ -158,10 +158,48 @@ export async function POST(request: Request) {
             preferredMovement?: string | null;
             suicaNeeded?: boolean;
             suicaValueEur?: number;
+            guestHasJRPass?: boolean | null;
+            guestHasICCard?: boolean | null;
+            guestNeedsTransitHelp?: boolean | null;
+            guestSpecialRequirements?: unknown;
           }
         | undefined;
 
       if (state.tripMode === "single_day" && singleDay) {
+        const singleSelections = buildSingleDaySelections({
+          cityFocus: singleDay.cityFocus || "",
+          cityId: singleDay.cityId,
+          startTime: singleDay.startTime || "09:00",
+          travelPace:
+            singleDay.travelPace === "fast" ||
+            singleDay.travelPace === "moderate" ||
+            singleDay.travelPace === "relaxed"
+              ? singleDay.travelPace
+              : null,
+          guidePreference:
+            (singleDay.guidePreference as
+              | "private_guide"
+              | "local_host"
+              | "self_paced") || "private_guide",
+          selectedExperiences: (singleDay.selectedExperiences || []).map(
+            (e) => ({
+              tourId: e.tourId,
+              title: "",
+              selectedLanguage: "",
+              duration_hours: 0,
+            })
+          ),
+          tourHours: Number(singleDay.tourHours) || 6,
+          transitOption: singleDay.transitOption,
+          preferredMovement: singleDay.preferredMovement ?? null,
+          suicaNeeded: Boolean(singleDay.suicaNeeded),
+          suicaValueEur: Number(singleDay.suicaValueEur) || 0,
+          guestHasJRPass: singleDay.guestHasJRPass ?? null,
+          guestHasICCard: singleDay.guestHasICCard ?? null,
+          guestNeedsTransitHelp: singleDay.guestNeedsTransitHelp ?? null,
+          guestSpecialRequirements:
+            singleDay.guestSpecialRequirements as never,
+        });
         await upsertBookingsAndLeads({
           bookingRef: reference,
           email: contactEmail,
@@ -174,37 +212,11 @@ export async function POST(request: Request) {
             kids: Number(singleDay.children) || 0,
           },
           durationValue: Number(singleDay.tourHours) || 0,
-          selections: buildSingleDaySelections({
-            cityFocus: singleDay.cityFocus || "",
-            cityId: singleDay.cityId,
-            startTime: singleDay.startTime || "09:00",
-            travelPace:
-              singleDay.travelPace === "fast" ||
-              singleDay.travelPace === "moderate" ||
-              singleDay.travelPace === "relaxed"
-                ? singleDay.travelPace
-                : null,
-            guidePreference:
-              (singleDay.guidePreference as
-                | "private_guide"
-                | "local_host"
-                | "self_paced") || "private_guide",
-            selectedExperiences: (singleDay.selectedExperiences || []).map(
-              (e) => ({
-                tourId: e.tourId,
-                title: "",
-                selectedLanguage: "",
-                duration_hours: 0,
-              })
-            ),
-            tourHours: Number(singleDay.tourHours) || 6,
-            transitOption: singleDay.transitOption,
-            preferredMovement: singleDay.preferredMovement ?? null,
-            suicaNeeded: Boolean(singleDay.suicaNeeded),
-            suicaValueEur: Number(singleDay.suicaValueEur) || 0,
-          }),
+          selections: singleSelections,
+          guestSpecialRequirements: singleSelections.guestSpecialRequirements,
         });
       } else {
+        const multiSelections = buildMultiDaySelections(state);
         await upsertBookingsAndLeads({
           bookingRef: reference,
           email: contactEmail,
@@ -217,7 +229,8 @@ export async function POST(request: Request) {
             kids: state.children ?? 0,
           },
           durationValue: state.durationDays ?? 0,
-          selections: buildMultiDaySelections(state),
+          selections: multiSelections,
+          guestSpecialRequirements: multiSelections.guestSpecialRequirements,
         });
       }
     } catch (err) {

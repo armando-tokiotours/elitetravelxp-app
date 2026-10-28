@@ -5,14 +5,15 @@ import { useEffect, useState } from "react";
 import { formatPbError } from "@/lib/pocketbase/admin-schema";
 import {
   BRANDING_UI_FALLBACKS,
-  isVideoFilename,
   type BrandingUiFallback,
 } from "@/lib/brandingUi";
+import type { PbBrandingUiItem } from "@/lib/pocketbase/client";
 import {
-  brandingUiMediaUrl,
-  brandingUiPosterUrl,
-  type PbBrandingUiItem,
-} from "@/lib/pocketbase/client";
+  brandingKeyImageSlot,
+  brandingSlotVersionedUrl,
+} from "@/lib/brandingImageSlots";
+import { preEliteMediaVersion } from "@/lib/preEliteBranding";
+import { uploadToVps } from "@/lib/vpsUploadClient";
 import { useSiteBrandingStore } from "@/store/useSiteBrandingStore";
 
 type PbClient = PocketBase;
@@ -31,8 +32,12 @@ type Draft = {
 
 function draftFromRow(row: PbBrandingUiItem): Draft {
   const fb = BRANDING_UI_FALLBACKS[row.key];
-  const media = brandingUiMediaUrl(row) || fb?.mediaFallback || "";
-  const poster = brandingUiPosterUrl(row) || "";
+  // ONE image space per key: the stable slot (numbered placeholder
+  // until replaced), version-stamped so replaces are never cached.
+  const media = brandingSlotVersionedUrl(
+    brandingKeyImageSlot(row.key),
+    preEliteMediaVersion(row)
+  );
   return {
     title: row.title || fb?.title || "",
     subtitle: row.subtitle || fb?.subtitle || "",
@@ -40,7 +45,7 @@ function draftFromRow(row: PbBrandingUiItem): Draft {
     file: null,
     posterFile: null,
     preview: media,
-    posterPreview: poster,
+    posterPreview: "",
   };
 }
 
@@ -141,15 +146,23 @@ export function BrandingUiKeysAdmin({
     setError(null);
     try {
       const pb = getClient();
+      // Image → stable slot outside PocketBase (same ID forever);
+      // clear legacy PB media + stamp media_version. NOTE: here
+      // `description` is real explanation text — never a stamp.
+      if (draft.file) {
+        await uploadToVps(draft.file, "branding", pb.authStore.token || "", {
+          stableKey: brandingKeyImageSlot(row.key),
+        });
+      }
       const fd = new FormData();
       fd.append("title", draft.title);
       fd.append("subtitle", draft.subtitle);
       if (showExplanation) {
         fd.append("description", draft.description);
       }
-      if (showCard) {
-        if (draft.file) fd.append("media", draft.file);
-        if (draft.posterFile) fd.append("poster", draft.posterFile);
+      if (draft.file) {
+        fd.append("media", "");
+        fd.append("media_version", String(Date.now()));
       }
 
       const saved = (await pb
@@ -196,9 +209,6 @@ export function BrandingUiKeysAdmin({
           const draft = drafts[row.id];
           if (!draft) return null;
           const fb = BRANDING_UI_FALLBACKS[row.key];
-          const previewIsVideo =
-            (draft.file && isVideoFilename(draft.file.name)) ||
-            isVideoFilename(draft.preview);
 
           return (
             <article
@@ -212,71 +222,40 @@ export function BrandingUiKeysAdmin({
                 {row.key.replace(/_/g, " ")}
               </p>
 
+              {/* ONE image space per key — shown in card AND explanation modes (same slot ID) */}
+              <>
+                <div className="overflow-hidden rounded-lg border border-zinc-800 bg-zinc-950">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={draft.preview}
+                    alt=""
+                    className="aspect-[3/4] w-full object-cover"
+                  />
+                </div>
+                <p className="text-[10px] text-zinc-600">
+                  Slot: {brandingKeyImageSlot(row.key)} · /uploads/branding/
+                  {brandingKeyImageSlot(row.key)}.webp
+                </p>
+                <label className="block text-[10px] uppercase tracking-wider text-zinc-500">
+                  Photo (image only)
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="mt-1 block w-full text-xs text-zinc-400"
+                    onChange={(e) => {
+                      const f = e.target.files?.[0] || null;
+                      updateDraft(row.id, {
+                        file: f,
+                        preview: f
+                          ? URL.createObjectURL(f)
+                          : draftFromRow(row).preview,
+                      });
+                    }}
+                  />
+                </label>
+              </>
               {showCard ? (
                 <>
-                  <div className="overflow-hidden rounded-lg border border-zinc-800 bg-zinc-950">
-                    {draft.preview ? (
-                      previewIsVideo ? (
-                        <video
-                          src={draft.preview}
-                          poster={draft.posterPreview || undefined}
-                          className="aspect-[3/4] w-full object-cover"
-                          muted
-                          playsInline
-                          controls
-                        />
-                      ) : (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={draft.preview}
-                          alt=""
-                          className="aspect-[3/4] w-full object-cover"
-                        />
-                      )
-                    ) : (
-                      <div className="flex aspect-[3/4] items-center justify-center text-xs text-zinc-600">
-                        {fb?.mediaFallback
-                          ? `Fallback: ${fb.mediaFallback}`
-                          : "No image"}
-                      </div>
-                    )}
-                  </div>
-                  <label className="block text-[10px] uppercase tracking-wider text-zinc-500">
-                    Photo / video
-                    <input
-                      type="file"
-                      accept="image/*,video/mp4,video/webm,video/quicktime,.m4v"
-                      className="mt-1 block w-full text-xs text-zinc-400"
-                      onChange={(e) => {
-                        const f = e.target.files?.[0] || null;
-                        updateDraft(row.id, {
-                          file: f,
-                          preview: f
-                            ? URL.createObjectURL(f)
-                            : draftFromRow(row).preview,
-                        });
-                      }}
-                    />
-                  </label>
-                  {previewIsVideo ? (
-                    <label className="block text-[10px] uppercase tracking-wider text-zinc-500">
-                      Poster image
-                      <input
-                        type="file"
-                        accept="image/*"
-                        className="mt-1 block w-full text-xs text-zinc-400"
-                        onChange={(e) => {
-                          const f = e.target.files?.[0] || null;
-                          updateDraft(row.id, {
-                            posterFile: f,
-                            posterPreview: f
-                              ? URL.createObjectURL(f)
-                              : draft.posterPreview,
-                          });
-                        }}
-                      />
-                    </label>
-                  ) : null}
                   <label className="block text-[10px] uppercase tracking-wider text-zinc-500">
                     Title
                     <input

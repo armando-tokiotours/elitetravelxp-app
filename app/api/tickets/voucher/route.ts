@@ -1,16 +1,21 @@
 import { NextResponse } from "next/server";
 import { getAdminPocketBase } from "@/lib/pocketbase/admin";
 import {
-  listTicketCartItemsForPnr,
+  listProcurementItemsForPnr,
   loadTicketVouchersByPnr,
   uploadTicketVoucherForItem,
 } from "@/lib/ticketVouchers";
-import { ticketStorageReady } from "@/lib/blobStorage";
+import {
+  isTicketVoucherMime,
+  ticketStorageReady,
+} from "@/lib/blobStorage";
 
 /**
  * GET ?pnr= — guest/ops: list per-item voucher download URLs from agent_services.
- * POST multipart (pnr, itemId, ticket_pdf, tour_end_date?) — Ops upload to local disk
- * under public/uploads/tickets (URL: /uploads/tickets/...).
+ * POST multipart (pnr, itemId, ticket_pdf|file, tour_end_date?) — Ops upload
+ * PDF or image e-ticket to local disk under public/uploads/tickets
+ * (URL: /uploads/tickets/...). Marks ticket_status done (ISSUED) when all
+ * procurement lines have vouchers; guest dossier reads agent_services.voucherUrl.
  */
 export async function GET(request: Request) {
   try {
@@ -26,15 +31,25 @@ export async function GET(request: Request) {
 
     let cartItems: unknown[] | undefined;
     if (includeCart) {
-      const cart = await listTicketCartItemsForPnr(pnr);
+      // Shared extractor: agent_services + ticket_access_rollup / day tickets
+      const cart = await listProcurementItemsForPnr(pnr);
       cartItems = cart.items.map((item) => ({
         id: item.id,
         title: item.title,
-        category: item.category,
-        quantity: item.quantity ?? 1,
-        voucherUrl: item.voucherUrl || null,
-        voucherFilename: item.voucherFilename || null,
-        fulfillmentStatus: item.fulfillmentStatus || null,
+        category: item.cartItem?.category || item.category,
+        procurementCategory: item.category,
+        categoryLabel: item.categoryLabel,
+        quantity: item.quantity,
+        isBonus: item.isBonus,
+        serviceDate: item.serviceDate,
+        scheduledDate: item.scheduledDate,
+        notes: item.notes,
+        kind: item.kind,
+        source: item.source,
+        uploadable: item.uploadable,
+        voucherUrl: item.voucherUrl,
+        voucherFilename: item.voucherFilename,
+        fulfillmentStatus: item.fulfillmentStatus,
       }));
     }
 
@@ -86,13 +101,13 @@ export async function POST(request: Request) {
     }
     if (!(file instanceof File) || file.size <= 0) {
       return NextResponse.json(
-        { error: "PDF file required (ticket_pdf)" },
+        { error: "PDF or image file required (ticket_pdf)" },
         { status: 400 }
       );
     }
-    if (file.type && file.type !== "application/pdf") {
+    if (file.type && !isTicketVoucherMime(file.type)) {
       return NextResponse.json(
-        { error: "Only PDF vouchers are accepted" },
+        { error: "Only PDF or image vouchers are accepted (PDF/JPG/PNG/WebP)" },
         { status: 400 }
       );
     }

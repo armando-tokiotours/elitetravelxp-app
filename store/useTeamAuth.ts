@@ -9,6 +9,7 @@ import {
   type StaffRole,
 } from "@/lib/staffRoles";
 import { resolveStaffRoleForEmail } from "@/lib/staffRoleProvisioning";
+import { staffNeedsPasswordChange } from "@/lib/contractorProvisioning";
 import {
   isAuthorizedStaffEmail,
   staffGoogleSsoDeniedMessage,
@@ -28,9 +29,17 @@ interface TeamAuthState {
   staffId: string | null;
   agencyId: string | null;
   isAuthenticated: boolean;
-  login: (email: string, password: string) => Promise<{ role: StaffRole }>;
+  /** From staff.force_password_change — redirect to /staff/change-password. */
+  forcePasswordChange: boolean;
+  login: (
+    email: string,
+    password: string
+  ) => Promise<{ role: StaffRole; forcePasswordChange: boolean }>;
   /** Google Workspace SSO via PocketBase staff.oauth2 (google provider). */
-  loginWithGoogle: () => Promise<{ role: StaffRole }>;
+  loginWithGoogle: () => Promise<{
+    role: StaffRole;
+    forcePasswordChange: boolean;
+  }>;
   /** @deprecated use loginWithGoogle */
   loginWithGoogleStub: () => never;
   logout: () => void;
@@ -38,6 +47,7 @@ interface TeamAuthState {
   ensureAuth: () => boolean;
   hydrateAuth: () => Promise<void>;
   homePath: () => string;
+  clearForcePasswordChange: () => void;
 }
 
 function roleFromRecord(
@@ -59,6 +69,7 @@ function clearAuth(set: (partial: Partial<TeamAuthState>) => void) {
     staffId: null,
     agencyId: null,
     isAuthenticated: false,
+    forcePasswordChange: false,
   });
 }
 
@@ -73,8 +84,17 @@ export const useTeamAuth = create<TeamAuthState>()(
       staffId: null,
       agencyId: null,
       isAuthenticated: false,
+      forcePasswordChange: false,
 
       homePath: () => homePathForRole(get().role),
+
+      clearForcePasswordChange: () => {
+        const { record } = get();
+        const nextRecord = record
+          ? ({ ...record, force_password_change: false } as RecordModel)
+          : record;
+        set({ forcePasswordChange: false, record: nextRecord });
+      },
 
       loginWithGoogleStub: () => {
         throw new Error(
@@ -174,6 +194,7 @@ export const useTeamAuth = create<TeamAuthState>()(
 
         const collection: AuthCollection = "staff";
         const role = roleFromRecord(collection, record);
+        const forcePasswordChange = staffNeedsPasswordChange(record);
         set({
           token: pb.authStore.token,
           record,
@@ -183,8 +204,9 @@ export const useTeamAuth = create<TeamAuthState>()(
           staffId: String(record?.id || "") || null,
           agencyId: String(record?.agency_id || "") || null,
           isAuthenticated: true,
+          forcePasswordChange,
         });
-        return { role };
+        return { role, forcePasswordChange };
       },
 
       ensureAuth: () => {
@@ -238,6 +260,10 @@ export const useTeamAuth = create<TeamAuthState>()(
                 ? String(nextRecord?.agency_id || "") || null
                 : null,
             isAuthenticated: true,
+            forcePasswordChange:
+              collection === "staff"
+                ? staffNeedsPasswordChange(nextRecord)
+                : false,
           });
         } catch {
           // Stale JWT (e.g. production) still looks valid client-side but fails
@@ -281,6 +307,8 @@ export const useTeamAuth = create<TeamAuthState>()(
 
         const record = pb.authStore.record;
         const role = roleFromRecord(collection, record);
+        const forcePasswordChange =
+          collection === "staff" ? staffNeedsPasswordChange(record) : false;
         set({
           token: pb.authStore.token,
           record,
@@ -293,8 +321,9 @@ export const useTeamAuth = create<TeamAuthState>()(
               ? String(record?.agency_id || "") || null
               : null,
           isAuthenticated: true,
+          forcePasswordChange,
         });
-        return { role };
+        return { role, forcePasswordChange };
       },
 
       logout: () => {
@@ -313,6 +342,7 @@ export const useTeamAuth = create<TeamAuthState>()(
         authCollection: s.authCollection,
         staffId: s.staffId,
         agencyId: s.agencyId,
+        forcePasswordChange: s.forcePasswordChange,
       }),
       skipHydration: true,
     }

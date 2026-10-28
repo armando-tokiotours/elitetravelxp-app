@@ -14,6 +14,8 @@ export type BookingMasterBundle = {
   dispatch: OpsDispatchRow | null;
   money: OpsMoneyRow | null;
   tickets: OpsTicketsRow | null;
+  /** `bookings_and_leads.type` (single_day | multi_day | experience_only) — Journey routing discriminator. */
+  leadType?: string | null;
 };
 
 function safePnr(pnr: string): string {
@@ -38,7 +40,7 @@ export async function loadBookingMasterByPnr(
   pnrRaw: string
 ): Promise<BookingMasterBundle> {
   const pnr = safePnr(pnrRaw);
-  const [hub, dispatch, money, tickets] = await Promise.all([
+  const [hub, dispatch, money, tickets, bal] = await Promise.all([
     firstOrNull(() =>
       pb
         .collection("ops_hub")
@@ -59,6 +61,13 @@ export async function loadBookingMasterByPnr(
         .collection("ops_tickets")
         .getFirstListItem<OpsTicketsRow>(`pnr="${pnr}"`, { requestKey: null })
     ),
+    firstOrNull(() =>
+      pb
+        .collection("bookings_and_leads")
+        .getFirstListItem<{ type?: string }>(`booking_ref="${pnr}"`, {
+          requestKey: null,
+        })
+    ),
   ]);
-  return { pnr, hub, dispatch, money, tickets };
+  return { pnr, hub, dispatch, money, tickets, leadType: bal?.type || null };
 }

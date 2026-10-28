@@ -21,10 +21,12 @@ import {
   ROLE_LABELS,
   STAFF_ROLES,
   canAccessOpsBoard,
+  canAccessTeamAccess,
   roleMatchesCredentialTab,
   type CredentialTab,
   type StaffRole,
 } from "@/lib/staffRoles";
+import { roleUsesPasswordLogin } from "@/lib/contractorProvisioning";
 import {
   PassportBookletModal,
   StaffPassportCard,
@@ -38,13 +40,9 @@ type TeamUser = {
   role?: StaffRole;
   agency_id?: string;
   active?: boolean;
+  force_password_change?: boolean;
   created?: string;
 };
-
-/** Guides / agencies / drivers use email+password — not Google Workspace SSO. */
-function roleUsesPasswordLogin(role: StaffRole): boolean {
-  return role === "guide" || role === "agency" || role === "driver";
-}
 
 /** Satisfy PB auth min password when pre-provisioning SSO-only staff. */
 function generateSsoPlaceholderPassword(): string {
@@ -76,6 +74,13 @@ export function StaffUsersPanel({
   const [agencyId, setAgencyId] = useState("");
   const [password, setPassword] = useState("");
   const [passwordConfirm, setPasswordConfirm] = useState("");
+  const [phone, setPhone] = useState("");
+  const [bio, setBio] = useState("");
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [sendWelcome, setSendWelcome] = useState(true);
+  const [createdTempPassword, setCreatedTempPassword] = useState<string | null>(
+    null
+  );
   /** Core staff: hide password UI and mint a dummy PB password for Google SSO. */
   const [ssoPreProvision, setSsoPreProvision] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -87,6 +92,7 @@ export function StaffUsersPanel({
     setRole(next);
     if (roleUsesPasswordLogin(next)) {
       setSsoPreProvision(false);
+      setSendWelcome(true);
     } else {
       setSsoPreProvision(true);
     }
@@ -101,14 +107,18 @@ export function StaffUsersPanel({
   const [hubPnrs, setHubPnrs] = useState<{ pnr: string; guest?: string }[]>(
     []
   );
+  const [usersTab, setUsersTab] = useState<"create" | "registry">("create");
   const [credentialTab, setCredentialTab] =
     useState<CredentialTab>("staff");
   const isAuthenticated = useTeamAuth((s) => s.isAuthenticated);
   const authEmail = useTeamAuth((s) => s.email);
   const authRole = useTeamAuth((s) => s.role);
+  const authToken = useTeamAuth((s) => s.token);
   const authCollection = useTeamAuth((s) => s.authCollection);
   const canManage =
-    authCollection === "_superusers" || canAccessOpsBoard(authRole);
+    authCollection === "_superusers" ||
+    canAccessOpsBoard(authRole) ||
+    canAccessTeamAccess(authRole);
 
   const load = async () => {
     setLoading(true);
@@ -195,13 +205,13 @@ export function StaffUsersPanel({
     setSaving(true);
     setError(null);
     setMsg(null);
+    setCreatedTempPassword(null);
     try {
       const trimmedEmail = email.trim().toLowerCase();
       const trimmedName = name.trim();
       if (!trimmedName) {
         throw new Error("Display name is required.");
       }
-      // PocketBase auth email validation — catch before HTTP 400.
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
         throw new Error(
           "Email must look like name@company.com (include @ and a domain)."
@@ -213,8 +223,62 @@ export function StaffUsersPanel({
       );
       if (existing) {
         throw new Error(
-          "⚠️ This email already exists in the system. To change their role, edit the existing user instead of creating a new one."
+          "This email already exists. Edit the existing user instead of creating a new one."
         );
+      }
+
+      // Contractors: server-side temp password + welcome email (admin client).
+      if (passwordLoginRole) {
+        if (role === "agency" && !agencyId.trim()) {
+          throw new Error("Agency id is required for the Agency role.");
+        }
+        if (!authToken) {
+          throw new Error("Sign in again — missing auth token for API create.");
+        }
+        const fd = new FormData();
+        fd.append("email", trimmedEmail);
+        fd.append("name", trimmedName);
+        fd.append("role", role);
+        fd.append("phone", phone.trim());
+        fd.append("bio", bio.trim());
+        fd.append("agencyId", agencyId.trim());
+        fd.append("sendWelcome", sendWelcome ? "true" : "false");
+        if (photoFile) fd.append("photo", photoFile);
+
+        const res = await fetch("/api/staff/create-contractor", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${authToken}` },
+          body: fd,
+        });
+        const data = (await res.json().catch(() => ({}))) as {
+          error?: string;
+          tempPassword?: string;
+          emailSent?: boolean;
+          emailError?: string;
+          loginUrl?: string;
+        };
+        if (!res.ok) {
+          throw new Error(data.error || "Could not create contractor.");
+        }
+        setCreatedTempPassword(data.tempPassword || null);
+        setEmail("");
+        setName("");
+        setAgencyId("");
+        setPhone("");
+        setBio("");
+        setPhotoFile(null);
+        setPassword("");
+        setPasswordConfirm("");
+        const mailNote = sendWelcome
+          ? data.emailSent
+            ? " Welcome email sent."
+            : ` Welcome email not sent${data.emailError ? `: ${data.emailError}` : "."}`
+          : " Welcome email skipped.";
+        setMsg(
+          `${ROLE_LABELS[role]} created with temporary password (forced reset on first login).${mailNote}`
+        );
+        await load();
+        return;
       }
 
       let pass = password;
@@ -225,19 +289,16 @@ export function StaffUsersPanel({
       } else {
         if (pass.length < 8) {
           throw new Error(
-            "⚠️ Password must be at least 8 characters and match the confirmation."
+            "Password must be at least 8 characters and match the confirmation."
           );
         }
         if (pass !== passConfirm) {
           throw new Error(
-            "⚠️ Password must be at least 8 characters and match the confirmation."
+            "Password must be at least 8 characters and match the confirmation."
           );
         }
       }
 
-      if (role === "agency" && !agencyId.trim()) {
-        throw new Error("Agency id is required for the Agency role.");
-      }
       const accountType =
         role === "guide"
           ? "GUIDE"
@@ -255,6 +316,7 @@ export function StaffUsersPanel({
           agency_id: role === "agency" ? agencyId.trim() : "",
           active: true,
           emailVisibility: true,
+          force_password_change: false,
         },
         { requestKey: null }
       );
@@ -297,9 +359,7 @@ export function StaffUsersPanel({
       setMsg(
         useSsoProvision
           ? `Pre-provisioned ${ROLE_LABELS[role]} for Google SSO — ${trimmedEmail} can sign in with Workspace (role already assigned).`
-          : role === "guide" || role === "agency"
-            ? `${ROLE_LABELS[role]} created — they sign in with email + password (not Google SSO).`
-            : `Staff created (${ROLE_LABELS[role]}) — they can sign in.`
+          : `Staff created (${ROLE_LABELS[role]}) — they can sign in.`
       );
       await load();
     } catch (e) {
@@ -320,19 +380,61 @@ export function StaffUsersPanel({
       if (resetPass !== resetConfirm) {
         throw new Error("Password confirmation does not match.");
       }
-      await getClient().collection("staff").update(
-        id,
-        { password: resetPass, passwordConfirm: resetConfirm },
-        { requestKey: null }
-      );
+      if (!authToken) {
+        throw new Error("Sign in again — missing auth token.");
+      }
+      // Admin API — browser JWT cannot update other staff passwords (manageRule: null).
+      const res = await fetch("/api/staff/admin-reset-password", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${authToken}`,
+        },
+        body: JSON.stringify({
+          staffId: id,
+          password: resetPass,
+          passwordConfirm: resetConfirm,
+          forcePasswordChange: true,
+        }),
+      });
+      const data = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) {
+        throw new Error(data.error || "Could not reset password.");
+      }
       setResetId(null);
       setResetPass("");
       setResetConfirm("");
-      setMsg("Password updated.");
+      setMsg("Password updated — user must change it on next login.");
+      await load();
     } catch (e) {
       setError(formatPbError(e));
     } finally {
       setSaving(false);
+    }
+  };
+
+  const sendResetEmail = async (row: TeamUser) => {
+    setError(null);
+    setMsg(null);
+    try {
+      const res = await fetch("/api/staff/request-password-reset", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: row.email }),
+      });
+      const data = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        message?: string;
+      };
+      if (!res.ok) {
+        throw new Error(data.error || "Could not request reset email.");
+      }
+      setMsg(
+        data.message ||
+          `Password reset requested for ${row.email} via PocketBase staff collection.`
+      );
+    } catch (e) {
+      setError(formatPbError(e));
     }
   };
 
@@ -396,6 +498,7 @@ export function StaffUsersPanel({
         {
           assigned_agent_id: assignUser.id,
           assigned_agent: name,
+          agent_response: "accepted",
         },
         { requestKey: null }
       );
@@ -439,11 +542,39 @@ export function StaffUsersPanel({
       ) : null}
       {msg ? <p className="mt-3 text-sm text-emerald-400">{msg}</p> : null}
 
+      <div className="mt-6 flex flex-wrap gap-2 overflow-x-auto border-b border-zinc-800 pb-4">
+        {(
+          [
+            ["create", "Create Staff", "rounded-full border border-cyan-400 bg-[#075473] px-4 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-white"],
+            ["registry", "Credential Registry", "rounded-full border border-[#F6A724]/70 bg-[#F6A724]/15 px-4 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-[#F6A724]"],
+          ] as const
+        ).map(([id, label, activeClass]) => (
+          <button
+            key={id}
+            type="button"
+            onClick={() => setUsersTab(id)}
+            className={
+              usersTab === id
+                ? activeClass
+                : "rounded-full border border-zinc-700 bg-zinc-950 px-4 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-zinc-400 hover:border-zinc-500"
+            }
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {usersTab === "create" ? (
       <div className="mt-6 rounded-2xl border border-zinc-800 bg-zinc-950 p-4">
-        <h3 className="font-medium text-zinc-100">Create staff</h3>
+        <h3 className="font-medium text-zinc-100">
+          {passwordLoginRole
+            ? "Create contractor / partner"
+            : "Create staff"}
+        </h3>
         <p className="mt-1 text-xs text-zinc-500">
-          Pre-create core staff with their Workspace email + role before first
-          Google login. Guides &amp; agencies use email + password (any domain).
+          {passwordLoginRole
+            ? "Owner / Ops create guides, drivers, agencies, and ticketers. A temporary password is generated server-side; they must change it on first login."
+            : "Pre-create core staff with their Workspace email + role before first Google login."}
         </p>
         <div className="mt-3 grid gap-3 sm:grid-cols-2">
           <label className="block text-xs uppercase tracking-wider text-zinc-400 sm:col-span-2">
@@ -458,7 +589,9 @@ export function StaffUsersPanel({
                   ? "name@tokiotours.nl"
                   : role === "guide"
                     ? "guide@gmail.com"
-                    : "agent@agency.com"
+                    : role === "driver"
+                      ? "driver@example.com"
+                      : "partner@agency.com"
               }
             />
           </label>
@@ -498,86 +631,153 @@ export function StaffUsersPanel({
             </label>
           ) : null}
 
-          <label
-            className={`flex items-start gap-2.5 rounded-xl border px-3 py-2.5 sm:col-span-2 ${
-              passwordLoginRole
-                ? "cursor-not-allowed border-zinc-800 bg-zinc-900/40 opacity-70"
-                : "cursor-pointer border-cyan-500/30 bg-cyan-500/5"
-            }`}
-          >
-            <input
-              type="checkbox"
-              className="mt-0.5"
-              checked={useSsoProvision}
-              disabled={passwordLoginRole}
-              onChange={(e) => setSsoPreProvision(e.target.checked)}
-            />
-            <span className="text-xs text-zinc-300 normal-case tracking-normal">
-              <span className="font-semibold text-white">
-                Pre-provision for Google SSO
-              </span>
-              <span className="mt-0.5 block text-zinc-500">
-                {passwordLoginRole
-                  ? "Guides, agencies, and drivers sign in with email + password — SSO pre-provision is off."
-                  : "Hides password fields. Creates the account with a hidden password so PocketBase is satisfied; they sign in with Google Workspace."}
-              </span>
-            </span>
-          </label>
-
-          {!useSsoProvision ? (
+          {passwordLoginRole ? (
             <>
+              <label className="block text-xs uppercase tracking-wider text-zinc-400">
+                Phone
+                <input
+                  type="tel"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  className="mt-1 w-full rounded-xl border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-100"
+                  placeholder="+81 90-1234-5678"
+                />
+              </label>
+              <label className="block text-xs uppercase tracking-wider text-zinc-400">
+                Profile photo
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) =>
+                    setPhotoFile(e.target.files?.[0] || null)
+                  }
+                  className="mt-1 w-full text-xs text-zinc-400 file:mr-3 file:rounded-full file:border-0 file:bg-[#075473] file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-white"
+                />
+              </label>
+              <label className="block text-xs uppercase tracking-wider text-zinc-400 sm:col-span-2">
+                Bio
+                <textarea
+                  value={bio}
+                  onChange={(e) => setBio(e.target.value)}
+                  rows={3}
+                  className="mt-1 w-full rounded-xl border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-100"
+                  placeholder="Short intro for Ops / guests"
+                />
+              </label>
+              <label className="flex items-start gap-2.5 rounded-xl border border-emerald-500/30 bg-emerald-500/5 px-3 py-2.5 sm:col-span-2">
+                <input
+                  type="checkbox"
+                  className="mt-0.5"
+                  checked={sendWelcome}
+                  onChange={(e) => setSendWelcome(e.target.checked)}
+                />
+                <span className="text-xs text-zinc-300 normal-case tracking-normal">
+                  <span className="font-semibold text-white">
+                    Send welcome email
+                  </span>
+                  <span className="mt-0.5 block text-zinc-500">
+                    Includes login link, email, and temporary password via
+                    transactional mail. Temp password is also shown once below
+                    after create.
+                  </span>
+                </span>
+              </label>
               <p className="text-[11px] leading-relaxed text-amber-200/80 sm:col-span-2">
-                Guides and Agencies use Email + Password to log in. Please set
-                an initial password (min 8 characters).
+                Temporary password is generated securely on the server. The
+                account is marked <code className="text-amber-100">force_password_change</code> until
+                they set their own password.
               </p>
-              <label className="block text-xs uppercase tracking-wider text-zinc-400">
-                Password
-                <input
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="mt-1 w-full rounded-xl border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-100"
-                  autoComplete="new-password"
-                />
-              </label>
-              <label className="block text-xs uppercase tracking-wider text-zinc-400">
-                Confirm password
-                <input
-                  type="password"
-                  value={passwordConfirm}
-                  onChange={(e) => setPasswordConfirm(e.target.value)}
-                  className="mt-1 w-full rounded-xl border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-100"
-                  autoComplete="new-password"
-                />
-              </label>
             </>
           ) : (
-            <p className="text-[11px] leading-relaxed text-zinc-500 sm:col-span-2">
-              Password fields hidden — a secure placeholder is generated so
-              PocketBase accepts the create. Staff never need this password if
-              they use Google SSO.
-            </p>
+            <>
+              <label
+                className="flex cursor-pointer items-start gap-2.5 rounded-xl border border-cyan-500/30 bg-cyan-500/5 px-3 py-2.5 sm:col-span-2"
+              >
+                <input
+                  type="checkbox"
+                  className="mt-0.5"
+                  checked={useSsoProvision}
+                  onChange={(e) => setSsoPreProvision(e.target.checked)}
+                />
+                <span className="text-xs text-zinc-300 normal-case tracking-normal">
+                  <span className="font-semibold text-white">
+                    Pre-provision for Google SSO
+                  </span>
+                  <span className="mt-0.5 block text-zinc-500">
+                    Hides password fields. Creates the account with a hidden
+                    password so PocketBase is satisfied; they sign in with Google
+                    Workspace.
+                  </span>
+                </span>
+              </label>
+
+              {!useSsoProvision ? (
+                <>
+                  <label className="block text-xs uppercase tracking-wider text-zinc-400">
+                    Password
+                    <input
+                      type="password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      className="mt-1 w-full rounded-xl border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-100"
+                      autoComplete="new-password"
+                    />
+                  </label>
+                  <label className="block text-xs uppercase tracking-wider text-zinc-400">
+                    Confirm password
+                    <input
+                      type="password"
+                      value={passwordConfirm}
+                      onChange={(e) => setPasswordConfirm(e.target.value)}
+                      className="mt-1 w-full rounded-xl border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-100"
+                      autoComplete="new-password"
+                    />
+                  </label>
+                </>
+              ) : (
+                <p className="text-[11px] leading-relaxed text-zinc-500 sm:col-span-2">
+                  Password fields hidden — a secure placeholder is generated so
+                  PocketBase accepts the create. Staff never need this password if
+                  they use Google SSO.
+                </p>
+              )}
+            </>
           )}
         </div>
+        {createdTempPassword ? (
+          <div className="mt-3 rounded-xl border border-amber-500/40 bg-amber-950/30 p-3 text-xs text-amber-100">
+            <p className="font-semibold uppercase tracking-wider text-amber-200">
+              Temporary password (shown once)
+            </p>
+            <p className="mt-1 font-mono text-sm text-white">
+              {createdTempPassword}
+            </p>
+          </div>
+        ) : null}
         <button
           type="button"
           disabled={
             saving ||
             !email.trim() ||
             !name.trim() ||
-            (!useSsoProvision && !password)
+            (!passwordLoginRole && !useSsoProvision && !password)
           }
           onClick={() => void createUser()}
           className="mt-4 rounded-full bg-[#075473] px-5 py-2 text-sm font-semibold text-white disabled:opacity-50"
         >
           {saving
             ? "Creating…"
-            : useSsoProvision
-              ? "+ Pre-provision SSO"
-              : "+ Create staff"}
+            : passwordLoginRole
+              ? "+ Create contractor"
+              : useSsoProvision
+                ? "+ Pre-provision SSO"
+                : "+ Create staff"}
         </button>
       </div>
+      ) : null}
 
+      {usersTab === "registry" ? (
+      <>
       <div className="mt-6">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <h3 className="font-medium text-zinc-100">Credential registry</h3>
@@ -667,6 +867,10 @@ export function StaffUsersPanel({
           <h3 className="font-medium text-zinc-100">
             Reset password · {rows.find((r) => r.id === resetId)?.email}
           </h3>
+          <p className="mt-1 text-xs text-zinc-500">
+            Uses the admin API (staff.manageRule blocks browser password updates
+            on other accounts). Sets force_password_change for next login.
+          </p>
           <div className="mt-3 grid gap-3 sm:grid-cols-2">
             <input
               type="password"
@@ -683,7 +887,7 @@ export function StaffUsersPanel({
               className="rounded-xl border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-100"
             />
           </div>
-          <div className="mt-3 flex gap-2">
+          <div className="mt-3 flex flex-wrap gap-2">
             <button
               type="button"
               disabled={saving}
@@ -694,6 +898,16 @@ export function StaffUsersPanel({
             </button>
             <button
               type="button"
+              onClick={() => {
+                const row = rows.find((r) => r.id === resetId);
+                if (row) void sendResetEmail(row);
+              }}
+              className="rounded-full border border-[#075473]/50 px-4 py-2 text-sm text-[#7eb8cc]"
+            >
+              Email PB reset link
+            </button>
+            <button
+              type="button"
               onClick={() => setResetId(null)}
               className="rounded-full border border-zinc-700 px-4 py-2 text-sm text-zinc-300"
             >
@@ -701,6 +915,8 @@ export function StaffUsersPanel({
             </button>
           </div>
         </div>
+      ) : null}
+      </>
       ) : null}
 
       {assignUser ? (

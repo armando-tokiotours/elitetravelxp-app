@@ -105,7 +105,7 @@ export function TicketVoucherDownloadBanner({
 
   return (
     <div
-      className={`flex flex-col gap-3 rounded-2xl border border-[#075473] bg-[#075473]/30 p-4 ${className}`}
+      className={`flex flex-col gap-3 rounded-2xl border border-[#075473]/40 bg-[#EBFFFF] p-4 ${className}`}
     >
       <div className="flex flex-col items-center justify-between gap-3 sm:flex-row">
         <div className="flex items-center gap-3">
@@ -113,10 +113,10 @@ export function TicketVoucherDownloadBanner({
             🎟️
           </div>
           <div>
-            <h4 className="text-xs font-bold tracking-wider text-white uppercase">
+            <h4 className="text-xs font-bold tracking-wider text-[#054F70] uppercase">
               Your official attraction tickets are ready
             </h4>
-            <p className="text-[10px] text-zinc-300">
+            <p className="text-[10px] text-[#054F70]/70">
               {multi
                 ? "Download each pass / entry voucher and save it to your phone before your tour."
                 : "Download and save your QR vouchers to your phone before your tour."}
@@ -141,9 +141,9 @@ export function TicketVoucherDownloadBanner({
           {bundle.vouchers.map((v) => (
             <li
               key={v.itemId || v.url}
-              className="flex items-center justify-between gap-2 rounded-xl border border-white/10 bg-black/25 px-3 py-2"
+              className="flex items-center justify-between gap-2 rounded-xl border border-[#075473]/20 bg-white px-3 py-2"
             >
-              <span className="truncate text-[11px] font-semibold text-white">
+              <span className="truncate text-[11px] font-semibold text-[#054F70]">
                 {v.title || v.filename}
               </span>
               <a

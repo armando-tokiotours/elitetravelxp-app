@@ -5,6 +5,20 @@
 
 import type { InvoiceItem } from "@/components/invoice/ItemizedInvoiceTable";
 
+import {
+  classifyProcurementCategory,
+  isPrivateVehicleHaystack,
+  isProcurementLineItem,
+  matchesHotelProcurementHaystack,
+  matchesTicketProcurementHaystack,
+  procurementHaystack,
+  procurementKindFromCategory,
+  type ProcurementKind,
+  type ProcurementTicketCategory,
+} from "@/lib/ticketNormalizer";
+
+export type { ProcurementKind, ProcurementTicketCategory };
+
 export type AgentServiceCategory =
   | "TOUR"
   | "TRANSPORT"
@@ -667,62 +681,25 @@ export function isActiveAgentService(item: ServiceLineItem): boolean {
 }
 
 function titleHaystack(item: ServiceLineItem): string {
-  return `${item.title || ""} ${item.notes || ""}`.toLowerCase();
+  return procurementHaystack(item.title, item.notes);
 }
 
 /**
  * Suica / Pasmo / entry tickets / vouchers — win over car/transit buckets.
- * Matches TICKET / EXTRA categories and title heuristics; excludes private cars.
+ * Shared keyword engine: lib/ticketNormalizer.ts
+ * Bonus / complimentary lines (`isBonus`) still match — they need real purchase.
  */
 export function isTicketServiceItem(item: ServiceLineItem): boolean {
-  const title = titleHaystack(item);
-  const cat = String(item.category || "").toUpperCase();
+  return matchesTicketProcurementHaystack(
+    titleHaystack(item),
+    item.category
+  );
+}
 
-  // Never treat private-vehicle transfers as tickets
-  if (
-    title.includes("alphard") ||
-    title.includes("hiace") ||
-    title.includes("chauffeur") ||
-    title.includes("private car") ||
-    (title.includes("airport") && title.includes("transfer")) ||
-    (title.includes("transfer") &&
-      (title.includes("van") || title.includes("vehicle") || title.includes("driver")))
-  ) {
-    return false;
-  }
-
-  if (
-    title.includes("suica") ||
-    title.includes("pasmo") ||
-    title.includes("icoca") ||
-    title.includes("ic card") ||
-    title.includes("ic-card") ||
-    title.includes("iccard") ||
-    title.includes("teamlab") ||
-    title.includes("museum pass") ||
-    title.includes("metro pass") ||
-    title.includes("train ticket") ||
-    title.includes("rail pass") ||
-    title.includes("jr pass") ||
-    title.includes("entry ticket") ||
-    title.includes("admission") ||
-    title.includes("voucher") ||
-    /\bticket(s)?\b/.test(title) ||
-    /\bentry\b/.test(title)
-  ) {
-    return true;
-  }
-
-  if (cat === "TICKET") return true;
-  if (cat === "CONCIERGE_EXTRA" || cat === "EXTRA") {
-    return (
-      title.includes("pass") ||
-      title.includes("entry") ||
-      title.includes("ticket") ||
-      title.includes("admission")
-    );
-  }
-  return false;
+/** Hotel / ryokan / lodging lines Ops must procure (often CONCIERGE_EXTRA). */
+export function isAccommodationServiceItem(item: ServiceLineItem): boolean {
+  if (isTicketServiceItem(item)) return false;
+  return matchesHotelProcurementHaystack(titleHaystack(item), item.category);
 }
 
 /** Private car / vehicle / transfer lines (Alphard, airport transfer, etc.). */
@@ -733,21 +710,7 @@ export function isTransitServiceItem(item: ServiceLineItem): boolean {
   const v = titleHaystack(item);
   const cat = String(item.category || "").toUpperCase();
 
-  if (
-    v.includes("alphard") ||
-    v.includes("hiace") ||
-    v.includes("chauffeur") ||
-    v.includes("private car") ||
-    v.includes("private driver") ||
-    (v.includes("airport") && v.includes("transfer")) ||
-    (v.includes("transfer") &&
-      (v.includes("van") ||
-        v.includes("vehicle") ||
-        v.includes("car") ||
-        v.includes("driver")))
-  ) {
-    return true;
-  }
+  if (isPrivateVehicleHaystack(v)) return true;
 
   if (cat === "TRANSPORT" || cat === "TRANSIT") {
     // Category alone is not enough when titles are ticket-like (handled above)
@@ -765,7 +728,9 @@ export function isTransitServiceItem(item: ServiceLineItem): boolean {
       (!v.includes("suica") &&
         !v.includes("pasmo") &&
         !v.includes("ticket") &&
-        !v.includes("pass"))
+        !v.includes("pass") &&
+        !/\brail\b/.test(v) &&
+        !/\bnikko\b/.test(v))
     );
   }
 
@@ -791,6 +756,37 @@ export function isGuideServiceItem(item: ServiceLineItem): boolean {
     v.includes("local host") ||
     v.includes("experience with guide")
   );
+}
+
+/**
+ * Ticketer procurement checklist: tickets / rail passes / hotels.
+ * Includes bonus gifts (`isBonus`). Shared engine: lib/ticketNormalizer.ts
+ */
+export function isProcurementServiceItem(item: ServiceLineItem): boolean {
+  if (!isActiveAgentService(item)) return false;
+  return isProcurementLineItem(item);
+}
+
+/** UI bucket for procurement checklist icons / badges. */
+export function procurementKindForItem(item: ServiceLineItem): ProcurementKind {
+  return procurementKindFromCategory(
+    classifyProcurementCategory({
+      title: item.title,
+      notes: item.notes,
+      category: item.category,
+    })
+  );
+}
+
+/** Fine-grained badge category (IC_CARD / RAIL_PASS / ATTRACTION / HOTEL / GENERAL_TICKET). */
+export function procurementCategoryForItem(
+  item: ServiceLineItem
+): ProcurementTicketCategory {
+  return classifyProcurementCategory({
+    title: item.title,
+    notes: item.notes,
+    category: item.category,
+  });
 }
 
 /** Guest-facing ticket readiness for Day Services rows. */

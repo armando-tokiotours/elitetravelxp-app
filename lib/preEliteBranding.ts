@@ -110,6 +110,22 @@ export function preEliteBrandingKey(optionId: string): string {
   return `${PRE_ELITE_BRANDING_PREFIX}${optionId}`;
 }
 
+/**
+ * Media version stamp for the stable branding slots. Slot IDs never
+ * change when an image is replaced, so admins store a timestamp in
+ * the record's `media_version` field on every image save (legacy
+ * fallback: digits in `description`); guests/admin append it as `?v=`
+ * so a replaced photo is never hidden by the browser cache.
+ */
+export function preEliteMediaVersion(
+  row?: { description?: string; media_version?: string } | null
+): string {
+  const mv = String(row?.media_version || "").trim();
+  if (mv) return mv;
+  const d = String(row?.description || "").trim();
+  return /^\d{10,}$/.test(d) ? d : "";
+}
+
 export function isPreEliteBrandingKey(key: string): boolean {
   return key.startsWith(PRE_ELITE_BRANDING_PREFIX);
 }

@@ -4,9 +4,9 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import {
-  Bookmark,
   CalendarDays,
   CircleHelp,
+  ClipboardList,
   Home,
   LogOut,
   Sparkles,
@@ -22,7 +22,18 @@ import {
 } from "@/lib/pocketbase/client";
 import { useTeamAuth } from "@/store/useTeamAuth";
 import { useBuilderStore } from "@/store/useBuilderStore";
+import { bookingBoundRef } from "@/lib/bookingKindGuard";
+import {
+  journeyBuilderHref,
+  journeyItineraryHref,
+} from "@/lib/builderRoutes";
 import { ManageBookingModal } from "@/components/modals/ManageBookingModal";
+import { NewBookingResetButton } from "@/components/builder/NewBookingResetButton";
+import { FaqLinkSuspense } from "@/components/navigation/FaqLink";
+import {
+  OPEN_TRAVEL_BRIEF_EVENT,
+  SCROLL_HOME_OPTIONS_EVENT,
+} from "@/components/navigation/AppNavDock";
 
 export type AppNavId =
   | "home"
@@ -52,7 +63,7 @@ export const APP_SIDEBAR_FULL_PAD = "lg:pl-16";
 
 /** Canonical app nav — labels can be overridden via `labelOverrides`. */
 export const APP_NAV_ITEMS: AppNavItem[] = [
-  { id: "home", href: "/", label: "Home", icon: Home },
+  { id: "home", href: "/#options", label: "Home", icon: Home },
   {
     id: "builderE",
     href: "/builder/vip-access",
@@ -69,7 +80,7 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
     id: "itinerary",
     href: "/builder/japan-journey/itinerary",
     label: "Itinerary",
-    icon: Bookmark,
+    icon: Ticket,
   },
   {
     id: "faq",
@@ -168,6 +179,7 @@ function NavLinkList({
   variant = "sidebar",
   rail = false,
   expanded = false,
+  hideManageBooking = false,
 }: {
   pathname: string;
   onNavigate?: () => void;
@@ -176,26 +188,50 @@ function NavLinkList({
   variant?: "sidebar" | "drawer";
   rail?: boolean;
   expanded?: boolean;
+  /** Guest builder hamburger: Manage Booking lives elsewhere (e.g. homepage MANAGE), so omit its row here. */
+  hideManageBooking?: boolean;
 }) {
   const tripMode = useBuilderStore((s) => s.tripMode);
-  const isSingleDay =
-    tripMode === "single_day" ||
+  const confirmedBookingRef = useBuilderStore((s) => s.confirmedBookingRef);
+  // Route wins while inside a builder (the page/guard owns the mode there);
+  // elsewhere the active booking's tripMode picks the menu. Previously
+  // `tripMode === "single_day" || <multi path>` could label the menu
+  // 1-Day while the guest stood in Grand Japan Journey and vice versa.
+  const onSingleBuilderPath =
     pathname.startsWith("/builder-single") ||
     pathname.startsWith("/builder/day-pass");
+  const onMultiBuilderPath =
+    pathname.startsWith("/builder/japan-journey") ||
+    pathname === "/builder" ||
+    pathname.startsWith("/builder/itinerary");
+  const isSingleDay = onSingleBuilderPath
+    ? true
+    : onMultiBuilderPath
+      ? false
+      : tripMode === "single_day";
   const isBuilderE =
     pathname.startsWith("/builder-e") ||
     pathname.startsWith("/builder/vip-access");
+  // Confirmed PNR pins ?ref= on builder links (saved booking
+  // reloads instead of a blank draft); fresh drafts get no ref.
+  const singleDayBoundRef =
+    isSingleDay && tripMode === "single_day"
+      ? bookingBoundRef(confirmedBookingRef)
+      : null;
+  const multiDayBoundRef =
+    !isSingleDay && !isBuilderE && tripMode === "multi_day"
+      ? bookingBoundRef(confirmedBookingRef)
+      : null;
   const isMultiDay =
-    tripMode === "multi_day" ||
-    pathname.startsWith("/builder/japan-journey") ||
-    (pathname.startsWith("/builder") &&
-      !isSingleDay &&
-      !isBuilderE &&
-      !pathname.startsWith("/builder/day-pass") &&
-      !pathname.startsWith("/builder/vip-access"));
+    !isSingleDay &&
+    !isBuilderE &&
+    (onMultiBuilderPath ||
+      tripMode === "multi_day" ||
+      pathname.startsWith("/builder"));
 
   /** Context-isolated menu — never cross-link builders (matches AppNavDock). */
   const navItems: AppNavItem[] = APP_NAV_ITEMS.flatMap((item) => {
+    if (hideManageBooking && item.id === "manage") return [];
     if (item.id !== "builderE") return [item];
     if (isSingleDay) {
       return [
@@ -226,27 +262,42 @@ function NavLinkList({
     <nav className="flex flex-1 flex-col gap-1" aria-label="Main">
       {navItems.map((item) => {
         const Icon = item.icon;
+        // Itinerary is just "Itinerary" in every context (APP_NAV_ITEMS) —
+        // never prefix it with the builder name ("1-Day Express Pass ·
+        // Itinerary", "VIP Tickets · Dossier", …). Href/active unchanged.
         const label =
           item.id === "builder"
             ? isSingleDay
               ? "1-Day Express Pass"
               : (labelOverrides?.[item.id] ?? item.label)
-            : item.id === "itinerary" && isSingleDay
-              ? "1-Day Express Pass · Itinerary"
-              : item.id === "itinerary" && isBuilderE
-                ? "VIP Tickets · Dossier"
-                : (labelOverrides?.[item.id] ?? item.label);
+            : (labelOverrides?.[item.id] ?? item.label);
         const href =
           item.id === "builder"
             ? isSingleDay
-              ? "/builder/day-pass"
-              : "/builder/japan-journey"
+              ? singleDayBoundRef
+                ? journeyBuilderHref(singleDayBoundRef, {
+                    type: "single_day",
+                  })
+                : "/builder/day-pass"
+              : multiDayBoundRef
+                ? journeyBuilderHref(multiDayBoundRef, {
+                    type: "multi_day",
+                  })
+                : "/builder/japan-journey"
             : item.id === "itinerary"
               ? isSingleDay
-                ? "/builder/day-pass/itinerary"
+                ? singleDayBoundRef
+                  ? journeyItineraryHref(singleDayBoundRef, {
+                      type: "single_day",
+                    })
+                  : "/builder/day-pass/itinerary"
                 : isBuilderE
                   ? "/builder/vip-access/dossier"
-                  : "/builder/japan-journey/itinerary"
+                  : multiDayBoundRef
+                    ? journeyItineraryHref(multiDayBoundRef, {
+                        type: "multi_day",
+                      })
+                    : "/builder/japan-journey/itinerary"
               : item.href!;
         const active = isNavActive(pathname, { ...item, href });
 
@@ -291,22 +342,16 @@ function NavLinkList({
           );
         }
 
-        return (
-          <Link
-            key={item.id}
-            href={href}
-            title={label}
-            onClick={onNavigate}
-            className={
-              variant === "sidebar"
-                ? `flex items-center gap-3 rounded-xl py-2.5 text-sm transition-all duration-300 ${railItemClass} ${railLayout}`
-                : `flex items-center gap-3 rounded-xl px-4 py-3.5 text-sm tracking-wide transition ${
-                    active
-                      ? "bg-[#075473]/20 text-[#075473]"
-                      : "text-white/85 hover:bg-white/8"
-                  }`
-            }
-          >
+        const linkClassName =
+          variant === "sidebar"
+            ? `flex items-center gap-3 rounded-xl py-2.5 text-sm transition-all duration-300 ${railItemClass} ${railLayout}`
+            : `flex items-center gap-3 rounded-xl px-4 py-3.5 text-sm tracking-wide transition ${
+                active
+                  ? "bg-[#075473]/20 text-[#075473]"
+                  : "text-white/85 hover:bg-white/8"
+              }`;
+        const linkContent = (
+          <>
             <Icon
               className={`h-5 w-5 shrink-0 ${
                 active ? "text-[#075473]" : "text-zinc-500"
@@ -320,9 +365,83 @@ function NavLinkList({
                 <span className={active ? "font-semibold" : ""}>{label}</span>
               </NavLabel>
             )}
+          </>
+        );
+
+        // FAQ carries the current path+query so its Back button can return here.
+        if (item.id === "faq") {
+          return (
+            <FaqLinkSuspense
+              key={item.id}
+              title={label}
+              onClick={onNavigate}
+              className={linkClassName}
+            >
+              {linkContent}
+            </FaqLinkSuspense>
+          );
+        }
+
+        return (
+          <Link
+            key={item.id}
+            href={href}
+            title={label}
+            onClick={(e) => {
+              // Soft: already on `/` (or `/#options`) — still scroll to the
+              // 3-card selector; Next.js Link may no-op same-route hashes.
+              if (item.id === "home" && pathname === "/") {
+                if (window.location.hash === "#options") {
+                  e.preventDefault();
+                  window.dispatchEvent(new Event(SCROLL_HOME_OPTIONS_EVENT));
+                } else {
+                  // Let the hash update; GridSequenceHero listens for hashchange.
+                  window.setTimeout(() => {
+                    if (window.location.hash !== "#options") {
+                      window.location.hash = "options";
+                    }
+                  }, 0);
+                }
+              }
+              onNavigate?.();
+            }}
+            className={linkClassName}
+          >
+            {linkContent}
           </Link>
         );
       })}
+      {/* Questionnaire used to live on the magic dock (SINGLE/MULTIDAY);
+          Discover owns that slot now — keep brief reachable from the menu. */}
+      {!isBuilderE && (isSingleDay || isMultiDay) ? (
+        <button
+          type="button"
+          title="Questionnaire"
+          onClick={() => {
+            window.dispatchEvent(new Event(OPEN_TRAVEL_BRIEF_EVENT));
+            onNavigate?.();
+          }}
+          className={
+            variant === "sidebar"
+              ? `flex items-center gap-3 rounded-xl py-2.5 text-sm transition-all duration-300 border-r-2 border-transparent text-zinc-300 hover:bg-zinc-900 hover:text-white ${
+                  expanded ? "justify-start px-3" : "justify-center px-2"
+                }`
+              : "flex items-center gap-3 rounded-xl px-4 py-3.5 text-sm tracking-wide text-white/85 transition hover:bg-white/8"
+          }
+        >
+          <ClipboardList
+            className="h-5 w-5 shrink-0 text-[#075473]"
+            aria-hidden
+          />
+          {variant === "drawer" ? (
+            <span>Questionnaire</span>
+          ) : (
+            <NavLabel rail={rail} expanded={expanded}>
+              <span>Questionnaire</span>
+            </NavLabel>
+          )}
+        </button>
+      ) : null}
     </nav>
   );
 }
@@ -333,6 +452,7 @@ function AccountFooter({
   rail = false,
   expanded = false,
   overlay = false,
+  onNewBookingAfterConfirm,
 }: {
   onManage: () => void;
   compact?: boolean;
@@ -340,6 +460,8 @@ function AccountFooter({
   expanded?: boolean;
   /** Full-screen menu footer — lifted above mobile bottom nav */
   overlay?: boolean;
+  /** Closes the menu drawer after a confirmed New Booking reset (modal is portalled above the drawer, so the drawer stays open until then). */
+  onNewBookingAfterConfirm?: () => void;
 }) {
   const email = useTeamAuth((s) => s.email);
   const isAuthenticated = useTeamAuth((s) => s.isAuthenticated);
@@ -362,6 +484,12 @@ function AccountFooter({
               <p className="truncate text-sm font-bold text-white">{email}</p>
               <p className="text-xs text-zinc-400">Team account</p>
             </div>
+          </div>
+          <div className="mt-3">
+            <NewBookingResetButton
+              variant="menu"
+              onAfterConfirm={onNewBookingAfterConfirm}
+            />
           </div>
           <button
             type="button"
@@ -394,6 +522,12 @@ function AccountFooter({
             </p>
           </div>
         </button>
+        <div className="mt-3">
+          <NewBookingResetButton
+            variant="menu"
+            onAfterConfirm={onNewBookingAfterConfirm}
+          />
+        </div>
       </div>
     );
   }
@@ -480,6 +614,7 @@ function FullScreenNavOverlay({
   pathname,
   labelOverrides,
   onManage,
+  hideManageBooking = false,
 }: {
   open: boolean;
   onClose: () => void;
@@ -489,6 +624,7 @@ function FullScreenNavOverlay({
   pathname: string;
   labelOverrides?: Partial<Record<AppNavId, string>>;
   onManage: () => void;
+  hideManageBooking?: boolean;
 }) {
   useEffect(() => {
     if (!open) return;
@@ -506,7 +642,7 @@ function FullScreenNavOverlay({
       role="dialog"
       aria-modal="true"
       aria-label="Main menu"
-      className="tokio-nav-drawer fixed inset-0 z-[80] flex h-[100dvh] min-h-screen w-screen flex-col border-r border-white/10 text-white opacity-100 lg:hidden"
+      className="tokio-nav-drawer fixed inset-0 z-[999] flex h-[100dvh] min-h-screen w-screen flex-col border-r border-white/10 text-white opacity-100 lg:hidden"
     >
       {/* Solid tint scrim — kills text bleed from the builder behind */}
       <div
@@ -527,7 +663,7 @@ function FullScreenNavOverlay({
             </span>
           </button>
           <div className="min-w-0">
-            <p className="text-[0.55rem] font-semibold uppercase tracking-[0.28em] text-white">
+            <p className="text-[0.55rem] font-semibold uppercase tracking-[0.28em] text-[#D91147]">
               {brandEyebrow}
             </p>
             <p className="text-xs font-bold uppercase tracking-widest text-[#075473]">
@@ -565,6 +701,7 @@ function FullScreenNavOverlay({
             }}
             labelOverrides={labelOverrides}
             variant="drawer"
+            hideManageBooking={hideManageBooking}
           />
 
           <AccountFooter
@@ -573,6 +710,7 @@ function FullScreenNavOverlay({
               onClose();
               onManage();
             }}
+            onNewBookingAfterConfirm={onClose}
           />
         </div>
       </div>
@@ -640,7 +778,7 @@ export function AppSidebar({
           />
           <NavLabel rail expanded={showLabels}>
             <div className="min-w-0">
-              <p className="text-[0.55rem] font-semibold uppercase tracking-[0.2em] text-[#075473]">
+              <p className="text-[0.55rem] font-semibold uppercase tracking-[0.2em] text-[#D91147]">
                 TOKIOTOURS
               </p>
               <p className="truncate text-xs font-bold text-[#F5EFE6]">Menu</p>
@@ -691,10 +829,16 @@ export function MobileAppNav({
   brandEyebrow = "TOKIOTOURS",
   brandTitle = "Discover",
   labelOverrides,
+  hideManageBooking = false,
+  buttonTone = "dark",
 }: {
   brandEyebrow?: string;
   brandTitle?: string;
   labelOverrides?: Partial<Record<AppNavId, string>>;
+  /** Guest builder menus omit the Manage Booking row (it exists elsewhere). Team/staff menus leave this off. */
+  hideManageBooking?: boolean;
+  /** `light` = dark hamburger (legacy cream chrome). `dark` = white hamburger. */
+  buttonTone?: "dark" | "light";
 }) {
   const pathname = usePathname();
   const logoSrc = useBrandLogo();
@@ -728,7 +872,11 @@ export function MobileAppNav({
         aria-label="Open menu"
         aria-expanded={open}
         onClick={() => setOpen(true)}
-        className="flex h-10 w-10 items-center justify-center rounded-xl border border-zinc-700 bg-zinc-900 text-white transition hover:border-[#075473] lg:hidden"
+        className={`flex h-10 w-10 items-center justify-center border-0 bg-transparent shadow-none transition hover:bg-transparent focus-visible:bg-transparent focus-visible:outline-none focus-visible:ring-2 lg:hidden ${
+          buttonTone === "light"
+            ? "text-slate-900 focus-visible:ring-slate-400/60"
+            : "text-white focus-visible:ring-white/60"
+        }`}
       >
         <HamburgerIcon />
       </button>
@@ -743,6 +891,7 @@ export function MobileAppNav({
           pathname={pathname}
           labelOverrides={labelOverrides}
           onManage={() => setManageOpen(true)}
+          hideManageBooking={hideManageBooking}
         />
       </div>
 

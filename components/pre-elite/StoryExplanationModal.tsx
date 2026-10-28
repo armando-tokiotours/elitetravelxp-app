@@ -247,6 +247,13 @@ export function StoryExplanationModal({
                       <img
                         src={slide.imageUrl}
                         alt=""
+                        onError={(e) => {
+                          const t = e.currentTarget;
+                          if (slide.fallbackImageUrl && !t.dataset.fb) {
+                            t.dataset.fb = "1";
+                            t.src = slide.fallbackImageUrl;
+                          }
+                        }}
                         className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-300 ${
                           videoReady ? "opacity-0" : "opacity-100"
                         }`}
@@ -272,6 +279,13 @@ export function StoryExplanationModal({
                     key={slide.id}
                     src={slide.imageUrl}
                     alt=""
+                    onError={(e) => {
+                      const t = e.currentTarget;
+                      if (slide.fallbackImageUrl && !t.dataset.fb) {
+                        t.dataset.fb = "1";
+                        t.src = slide.fallbackImageUrl;
+                      }
+                    }}
                     className="h-full w-full object-cover"
                   />
                 ) : null}

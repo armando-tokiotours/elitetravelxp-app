@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent as ReactMouseEvent } from "react";
+import { useSearchParams } from "next/navigation";
 import { Check, Trash2 } from "lucide-react";
 import type PocketBase from "pocketbase";
 import {
@@ -27,8 +28,10 @@ import { StaffPortalShell, STAFF_PORTAL_REFRESH_EVENT } from "@/components/staff
 import { OpsBookingInspector } from "@/components/staff/OpsBookingInspector";
 import { OpsCommsHub } from "@/components/staff/OpsCommsHub";
 import { OpsPaymentStatusBadges } from "@/components/staff/OpsPaymentStatusBadges";
+import { PaymentMilestoneBar } from "@/components/ops/PaymentMilestoneBar";
 import {
   OpsStatusBadge,
+  loadAssignableConciergeStaff,
   loadStaffByRole,
   useOpsHubList,
   type OpsHubRow,
@@ -68,14 +71,20 @@ export function OpsInquiryManagement() {
   );
 }
 
+const LIST_PILL =
+  "rounded-md border px-1 py-0.5 text-[7.5px] tracking-wider uppercase";
+
 function ListRowBadges({
   row,
   dispatch,
   tickets,
+  active = false,
 }: {
   row: OpsHubRow;
   dispatch?: OpsDispatchRow;
   tickets?: OpsTicketsRow;
+  /** Selected rows use dark surface; unselected use cream */
+  active?: boolean;
 }) {
   const guideStatus = normalizeGuideConfirmStatus(dispatch?.guide_mode, {
     boardVisible: Boolean(dispatch?.guide_board_visible),
@@ -95,30 +104,68 @@ function ListRowBadges({
     ticketStatus !== "ordered" &&
     ticketStatus !== "done";
 
+  const hasDate = Boolean(String(row.tour_date || "").trim());
+  const surface = active ? "dark" : "cream";
+  const datedTone = active
+    ? "border-[#F6A724]/35 bg-[#F6A724]/15 text-[#F6A724]"
+    : "border-[#b7791f]/40 bg-[#F6A724]/20 text-[#92400e]";
+  const mutedTone = active
+    ? "border-zinc-700 bg-zinc-900 text-zinc-400"
+    : "border-slate-300 bg-slate-100 text-slate-600";
+  const warnTone = active
+    ? "border-orange-500/40 bg-orange-500/15 font-semibold text-orange-300"
+    : "border-orange-700/35 bg-orange-50 font-semibold text-orange-800";
+  const tixTone = active
+    ? "border-amber-500/40 bg-amber-500/15 font-semibold text-amber-300"
+    : "border-amber-700/40 bg-amber-100 font-semibold text-amber-900";
+
   return (
-    <div className="mt-1 flex flex-wrap gap-1">
-      <OpsStatusBadge status={listStatus} />
-      <OpsPaymentStatusBadges row={row} />
+    <div className="mt-1 flex flex-wrap gap-0.5">
+      <OpsStatusBadge status={listStatus} compact surface={surface} />
+      <span
+        className={`${LIST_PILL} font-semibold ${
+          hasDate ? datedTone : mutedTone
+        }`}
+      >
+        {hasDate ? "P1 Dated" : "P2 Flexible"}
+      </span>
+      <OpsPaymentStatusBadges row={row} compact surface={surface} />
+      <PaymentMilestoneBar
+        hub={row}
+        compact
+        surface={surface}
+        className="!gap-0.5 !px-1 !py-0.5 !text-[7.5px]"
+      />
       {guideApprovalPending ? (
-        <span className="rounded-md border border-orange-500/40 bg-orange-500/15 px-1.5 py-0.5 text-[9px] font-semibold tracking-wider text-orange-300 uppercase">
-          Guide approval pending
-        </span>
+        <span className={`${LIST_PILL} ${warnTone}`}>Guide Conf - Pend</span>
       ) : (
-        <span className="rounded-md border border-zinc-700 bg-zinc-900 px-1.5 py-0.5 text-[9px] tracking-wider text-zinc-400 uppercase">
+        <span className={`${LIST_PILL} ${mutedTone}`}>
           {guideConfirmStaffLabel(guideStatus)}
         </span>
       )}
       {tixNeeded ? (
-        <span className="rounded-md border border-amber-500/40 bg-amber-500/15 px-1.5 py-0.5 text-[9px] font-semibold tracking-wider text-amber-300 uppercase">
-          Tix needed
-        </span>
+        <span className={`${LIST_PILL} ${tixTone}`}>Tix needed</span>
       ) : ticketStatus !== "none" ? (
-        <span className="rounded-md border border-zinc-700 bg-zinc-900 px-1.5 py-0.5 text-[9px] tracking-wider text-zinc-400 uppercase">
+        <span className={`${LIST_PILL} ${mutedTone}`}>
           Tix {ticketStatus}
         </span>
       ) : null}
     </div>
   );
+}
+
+function listAgentLabel(
+  row: OpsHubRow,
+  agents: StaffOption[]
+): { name: string; assigned: boolean } {
+  const fromRow = String(row.assigned_agent || "").trim();
+  if (fromRow) return { name: fromRow, assigned: true };
+  const id = String(row.assigned_agent_id || "").trim();
+  if (!id) return { name: "Unassigned", assigned: false };
+  const fromStaff = agents.find((a) => a.id === id);
+  const resolved = String(fromStaff?.name || fromStaff?.email || "").trim();
+  if (resolved) return { name: resolved, assigned: true };
+  return { name: "Unassigned", assigned: false };
 }
 
 async function deleteOpsBookingCascade(
@@ -183,6 +230,7 @@ async function deleteOpsBookingCascade(
 }
 
 function OpsInquiryInner() {
+  const searchParams = useSearchParams();
   const getClient = useTeamAuth((s) => s.getClient);
   const staffId = useTeamAuth((s) => s.staffId);
   const role = useTeamAuth((s) => s.role);
@@ -207,12 +255,33 @@ function OpsInquiryInner() {
   const [savingId, setSavingId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("incoming");
+  /** all | dated (Pipeline 1) | flexible (Pipeline 2) */
+  const [pipelineFilter, setPipelineFilter] = useState<
+    "all" | "dated" | "flexible"
+  >("all");
+  const deepLinkApplied = useRef(false);
+  const deepLinkPnr = useRef<string | null>(null);
   const [isCompactView, setIsCompactView] = useState(false);
   const [sidebarWidth, setSidebarWidth] = useState(380);
   const sidebarWidthRef = useRef(380);
   const isResizing = useRef(false);
   const resizeStartX = useRef(0);
   const resizeStartW = useRef(380);
+
+  // Deep-link from Operations Calendar: /ops?pnr=JPN-XXXX
+  useEffect(() => {
+    if (deepLinkApplied.current) return;
+    const raw = String(searchParams.get("pnr") || "")
+      .trim()
+      .toUpperCase();
+    if (!raw) return;
+    deepLinkApplied.current = true;
+    deepLinkPnr.current = raw;
+    setSelectedPnr(raw);
+    setStatusFilter("all");
+    setPipelineFilter("all");
+    setQuery(raw);
+  }, [searchParams]);
 
   useEffect(() => {
     try {
@@ -302,7 +371,7 @@ function OpsInquiryInner() {
       setGuides(await loadStaffByRole(pb, "guide"));
       setDrivers(await loadStaffByRole(pb, "driver"));
       setTicketers(await loadStaffByRole(pb, "ticketer"));
-      setAgents(await loadStaffByRole(pb, "agent"));
+      setAgents(await loadAssignableConciergeStaff(pb));
       await reloadPockets();
     })();
   }, [getClient, reloadPockets]);
@@ -335,6 +404,10 @@ function OpsInquiryInner() {
         if (effective !== statusFilter) return false;
       }
 
+      const hasDate = Boolean(String(r.tour_date || "").trim());
+      if (pipelineFilter === "dated" && !hasDate) return false;
+      if (pipelineFilter === "flexible" && hasDate) return false;
+
       if (!q) return true;
       const hay = [
         r.pnr,
@@ -358,7 +431,7 @@ function OpsInquiryInner() {
       // Stable tie-break: unread above read within same timestamp
       return Number(Boolean(a.is_read)) - Number(Boolean(b.is_read));
     });
-  }, [rows, query, statusFilter]);
+  }, [rows, query, statusFilter, pipelineFilter]);
 
   /** Isolated is_read patch — never re-submits full booking JSON */
   const toggleReadStatus = useCallback(
@@ -417,7 +490,17 @@ function OpsInquiryInner() {
 
   useEffect(() => {
     if (!filtered.length) {
-      setSelectedPnr(null);
+      // Keep deep-linked PNR while rows/filter settle
+      if (!deepLinkPnr.current) setSelectedPnr(null);
+      return;
+    }
+    const deep = deepLinkPnr.current;
+    if (
+      deep &&
+      filtered.some((r) => String(r.pnr).toUpperCase() === deep)
+    ) {
+      if (selectedPnr !== deep) setSelectedPnr(deep);
+      deepLinkPnr.current = null;
       return;
     }
     const exists = selectedPnr
@@ -528,22 +611,23 @@ function OpsInquiryInner() {
   };
 
   if (loading) {
-    return <p className="text-sm text-zinc-400">Loading inquiries…</p>;
+    return <p className="text-sm text-zinc-500">Loading inquiries…</p>;
   }
   if (error) {
-    return <p className="text-sm text-red-400">{error}</p>;
+    return <p className="text-sm text-red-600">{error}</p>;
   }
 
   return (
     <div className="relative flex h-[calc(100vh-4.5rem)] min-h-[32rem] flex-col gap-1.5">
-      {msg ? <p className="text-sm text-[#7ec8e3]">{msg}</p> : null}
+      {msg ? <p className="text-sm text-[#075473]">{msg}</p> : null}
 
       {rows.length === 0 ? (
-        <p className="rounded-xl border border-dashed border-zinc-800 px-4 py-10 text-center text-sm text-zinc-500">
-          No ops_hub rows yet — create a builder booking first.
+        <p className="rounded-xl border border-dashed border-slate-300 bg-white/50 px-4 py-10 text-center text-sm text-zinc-500">
+          No ops_hub rows yet — create a builder booking or use AI Ingest
+          (/ops/ingestion).
         </p>
       ) : (
-        <div className="flex min-h-0 flex-1 overflow-hidden rounded-xl border border-zinc-800 bg-zinc-950/60">
+        <div className="flex min-h-0 flex-1 overflow-hidden rounded-xl border border-slate-200 bg-white/40">
           {/* Left pane — inquiry list (resizable on lg+) */}
           <aside
             style={
@@ -551,16 +635,16 @@ function OpsInquiryInner() {
                 ["--ops-sidebar-w"]: `${sidebarWidth}px`,
               } as CSSProperties
             }
-            className="flex min-h-0 w-full flex-col border-b border-zinc-800 lg:w-[var(--ops-sidebar-w)] lg:shrink-0 lg:border-r lg:border-b-0"
+            className="flex min-h-0 w-full flex-col border-b border-slate-200 lg:w-[var(--ops-sidebar-w)] lg:shrink-0 lg:border-r lg:border-b-0"
           >
-            <div className="shrink-0 space-y-2 border-b border-zinc-800 px-3 py-2">
+            <div className="shrink-0 space-y-2 border-b border-slate-200 px-3 py-2">
               <div className="flex items-center gap-2">
                 <input
                   type="search"
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                   placeholder="Search PNR, city, guests…"
-                  className="min-w-0 flex-1 rounded-lg border border-white/10 bg-black/40 px-3 py-1.5 text-xs text-white placeholder:text-zinc-600 focus:border-[#075473] focus:outline-none"
+                  className="min-w-0 flex-1 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs text-zinc-800 placeholder:text-zinc-400 focus:border-[#075473] focus:outline-none"
                 />
                 <button
                   type="button"
@@ -573,14 +657,41 @@ function OpsInquiryInner() {
                   className={`flex shrink-0 items-center justify-center rounded-lg border px-2.5 py-1.5 text-[11px] font-bold transition-colors ${
                     isCompactView
                       ? "border-[#075473] bg-[#075473] text-white"
-                      : "border-white/10 bg-white/5 text-zinc-400 hover:bg-white/10"
+                      : "border-slate-300 bg-white text-zinc-600 hover:bg-slate-50"
                   }`}
                 >
                   {isCompactView ? "☰ Detailed" : "☵ Compact"}
                 </button>
               </div>
               <div className="flex gap-1 overflow-x-auto pb-0.5">
-                <div className="inline-flex min-w-max gap-0.5 rounded-full border border-zinc-700 bg-zinc-900 p-0.5">
+                <div className="inline-flex min-w-max gap-0.5 rounded-full border border-slate-300 bg-white p-0.5">
+                  {(
+                    [
+                      { id: "all", label: "All pipelines" },
+                      { id: "dated", label: "P1 · Dated" },
+                      { id: "flexible", label: "P2 · Flexible" },
+                    ] as const
+                  ).map((pill) => {
+                    const active = pipelineFilter === pill.id;
+                    return (
+                      <button
+                        key={pill.id}
+                        type="button"
+                        onClick={() => setPipelineFilter(pill.id)}
+                        className={`rounded-full px-2.5 py-1 text-[10px] font-semibold tracking-wide whitespace-nowrap transition ${
+                          active
+                            ? "bg-[#F6A724]/20 text-[#b7791f]"
+                            : "text-zinc-500 hover:text-zinc-800"
+                        }`}
+                      >
+                        {pill.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+              <div className="flex gap-1 overflow-x-auto pb-0.5">
+                <div className="inline-flex min-w-max gap-0.5 rounded-full border border-slate-300 bg-white p-0.5">
                   {STATUS_FILTER_PILLS.map((pill) => {
                     const active = statusFilter === pill.id;
                     return (
@@ -591,7 +702,7 @@ function OpsInquiryInner() {
                         className={`rounded-full px-2.5 py-1 text-[10px] font-semibold tracking-wide whitespace-nowrap transition ${
                           active
                             ? "bg-[#0B1F3A] text-white"
-                            : "text-zinc-500 hover:text-zinc-300"
+                            : "text-zinc-500 hover:text-zinc-800"
                         }`}
                       >
                         {pill.label}
@@ -600,7 +711,7 @@ function OpsInquiryInner() {
                   })}
                 </div>
               </div>
-              <p className="text-[10px] text-zinc-600">
+              <p className="text-[10px] text-zinc-500">
                 {filtered.length} of {rows.length} inquiries
                 {isCompactView ? " · compact" : ""}
               </p>
@@ -619,6 +730,7 @@ function OpsInquiryInner() {
                   row.status,
                   Boolean(row.payment_confirmed)
                 );
+                const agent = listAgentLabel(row, agents);
 
                 if (isCompactView) {
                   return (
@@ -631,8 +743,8 @@ function OpsInquiryInner() {
                         }}
                         className={`relative flex w-full items-center justify-between gap-2 rounded-lg border px-3 py-2 text-left text-xs transition ${
                           active
-                            ? "border-[#075473] bg-[#075473]/30 font-bold text-white"
-                            : "border-white/5 bg-[#0D1117] text-zinc-300 hover:bg-white/5"
+                            ? "border-[#075473] bg-[#23262c] font-bold text-zinc-100"
+                            : "border-slate-200 bg-[#faf9f4] text-slate-700 hover:border-slate-300 hover:bg-[#f3f1ea]"
                         }`}
                       >
                         {unread ? (
@@ -642,24 +754,42 @@ function OpsInquiryInner() {
                           />
                         ) : null}
                         <div className="flex min-w-0 items-center gap-2 truncate pl-1">
-                          <span className="shrink-0 font-mono text-xs font-bold text-[#F6A724]">
+                          <span
+                            className={`shrink-0 font-mono text-xs font-bold ${
+                              active ? "text-[#F6A724]" : "text-[#0B1F3A]"
+                            }`}
+                          >
                             {row.pnr}
                           </span>
-                          <span className="truncate text-zinc-400">
+                          <span
+                            className={`truncate ${
+                              active ? "text-zinc-400" : "text-slate-500"
+                            }`}
+                          >
                             {row.primary_city || "—"}
                           </span>
-                          <span className="shrink-0 text-[11px] text-zinc-500">
+                          <span
+                            className={`shrink-0 text-[11px] ${
+                              active ? "text-zinc-500" : "text-slate-500"
+                            }`}
+                          >
                             {row.guest_summary || "—"}
                           </span>
                         </div>
                         <div className="flex shrink-0 items-center gap-1.5">
                           <span
-                            className={`rounded px-2 py-0.5 text-[10px] font-medium tracking-wide uppercase ${
+                            className={`rounded px-1 py-0.5 text-[7.5px] font-medium tracking-wide uppercase ${
                               listStatus === "draft"
-                                ? "border border-gray-500/30 bg-gray-500/20 text-gray-400"
+                                ? active
+                                  ? "border border-gray-500/30 bg-gray-500/20 text-gray-400"
+                                  : "border border-slate-300 bg-slate-100 text-slate-600"
                                 : listStatus === "incoming"
-                                  ? "bg-amber-500/20 text-amber-300"
-                                  : "bg-blue-500/20 text-blue-300"
+                                  ? active
+                                    ? "bg-amber-500/20 text-amber-300"
+                                    : "bg-amber-100 text-amber-900"
+                                  : active
+                                    ? "bg-blue-500/20 text-blue-300"
+                                    : "bg-sky-100 text-sky-900"
                             }`}
                           >
                             {listStatus}
@@ -684,8 +814,12 @@ function OpsInquiryInner() {
                             }}
                             className={
                               unread
-                                ? "rounded bg-blue-500/20 p-0.5 text-blue-300 hover:bg-blue-500/40"
-                                : "rounded bg-white/5 p-0.5 text-zinc-500 hover:bg-white/10 hover:text-zinc-300"
+                                ? active
+                                  ? "rounded bg-blue-500/20 p-0.5 text-blue-300 hover:bg-blue-500/40"
+                                  : "rounded bg-blue-100 p-0.5 text-blue-700 hover:bg-blue-200"
+                                : active
+                                  ? "rounded bg-white/5 p-0.5 text-zinc-500 hover:bg-white/10 hover:text-zinc-300"
+                                  : "rounded bg-slate-100 p-0.5 text-slate-400 hover:bg-slate-200 hover:text-slate-600"
                             }
                           >
                             <Check className="h-3 w-3" aria-hidden />
@@ -719,19 +853,19 @@ function OpsInquiryInner() {
                 }
 
                 return (
-                  <li key={row.id} className="relative border-b border-zinc-900">
+                  <li key={row.id} className="relative px-1.5 pt-1.5">
                     <button
                       type="button"
                       onClick={() => {
                         setSelectedPnr(pnr);
                         void markInquiryRead(row);
                       }}
-                      className={`relative w-full px-3 py-2.5 pr-16 text-left transition ${
+                      className={`relative w-full rounded-lg border px-3 py-2.5 pr-16 text-left transition ${
                         active
-                          ? "bg-[#075473]/20"
+                          ? "border-[#075473] bg-[#23262c]"
                           : unread
-                            ? "bg-[#0D1117] hover:bg-zinc-900/80"
-                            : "hover:bg-zinc-900/80"
+                            ? "border-[#075473]/35 bg-[#faf9f4] hover:border-[#075473]/55 hover:bg-[#f3f1ea]"
+                            : "border-slate-200 bg-[#faf9f4] hover:border-slate-300 hover:bg-[#f3f1ea]"
                       }`}
                     >
                       {unread ? (
@@ -743,23 +877,49 @@ function OpsInquiryInner() {
                         />
                       ) : null}
                       <div className="flex items-start justify-between gap-1">
-                        <p className="font-mono text-sm font-semibold text-white">
+                        <p
+                          className={`font-mono text-sm font-semibold ${
+                            active ? "text-zinc-100" : "text-[#0B1F3A]"
+                          }`}
+                        >
                           {row.pnr}
                         </p>
-                        <span className="mr-8 shrink-0 text-[10px] text-zinc-500">
+                        <span
+                          className={`mr-8 shrink-0 text-[10px] ${
+                            active ? "text-zinc-400" : "text-slate-500"
+                          }`}
+                        >
                           {row.tour_date
                             ? String(row.tour_date).slice(0, 10)
                             : "—"}
                         </span>
                       </div>
-                      <p className="mt-0.5 truncate text-xs text-zinc-400">
+                      <p
+                        className={`mt-0.5 truncate text-xs ${
+                          active ? "text-zinc-400" : "text-slate-600"
+                        }`}
+                      >
                         {row.primary_city || "—"} ·{" "}
                         {row.guest_summary || "—"}
+                      </p>
+                      <p
+                        className={`mt-0.5 truncate text-[11px] ${
+                          agent.assigned
+                            ? active
+                              ? "text-[#7ec8e3]"
+                              : "text-[#075473]"
+                            : active
+                              ? "text-zinc-500"
+                              : "text-slate-500"
+                        }`}
+                      >
+                        Agent: {agent.name}
                       </p>
                       <ListRowBadges
                         row={row}
                         dispatch={dispatchByPnr[pnr]}
                         tickets={ticketsByPnr[pnr]}
+                        active={active}
                       />
                       {postTour ? (
                         <span
@@ -792,7 +952,11 @@ function OpsInquiryInner() {
                               e.currentTarget.click();
                             }
                           }}
-                          className="mt-2 inline-flex rounded-md border border-[#F6A724]/35 bg-[#F6A724]/10 px-2 py-1 text-[10px] font-semibold tracking-wide text-[#F6A724] uppercase hover:bg-[#F6A724]/20"
+                          className={
+                            active
+                              ? "mt-2 inline-flex rounded-md border border-[#F6A724]/35 bg-[#F6A724]/10 px-2 py-1 text-[10px] font-semibold tracking-wide text-[#F6A724] uppercase hover:bg-[#F6A724]/20"
+                              : "mt-2 inline-flex rounded-md border border-[#b7791f]/40 bg-[#F6A724]/15 px-2 py-1 text-[10px] font-semibold tracking-wide text-[#92400e] uppercase hover:bg-[#F6A724]/25"
+                          }
                         >
                           Send follow-up
                         </span>
@@ -811,8 +975,12 @@ function OpsInquiryInner() {
                         }}
                         className={
                           unread
-                            ? "rounded-md bg-blue-500/20 p-1 text-blue-300 transition hover:bg-blue-500/40"
-                            : "rounded-md bg-white/5 p-1 text-zinc-500 transition hover:bg-white/10 hover:text-zinc-300"
+                            ? active
+                              ? "rounded-md bg-blue-500/20 p-1 text-blue-300 transition hover:bg-blue-500/40"
+                              : "rounded-md bg-blue-100 p-1 text-blue-700 transition hover:bg-blue-200"
+                            : active
+                              ? "rounded-md bg-white/5 p-1 text-zinc-500 transition hover:bg-white/10 hover:text-zinc-300"
+                              : "rounded-md bg-slate-100 p-1 text-slate-400 transition hover:bg-slate-200 hover:text-slate-600"
                         }
                       >
                         <Check className="h-3.5 w-3.5" aria-hidden />
@@ -848,13 +1016,13 @@ function OpsInquiryInner() {
             aria-valuemax={550}
             aria-valuenow={sidebarWidth}
             onMouseDown={handleSplitterMouseDown}
-            className="group relative z-30 hidden w-1.5 shrink-0 cursor-col-resize items-center justify-center bg-white/5 transition-colors hover:bg-[#075473] active:bg-[#F6A724] lg:flex"
+            className="group relative z-30 hidden w-1.5 shrink-0 cursor-col-resize items-center justify-center bg-slate-200/80 transition-colors hover:bg-[#075473] active:bg-[#F6A724] lg:flex"
           >
-            <div className="h-8 w-0.5 rounded-full bg-gray-500 group-hover:bg-white" />
+            <div className="h-8 w-0.5 rounded-full bg-slate-400 group-hover:bg-white" />
           </div>
 
           {/* Right pane — inspector */}
-          <div className="min-h-0 min-w-0 flex-1 overflow-hidden">
+          <div className="min-h-0 min-w-0 flex-1 overflow-hidden bg-[#faf9f4]">
             {selected ? (
               <OpsBookingInspector
                 row={selected}

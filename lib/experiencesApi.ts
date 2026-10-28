@@ -3,7 +3,9 @@
  * Multi-Day guided city tours stay out of this storefront.
  */
 
+import type { SubServiceItem } from "@/components/builder-e/subServices";
 import {
+  accessTypeGuestBadge,
   accessTypeNeedsTicketer,
   experienceNeedsEntryTicket,
 } from "@/lib/accessType";
@@ -11,6 +13,8 @@ import {
   fetchExperiencesAndPlaces,
   getPocketBase,
   mapEapToTour,
+  pbFileUrl,
+  tourPhoto,
   type PbCity,
   type PbTour,
 } from "@/lib/pocketbase/client";
@@ -98,4 +102,37 @@ export async function getBuilderEAttractions(
   ];
 
   return merged.filter((t) => t.is_active !== false);
+}
+
+function attractionThumbUrl(tour: PbTour): string {
+  const raw = tourPhoto(tour);
+  if (!raw) return "";
+  if (raw.startsWith("http") || raw.startsWith("/")) return raw;
+  return (
+    pbFileUrl(tour.collectionId || "tours", tour.id, raw, {
+      thumb: "400x300",
+      format: "webp",
+    }) || raw
+  );
+}
+
+/** Map a PocketBase ticketed tour into Builder E VIP Concierge card shape. */
+export function mapTourToVipSubService(tour: PbTour): SubServiceItem {
+  const city = (tour.expand?.city_id?.name || "").trim();
+  const duration = tour.duration_hours ? `${tour.duration_hours}h` : undefined;
+  const requiresTicket = tourRequiresTicketBadge(tour);
+  const accessBadge = accessTypeGuestBadge(tour.access_type);
+  return {
+    id: tour.id,
+    category: "EXPERIENCE",
+    title: tour.title,
+    icon: "🎟️",
+    heroMediaUrl: attractionThumbUrl(tour),
+    description: (tour.description || "").trim() || city || "VIP experience",
+    duration,
+    badgeTag: requiresTicket ? accessBadge || "Ticketed" : "Concierge",
+    requiresTicket,
+    tourId: tour.id,
+    access_type: tour.access_type || "",
+  };
 }

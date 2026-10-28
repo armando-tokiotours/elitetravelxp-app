@@ -3,16 +3,20 @@
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
-  BookOpen,
-  Briefcase,
   Building2,
+  Calculator,
+  CalendarDays,
   Car,
   ChevronDown,
   ChevronUp,
   ClipboardList,
-  CreditCard,
+  FileSpreadsheet,
+  HardDrive,
+  LayoutDashboard,
   Link2,
   Map,
+  MessageSquareHeart,
+  MonitorPlay,
   RefreshCw,
   Settings2,
   Sparkles,
@@ -24,15 +28,11 @@ import {
 import { getPbBaseUrl } from "@/lib/pocketbase/client";
 import {
   ROLE_LABELS,
-  canAccessAdmin,
-  canAccessAgency,
+  canAccessAccounting,
   canAccessAgent,
-  canAccessDriver,
-  canAccessGuide,
   canAccessMoney,
   canAccessOpsBoard,
   canAccessTeamAccess,
-  canAccessTicketer,
   type StaffRole,
 } from "@/lib/staffRoles";
 import { useTeamAuth } from "@/store/useTeamAuth";
@@ -41,26 +41,95 @@ import { ShortcutTile } from "@/components/staff/ShortcutTile";
 const STAFF_NAV_EXPANDED_KEY = "staff-nav-expanded";
 export const STAFF_PORTAL_REFRESH_EVENT = "staff-portal-refresh";
 
+/** Predicate, boolean, or omitted — shells always call this as a function. */
+export type StaffAllowCheck =
+  | ((role: StaffRole | null) => boolean)
+  | boolean;
+
+/** Normalize allow prop so missing/boolean values never throw at runtime. */
+export function resolveStaffAllow(
+  allow: StaffAllowCheck | undefined
+): (role: StaffRole | null) => boolean {
+  if (typeof allow === "function") return allow;
+  if (typeof allow === "boolean") return () => allow;
+  return () => false;
+}
+
 type StaffNavLink = {
   href: string;
   label: string;
   icon: ReactNode;
 };
 
+/**
+ * Super User / Ops management suite — Owner, Ops, Agent.
+ * Accountant gets settlements + money only (not the full Ops suite).
+ * Guide / Driver use ContractorPortalShell (no Super User bar).
+ * Ticketer gets a minimal self-service strip only.
+ */
 function linksForRole(role: StaffRole | null): StaffNavLink[] {
+  if (!role) return [];
+
+  // Guide / driver: no Super User suite (ContractorPortalShell owns their chrome).
+  if (role === "guide" || role === "driver") return [];
+
+  // Ticketer: tickets + profile only — never Ops management desks.
+  if (role === "ticketer") {
+    return [
+      {
+        href: "/ticketer",
+        label: "Tickets",
+        icon: <Ticket className="h-5 w-5" strokeWidth={2} />,
+      },
+      {
+        href: "/profile",
+        label: "Profile",
+        icon: <UserCircle className="h-5 w-5" strokeWidth={2} />,
+      },
+    ];
+  }
+
+  // Accountant: settlements desk + money surfaces + profile — not Ops board.
+  if (role === "accounting") {
+    return [
+      {
+        href: "/accounting/dashboard",
+        label: "Accounting",
+        icon: <Calculator className="h-5 w-5" strokeWidth={2} />,
+      },
+      {
+        href: "/ops/money",
+        label: "Money",
+        icon: <Wallet className="h-5 w-5" strokeWidth={2} />,
+      },
+      {
+        href: "/ops/profile",
+        label: "Profile",
+        icon: <UserCircle className="h-5 w-5" strokeWidth={2} />,
+      },
+    ];
+  }
+
   const links: StaffNavLink[] = [];
 
+  // Super User suite — Dashboard first when ops-manager roles can access the board.
+  if (canAccessOpsBoard(role))
+    links.push({
+      href: "/ops/dashboard",
+      label: "Dashboard",
+      icon: <LayoutDashboard className="h-5 w-5" strokeWidth={2} />,
+    });
   if (canAccessOpsBoard(role))
     links.push({
       href: "/ops",
       label: "Ops",
       icon: <ClipboardList className="h-5 w-5" strokeWidth={2} />,
     });
-  if (canAccessOpsBoard(role))
+  if (canAccessAccounting(role))
     links.push({
-      href: "/ops/booking",
-      label: "Booking",
-      icon: <Briefcase className="h-5 w-5" strokeWidth={2} />,
+      href: "/accounting/dashboard",
+      label: "Accounting",
+      icon: <Calculator className="h-5 w-5" strokeWidth={2} />,
     });
   if (canAccessMoney(role))
     links.push({
@@ -68,64 +137,55 @@ function linksForRole(role: StaffRole | null): StaffNavLink[] {
       label: "Money",
       icon: <Wallet className="h-5 w-5" strokeWidth={2} />,
     });
-  if (canAccessAgent(role))
+  if (canAccessOpsBoard(role))
     links.push({
-      href: "/agent",
+      href: "/ops/concierge",
       label: "Concierge",
-      icon: <Users className="h-5 w-5" strokeWidth={2} />,
+      icon: <MessageSquareHeart className="h-5 w-5" strokeWidth={2} />,
     });
-  if (canAccessAgent(role))
+  if (canAccessOpsBoard(role))
     links.push({
-      href: "/agent/draft",
-      label: "Draft link",
-      icon: <Link2 className="h-5 w-5" strokeWidth={2} />,
+      href: "/ops/calendar",
+      label: "Calendar",
+      icon: <CalendarDays className="h-5 w-5" strokeWidth={2} />,
     });
-  if (canAccessTicketer(role))
+  // Super User procurement desk; ticketer role keeps /ticketer (early return above).
+  if (canAccessOpsBoard(role))
     links.push({
-      href: "/ticketer",
+      href: "/ops/tickets-master",
       label: "Tickets",
       icon: <Ticket className="h-5 w-5" strokeWidth={2} />,
     });
-  if (canAccessGuide(role))
+  // Master desks (cross-booking) — not the individual /guide or /driver portals.
+  if (canAccessOpsBoard(role))
     links.push({
-      href: "/guide",
+      href: "/ops/guides-master",
       label: "Guide",
       icon: <UserCircle className="h-5 w-5" strokeWidth={2} />,
     });
-  if (canAccessDriver(role))
+  if (canAccessOpsBoard(role))
     links.push({
-      href: "/driver",
+      href: "/ops/drivers-master",
       label: "Driver Coordinator",
       icon: <Car className="h-5 w-5" strokeWidth={2} />,
     });
-  if (canAccessAgency(role))
+  if (canAccessOpsBoard(role))
     links.push({
-      href: "/agency",
-      label: "Agency",
+      href: "/ops/agencies",
+      label: "Agencies",
       icon: <Building2 className="h-5 w-5" strokeWidth={2} />,
     });
-
-  // Map — available to any authenticated staff portal user
-  if (role)
+  if (canAccessOpsBoard(role) || canAccessAgent(role))
     links.push({
       href: "/map",
       label: "Map",
       icon: <Map className="h-5 w-5" strokeWidth={2} />,
     });
-
-  if (role)
+  if (canAccessOpsBoard(role))
     links.push({
-      href: "/profile",
+      href: "/ops/profile",
       label: "Profile",
-      icon: <CreditCard className="h-5 w-5" strokeWidth={2} />,
-    });
-
-  // Role-gated: Admin leads vs Content (Team Access)
-  if (canAccessAdmin(role))
-    links.push({
-      href: "/admin",
-      label: "Leads",
-      icon: <ClipboardList className="h-5 w-5" strokeWidth={2} />,
+      icon: <UserCircle className="h-5 w-5" strokeWidth={2} />,
     });
   if (canAccessTeamAccess(role))
     links.push({
@@ -133,18 +193,57 @@ function linksForRole(role: StaffRole | null): StaffNavLink[] {
       label: "Content",
       icon: <Settings2 className="h-5 w-5" strokeWidth={2} />,
     });
-  if (canAccessTeamAccess(role))
-    links.push({
-      href: "/staff/logic-dictionary",
-      label: "Logic dictionary",
-      icon: <BookOpen className="h-5 w-5" strokeWidth={2} />,
-    });
   if (canAccessOpsBoard(role))
     links.push({
       href: "/ops/settings/ai-rules",
       label: "AI knowledge",
       icon: <Sparkles className="h-5 w-5" strokeWidth={2} />,
     });
+  if (canAccessOpsBoard(role))
+    links.push({
+      href: "/ops/ingestion",
+      label: "AI Ingest",
+      icon: <FileSpreadsheet className="h-5 w-5" strokeWidth={2} />,
+    });
+  if (canAccessOpsBoard(role))
+    links.push({
+      href: "/ops/media-inspector",
+      label: "Media",
+      icon: <HardDrive className="h-5 w-5" strokeWidth={2} />,
+    });
+  if (canAccessOpsBoard(role))
+    links.push({
+      href: "/ops/role-previews",
+      label: "Role previews",
+      icon: <MonitorPlay className="h-5 w-5" strokeWidth={2} />,
+    });
+
+  if (canAccessAgent(role)) {
+    links.push({
+      href: "/agent",
+      label: "Agent",
+      icon: <Users className="h-5 w-5" strokeWidth={2} />,
+    });
+    links.push({
+      href: "/agent/draft",
+      label: "Draft link",
+      icon: <Link2 className="h-5 w-5" strokeWidth={2} />,
+    });
+  }
+
+  // Agency portal: map + profile without the Ops management suite
+  if (role === "agency") {
+    links.push({
+      href: "/map",
+      label: "Map",
+      icon: <Map className="h-5 w-5" strokeWidth={2} />,
+    });
+    links.push({
+      href: "/profile",
+      label: "Profile",
+      icon: <UserCircle className="h-5 w-5" strokeWidth={2} />,
+    });
+  }
 
   return links;
 }
@@ -166,8 +265,17 @@ export function StaffLoginCard({
   const [authError, setAuthError] = useState<string | null>(null);
   const [authLoading, setAuthLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
+  const [resetBusy, setResetBusy] = useState(false);
+  const [resetMsg, setResetMsg] = useState<string | null>(null);
 
-  const redirectAfterLogin = (role: StaffRole) => {
+  const redirectAfterLogin = (
+    role: StaffRole,
+    forcePasswordChange?: boolean
+  ) => {
+    if (forcePasswordChange) {
+      router.replace("/staff/change-password");
+      return;
+    }
     router.replace(
       homePath() ||
         (role === "agency"
@@ -178,10 +286,46 @@ export function StaffLoginCard({
               ? "/driver"
               : role === "ticketer"
                 ? "/ticketer"
-                : role === "agent"
-                  ? "/agent"
-                  : "/ops")
+                : role === "accounting"
+                  ? "/accounting/dashboard"
+                  : role === "agent"
+                    ? "/agent"
+                    : "/ops")
     );
+  };
+
+  const requestPasswordReset = async () => {
+    const email = emailInput.trim().toLowerCase();
+    if (!email || !email.includes("@")) {
+      setAuthError("Enter your email above, then request a reset.");
+      return;
+    }
+    setResetBusy(true);
+    setAuthError(null);
+    setResetMsg(null);
+    try {
+      const res = await fetch("/api/staff/request-password-reset", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+      const data = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        message?: string;
+      };
+      if (!res.ok) {
+        setAuthError(data.error || "Could not request password reset.");
+        return;
+      }
+      setResetMsg(
+        data.message ||
+          "If that email has a staff login, a reset link will be sent."
+      );
+    } catch {
+      setAuthError("Could not request password reset.");
+    } finally {
+      setResetBusy(false);
+    }
   };
 
   return (
@@ -200,8 +344,8 @@ export function StaffLoginCard({
           setGoogleLoading(true);
           setAuthError(null);
           try {
-            const { role } = await loginWithGoogle();
-            redirectAfterLogin(role);
+            const { role, forcePasswordChange } = await loginWithGoogle();
+            redirectAfterLogin(role, forcePasswordChange);
           } catch (err) {
             setAuthError(
               err instanceof Error ? err.message : "Google sign-in failed"
@@ -246,9 +390,13 @@ export function StaffLoginCard({
           e.preventDefault();
           setAuthLoading(true);
           setAuthError(null);
+          setResetMsg(null);
           try {
-            const { role } = await login(emailInput.trim(), password);
-            redirectAfterLogin(role);
+            const { role, forcePasswordChange } = await login(
+              emailInput.trim(),
+              password
+            );
+            redirectAfterLogin(role, forcePasswordChange);
           } catch (err) {
             setAuthError(
               err instanceof Error ? err.message : "Login failed"
@@ -281,6 +429,9 @@ export function StaffLoginCard({
         {authError ? (
           <p className="text-sm text-red-400">{authError}</p>
         ) : null}
+        {resetMsg ? (
+          <p className="text-sm text-emerald-400">{resetMsg}</p>
+        ) : null}
         <button
           type="submit"
           disabled={authLoading || googleLoading}
@@ -288,13 +439,20 @@ export function StaffLoginCard({
         >
           {authLoading ? "Signing in…" : "Sign in with password"}
         </button>
+        <button
+          type="button"
+          disabled={resetBusy || authLoading || googleLoading}
+          onClick={() => void requestPasswordReset()}
+          className="w-full text-center text-xs text-[#075473] hover:underline disabled:opacity-50"
+        >
+          {resetBusy ? "Sending reset…" : "Forgot password? Email me a reset link"}
+        </button>
       </form>
       <p className="mt-4 text-center text-[10px] text-zinc-500">
-        Guides and external agents use email/password only (not Google SSO).
-        Create any test staff in PocketBase → <code className="text-zinc-400">staff</code>{" "}
-        with role <code className="text-zinc-400">agent</code> /{" "}
-        <code className="text-zinc-400">guide</code> /{" "}
-        <code className="text-zinc-400">agency</code>.
+        Guides and partners use email/password on the{" "}
+        <code className="text-zinc-400">staff</code> collection (not{" "}
+        <code className="text-zinc-400">users</code>). Reset uses PocketBase{" "}
+        <code className="text-zinc-400">requestPasswordReset</code>.
       </p>
     </div>
   );
@@ -311,7 +469,7 @@ export function StaffPortalShell({
   wide = false,
 }: {
   title: string;
-  allow: (role: StaffRole | null) => boolean;
+  allow?: StaffAllowCheck;
   children: ReactNode;
   /** Wider content + header for email-style split layouts (e.g. /ops). */
   wide?: boolean;
@@ -323,10 +481,13 @@ export function StaffPortalShell({
   const isAuthenticated = useTeamAuth((s) => s.isAuthenticated);
   const email = useTeamAuth((s) => s.email);
   const role = useTeamAuth((s) => s.role);
+  const forcePasswordChange = useTeamAuth((s) => s.forcePasswordChange);
   const logout = useTeamAuth((s) => s.logout);
   const hydrateAuth = useTeamAuth((s) => s.hydrateAuth);
   const homePath = useTeamAuth((s) => s.homePath);
   const maxW = wide ? "max-w-[90rem]" : "max-w-6xl";
+  const allowRole = useMemo(() => resolveStaffAllow(allow), [allow]);
+  const onChangePasswordPage = pathname === "/staff/change-password";
 
   useEffect(() => {
     let cancelled = false;
@@ -364,10 +525,23 @@ export function StaffPortalShell({
 
   useEffect(() => {
     if (!ready || !isAuthenticated) return;
-    if (!allow(role)) {
+    if (forcePasswordChange && !onChangePasswordPage) {
+      router.replace("/staff/change-password");
+      return;
+    }
+    if (!allowRole(role)) {
       router.replace(homePath());
     }
-  }, [ready, isAuthenticated, role, allow, router, homePath]);
+  }, [
+    ready,
+    isAuthenticated,
+    role,
+    allowRole,
+    router,
+    homePath,
+    forcePasswordChange,
+    onChangePasswordPage,
+  ]);
 
   const links = linksForRole(role);
   const ribbonSummary = useMemo(
@@ -381,14 +555,20 @@ export function StaffPortalShell({
   };
 
   const isOpsRoute = pathname === "/ops" || pathname.startsWith("/ops/");
+  /** Cream shell only for inquiry master-detail (`/ops`) — other desks keep dark chrome. */
+  const isOpsInquiryShell = pathname === "/ops";
 
   return (
     <div
-      className={`flex min-h-screen flex-col bg-[#0B0F14] text-zinc-200 ${
-        isOpsRoute ? "ops-dashboard" : ""
+      className={`flex min-h-screen flex-col ${
+        isOpsInquiryShell
+          ? "ops-dashboard bg-[#faf9f4] text-zinc-800"
+          : isOpsRoute
+            ? "ops-dashboard bg-[#0B0F14] text-zinc-200"
+            : "bg-[#0B0F14] text-zinc-200"
       }`}
     >
-      <header className="sticky top-0 z-40 border-b border-zinc-800 bg-[#0A1017]/95 backdrop-blur">
+      <header className="sticky top-0 z-40 border-b border-zinc-800 bg-[#0A1017]/95 text-zinc-200 backdrop-blur">
         <div
           className={`mx-auto flex ${maxW} flex-wrap items-center gap-2 px-4 py-2 sm:px-6`}
         >
@@ -481,11 +661,21 @@ export function StaffPortalShell({
 
       <div className={`mx-auto w-full flex-1 ${maxW} px-4 py-2 sm:px-6`}>
         {!ready ? (
-          <p className="py-16 text-center text-sm text-zinc-400">Loading…</p>
+          <p
+            className={`py-16 text-center text-sm ${
+              isOpsInquiryShell ? "text-zinc-500" : "text-zinc-400"
+            }`}
+          >
+            Loading…
+          </p>
         ) : !isAuthenticated ? (
           <StaffLoginCard />
-        ) : !allow(role) ? (
-          <p className="py-16 text-center text-sm text-zinc-400">
+        ) : forcePasswordChange || !allowRole(role) ? (
+          <p
+            className={`py-16 text-center text-sm ${
+              isOpsInquiryShell ? "text-zinc-500" : "text-zinc-400"
+            }`}
+          >
             Redirecting…
           </p>
         ) : (

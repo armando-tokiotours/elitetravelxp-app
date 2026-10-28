@@ -5,6 +5,7 @@ import { BrandDocumentMeta } from "@/components/branding/BrandDocumentMeta";
 import { LazySeasonalParticlesHost } from "@/components/branding/LazySeasonalParticlesHost";
 import { BrandCharacterPreloader } from "@/components/branding/BrandCharacterPreloader";
 import { AppLinkInterceptor } from "@/components/navigation/AppLinkInterceptor";
+import { AppProviders } from "@/components/providers/AppProviders";
 import { BRAND_DESCRIPTION, BRAND_TITLE, BRAND_URL } from "@/lib/brand";
 import "./globals.css";
 
@@ -102,9 +103,11 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <BrandDocumentMeta />
         <LazySeasonalParticlesHost />
         <AppLinkInterceptor />
-        <main id="app-main" className="flex min-h-0 flex-1 flex-col">
-          {children}
-        </main>
+        <AppProviders>
+          <main id="app-main" className="flex min-h-0 flex-1 flex-col">
+            {children}
+          </main>
+        </AppProviders>
       </body>
     </html>
   );

@@ -7,6 +7,10 @@ import { randomBytes } from "crypto";
 import type PocketBase from "pocketbase";
 import { getAdminPocketBase } from "@/lib/pocketbase/admin";
 import {
+  formatGuestSpecialRequirementsSummary,
+  hasGuestSpecialRequirements,
+} from "@/lib/guestSpecialRequirements";
+import {
   loadOpsGuestRequirements,
   type OpsGuestRequirements,
 } from "@/lib/opsGuestRequirements";
@@ -271,7 +275,13 @@ export async function loadVendorViewByToken(
         dayItinerary: itinerary,
         meetingPoint: meeting,
         emergencyPhone: "+81 (Ops will confirm on assignment)",
-        mobilityNotes: reqs?.specialMobility || reqs?.specialNotes || "None noted",
+        mobilityNotes: hasGuestSpecialRequirements(
+          reqs?.guestSpecialRequirements
+        )
+          ? formatGuestSpecialRequirementsSummary(
+              reqs?.guestSpecialRequirements
+            )
+          : reqs?.specialMobility || reqs?.specialNotes || "None noted",
         guideStatus: guideConfirmStaffLabel(guideStatus),
       },
     };
@@ -361,8 +371,13 @@ export async function loadVendorViewByToken(
           reqs?.startTime ||
           "Not set",
         guestName: reqs?.guestName || "Guest party",
-        mobilityNotes:
-          reqs?.specialMobility || reqs?.specialNotes || "None",
+        mobilityNotes: hasGuestSpecialRequirements(
+          reqs?.guestSpecialRequirements
+        )
+          ? formatGuestSpecialRequirementsSummary(
+              reqs?.guestSpecialRequirements
+            )
+          : reqs?.specialMobility || reqs?.specialNotes || "None",
         language: reqs?.tourLanguage || "English",
         dayItinerary: itinerary.length ? itinerary : ["Itinerary pending"],
         meetingPoint:

@@ -1,12 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
 import { Search } from "lucide-react";
 import { AppShell } from "@/components/layout/AppShell";
 import { BoxGradingGlow } from "@/components/branding/BoxGradingGlow";
 import { ExplainerTriggerButton } from "@/components/builder/ExplainerTriggerButton";
+import { FaqBackButton, FaqBackButtonFallback } from "./FaqBackButton";
 
 /** Static FAQ topics — extend here (no PocketBase). */
 const faqData = [
@@ -147,6 +148,11 @@ export function FAQPageClient() {
     <AppShell dark title="FAQ" subtitle="TOKIOTOURS">
       <div className="min-h-[calc(100dvh-4rem)] bg-[#0A1017] px-4 pb-16 pt-8 text-white sm:px-6 sm:pt-10">
         <div className="mx-auto w-full max-w-3xl">
+          <div className="mb-6">
+            <Suspense fallback={<FaqBackButtonFallback />}>
+              <FaqBackButton />
+            </Suspense>
+          </div>
           <h1 className="font-godiva text-3xl text-[#F6A724]">
             Frequently Asked Questions
           </h1>

@@ -3,22 +3,43 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { Ticket } from "lucide-react";
 import { ExperienceProfilerModal } from "@/components/quiz/ExperienceProfilerModal";
 import { useBuilderStore } from "@/store/useBuilderStore";
 import { useItineraryStore } from "@/store/useItineraryStore";
 import { useQuizStore } from "@/store/useQuizStore";
+import {
+  BUILDER_ROUTES,
+  journeyBuilderHref,
+  journeyItineraryHref,
+} from "@/lib/builderRoutes";
+import { bookingBoundRef } from "@/lib/bookingKindGuard";
 
 export function BottomNav() {
   const pathname = usePathname();
   const [quizOpen, setQuizOpen] = useState(false);
   const tripMode = useBuilderStore((s) => s.tripMode);
+  const confirmedBookingRef = useBuilderStore((s) => s.confirmedBookingRef);
   const experienceProfile = useBuilderStore((s) => s.experienceProfile);
   const setExperienceProfile = useBuilderStore((s) => s.setExperienceProfile);
   const isQuizCompleted = useQuizStore((s) => s.isQuizCompleted);
   const clearUserProfile = useItineraryStore((s) => s.clearUserProfile);
-  const isBuilderE = pathname.startsWith("/builder-e");
-  const isSingleDay =
-    tripMode === "single_day" || pathname.startsWith("/builder-single");
+  const isBuilderE =
+    pathname.startsWith("/builder-e") ||
+    pathname.startsWith("/builder/vip-access");
+  // Route wins inside a builder; elsewhere the active booking's tripMode.
+  const onSingleBuilderPath =
+    pathname.startsWith("/builder-single") ||
+    pathname.startsWith("/builder/day-pass");
+  const onMultiBuilderPath =
+    pathname.startsWith("/builder/japan-journey") ||
+    pathname === "/builder" ||
+    pathname.startsWith("/builder/itinerary");
+  const isSingleDay = onSingleBuilderPath
+    ? true
+    : onMultiBuilderPath
+      ? false
+      : tripMode === "single_day";
 
   // Scrub stale Match Quiz profiles left by Pre-Elite hydrate / old sessions
   useEffect(() => {
@@ -38,21 +59,38 @@ export function BottomNav() {
     return unsub;
   }, [isQuizCompleted, experienceProfile, setExperienceProfile, clearUserProfile]);
 
+  // Confirmed PNR pins ?ref= (saved booking, not blank draft).
+  const singleDayBoundRef =
+    isSingleDay && tripMode === "single_day"
+      ? bookingBoundRef(confirmedBookingRef)
+      : null;
+  const multiDayBoundRef =
+    !isSingleDay && !isBuilderE && tripMode === "multi_day"
+      ? bookingBoundRef(confirmedBookingRef)
+      : null;
   const builderHref = isBuilderE
-    ? "/builder-e"
+    ? BUILDER_ROUTES.vipAccess
     : isSingleDay
-      ? "/builder-single"
-      : "/builder";
+      ? singleDayBoundRef
+        ? journeyBuilderHref(singleDayBoundRef, { type: "single_day" })
+        : BUILDER_ROUTES.dayPass
+      : multiDayBoundRef
+        ? journeyBuilderHref(multiDayBoundRef, { type: "multi_day" })
+        : BUILDER_ROUTES.japanJourney;
   const builderLabel = isBuilderE
     ? "VIP Access"
     : isSingleDay
       ? "1-Day Pass"
       : "Journey";
   const itineraryHref = isBuilderE
-    ? "/builder-e/dossier"
+    ? BUILDER_ROUTES.vipAccessDossier
     : isSingleDay
-      ? "/builder-single/itinerary"
-      : "/builder/itinerary";
+      ? singleDayBoundRef
+        ? journeyItineraryHref(singleDayBoundRef, { type: "single_day" })
+        : BUILDER_ROUTES.dayPassItinerary
+      : multiDayBoundRef
+        ? journeyItineraryHref(multiDayBoundRef, { type: "multi_day" })
+        : BUILDER_ROUTES.japanJourneyItinerary;
 
   type NavTab =
     | {
@@ -71,7 +109,7 @@ export function BottomNav() {
 
   const allTabs: NavTab[] = [
     {
-      href: "/builder-e",
+      href: BUILDER_ROUTES.vipAccess,
       label: "VIP Access",
       icon: BuilderIcon,
       kind: "link",
@@ -116,7 +154,7 @@ export function BottomNav() {
 
   return (
     <>
-      <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-white/10 bg-[#0D1117]/85 backdrop-blur-md lg:hidden">
+      <nav className="magic-nav magic-nav--dock fixed inset-x-0 bottom-0 z-40 border-t lg:hidden">
         <ul className="mx-auto flex max-w-lg items-stretch justify-around px-0.5 pb-[env(safe-area-inset-bottom)]">
           {tabs.map((tab) => {
             const Icon = tab.icon;
@@ -127,7 +165,7 @@ export function BottomNav() {
                     type="button"
                     onClick={() => setQuizOpen(true)}
                     className={`flex w-full flex-col items-center gap-0.5 px-0.5 py-2.5 text-[0.6rem] ${
-                      quizOpen ? "text-white" : "text-zinc-400"
+                      quizOpen ? "text-white" : "text-white/80"
                     }`}
                     aria-pressed={quizOpen}
                   >
@@ -141,27 +179,32 @@ export function BottomNav() {
             }
             const active =
               tab.match === "builderE"
-                ? pathname.startsWith("/builder-e") &&
-                  !pathname.startsWith("/builder-e/dossier")
+                ? (pathname.startsWith("/builder-e") ||
+                    pathname.startsWith("/builder/vip-access")) &&
+                  !pathname.startsWith("/builder-e/dossier") &&
+                  !pathname.startsWith("/builder/vip-access/dossier")
                 : tab.match === "builder"
                   ? pathname === "/builder" ||
-                    (pathname.startsWith("/builder-single") &&
-                      !pathname.startsWith("/builder-single/itinerary"))
+                    ((pathname.startsWith("/builder-single") ||
+                      pathname.startsWith("/builder/day-pass") ||
+                      pathname.startsWith("/builder/japan-journey")) &&
+                      !pathname.includes("/itinerary"))
                   : tab.match === "itinerary"
                     ? pathname.startsWith("/builder-single/itinerary") ||
+                      pathname.startsWith("/builder/day-pass/itinerary") ||
+                      pathname.startsWith("/builder/japan-journey/itinerary") ||
                       pathname.startsWith("/builder/itinerary") ||
-                      pathname.startsWith("/builder-e/dossier")
+                      pathname.startsWith("/builder-e/dossier") ||
+                      pathname.startsWith("/builder/vip-access/dossier")
                     : tab.match === "explore"
                       ? pathname.startsWith("/discover")
-                      : tab.href === "/builder"
-                        ? pathname === "/builder"
-                        : pathname.startsWith(tab.href);
+                      : pathname.startsWith(tab.href);
             return (
               <li key={`${tab.href}-${tab.label}`} className="flex-1">
                 <Link
                   href={tab.href}
                   className={`flex flex-col items-center gap-0.5 px-0.5 py-2.5 text-[0.6rem] ${
-                    active ? "text-white" : "text-zinc-400"
+                    active ? "text-white" : "text-white/80"
                   }`}
                 >
                   <Icon active={active} />
@@ -187,7 +230,7 @@ function BuilderIcon({ active }: { active: boolean }) {
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
       <path
         d="M4 7h16M4 12h10M4 17h14"
-        stroke={active ? "#075473" : "#a1a1aa"}
+        stroke={active ? "#D91147" : "rgba(255,255,255,0.8)"}
         strokeWidth="1.8"
         strokeLinecap="round"
       />
@@ -196,7 +239,7 @@ function BuilderIcon({ active }: { active: boolean }) {
 }
 
 function DiscoverIcon({ active }: { active: boolean }) {
-  const stroke = active ? "#075473" : "#a1a1aa";
+  const stroke = active ? "#D91147" : "rgba(255,255,255,0.8)";
   return (
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
       <circle cx="12" cy="12" r="9" stroke={stroke} strokeWidth="1.8" />
@@ -212,28 +255,17 @@ function DiscoverIcon({ active }: { active: boolean }) {
 
 function ItineraryIcon({ active }: { active: boolean }) {
   return (
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
-      <rect
-        x="5"
-        y="3.5"
-        width="14"
-        height="17"
-        rx="2"
-        stroke={active ? "#075473" : "#a1a1aa"}
-        strokeWidth="1.8"
-      />
-      <path
-        d="M8 8h8M8 12h8M8 16h5"
-        stroke={active ? "#075473" : "#a1a1aa"}
-        strokeWidth="1.6"
-        strokeLinecap="round"
-      />
-    </svg>
+    <Ticket
+      size={22}
+      color={active ? "#D91147" : "rgba(255,255,255,0.8)"}
+      strokeWidth={1.8}
+      aria-hidden
+    />
   );
 }
 
 function QuizIcon({ active }: { active: boolean }) {
-  const stroke = active ? "#075473" : "#a1a1aa";
+  const stroke = active ? "#D91147" : "rgba(255,255,255,0.8)";
   return (
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
       <path

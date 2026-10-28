@@ -5,18 +5,17 @@ import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import { ArrowLeft, Check } from "lucide-react";
 import { LazyVideo } from "@/components/ui/LazyVideo";
-import { useBuilderStore, type SpecialNeedId } from "@/store/useBuilderStore";
+import { useBuilderStore } from "@/store/useBuilderStore";
 import { FieldLabel } from "../ui";
 import { type PaceId } from "@/lib/travelPace";
 import { useSiteBrandingStore } from "@/store/useSiteBrandingStore";
 import { PaceDetailModal } from "@/components/builder/modals/PaceDetailModal";
 import { GuestCountStrip } from "@/components/branding/GuestCountStrip";
-
-const SPECIAL_NEED_OPTIONS: { id: SpecialNeedId; label: string }[] = [
-  { id: "reduced_mobility", label: "Reduced mobility" },
-  { id: "baby_car_seat", label: "Kid / baby car seat" },
-  { id: "senior", label: "Senior" },
-];
+import { GuestRequirementsSelector } from "@/components/builder/GuestRequirementsSelector";
+import {
+  guestSpecialRequirementsChoicesComplete,
+  guestSpecialRequirementsNotesValid,
+} from "@/lib/guestSpecialRequirements";
 
 /**
  * Pace + guest party configure modal (“Configure Trip Details”).
@@ -32,7 +31,18 @@ export function DurationEditorModal({
   const adults = useBuilderStore((s) => s.adults);
   const children = useBuilderStore((s) => s.children);
   const travelPace = useBuilderStore((s) => s.travelPace);
-  const specialNeeds = useBuilderStore((s) => s.specialNeeds);
+  const guestSpecialRequirements = useBuilderStore(
+    (s) => s.guestSpecialRequirements
+  );
+  const guestSpecialRequirementsAcked = useBuilderStore(
+    (s) => s.guestSpecialRequirementsAcked
+  );
+  const setGuestSpecialRequirements = useBuilderStore(
+    (s) => s.setGuestSpecialRequirements
+  );
+  const ackGuestSpecialRequirements = useBuilderStore(
+    (s) => s.ackGuestSpecialRequirements
+  );
   const setAdults = useBuilderStore((s) => s.setAdults);
   const setChildren = useBuilderStore((s) => s.setChildren);
   const setTravelPace = useBuilderStore((s) => s.setTravelPace);
@@ -46,9 +56,18 @@ export function DurationEditorModal({
   const [paceModal, setPaceModal] = useState<PaceId | null>(null);
 
   const totalGuests = adults + children;
-  const specialNeedsAnswered = specialNeeds.length > 0;
+  const guestReqsNotesOk = guestSpecialRequirementsNotesValid(
+    guestSpecialRequirements
+  );
+  const guestReqsChoicesOk = guestSpecialRequirementsChoicesComplete(
+    guestSpecialRequirements
+  );
   const canDone =
-    travelPace !== null && totalGuests > 0 && specialNeedsAnswered;
+    travelPace !== null &&
+    totalGuests > 0 &&
+    guestReqsChoicesOk &&
+    guestSpecialRequirementsAcked &&
+    guestReqsNotesOk;
 
   useEffect(() => {
     setMounted(true);
@@ -197,7 +216,19 @@ export function DurationEditorModal({
                   Used for airport transfers, vehicles, and hotel room guidance.
                 </p>
 
-                <SpecialNeedsAccordion key={open ? "mobility-open" : "mobility-closed"} />
+                <div className="mt-3 space-y-2">
+                  <FieldLabel>Dietary &amp; mobility</FieldLabel>
+                  {!guestReqsChoicesOk ? (
+                    <p className="text-[11px] text-amber-200/80">
+                      Confirm Dietary and Mobility with Yes or No to continue.
+                    </p>
+                  ) : null}
+                  <GuestRequirementsSelector
+                    value={guestSpecialRequirements}
+                    onChange={setGuestSpecialRequirements}
+                    onAck={ackGuestSpecialRequirements}
+                  />
+                </div>
               </div>
             </div>
 
@@ -267,112 +298,6 @@ function GuestStepper({
           +
         </button>
       </div>
-    </div>
-  );
-}
-
-function SpecialNeedsAccordion() {
-  const [open, setOpen] = useState(false);
-  const specialNeeds = useBuilderStore((s) => s.specialNeeds);
-  const toggleSpecialNeed = useBuilderStore((s) => s.toggleSpecialNeed);
-  const noNeed = specialNeeds.includes("none");
-  const activeNeeds = specialNeeds.filter((id) => id !== "none");
-  const answered = specialNeeds.length > 0;
-
-  const pickNeed = (id: SpecialNeedId) => {
-    toggleSpecialNeed(id);
-    if (id === "none") {
-      window.setTimeout(() => setOpen(false), 180);
-    }
-  };
-
-  return (
-    <div className="mt-3 overflow-visible">
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        aria-expanded={open}
-        aria-label={
-          open
-            ? "Hide special mobility options"
-            : "Show special mobility options"
-        }
-        className={`relative flex shrink-0 items-center gap-1.5 rounded-full bg-zinc-900/60 px-4 py-1.5 text-xs font-bold uppercase tracking-wider text-white transition ${
-          !answered
-            ? "z-[1] border border-white/70 animate-locations-help-glow"
-            : open
-              ? "border border-white/40 bg-white/10"
-              : noNeed
-                ? "border border-emerald-500/40 text-emerald-400"
-                : "border border-white/30"
-        }`}
-      >
-        {!answered ? (
-          <span
-            className="pointer-events-none absolute inset-0 animate-locations-help-ring rounded-full border border-white/80"
-            aria-hidden
-          />
-        ) : null}
-        <span className="relative z-[1]">Special mobility</span>
-        {answered && !open ? (
-          <span className="relative z-[1] rounded-full bg-white/15 px-1.5 py-0.5 text-[9px]">
-            {noNeed ? "OK" : activeNeeds.length}
-          </span>
-        ) : null}
-      </button>
-
-      <AnimatePresence initial={false}>
-        {open ? (
-          <motion.div
-            key="special-mobility-panel"
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: "auto", opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.28, ease: "easeInOut" }}
-            className="overflow-hidden"
-          >
-            <div className="mt-2 space-y-2">
-              <p className="text-[11px] leading-snug text-zinc-400">
-                Tap any that apply, or select{" "}
-                <span className="font-semibold text-zinc-300">No need</span> to
-                continue.
-              </p>
-              <div className="grid grid-cols-2 gap-2">
-                {SPECIAL_NEED_OPTIONS.map((opt) => {
-                  const on = specialNeeds.includes(opt.id);
-                  return (
-                    <button
-                      key={opt.id}
-                      type="button"
-                      aria-pressed={on}
-                      onClick={() => pickNeed(opt.id)}
-                      className={`rounded-full border px-2 py-2 text-center text-[11px] font-semibold leading-snug transition sm:text-xs ${
-                        on
-                          ? "border-amber-400/70 bg-amber-500/10 text-white"
-                          : "border-white/20 bg-zinc-900/50 text-zinc-300 hover:border-white/35"
-                      }`}
-                    >
-                      {opt.label}
-                    </button>
-                  );
-                })}
-                <button
-                  type="button"
-                  aria-pressed={noNeed}
-                  onClick={() => pickNeed("none")}
-                  className={`rounded-full border px-2 py-2 text-center text-[11px] font-semibold transition sm:text-xs ${
-                    noNeed
-                      ? "border-emerald-500/60 bg-emerald-500/15 text-emerald-300"
-                      : "border-white/20 bg-zinc-900/50 text-zinc-300 hover:border-white/35"
-                  }`}
-                >
-                  No need
-                </button>
-              </div>
-            </div>
-          </motion.div>
-        ) : null}
-      </AnimatePresence>
     </div>
   );
 }

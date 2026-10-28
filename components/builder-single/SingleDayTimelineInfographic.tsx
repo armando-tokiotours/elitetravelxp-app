@@ -8,7 +8,9 @@ import {
   resolveItineraryStopKind,
   type ItineraryStopKind,
 } from "@/components/dossier/ItineraryStopTickets";
-import { QUIZ_VIBE } from "@/lib/experienceProfiler";
+import {
+  itineraryStopBadgeLabel,
+} from "@/lib/experiencesPlaces";
 import {
   formatClock12h,
   type TimedRouteItem,
@@ -35,7 +37,8 @@ function resolveStopKind(
   item: PbTour | undefined
 ): TimelineStopKind {
   return resolveItineraryStopKind({
-    category: item?.category,
+    category: stop.category || item?.category,
+    entry_type: stop.entry_type || item?.entry_type,
     access_type: item?.access_type || stop.access_type,
     is_self_guided: item?.is_self_guided,
     is_extra: stop.is_extra,
@@ -44,30 +47,8 @@ function resolveStopKind(
   });
 }
 
-function vibeLabelFromTags(tags: string[] | undefined): string {
-  if (!tags?.length) return "Experience";
-  const first = String(tags[0] || "").toLowerCase();
-  const known = QUIZ_VIBE.find((o) => o.id === first);
-  if (known) return known.label;
-  if (first.includes("food") || first.includes("night")) return "Food & Nightlife";
-  if (first.includes("modern") || first.includes("art"))
-    return "Modern & Pop Culture";
-  if (first.includes("nature")) return "Nature & Scenery";
-  if (first.includes("culture") || first.includes("heritage"))
-    return "Culture & Heritage";
-  return tags[0] || "Experience";
-}
-
-function ringToneFromTags(tags: string[] | undefined): "red" | "cyan" {
-  const first = String(tags?.[0] || "").toLowerCase();
-  if (
-    first.includes("culture") ||
-    first.includes("heritage") ||
-    first.includes("nature")
-  ) {
-    return "red";
-  }
-  return "cyan";
+function ringToneFromKind(kind: TimelineStopKind): "red" | "cyan" {
+  return kind === "tour" ? "red" : "cyan";
 }
 
 
@@ -90,13 +71,13 @@ export function enrichTimelineStops(
 ): TimelineStop[] {
   return timed.map((stop) => {
     const item = catalogById.get(stop.tourId);
-    const tags = item?.vibe_tags;
     const desc = String(item?.description || "").trim();
     const route = String(item?.route || "").trim();
     const address =
       typeof item?.google_location?.address === "string"
         ? item.google_location.address.trim()
         : "";
+    const stopKind = resolveStopKind(stop, item);
     return {
       ...stop,
       thumbUrl: thumbFor(stop.tourId),
@@ -107,9 +88,13 @@ export function enrichTimelineStops(
         : undefined,
       route: route || undefined,
       address,
-      vibeLabel: vibeLabelFromTags(tags),
-      ringTone: ringToneFromTags(tags),
-      stopKind: resolveStopKind(stop, item),
+      vibeLabel: itineraryStopBadgeLabel({
+        category: stop.category || item?.category,
+        entry_type: stop.entry_type || item?.entry_type,
+        is_extra: stop.is_extra,
+      }),
+      ringTone: ringToneFromKind(stopKind),
+      stopKind,
     };
   });
 }
@@ -174,7 +159,7 @@ export function SingleDayTimelineInfographic({
         className={
           isPrint
             ? "rounded-2xl border border-dashed border-zinc-300 px-4 py-8 text-center text-sm text-zinc-500"
-            : "rounded-2xl border border-dashed border-white/15 bg-[#0D1117]/60 px-4 py-8 text-center text-sm text-white/50"
+            : "rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500"
         }
       >
         No experiences scheduled yet. Continue editing to add stops.
@@ -184,33 +169,35 @@ export function SingleDayTimelineInfographic({
 
   return (
     <div
-      className={`sd-timeline print:break-inside-avoid ${
+      className={`sd-timeline print:break-inside-avoid px-8 sm:px-10 ${
         isPrint
           ? "sd-timeline--print text-white"
-          : "text-white print:text-black"
+          : "text-slate-900 print:text-black"
       }`}
     >
-      <header className="relative mb-5 text-center md:mb-8">
-        {editHref && !isPrint ? (
-          <Link
-            href={editHref}
-            aria-label="Edit Itinerary"
-            title="Edit Itinerary"
-            className="absolute top-0 right-0 z-10 rounded-md p-1.5 text-zinc-500 transition-colors hover:text-[#D91147] print:hidden"
-          >
-            <SquarePen className="h-[18px] w-[18px]" strokeWidth={2} />
-          </Link>
-        ) : null}
-        <p className="text-[0.65rem] font-semibold uppercase tracking-[0.28em] text-white print:text-gray-900">
-          Day Timeline
-        </p>
-        <p className="mt-2 font-mono text-sm font-bold tracking-wide text-white print:text-gray-900 sm:text-base">
+      <header className="mb-5 md:mb-8">
+        <div className="mb-3 flex items-center justify-between gap-2 border-b border-dotted border-slate-300 pb-2">
+          <p className="text-[0.8125rem] font-semibold uppercase tracking-[0.35em] text-[#075473] print:text-gray-900">
+            Day Timeline
+          </p>
+          {editHref && !isPrint ? (
+            <Link
+              href={editHref}
+              aria-label="Edit Itinerary"
+              title="Edit Itinerary"
+              className="shrink-0 rounded-md p-1.5 text-zinc-500 transition-colors hover:text-[#D91147] print:hidden"
+            >
+              <SquarePen className="h-[18px] w-[18px]" strokeWidth={2} />
+            </Link>
+          ) : null}
+        </div>
+        <p className="mt-2 font-mono text-sm font-bold tracking-wide text-slate-900 print:text-gray-900 sm:text-base">
           {windowLabel}
         </p>
         {cityLabel || placeName ? (
           <p
             className={`mt-1 text-xs ${
-              isPrint ? "text-white/60" : "text-white/45"
+              isPrint ? "text-white/60" : "text-slate-500"
             }`}
           >
             {routeHint}
@@ -274,8 +261,8 @@ export function SingleDayTimelineInfographic({
                 <div
                   className={`pointer-events-none absolute top-8 hidden max-w-[calc(50%-2rem)] md:block ${
                     branchLeft
-                      ? "left-[calc(50%+1.75rem)] text-left"
-                      : "right-[calc(50%+1.75rem)] text-right"
+                      ? "left-[calc(50%+1.75rem)] pr-8 text-left sm:pr-12"
+                      : "right-[calc(50%+1.75rem)] pl-8 text-right sm:pl-12"
                   }`}
                 >
                   <p
@@ -287,7 +274,7 @@ export function SingleDayTimelineInfographic({
                   </p>
                   <p
                     className={`mt-1 whitespace-pre-line text-xs leading-relaxed ${
-                      isPrint ? "text-zinc-600" : "text-white/55"
+                      isPrint ? "text-zinc-600" : "text-slate-600"
                     }`}
                   >
                     {routeText}
@@ -302,7 +289,7 @@ export function SingleDayTimelineInfographic({
               >
                 <p
                   className={`mb-2 font-mono text-xs font-bold tracking-wide sm:text-sm ${
-                    isPrint ? "text-[#B45309]" : "text-[#F6A724]"
+                    isPrint ? "text-[#B45309]" : "text-[#075473]"
                   }`}
                 >
                   {formatTimeSlotRange(stop.startTime, stop.endTime)}

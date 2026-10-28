@@ -9,7 +9,8 @@ export default function BuilderSingleLayout({
   return (
     <>
       <AppNavDock context="SINGLE" />
-      <main className="pb-20 sm:pb-0 sm:pl-20">{children}</main>
+      {/* Rail is lg-only (w-16); below lg the top chrome + bottom dock own nav, so no left reserve. pl-16 exactly matches the rail — no dead gutter. */}
+      <main className="pb-20 lg:pb-0 lg:pl-16">{children}</main>
     </>
   );
 }

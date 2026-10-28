@@ -86,6 +86,48 @@ export function isTourPartiallyPaid(input: {
   return deriveTourPaymentStatus(input) === "PARTIALLY_PAID";
 }
 
+/**
+ * Top-right builder badge label from saved payment state.
+ * Returns null for a truly unpaid draft (caller keeps the DRAFT badge).
+ * Fee-only → `Fee credit applied (€60)`; ≥30% of package → `30% deposit paid`.
+ */
+export function guestPaymentBadgeLabel(input: {
+  feeCreditEur?: number | null;
+  totalPaidEur?: number | null;
+  estimatedTotalEur?: number | null;
+  tourPaymentStatus?: string | null;
+  conciergeFeePaid?: boolean | null;
+  paymentConfirmed?: boolean | null;
+}): string | null {
+  const feeCredit = roundEur(Number(input.feeCreditEur) || 0);
+  const totalPaid = Math.max(
+    roundEur(Number(input.totalPaidEur) || 0),
+    feeCredit
+  );
+  const packageTotal = roundEur(Number(input.estimatedTotalEur) || 0);
+  const status = deriveTourPaymentStatus({
+    concierge_fee_paid:
+      Boolean(input.conciergeFeePaid) || feeCredit > 0 || undefined,
+    payment_confirmed: input.paymentConfirmed,
+    tour_payment_status: input.tourPaymentStatus,
+    concierge_fee_amount: feeCredit || null,
+  });
+  if (status === "FULLY_PAID") return "Fully paid ✓";
+  if (packageTotal > 0 && totalPaid > 0) {
+    const badge = paymentBadgeForAmount(totalPaid, packageTotal);
+    if (badge.fullyPaid) return "Fully paid ✓";
+    if (badge.milestone30Met) return `30% deposit paid (€${totalPaid})`;
+  }
+  if (status === "PARTIALLY_PAID" && totalPaid > 0) {
+    return `30% deposit paid (€${totalPaid})`;
+  }
+  if (status === "FEE_PAID" || feeCredit > 0) {
+    return `Fee credit applied (€${feeCredit || totalPaid || 60})`;
+  }
+  if (totalPaid > 0) return `Paid (€${totalPaid})`;
+  return null;
+}
+
 /** Toolbar / sticky CTA when fee not yet paid. */
 export const CTA_SECURE_DEPOSIT = "Secure Dates";
 

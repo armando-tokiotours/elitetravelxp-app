@@ -1,15 +1,55 @@
 /**
  * Local VPS ticket voucher storage (filesystem under public/uploads/tickets).
  *
- * Disk:   {cwd}/public/uploads/tickets/{PNR}/{itemId}/{timestamp}-{file}.pdf
- * Public: /uploads/tickets/{PNR}/{itemId}/{timestamp}-{file}.pdf
+ * Disk:   {cwd}/public/uploads/tickets/{PNR}/{itemId}/{timestamp}-{file}.{pdf|jpg|…}
+ * Public: /uploads/tickets/{PNR}/{itemId}/{timestamp}-{file}.{pdf|jpg|…}
  *
- * Docker: mount a host volume on /app/public/uploads/tickets so PDFs survive
+ * Docker: mount a host volume on /app/public/uploads/tickets so files survive
  * container rebuilds (see docker-compose.vps.yml). No cloud token required.
  */
 
 import { mkdir, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
+
+export const TICKET_VOUCHER_MIME = new Set([
+  "application/pdf",
+  "image/jpeg",
+  "image/jpg",
+  "image/png",
+  "image/webp",
+  "image/gif",
+]);
+
+export function isTicketVoucherMime(type: string | null | undefined): boolean {
+  const t = String(type || "")
+    .trim()
+    .toLowerCase();
+  if (!t) return true; // allow empty (some browsers omit)
+  return TICKET_VOUCHER_MIME.has(t);
+}
+
+function extensionForTicketFile(
+  filename: string,
+  mime?: string | null
+): string {
+  const fromName = path.extname(filename).toLowerCase();
+  if (
+    fromName === ".pdf" ||
+    fromName === ".jpg" ||
+    fromName === ".jpeg" ||
+    fromName === ".png" ||
+    fromName === ".webp" ||
+    fromName === ".gif"
+  ) {
+    return fromName === ".jpeg" ? ".jpg" : fromName;
+  }
+  const m = String(mime || "").toLowerCase();
+  if (m === "image/png") return ".png";
+  if (m === "image/webp") return ".webp";
+  if (m === "image/gif") return ".gif";
+  if (m === "image/jpeg" || m === "image/jpg") return ".jpg";
+  return ".pdf";
+}
 
 const MAX_TICKET_PDF_BYTES = 15 * 1024 * 1024;
 const PUBLIC_URL_PREFIX = "/uploads/tickets";
@@ -48,9 +88,11 @@ export function ticketVoucherPublicPath(opts: {
 }): string {
   const pnr = sanitizePathSegment(opts.pnr).toUpperCase() || "PNR";
   const itemId = sanitizePathSegment(opts.itemId) || "item";
-  const base = sanitizePathSegment(opts.filename) || "ticket.pdf";
-  const withExt = /\.pdf$/i.test(base) ? base : `${base}.pdf`;
-  return `${PUBLIC_URL_PREFIX}/${pnr}/${itemId}/${Date.now()}-${withExt}`;
+  const rawName = String(opts.filename || "ticket.pdf").trim() || "ticket.pdf";
+  const ext = extensionForTicketFile(rawName);
+  const stem =
+    sanitizePathSegment(rawName.replace(/\.[^.]+$/, "")) || "ticket";
+  return `${PUBLIC_URL_PREFIX}/${pnr}/${itemId}/${Date.now()}-${stem}${ext}`;
 }
 
 /** @deprecated Prefer ticketVoucherPublicPath — same shape without leading slash historically. */
@@ -104,22 +146,25 @@ export async function uploadTicketPdfBlob(opts: {
   if (size > MAX_TICKET_PDF_BYTES) {
     throw new Error("PDF exceeds 15MB limit");
   }
+  const mime =
+    opts.file instanceof File ? opts.file.type : null;
+  if (opts.file instanceof File && mime && !isTicketVoucherMime(mime)) {
+    throw new Error("Only PDF or image vouchers are accepted (PDF/JPG/PNG/WebP)");
+  }
   const filename =
     String(opts.filename || "").trim() ||
     (opts.file instanceof File ? opts.file.name : "ticket.pdf") ||
     "ticket.pdf";
-  if (
-    opts.file instanceof File &&
-    opts.file.type &&
-    opts.file.type !== "application/pdf"
-  ) {
-    throw new Error("Only PDF vouchers are accepted");
-  }
+  const withExt = (() => {
+    const ext = extensionForTicketFile(filename, mime);
+    if (/\.(pdf|jpe?g|png|webp|gif)$/i.test(filename)) return filename;
+    return `${filename}${ext}`;
+  })();
 
   const publicPath = ticketVoucherPublicPath({
     pnr: opts.pnr,
     itemId: opts.itemId,
-    filename,
+    filename: withExt,
   });
   const abs = publicUrlToAbsolutePath(publicPath);
   if (!abs) throw new Error("Invalid ticket storage path");
@@ -131,7 +176,7 @@ export async function uploadTicketPdfBlob(opts: {
   return {
     url: publicPath,
     pathname: publicPath,
-    filename: filename.slice(0, 240),
+    filename: withExt.slice(0, 240),
   };
 }
 

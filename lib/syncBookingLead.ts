@@ -49,6 +49,53 @@ function normalizeRef(ref: string): string {
     .toUpperCase();
 }
 
+/** Guest contact for Ops — Pre-Elite / itinerary profile is the source of truth. */
+async function resolveGuestContact(opts?: {
+  guestName?: string;
+  whatsapp?: string;
+}): Promise<{ guestName: string; whatsapp: string }> {
+  let guestName = String(opts?.guestName || "").trim();
+  let whatsapp = String(opts?.whatsapp || "").trim();
+  if ((!guestName || !whatsapp) && typeof window !== "undefined") {
+    try {
+      const { usePreBuilderStore } = await import("@/store/usePreBuilderStore");
+      const pre = usePreBuilderStore.getState();
+      if (!guestName) {
+        guestName = String(
+          pre.fullName || pre.lastPayload?.fullName || ""
+        ).trim();
+      }
+      if (!whatsapp) {
+        whatsapp = String(
+          pre.whatsapp || pre.lastPayload?.whatsapp || ""
+        ).trim();
+      }
+    } catch {
+      /* SSR / store unavailable */
+    }
+  }
+  return { guestName, whatsapp };
+}
+
+/** Embed contact keys Ops Guest Requirements already knows how to read. */
+function withGuestContactSelections(
+  selections: Record<string, unknown>,
+  contact: { guestName: string; whatsapp: string }
+): Record<string, unknown> {
+  const next = { ...selections };
+  if (contact.guestName) {
+    next.guestName = contact.guestName;
+    next.fullName = contact.guestName;
+    next.contactName = contact.guestName;
+  }
+  if (contact.whatsapp) {
+    next.whatsapp = contact.whatsapp;
+    next.guestPhone = contact.whatsapp;
+    next.contactPhone = contact.whatsapp;
+  }
+  return next;
+}
+
 function readLeadList(raw: string | null): CachedBookingLead[] {
   if (!raw) return [];
   try {
@@ -156,6 +203,48 @@ function quoteFields(quote?: QuoteSlice): {
   };
 }
 
+/**
+ * Fire-and-forget (or awaited) multi-day draft flush used by Builder M
+ * modal Done / Save & View. No-ops without email+ref — never fakes success.
+ */
+export async function persistMultiDayDraft(opts?: {
+  cityNames?: Record<string, string>;
+  status?: BookingLeadStatus;
+  quote?: QuoteSlice;
+}): Promise<{ ok: boolean; reason?: string; bookingRef?: string }> {
+  const [{ useBuilderStore }, { useItineraryStore }, { usePreBuilderStore }] =
+    await Promise.all([
+      import("@/store/useBuilderStore"),
+      import("@/store/useItineraryStore"),
+      import("@/store/usePreBuilderStore"),
+    ]);
+  const builder = useBuilderStore.getState();
+  const bookingRef = normalizeRef(
+    builder.confirmedBookingRef || builder.tempBookingRef || ""
+  );
+  const email = String(
+    useItineraryStore.getState().clientEmail ||
+      usePreBuilderStore.getState().email ||
+      usePreBuilderStore.getState().lastPayload?.email ||
+      ""
+  )
+    .trim()
+    .toLowerCase();
+  if (!bookingRef) return { ok: false, reason: "missing_ref" };
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return { ok: false, reason: "missing_email", bookingRef };
+  }
+  const ok = await syncMultiDayBookingLead({
+    bookingRef,
+    email,
+    state: builder,
+    cityNames: opts?.cityNames,
+    status: opts?.status || "lead",
+    quote: opts?.quote,
+  });
+  return { ok, reason: ok ? undefined : "upsert_failed", bookingRef };
+}
+
 export async function syncMultiDayBookingLead(opts: {
   bookingRef: string;
   email: string;
@@ -164,10 +253,17 @@ export async function syncMultiDayBookingLead(opts: {
   status?: BookingLeadStatus;
   dossierPdfUrl?: string | null;
   quote?: QuoteSlice;
+  guestName?: string;
+  whatsapp?: string;
 }): Promise<boolean> {
   const email = String(opts.email || "").trim().toLowerCase();
   const bookingRef = normalizeRef(opts.bookingRef);
   if (!email || !bookingRef) return false;
+
+  // PB date fields reject / re-emit full datetimes — always bare YYYY-MM-DD.
+  const arrivalYmd = String(opts.state.arrivalDate || "")
+    .trim()
+    .match(/^(\d{4}-\d{2}-\d{2})/)?.[1] || null;
 
   const primaryCity = primaryCityFromMultiDay(opts.state, opts.cityNames);
   const stayOnly = (opts.state.locations || []).filter(
@@ -184,9 +280,16 @@ export async function syncMultiDayBookingLead(opts: {
     adults: opts.state.adults,
     kids: opts.state.children,
   };
-  const selections = buildMultiDaySelections(opts.state, {
-    cityNames: opts.cityNames,
+  const contact = await resolveGuestContact({
+    guestName: opts.guestName,
+    whatsapp: opts.whatsapp,
   });
+  const selections = withGuestContactSelections(
+    buildMultiDaySelections(opts.state, {
+      cityNames: opts.cityNames,
+    }) as unknown as Record<string, unknown>,
+    contact
+  );
   const q = quoteFields(opts.quote);
   const status = opts.status || "lead";
   const { demandFromMultiDay } = await import("@/lib/opsDemand");
@@ -198,11 +301,11 @@ export async function syncMultiDayBookingLead(opts: {
     type: "multi_day",
     status,
     primary_city: primaryCity,
-    tour_date: opts.state.arrivalDate,
+    tour_date: arrivalYmd,
     guests,
     duration_value: opts.state.durationDays,
     cities_list: cityNamesList.join(", "),
-    selections: selections as unknown as Record<string, unknown>,
+    selections,
     ...q,
   });
 
@@ -216,7 +319,7 @@ export async function syncMultiDayBookingLead(opts: {
         type: "multi_day",
         status,
         primaryCity,
-        tourDate: opts.state.arrivalDate,
+        tourDate: arrivalYmd,
         guests,
         durationValue: opts.state.durationDays,
         citiesList: cityNamesList.join(", "),
@@ -225,8 +328,17 @@ export async function syncMultiDayBookingLead(opts: {
           ...selections,
           ...q,
         },
+        guestName: contact.guestName || undefined,
+        whatsapp: contact.whatsapp || undefined,
+        guestSpecialRequirements: selections.guestSpecialRequirements,
         dossierPdfUrl: opts.dossierPdfUrl ?? null,
         demand,
+        meetingPointName:
+          opts.state.meetingPointName || opts.state.meetingPoint || "",
+        meetingPointAddress: opts.state.meetingPoint || "",
+        meetingPointLat: opts.state.meetingPointLat ?? null,
+        meetingPointLng: opts.state.meetingPointLng ?? null,
+        meetingPointPlaceId: opts.state.meetingPointPlaceId || "",
       }),
     });
     if (!res.ok) {
@@ -250,9 +362,16 @@ export async function syncSingleDayBookingLead(opts: {
   email: string;
   state: SingleDayBuilderState;
   cityId?: string;
+  /** Pre-Elite brief fields live on useBuilderStore, not the single-day store. */
+  preEliteTravelStyle?: string | null;
+  preEliteInterests?: string[];
+  preEliteMotivation?: string | null;
+  preElitePainPoints?: string[];
   status?: BookingLeadStatus;
   dossierPdfUrl?: string | null;
   quote?: QuoteSlice;
+  guestName?: string;
+  whatsapp?: string;
 }): Promise<boolean> {
   const email = String(opts.email || "").trim().toLowerCase();
   const bookingRef = normalizeRef(opts.bookingRef);
@@ -262,10 +381,56 @@ export async function syncSingleDayBookingLead(opts: {
     adults: opts.state.adults,
     kids: opts.state.children,
   };
-  const selections = buildSingleDaySelections({
-    ...opts.state,
-    cityId: opts.cityId,
+  // Pre-Elite brief fields live on useBuilderStore. Callers that don't
+  // pass them explicitly (autosave, payment, guests modal…) must not
+  // wipe the brief already saved in selections — fall back to the live
+  // builder store, exactly where the Travel Brief modal writes them.
+  let preEliteFallback: {
+    preEliteTravelStyle?: string | null;
+    preEliteInterests?: string[];
+    preEliteMotivation?: string | null;
+    preElitePainPoints?: string[];
+  } = {};
+  if (
+    opts.preEliteTravelStyle === undefined ||
+    opts.preEliteInterests === undefined ||
+    opts.preEliteMotivation === undefined ||
+    opts.preElitePainPoints === undefined
+  ) {
+    try {
+      const { useBuilderStore } = await import("@/store/useBuilderStore");
+      const b = useBuilderStore.getState();
+      preEliteFallback = {
+        preEliteTravelStyle: b.preEliteTravelStyle,
+        preEliteInterests: b.preEliteInterests,
+        preEliteMotivation: b.preEliteMotivation,
+        preElitePainPoints: b.preElitePainPoints,
+      };
+    } catch {
+      /* keep null/[] defaults below */
+    }
+  }
+  const contact = await resolveGuestContact({
+    guestName: opts.guestName,
+    whatsapp: opts.whatsapp,
   });
+  const selections = withGuestContactSelections(
+    buildSingleDaySelections({
+      ...opts.state,
+      cityId: opts.cityId,
+      preEliteTravelStyle:
+        opts.preEliteTravelStyle ??
+        preEliteFallback.preEliteTravelStyle ??
+        null,
+      preEliteInterests:
+        opts.preEliteInterests ?? preEliteFallback.preEliteInterests ?? [],
+      preEliteMotivation:
+        opts.preEliteMotivation ?? preEliteFallback.preEliteMotivation ?? null,
+      preElitePainPoints:
+        opts.preElitePainPoints ?? preEliteFallback.preElitePainPoints ?? [],
+    }) as unknown as Record<string, unknown>,
+    contact
+  );
   const q = quoteFields(opts.quote);
   const status = opts.status || "lead";
   const { demandFromSingleDay } = await import("@/lib/opsDemand");
@@ -281,7 +446,7 @@ export async function syncSingleDayBookingLead(opts: {
     guests,
     duration_value: opts.state.tourHours,
     cities_list: opts.state.cityFocus || "",
-    selections: selections as unknown as Record<string, unknown>,
+    selections,
     ...q,
   });
 
@@ -304,6 +469,9 @@ export async function syncSingleDayBookingLead(opts: {
           ...selections,
           ...q,
         },
+        guestName: contact.guestName || undefined,
+        whatsapp: contact.whatsapp || undefined,
+        guestSpecialRequirements: selections.guestSpecialRequirements,
         dossierPdfUrl: opts.dossierPdfUrl ?? null,
         demand,
         meetingPointName:

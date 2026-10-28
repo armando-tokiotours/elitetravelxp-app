@@ -4,6 +4,7 @@
  * Pipeline hierarchy (Ops → Concierge → Vendors):
  *   owner / ops  ≈ ADMIN_OPS     — full system + assign concierge
  *   agent        ≈ CONCIERGE     — client hub, vendor dispatch, inspector
+ *   accounting   ≈ ACCOUNTANT    — settlements desk (not full Ops suite)
  *   guide        ≈ GUIDE         — assigned tours only
  *   driver       ≈ DRIVER        — assigned transport only
  *   ticketer     ≈ TICKET_SUPPLIER — ticket lines only
@@ -34,8 +35,9 @@ export function homePathForRole(role: StaffRole | null | undefined): string {
   switch (role) {
     case "owner":
     case "ops":
-    case "accounting":
       return "/ops";
+    case "accounting":
+      return "/accounting/dashboard";
     case "agent":
       return "/ops";
     case "ticketer":
@@ -61,14 +63,15 @@ export function canAccessAdmin(role: StaffRole | null | undefined): boolean {
 
 /** Ops inbox + booking inspector (Ops managers + Concierge agents). */
 export function canAccessOpsBoard(role: StaffRole | null | undefined): boolean {
-  return (
-    role === "owner" ||
-    role === "ops" ||
-    role === "agent" ||
-    role === "accounting"
-  );
+  return role === "owner" || role === "ops" || role === "agent";
 }
 
+/** Accountant Financial Settlements Desk (+ Owner oversight). */
+export function canAccessAccounting(role: StaffRole | null | undefined): boolean {
+  return role === "owner" || role === "accounting";
+}
+
+/** Money / payouts / agency invoice surfaces (not the full Ops suite). */
 export function canAccessMoney(role: StaffRole | null | undefined): boolean {
   return role === "owner" || role === "accounting";
 }
@@ -102,19 +105,51 @@ export const ROLE_LABELS: Record<StaffRole, string> = {
   owner: "Owner (Super User)",
   ops: "Ops Coordinator",
   agent: "Concierge agent",
-  accounting: "Accounting",
+  accounting: "Accountant",
   ticketer: "Ticket supplier",
   guide: "Guide",
   driver: "Driver Coordinator",
   agency: "Agency",
 };
 
+/** Roles that can be assigned as booking in-charge (concierge dropdown). */
+export const CONCIERGE_ASSIGNABLE_ROLES = ["owner", "ops", "agent"] as const;
+
+export type ConciergeAssignableRole =
+  (typeof CONCIERGE_ASSIGNABLE_ROLES)[number];
+
+/** Short option labels: Super User / Ops / Agent. */
+export function conciergeAssigneeRoleLabel(
+  role: string | null | undefined
+): string {
+  switch (role) {
+    case "owner":
+      return "Super User";
+    case "ops":
+      return "Ops";
+    case "agent":
+      return "Agent";
+    default:
+      if (role && isStaffRole(role)) return ROLE_LABELS[role];
+      return String(role || "").trim();
+  }
+}
+
+export function isConciergeAssignableRole(
+  role: string | null | undefined
+): role is ConciergeAssignableRole {
+  return (
+    role === "owner" || role === "ops" || role === "agent"
+  );
+}
+
 /** Credential registry filter tabs (Drivers = Driver Coordinator role). */
 export const CREDENTIAL_TABS = [
   { id: "agencies", label: "Agencies" },
   { id: "guides", label: "Guides" },
-  { id: "staff", label: "Staff" },
   { id: "drivers", label: "Drivers" },
+  { id: "ticketers", label: "Ticketers" },
+  { id: "staff", label: "Staff" },
 ] as const;
 
 export type CredentialTab = (typeof CREDENTIAL_TABS)[number]["id"];
@@ -130,13 +165,14 @@ export function roleMatchesCredentialTab(
       return role === "guide";
     case "drivers":
       return role === "driver";
+    case "ticketers":
+      return role === "ticketer";
     case "staff":
       return (
         role === "owner" ||
         role === "ops" ||
         role === "agent" ||
         role === "accounting" ||
-        role === "ticketer" ||
         !role
       );
     default:

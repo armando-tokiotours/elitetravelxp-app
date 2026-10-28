@@ -40,6 +40,7 @@ import { getSystemMessage } from "@/lib/systemMessages";
 import { CityTransportModal } from "./CityTransportModal";
 import { HorizontalHelpAccordion } from "../HorizontalHelpAccordion";
 import { GoldLight } from "@/components/branding/GoldLight";
+import { FaqLinkSuspense } from "@/components/navigation/FaqLink";
 import { TransportProductPicker } from "@/components/builder/TransportProductPicker";
 import { SelfArrangeMicroTable } from "@/components/builder/SelfArrangeMicroTable";
 import {
@@ -1241,14 +1242,13 @@ function ModeAccordion({
                 </>
               )}
             </div>
-            <a
-              href="/faq"
+            <FaqLinkSuspense
               target="_blank"
               rel="noreferrer"
               className="inline-flex items-center gap-2 text-sm font-medium text-[#075473] transition-colors hover:text-[#F6A724]"
             >
               Read: How public transport works in Japan ↗
-            </a>
+            </FaqLinkSuspense>
           </div>
         ) : null}
 

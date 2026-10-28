@@ -30,12 +30,50 @@ export type StaffProfile = {
   languages?: string;
   strength_cities?: string;
   photo?: string;
+  /** Landscape banner for the social-style profile (/uploads/... URL). */
+  cover_url?: string;
   updated?: string;
   video?: string;
   video_url?: string;
   bank_info?: string;
   payment_link?: string;
   payout_notes?: string;
+  /** Comma-separated niches (e.g. "Otaku Culture, Food & Culinary"). */
+  specialties?: string;
+  max_group_size?: number;
+  pace_comfort?: string;
+  transit_comfort?: string;
+  bank_name?: string;
+  bank_branch?: string;
+  account_type?: string;
+  account_holder?: string;
+  account_number?: string;
+  /** Tokiotours Guide Questionnaire — Kanto (migration 1791280000). */
+  guiding_tenure?: string;
+  base_location?: string;
+  /** JSON string like {"English":5,"Japanese":4} (ratings 1–5). */
+  language_fluency?: string;
+  /** Comma-separated Kanto regions. */
+  strength_regions?: string;
+  /** Comma-separated most-enjoyable tour types (separate from `specialties`). */
+  tour_specialties?: string;
+  tours_to_avoid?: string;
+  /** Comma-separated preferred client types. */
+  preferred_clients?: string;
+  challenging_clients?: string;
+  skill_storytelling?: number;
+  skill_logistics?: number;
+  skill_problem_solving?: number;
+  skill_kids_patience?: number;
+  skill_conflict_resolution?: number;
+  skill_stamina?: number;
+  biggest_strength?: string;
+  improvement_areas?: string;
+  /** Yes / Sometimes / Prefer not */
+  early_starts?: string;
+  /** Yes / Sometimes / Prefer not */
+  full_day_tours?: string;
+  physical_limitations?: string;
 };
 
 /** Combine first + last into display_name (back-compat). */

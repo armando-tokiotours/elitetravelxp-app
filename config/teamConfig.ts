@@ -34,14 +34,14 @@ export const BUILDER_S_HERO_CONFIG = {
     },
     {
       id: "experiences",
-      label: "Experiences & Places",
+      label: "Experiences",
       href: "#section-experiences",
       number: 3,
       sectionId: "section-experiences",
     },
     {
       id: "transit",
-      label: "Transit & Transfers",
+      label: "Transit",
       href: "#section-transit",
       number: 4,
       sectionId: "section-transit",

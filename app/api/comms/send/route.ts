@@ -10,6 +10,7 @@ import {
   reminderById,
   type ReminderId,
 } from "@/lib/reminderRules";
+import { resolveTripEndDate } from "@/lib/remindersEngine";
 
 export const runtime = "nodejs";
 
@@ -106,6 +107,7 @@ export async function POST(request: Request) {
 
     let guestEmail = "";
     let guestName = "";
+    let durationDays: number | null = null;
     try {
       const lead = await pb
         .collection("bookings_and_leads")
@@ -114,6 +116,17 @@ export async function POST(request: Request) {
         .trim()
         .toLowerCase();
       guestName = String(lead.full_name || lead.name || "").trim();
+      const type = String(lead.type || "").toLowerCase();
+      const label = String(lead.duration_label || "").toLowerCase();
+      const raw = Number(lead.duration_value) || 0;
+      if (
+        raw > 0 &&
+        (type.includes("multi") ||
+          label.includes("day") ||
+          (!type.includes("single") && raw <= 30 && raw >= 2))
+      ) {
+        durationDays = Math.round(raw);
+      }
     } catch {
       /* may be agency */
     }
@@ -125,9 +138,15 @@ export async function POST(request: Request) {
       );
     }
 
+    const endDate = resolveTripEndDate({
+      tour_date: hub.tour_date,
+      end_date: hub.end_date,
+      duration_days: durationDays,
+    });
+
     const reminders = computeReminders({
       tourDate: hub.tour_date,
-      endDate: hub.end_date,
+      endDate,
       status: hub.status,
       tour_payment_status: hub.tour_payment_status,
       payment_confirmed: hub.payment_confirmed,

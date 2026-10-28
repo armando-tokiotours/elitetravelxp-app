@@ -12,6 +12,7 @@ import {
 } from "@/utils/pnr";
 import { LOCAL_LEADS_STORAGE_KEYS } from "@/lib/syncBookingLead";
 import type { BookingLeadType } from "@/lib/bookingsAndLeads";
+import { journeyItineraryHref } from "@/lib/builderRoutes";
 import {
   emptyTiming,
   parseItineraryData,
@@ -26,7 +27,8 @@ export interface ManageBookingModalProps {
   initialEmail?: string;
   /**
    * Override success navigation. Default: guest dossier for the retrieved trip
-   * (`/builder-single/itinerary`, `/builder/itinerary`, or `/builder-e/dossier`).
+   * via `journeyItineraryHref` (single-day → day-pass itinerary, multi-day →
+   * japan-journey itinerary, VIP → vip-access dossier).
    * Pass `null` to skip auto-navigation.
    */
   successHref?: string | null;
@@ -37,25 +39,10 @@ function dossierHrefForRetrieve(opts: {
   leadType?: string;
   bookingRef: string;
 }): string {
-  const ref = encodeURIComponent(opts.bookingRef);
-  const type = String(opts.leadType || "").toLowerCase();
-  if (
-    opts.hasSingleDay ||
-    type === "single_day" ||
-    type === "single-day" ||
-    type === "single"
-  ) {
-    return `/builder-single/itinerary?ref=${ref}&view=dossier`;
-  }
-  if (
-    type === "experience_only" ||
-    type === "builder_e" ||
-    type === "builder-e" ||
-    type === "experience"
-  ) {
-    return `/builder-e/dossier?ref=${ref}`;
-  }
-  return `/builder/itinerary?ref=${ref}&view=dossier`;
+  return journeyItineraryHref(opts.bookingRef, {
+    type: opts.leadType,
+    hasSingleDay: opts.hasSingleDay,
+  });
 }
 
 const ERROR_MSG =
@@ -445,7 +432,7 @@ export function ManageBookingModal({
 
   return createPortal(
     <div
-      className="tokio-modal-backdrop fixed inset-0 z-[100] flex items-center justify-center p-4"
+      className="tokio-modal-backdrop fixed inset-0 z-[120] flex items-center justify-center p-4"
       role="presentation"
     >
       <button

@@ -16,6 +16,7 @@ import {
   type GuideDayBooking,
 } from "@/lib/guideScheduleRules";
 import { GuideSearchModal } from "@/components/staff/GuideSearchModal";
+import { GuidePayoutBreakdown } from "@/components/staff/GuidePayoutBreakdown";
 import {
   clearGuideJob,
   formatGuideJobDateLabel,
@@ -28,6 +29,11 @@ import {
   syncGuideJobsForBooking,
   type GuideJobRow,
 } from "@/lib/guideJobs";
+import {
+  DEFAULT_SPECIALTY_TIERS,
+  loadGuidePaySettings,
+  type SpecialtyTier,
+} from "@/lib/guidePayBreakdown";
 import { formatPbError } from "@/lib/pocketbase/admin-schema";
 
 function jobStatusClass(status: string): string {
@@ -85,6 +91,9 @@ export function GuideDispatchTab({
   const [jobs, setJobs] = useState<GuideJobRow[]>([]);
   const [profiles, setProfiles] = useState<GuideMatchProfile[]>([]);
   const [dayBookings, setDayBookings] = useState<GuideDayBooking[]>([]);
+  const [specialtyTiers, setSpecialtyTiers] = useState<SpecialtyTier[]>(
+    DEFAULT_SPECIALTY_TIERS
+  );
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -142,7 +151,7 @@ export function GuideDispatchTab({
     let cancelled = false;
     void (async () => {
       try {
-        const [rows, bookings, staffPhotos] = await Promise.all([
+        const [rows, bookings, staffPhotos, paySettings] = await Promise.all([
           pb.collection("guides").getFullList<Record<string, unknown>>({
             requestKey: null,
           }),
@@ -155,8 +164,14 @@ export function GuideDispatchTab({
               photo?: string;
             }>({ requestKey: null })
             .catch(() => []),
+          loadGuidePaySettings(pb),
         ]);
         if (cancelled) return;
+        setSpecialtyTiers(
+          paySettings.specialty_tiers.length
+            ? paySettings.specialty_tiers
+            : DEFAULT_SPECIALTY_TIERS
+        );
         setDayBookings(bookings);
         const photoByStaff = new Map<string, string>();
         for (const sp of staffPhotos) {
@@ -327,8 +342,10 @@ export function GuideDispatchTab({
               Per-day guide dispatch
             </h2>
             <p className="mt-1 text-[11px] text-zinc-500">
-              Each tour day is its own job. Assign Guide A to Kyoto Day 1 and
-              post Day 2 to the open board — never one 80-hour mega-payout.
+              Guided Tours only — each tour day is its own job. Experiences,
+              tickets, and areas sit outside guide dispatch. Assign Guide A to
+              Kyoto Day 1 and post Day 2 to the open board — never one 80-hour
+              mega-payout.
             </p>
           </div>
           <button
@@ -369,8 +386,9 @@ export function GuideDispatchTab({
           <p className="text-zinc-500">Building day jobs from itinerary…</p>
         ) : jobs.length === 0 ? (
           <p className="text-zinc-500">
-            No guided tour days found for this PNR yet. Add tours in the guest
-            plan or Pricing Studio, then Sync days.
+            No Guided Tour days for this PNR. Experiences, tickets, and areas
+            do not create guide jobs — add a Guided Tour in the guest plan or
+            Pricing Studio, then Sync days.
           </p>
         ) : (
           <div className="space-y-3">
@@ -501,13 +519,7 @@ export function GuideDispatchTab({
                         </div>
                       </div>
                       <div className="text-right">
-                        <div className="font-mono text-sm font-bold text-white">
-                          ¥
-                          {Math.max(
-                            0,
-                            Number(job.payout_jpy) || 0
-                          ).toLocaleString("en-US")}
-                        </div>
+                        <GuidePayoutBreakdown job={job} compact />
                         <span
                           className={`mt-1 inline-block rounded border px-2 py-0.5 text-[9px] font-bold tracking-wider uppercase ${jobStatusClass(status)}`}
                         >
@@ -517,7 +529,7 @@ export function GuideDispatchTab({
                     </div>
 
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                      <div className="min-w-0 text-[11px]">
+                      <div className="min-w-0 text-[15.4px]">
                         {job.assigned_guide_name ? (
                           <>
                             <span className="font-bold text-white">
@@ -602,13 +614,23 @@ export function GuideDispatchTab({
           }
           allGuides={profiles}
           dayBookings={dayBookings}
+          specialtyTiers={specialtyTiers}
+          initialSpecialtyBonusJpy={
+            bulkAssignOpen
+              ? 0
+              : Math.max(0, Number(activeJob?.specialty_bonus_jpy) || 0)
+          }
           onClose={() => {
             setAssignJobId(null);
             setBulkAssignOpen(false);
           }}
-          onSelectGuide={async (guideId) => {
+          onSelectGuide={async (guideId, meta) => {
             const g = guides.find((x) => x.id === guideId);
             const name = g?.name || g?.email || "Guide";
+            const specialtyBonusJpy = Math.max(
+              0,
+              Math.round(Number(meta?.specialtyBonusJpy) || 0)
+            );
             if (bulkAssignOpen) {
               const ids = selectedJobIds.filter((id) =>
                 selectableJobIds.includes(id)
@@ -624,6 +646,7 @@ export function GuideDispatchTab({
                     jobId,
                     staffId: guideId,
                     staffName: name,
+                    specialtyBonusJpy,
                   });
                 }
                 setBulkMsg(
@@ -638,6 +661,7 @@ export function GuideDispatchTab({
                 jobId: assignJobId,
                 staffId: guideId,
                 staffName: name,
+                specialtyBonusJpy,
               }).then(() => undefined)
             );
             setAssignJobId(null);

@@ -24,10 +24,10 @@ export function CityLanguageSelect({
 
   return (
     <div className="mb-4 space-y-1.5">
-      <label className="block text-[10px] font-bold uppercase tracking-wider text-white">
+      <label className="block text-[10px] font-bold uppercase tracking-wider text-[#0A1017]">
         Preferred tour language
       </label>
-      <p className="text-[10px] font-semibold uppercase tracking-wider text-white/35">
+      <p className="text-[10px] font-semibold uppercase tracking-wider text-[#64748b]">
         {cityName ? `Available for ${cityName}` : "Available city languages"}
       </p>
       <div className="relative">

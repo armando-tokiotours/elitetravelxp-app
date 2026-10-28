@@ -19,8 +19,48 @@ import {
   enrichDemandFromTourCatalog,
   tourIdsFromSelections,
 } from "@/lib/opsDemand";
+import { catalogKind } from "@/lib/experiencesPlaces";
 import { formatTransportType } from "@/lib/transportProducts";
 import { isTripWidePassText } from "@/lib/guestItineraryDays";
+import {
+  formatGuestSpecialRequirementsMobility,
+  formatGuestSpecialRequirementsSummary,
+  guestReqsFromLegacySpecialNeeds,
+  hasGuestSpecialRequirements,
+  normalizeGuestSpecialRequirements,
+  type GuestSpecialRequirements,
+} from "@/lib/guestSpecialRequirements";
+
+/** Catalog meta used when building Ops day tours for guide dispatch. */
+export type ResolvedTourMeta = {
+  title: string;
+  category?: string;
+  entry_type?: string;
+  access_type?: string;
+};
+
+/** True when a day-tour row needs private guide Accept/Decline. */
+function isGuidedOpsDayTour(t: {
+  title?: string | null;
+  category?: string | null;
+  entry_type?: string | null;
+  access_type?: string | null;
+  is_extra?: boolean | null;
+}): boolean {
+  if (t.is_extra === true) return false;
+  const kind = catalogKind(t);
+  if (kind === "activity" || kind === "cluster") return false;
+  if (
+    experienceNeedsEntryTicket({
+      title: t.title,
+      access_type: t.access_type,
+      category: t.category,
+    })
+  ) {
+    return false;
+  }
+  return true;
+}
 
 export type OpsAccessLine = {
   tourId: string;
@@ -34,6 +74,11 @@ export type OpsDayTour = {
   title: string;
   language?: string;
   hours?: number;
+  /** Catalog kind fields — used by guide dispatch to keep Experiences/Areas out */
+  category?: string;
+  entry_type?: string;
+  access_type?: string;
+  is_extra?: boolean;
 };
 
 export type OpsDayTicket = {
@@ -202,6 +247,8 @@ export type OpsGuestRequirements = {
   tourLanguage: string;
   specialMobility: string;
   specialNotes: string;
+  /** Structured dietary / mobility / extras from PB guest_special_requirements */
+  guestSpecialRequirements: GuestSpecialRequirements;
   /** Ticket / Admission / VIP / Time-sensitive lines for Ops */
   accessLines: OpsAccessLine[];
   ticketsNeededFromCatalog: boolean;
@@ -213,6 +260,7 @@ type BalRow = BookingsAndLeadsRecord & {
   meeting_point_name?: string;
   meeting_point_address?: string;
   special_requests?: unknown;
+  guest_special_requirements?: unknown;
   guest_name?: string;
   full_name?: string;
   contact_phone?: string;
@@ -310,7 +358,18 @@ function summarizeTransportStrategy(
   return "Mix-Arranged";
 }
 
-function pickGuestName(bal: BalRow | null, sel: Record<string, unknown>): string {
+type BookingContactRow = {
+  full_name?: string;
+  whatsapp?: string;
+  phone?: string;
+  guest_special_requirements?: unknown;
+};
+
+function pickGuestName(
+  bal: BalRow | null,
+  sel: Record<string, unknown>,
+  booking?: BookingContactRow | null
+): string {
   const fromBal = String(
     bal?.guest_name || bal?.full_name || ""
   ).trim();
@@ -318,10 +377,18 @@ function pickGuestName(bal: BalRow | null, sel: Record<string, unknown>): string
   const fromSel = String(
     sel.guestName || sel.fullName || sel.contactName || ""
   ).trim();
-  return fromSel || "—";
+  if (fromSel) return fromSel;
+  // Pre-Elite / itinerary profile writes contact on `bookings`, not BAL columns
+  // (BAL has no guest_name / phone fields — only email + selections JSON).
+  const fromBooking = String(booking?.full_name || "").trim();
+  return fromBooking || "—";
 }
 
-function pickGuestPhone(bal: BalRow | null, sel: Record<string, unknown>): string {
+function pickGuestPhone(
+  bal: BalRow | null,
+  sel: Record<string, unknown>,
+  booking?: BookingContactRow | null
+): string {
   const fromBal = String(
     bal?.contact_phone || bal?.whatsapp || bal?.phone || ""
   ).trim();
@@ -333,7 +400,11 @@ function pickGuestPhone(bal: BalRow | null, sel: Record<string, unknown>): strin
       sel.phone ||
       ""
   ).trim();
-  return fromSel || "—";
+  if (fromSel) return fromSel;
+  const fromBooking = String(
+    booking?.whatsapp || booking?.phone || ""
+  ).trim();
+  return fromBooking || "—";
 }
 
 function formatPaceLabel(pace: unknown): string {
@@ -594,9 +665,9 @@ function buildCityDays(opts: {
   startDate?: string;
   nights: number;
   multi: MultiDaySelections | null;
-  resolvedTitles: Map<string, string>;
+  resolvedMeta: Map<string, ResolvedTourMeta>;
 }): OpsItineraryDay[] {
-  const { cityId, cityName, multi, resolvedTitles } = opts;
+  const { cityId, cityName, multi, resolvedMeta } = opts;
   const dates = enumerateStayDates(opts.startDate, opts.nights);
   const chauffeurDates = new Set(
     (multi?.chauffeurDaysByCity?.[cityId] || []).map((d) =>
@@ -632,29 +703,34 @@ function buildCityDays(opts: {
     });
     // Undated tours only on first day when we have a date grid
     const tours: OpsDayTour[] = datedTours.map((t) => {
+      const meta = resolvedMeta.get(t.tourId);
       const raw =
         cleanDisplayTitle(String(t.title || ""), t.tourId) ||
-        cleanDisplayTitle(resolvedTitles.get(t.tourId) || "", t.tourId) ||
-        resolvedTitles.get(t.tourId) ||
+        cleanDisplayTitle(meta?.title || "", t.tourId) ||
+        meta?.title ||
         "Experience";
       return {
         tourId: t.tourId,
         title: raw,
         language: t.language || undefined,
         hours: t.durationHours,
+        category: meta?.category,
+        entry_type: meta?.entry_type,
+        access_type: t.accessType || meta?.access_type,
       };
     });
 
     // Entry tickets for experiences on this day (TeamLab, museum, …) — not IC passes
     const entryTickets: OpsDayTicket[] = tours
-      .filter((t) =>
-        experienceNeedsEntryTicket({
-          title: t.title,
-        })
-      )
+      .filter((t) => !isGuidedOpsDayTour(t))
       .map((t) => ({
         title: t.title,
-        type: "Entry ticket",
+        type:
+          catalogKind(t) === "cluster"
+            ? "Area / place"
+            : catalogKind(t) === "activity"
+              ? "Experience"
+              : "Entry ticket",
       }));
 
     const dayTickets: OpsDayTicket[] =
@@ -674,7 +750,9 @@ function buildCityDays(opts: {
     }
 
     const hasCar = Boolean(date && chauffeurDates.has(date));
-    const hasGuide = tours.length > 0;
+    // Guided Tours only — Experiences / Tickets / Areas are not guide days
+    const guidedTours = tours.filter((t) => isGuidedOpsDayTour(t));
+    const hasGuide = guidedTours.length > 0;
     const hasTickets = dayTickets.length > 0;
 
     return {
@@ -695,7 +773,7 @@ function buildRouteTimeline(
   bal: BalRow | null,
   multi: MultiDaySelections | null,
   single: SingleDaySelections | null,
-  resolvedTitles: Map<string, string>
+  resolvedMeta: Map<string, ResolvedTourMeta>
 ): OpsRouteTimeline {
   const cityNames = String(bal?.cities_list || "")
     .split(",")
@@ -808,7 +886,7 @@ function buildRouteTimeline(
             startDate: stop.startDate,
             nights: Math.max(0, Number(stop.nights) || 0),
             multi,
-            resolvedTitles,
+            resolvedMeta,
           }),
         });
       }
@@ -867,7 +945,7 @@ function buildRouteTimeline(
             cityName,
             nights: 0,
             multi,
-            resolvedTitles,
+            resolvedMeta,
           }),
         });
       }
@@ -879,13 +957,52 @@ function buildRouteTimeline(
       single.cityId ||
       "Day city";
     const ids = single.selectedExperienceIds || [];
-    const tours: OpsDayTour[] = ids.map((id) => ({
-      tourId: id,
-      title:
-        cleanDisplayTitle(resolvedTitles.get(id) || "", id) ||
-        resolvedTitles.get(id) ||
-        "Experience",
-    }));
+    const detailById = new Map(
+      (single.selectedExperiencesDetail || []).map((d) => [d.tourId, d])
+    );
+    const tours: OpsDayTour[] = ids.map((id) => {
+      const detail = detailById.get(id);
+      const meta = resolvedMeta.get(id);
+      const title =
+        cleanDisplayTitle(String(detail?.title || ""), id) ||
+        cleanDisplayTitle(meta?.title || "", id) ||
+        meta?.title ||
+        "Experience";
+      const category = detail?.category || meta?.category;
+      const entry_type = detail?.entry_type || meta?.entry_type;
+      const access_type = detail?.access_type || meta?.access_type;
+      const is_extra =
+        detail?.is_extra === true
+          ? true
+          : detail?.is_extra === false
+            ? false
+            : undefined;
+      return {
+        tourId: id,
+        title,
+        language: detail?.selectedLanguage || undefined,
+        hours:
+          Number(detail?.duration_hours) > 0
+            ? Number(detail?.duration_hours)
+            : undefined,
+        category,
+        entry_type,
+        access_type,
+        is_extra,
+      };
+    });
+    const guidedTours = tours.filter((t) => isGuidedOpsDayTour(t));
+    const entryTickets: OpsDayTicket[] = tours
+      .filter((t) => !isGuidedOpsDayTour(t))
+      .map((t) => ({
+        title: t.title,
+        type:
+          catalogKind(t) === "cluster"
+            ? "Area / place"
+            : catalogKind(t) === "activity" || t.is_extra === true
+              ? "Experience"
+              : "Entry ticket",
+      }));
     stays.push({
       cityId: String(single.cityId || "single"),
       cityName: name,
@@ -907,10 +1024,10 @@ function buildRouteTimeline(
           dateLabel: formatArrivalDate(bal?.tour_date),
           dayIndex: 1,
           hasCar: false,
-          hasGuide: tours.length > 0,
-          hasTickets: false,
+          hasGuide: guidedTours.length > 0,
+          hasTickets: entryTickets.length > 0,
           tours,
-          tickets: [],
+          tickets: entryTickets,
         },
       ],
     });
@@ -932,6 +1049,8 @@ async function resolveTour(
   title: string;
   code: string;
   access_type: string;
+  category?: string;
+  entry_type?: string;
 } | null> {
   const id = String(tourId || "").trim();
   if (!id) return null;
@@ -943,6 +1062,8 @@ async function resolveTour(
       code?: string;
       tour_code?: string;
       access_type?: string;
+      category?: string;
+      entry_type?: string;
       is_self_guided?: boolean;
       description?: string;
     }>(id, { requestKey: null })
@@ -950,6 +1071,8 @@ async function resolveTour(
   if (!row) return { title: id, code: id, access_type: "" };
   const access = String(row.access_type || "").trim();
   const title = String(row.title || row.name || id).trim() || id;
+  const category = String(row.category || "").trim() || undefined;
+  const entry_type = String(row.entry_type || "").trim() || undefined;
   // Heuristic fill when catalog access_type empty but title is TeamLab-class
   const inferred =
     access ||
@@ -957,6 +1080,7 @@ async function resolveTour(
       title,
       description: row.description,
       is_self_guided: row.is_self_guided,
+      category,
     })
       ? "direct_ticket"
       : "");
@@ -964,6 +1088,8 @@ async function resolveTour(
     title,
     code: String(row.code || row.tour_code || id).trim() || id,
     access_type: inferred,
+    category,
+    entry_type,
   };
 }
 
@@ -1011,21 +1137,27 @@ export async function loadOpsGuestRequirements(
   const accessLines: OpsAccessLine[] = [];
 
   const tourIds = tourIdsFromSelections(bal?.selections);
-  const resolvedTitles = new Map<string, string>();
+  const resolvedMeta = new Map<string, ResolvedTourMeta>();
   for (const id of tourIds) {
     const t = await resolveTour(pb, id);
     if (!t) continue;
-    const clean = cleanDisplayTitle(t.title, id) || t.title;
-    resolvedTitles.set(id, clean);
+    let clean = cleanDisplayTitle(t.title, id) || t.title;
     const scheduled = multi?.experienceSchedule?.find((e) => e.tourId === id);
     if (scheduled?.title) {
       const snap = cleanDisplayTitle(scheduled.title, id);
-      if (snap) resolvedTitles.set(id, snap);
+      if (snap) clean = snap;
     }
+    resolvedMeta.set(id, {
+      title: clean,
+      category: t.category,
+      entry_type: t.entry_type,
+      access_type: t.access_type,
+    });
     if (
       !experienceNeedsEntryTicket({
         title: clean,
         access_type: t.access_type,
+        category: t.category,
       })
     ) {
       continue;
@@ -1036,6 +1168,22 @@ export async function loadOpsGuestRequirements(
       title: clean,
       accessType,
       label: accessTypeStaffLabel(accessType),
+    });
+  }
+  // Prefer single-day selection snapshots for category / is_extra when present
+  for (const detail of single?.selectedExperiencesDetail || []) {
+    const id = String(detail.tourId || "").trim();
+    if (!id) continue;
+    const prev = resolvedMeta.get(id);
+    const title =
+      cleanDisplayTitle(String(detail.title || ""), id) ||
+      prev?.title ||
+      id;
+    resolvedMeta.set(id, {
+      title,
+      category: detail.category || prev?.category,
+      entry_type: detail.entry_type || prev?.entry_type,
+      access_type: detail.access_type || prev?.access_type,
     });
   }
 
@@ -1086,10 +1234,9 @@ export async function loadOpsGuestRequirements(
       .map((e) => {
         const snap = cleanDisplayTitle(String(e.title || ""), e.tourId);
         if (snap) return snap;
+        const meta = resolvedMeta.get(e.tourId);
         return (
-          cleanDisplayTitle(resolvedTitles.get(e.tourId) || "", e.tourId) ||
-          resolvedTitles.get(e.tourId) ||
-          ""
+          cleanDisplayTitle(meta?.title || "", e.tourId) || meta?.title || ""
         );
       })
       .filter(Boolean);
@@ -1120,22 +1267,72 @@ export async function loadOpsGuestRequirements(
     specialMobility = formatNeeds(multi.specialNeeds);
   }
 
-  let specialNotes =
-    String(hub.pickup_notes || "").trim() ||
-    (typeof bal?.special_requests === "string"
-      ? bal.special_requests
-      : "") ||
-    "";
-  if (!specialNotes || specialNotes === "—") {
-    specialNotes = "No special requirements specified by client";
-  }
-
   const ticketsNeededFromCatalog = accessLines.length > 0;
 
   const selObj =
     bal?.selections && typeof bal.selections === "object"
       ? (bal.selections as unknown as Record<string, unknown>)
       : {};
+
+  // Prefer bookings.guest_special_requirements, then BAL top-level / selections.
+  // Also load full_name / whatsapp — guest itinerary profile uses `bookings`,
+  // while BAL upsert historically only persisted email (+ trip selections).
+  let bookingGuestReqs: GuestSpecialRequirements | null = null;
+  let bookingContact: BookingContactRow | null = null;
+  if (pnr) {
+    bookingContact = await firstOrNull(() =>
+      pb
+        .collection("bookings")
+        .getFirstListItem<BookingContactRow>(`booking_ref="${pnr}"`, {
+          requestKey: null,
+        })
+    );
+    if (bookingContact?.guest_special_requirements != null) {
+      bookingGuestReqs = normalizeGuestSpecialRequirements(
+        bookingContact.guest_special_requirements
+      );
+    }
+  }
+  const selGuestReqs = normalizeGuestSpecialRequirements(
+    selObj.guestSpecialRequirements ??
+      bal?.guest_special_requirements ??
+      multi?.guestSpecialRequirements ??
+      single?.guestSpecialRequirements
+  );
+  const legacyFromNeeds = guestReqsFromLegacySpecialNeeds(
+    multi?.specialNeeds ||
+      single?.specialNeeds ||
+      (Array.isArray(selObj.specialNeeds)
+        ? (selObj.specialNeeds as string[])
+        : null)
+  );
+  const guestSpecialRequirements =
+    bookingGuestReqs && hasGuestSpecialRequirements(bookingGuestReqs)
+      ? bookingGuestReqs
+      : hasGuestSpecialRequirements(selGuestReqs)
+        ? selGuestReqs
+        : hasGuestSpecialRequirements(legacyFromNeeds)
+          ? legacyFromNeeds
+          : bookingGuestReqs || selGuestReqs;
+
+  if (hasGuestSpecialRequirements(guestSpecialRequirements)) {
+    specialMobility = formatGuestSpecialRequirementsMobility(
+      guestSpecialRequirements
+    );
+  }
+
+  let specialNotes =
+    guestSpecialRequirements.customNotes.trim() ||
+    String(hub.pickup_notes || "").trim() ||
+    (typeof bal?.special_requests === "string"
+      ? bal.special_requests
+      : "") ||
+    "";
+  if (!specialNotes || specialNotes === "—") {
+    specialNotes = hasGuestSpecialRequirements(guestSpecialRequirements)
+      ? formatGuestSpecialRequirementsSummary(guestSpecialRequirements)
+      : "No special requirements specified by client";
+  }
 
   const guests = bal?.guests || { adults: 0, kids: 0 };
   const adults = Math.max(0, Number(guests.adults) || 0);
@@ -1151,19 +1348,33 @@ export async function loadOpsGuestRequirements(
     coerceTriBool(multi?.guestHasJRPass) ??
     coerceTriBool(selObj.guestHasJRPass) ??
     coerceTriBool(bal?.guest_has_jr_pass);
+  // Single-day legacy leads often only persist `suicaNeeded` — treat as no IC + help.
+  const suicaNeededFallback =
+    single?.suicaNeeded === true
+      ? true
+      : single?.suicaNeeded === false
+        ? false
+        : null;
   const guestHasICCard =
     coerceTriBool(multi?.guestHasICCard) ??
     coerceTriBool(selObj.guestHasICCard) ??
-    coerceTriBool(bal?.guest_has_ic_card);
+    coerceTriBool(bal?.guest_has_ic_card) ??
+    (suicaNeededFallback === true ? false : null);
   const guestNeedsTransitHelp =
     coerceTriBool(multi?.guestNeedsTransitHelp) ??
     coerceTriBool(selObj.guestNeedsTransitHelp) ??
-    coerceTriBool(bal?.guest_needs_transit_help);
+    coerceTriBool(bal?.guest_needs_transit_help) ??
+    (suicaNeededFallback === true ? true : null);
 
   const transportStrategy = summarizeTransportStrategy(multi, single);
-  const guestName = pickGuestName(bal, selObj);
-  const guestEmail = String(bal?.email || "").trim() || "—";
-  const guestPhone = pickGuestPhone(bal, selObj);
+  const guestName = pickGuestName(bal, selObj, bookingContact);
+  const guestEmail =
+    String(bal?.email || "").trim() ||
+    String(
+      (bookingContact as { email?: string } | null)?.email || ""
+    ).trim() ||
+    "—";
+  const guestPhone = pickGuestPhone(bal, selObj, bookingContact);
 
   const totalDaysLabel =
     durationLabel !== "—"
@@ -1204,7 +1415,7 @@ export async function loadOpsGuestRequirements(
     bal,
     multi,
     single,
-    resolvedTitles
+    resolvedMeta
   );
   const itineraryStops = routeTimeline.stays;
 
@@ -1241,12 +1452,18 @@ export async function loadOpsGuestRequirements(
       ? "VIP / reserved Shinkansen seats requested"
       : "Standard subway / train (no reserved Shinkansen flagged)";
 
-  const icCardsLabel =
-    guestHasICCard === false || guestNeedsTransitHelp === true
-      ? "Suica / PASMO assistance needed"
-      : guestHasICCard === true
-        ? "Suica / PASMO guest already has IC card"
-        : "Suica / PASMO no IC cards requested";
+  // Same assistance signal as logistics "Transit help" badge (header + row stay aligned).
+  const needsIcAssistance =
+    guestNeedsTransitHelp === true || guestHasICCard === false;
+  const icCardsLabel = needsIcAssistance
+    ? "Suica / PASMO assistance needed"
+    : guestHasICCard === true
+      ? "Suica / PASMO guest already has IC card"
+      : "Suica / PASMO no IC cards requested";
+  // Normalize display value so Transit help badge matches header when assistance is needed.
+  const guestNeedsTransitHelpDisplay = needsIcAssistance
+    ? true
+    : guestNeedsTransitHelp;
 
   const chauffeurPickupLabel = isSingleDayTrip
     ? "-"
@@ -1312,7 +1529,7 @@ export async function loadOpsGuestRequirements(
     infants,
     guestHasJRPass,
     guestHasICCard,
-    guestNeedsTransitHelp,
+    guestNeedsTransitHelp: guestNeedsTransitHelpDisplay,
     transportStrategy,
     productLabel,
     totalDaysLabel,
@@ -1341,6 +1558,7 @@ export async function loadOpsGuestRequirements(
     tourLanguage,
     specialMobility,
     specialNotes,
+    guestSpecialRequirements,
     accessLines,
     ticketsNeededFromCatalog,
     serviceCount,

@@ -37,8 +37,19 @@ import {
 } from "@/lib/builderSteps";
 import type { ExperienceProfile } from "@/lib/experienceProfiler";
 import { coerceExperienceProfile } from "@/lib/experienceProfiler";
+import type { GuestSpecialRequirements } from "@/lib/guestSpecialRequirements";
+import {
+  EMPTY_GUEST_SPECIAL_REQUIREMENTS,
+  guestReqsFromLegacySpecialNeeds,
+  guestSpecialRequirementsChoicesComplete,
+  hasGuestSpecialRequirements,
+  legacySpecialNeedsFromGuestReqs,
+  migrateUnsetGuestSpecialRequirements,
+  normalizeGuestSpecialRequirements,
+} from "@/lib/guestSpecialRequirements";
 import { useItineraryStore } from "@/store/useItineraryStore";
 import {
+  generateConfirmedPNR,
   generateTempPNR,
   isTempBookingRef,
   isValidBookingPNR,
@@ -225,6 +236,13 @@ export interface BuilderState {
   /** Guest special needs — shown to bookings staff */
   specialNeeds: SpecialNeedId[];
   /**
+   * Dietary / mobility / extras / notes → PB `guest_special_requirements`.
+   * Kept in store until PNR final save flushes to PocketBase.
+   */
+  guestSpecialRequirements: GuestSpecialRequirements;
+  /** True after guest acknowledges requirements (tags, notes, or “none”). */
+  guestSpecialRequirementsAcked: boolean;
+  /**
    * Public-transport pass questionnaire (JR Pass / Suica).
    * `null` = not answered yet · Tours step reads these later.
    */
@@ -276,6 +294,14 @@ export interface BuilderState {
   travelPace: TravelPace;
   /** City-level preferred guided language code (EN, JA, …) for Experiences */
   preferredTourLanguage: string;
+  /** First-day / primary hotel-hub pick-up (ops sets; guests skip map). */
+  meetingPoint: string;
+  meetingPointName: string;
+  meetingPointLat: number | null;
+  meetingPointLng: number | null;
+  meetingPointPlaceId: string;
+  /** True after Meeting Point & Language step is confirmed. */
+  meetingLogisticsConfirmed: boolean;
   /** Non-AI Experience Profiler quiz result (activity matcher) */
   experienceProfile: ExperienceProfile | null;
   /** Resolved from season_tiers for the chosen arrival date */
@@ -283,7 +309,7 @@ export interface BuilderState {
   activeSeasonNote: ActiveSeasonNote | null;
   /**
    * Booking reference lifecycle:
-   * - draft: tempBookingRef (JPN-XXXXXX from first paint)
+   * - draft: tempBookingRef (DRAFT-XXXXXX until contact, then JPN-)
    * - in_progress / confirmed: confirmedBookingRef locked (same JPN- format)
    * Legacy TMP-/TK- rows still hydrate from PocketBase / localStorage and upgrade.
    */
@@ -329,6 +355,8 @@ export interface BuilderActions {
   setChildren: (n: number) => void;
   toggleSpecialNeed: (id: SpecialNeedId) => void;
   setSpecialNeeds: (ids: SpecialNeedId[]) => void;
+  setGuestSpecialRequirements: (reqs: GuestSpecialRequirements) => void;
+  ackGuestSpecialRequirements: () => void;
   setCityHotel: (cityId: string, patch: Partial<CityHotelPref>) => void;
   ensureCityHotels: (cityIds: string[]) => void;
   addLocation: (cityId: string) => boolean;
@@ -408,6 +436,14 @@ export interface BuilderActions {
     guestNeedsTransitHelp: boolean;
   }) => void;
   setPreferredTourLanguage: (code: string) => void;
+  setMeetingPointDetails: (details: {
+    name: string;
+    address: string;
+    lat: number | null;
+    lng: number | null;
+    placeId?: string;
+  }) => void;
+  setMeetingLogisticsConfirmed: (confirmed: boolean) => void;
   setTripMode: (mode: "multi_day" | "single_day") => void;
   setExperienceProfile: (profile: ExperienceProfile | null) => void;
   setCustomBudgetTarget: (amount: number | null) => void;
@@ -422,8 +458,10 @@ export interface BuilderActions {
    */
   loadSavedItinerary: (payload: unknown) => void;
   hydrateFromSnapshot: (snapshot: Partial<BuilderState>) => void;
-      /** Ensure a JPN- draft ref exists for this browser session. */
+  /** Ensure a DRAFT- (or existing) ref exists for this browser session. */
   ensureTempBookingRef: () => string;
+  /** Promote DRAFT- → JPN- once guest contact (email) is present. */
+  promoteDraftOnContact: (hasContact: boolean) => string;
   /**
    * Lock an official JPN- PNR after Print/Request or Revolut deposit.
    * Status: in_progress | confirmed (confirmed = admin only on PB leads).
@@ -434,7 +472,7 @@ export interface BuilderActions {
   ) => void;
   /** Active code for UI / checkout (confirmed if locked, else temp). */
   displayBookingRef: () => string;
-  /** Official JPN- code for payment / email (promotes TMP- body when draft). */
+  /** Official JPN- code for payment / email (promotes DRAFT-/TMP- body when draft). */
   officialBookingRef: () => string;
   totalGuests: () => number;
   totalNights: () => number;
@@ -460,6 +498,8 @@ const initialState: BuilderState = {
   adults: 2,
   children: 0,
   specialNeeds: [],
+  guestSpecialRequirements: { ...EMPTY_GUEST_SPECIAL_REQUIREMENTS },
+  guestSpecialRequirementsAcked: false,
   guestHasJRPass: null,
   guestHasICCard: null,
   guestNeedsTransitHelp: null,
@@ -482,6 +522,12 @@ const initialState: BuilderState = {
   highestUnlockedStep: 1,
   travelPace: null,
   preferredTourLanguage: "EN",
+  meetingPoint: "",
+  meetingPointName: "",
+  meetingPointLat: null,
+  meetingPointLng: null,
+  meetingPointPlaceId: "",
+  meetingLogisticsConfirmed: false,
   experienceProfile: null,
   activeSeasonTier: null,
   activeSeasonNote: null,
@@ -524,6 +570,8 @@ const BUILDER_PERSIST_KEYS = [
   "adults",
   "children",
   "specialNeeds",
+  "guestSpecialRequirements",
+  "guestSpecialRequirementsAcked",
   "guestHasJRPass",
   "guestHasICCard",
   "guestNeedsTransitHelp",
@@ -546,6 +594,12 @@ const BUILDER_PERSIST_KEYS = [
   "highestUnlockedStep",
   "travelPace",
   "preferredTourLanguage",
+  "meetingPoint",
+  "meetingPointName",
+  "meetingPointLat",
+  "meetingPointLng",
+  "meetingPointPlaceId",
+  "meetingLogisticsConfirmed",
   "experienceProfile",
   "tempBookingRef",
   "confirmedBookingRef",
@@ -603,6 +657,12 @@ export function mergePersistedBuilderState(
   current: BuilderState
 ): BuilderState {
   const p = pickBuilderPayload(persisted);
+  // Self-heal drafts persisted/retrieved with a PB datetime arrivalDate.
+  if ("arrivalDate" in p) {
+    const normalizedArrival = normalizeDateIso(p.arrivalDate);
+    if (normalizedArrival) p.arrivalDate = normalizedArrival;
+    else delete p.arrivalDate;
+  }
   const rawLocs = p.locations ?? current.locations;
   const seenKeys = new Set<string>();
   const raw = rawLocs.map((l, i) => {
@@ -691,6 +751,50 @@ export function mergePersistedBuilderState(
           ["reduced_mobility", "baby_car_seat", "senior", "none"].includes(id)
         )
       : current.specialNeeds,
+    guestSpecialRequirements: (() => {
+      const persistedAcked = p.guestSpecialRequirementsAcked === true;
+      if (p.guestSpecialRequirements != null) {
+        return migrateUnsetGuestSpecialRequirements(
+          p.guestSpecialRequirements,
+          persistedAcked
+        );
+      }
+      if (Array.isArray(p.specialNeeds) && p.specialNeeds.length > 0) {
+        return guestReqsFromLegacySpecialNeeds(p.specialNeeds as string[]);
+      }
+      return migrateUnsetGuestSpecialRequirements(
+        current.guestSpecialRequirements,
+        persistedAcked || current.guestSpecialRequirementsAcked
+      );
+    })(),
+    guestSpecialRequirementsAcked: (() => {
+      const persistedAcked = p.guestSpecialRequirementsAcked === true;
+      const reqs =
+        p.guestSpecialRequirements != null
+          ? migrateUnsetGuestSpecialRequirements(
+              p.guestSpecialRequirements,
+              persistedAcked
+            )
+          : Array.isArray(p.specialNeeds) && p.specialNeeds.length > 0
+            ? guestReqsFromLegacySpecialNeeds(p.specialNeeds as string[])
+            : migrateUnsetGuestSpecialRequirements(
+                current.guestSpecialRequirements,
+                persistedAcked || current.guestSpecialRequirementsAcked
+              );
+      // null ≠ acked
+      if (!guestSpecialRequirementsChoicesComplete(reqs)) return false;
+      if (p.guestSpecialRequirementsAcked === true) return true;
+      if (p.guestSpecialRequirementsAcked === false) return false;
+      if (p.guestSpecialRequirements != null) {
+        return (
+          hasGuestSpecialRequirements(reqs) || Array.isArray(p.specialNeeds)
+        );
+      }
+      return (
+        current.guestSpecialRequirementsAcked ||
+        (Array.isArray(p.specialNeeds) && p.specialNeeds.length > 0)
+      );
+    })(),
     guestHasJRPass:
       p.guestHasJRPass === true || p.guestHasJRPass === false
         ? p.guestHasJRPass
@@ -827,9 +931,27 @@ function uid() {
   return `loc_${Math.random().toString(36).slice(2, 10)}`;
 }
 
+/**
+ * Bare YYYY-MM-DD from any date-ish value — PocketBase datetimes arrive
+ * as "2026-11-02 00:00:00.000Z", which split("-") parsing turns into NaN
+ * (same guard formatSingleDayDisplayDate uses in the Single-Day store).
+ */
+export function normalizeDateIso(raw: unknown): string | null {
+  if (raw == null) return null;
+  const m = String(raw).trim().match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!m) return null;
+  const y = Number(m[1]);
+  const mo = Number(m[2]);
+  const d = Number(m[3]);
+  if (!y || mo < 1 || mo > 12 || d < 1 || d > 31) return null;
+  return `${m[1]}-${m[2]}-${m[3]}`;
+}
+
 /** Add N calendar days to YYYY-MM-DD (local). */
 export function addDaysIso(iso: string, days: number): string {
-  const [y, m, d] = iso.split("-").map(Number);
+  const ymd = normalizeDateIso(iso);
+  if (!ymd) return "";
+  const [y, m, d] = ymd.split("-").map(Number);
   const dt = new Date(y, m - 1, d);
   dt.setDate(dt.getDate() + days);
   const yy = dt.getFullYear();
@@ -840,8 +962,10 @@ export function addDaysIso(iso: string, days: number): string {
 
 export function formatDisplayDate(iso: string | null | undefined): string {
   if (!iso) return "—";
-  const [y, m, d] = iso.split("-").map(Number);
-  if (!y || !m || !d) return iso;
+  const ymd = normalizeDateIso(iso);
+  // Never echo raw PB datetimes ("2026-11-02 00:00:00.000Z") or junk.
+  if (!ymd) return "—";
+  const [y, m, d] = ymd.split("-").map(Number);
   return new Date(y, m - 1, d).toLocaleDateString("en-GB", {
     day: "numeric",
     month: "short",
@@ -971,7 +1095,8 @@ export const useBuilderStore = create<BuilderState & BuilderActions>()(
             locations: distributeStayNights(s.locations, target),
           };
         }),
-      setArrivalDate: (iso) => set({ arrivalDate: iso }),
+      setArrivalDate: (iso) =>
+        set({ arrivalDate: iso ? normalizeDateIso(iso) : null }),
       setArrivalMode: (mode) =>
         set((s) => ({
           arrivalMode: mode,
@@ -1021,6 +1146,20 @@ export const useBuilderStore = create<BuilderState & BuilderActions>()(
           return { specialNeeds: next };
         }),
       setSpecialNeeds: (ids) => set({ specialNeeds: [...ids] }),
+      setGuestSpecialRequirements: (reqs) => {
+        const next = normalizeGuestSpecialRequirements(reqs);
+        set({
+          guestSpecialRequirements: next,
+          specialNeeds: legacySpecialNeedsFromGuestReqs(next),
+          guestSpecialRequirementsAcked:
+            guestSpecialRequirementsChoicesComplete(next),
+        });
+      },
+      ackGuestSpecialRequirements: () => {
+        const reqs = get().guestSpecialRequirements;
+        if (!guestSpecialRequirementsChoicesComplete(reqs)) return;
+        set({ guestSpecialRequirementsAcked: true });
+      },
 
       setCityHotel: (cityId, patch) =>
         set((s) => {
@@ -1600,6 +1739,20 @@ export const useBuilderStore = create<BuilderState & BuilderActions>()(
       setPreferredTourLanguage: (code) =>
         set({ preferredTourLanguage: String(code || "EN").trim() || "EN" }),
 
+      setMeetingPointDetails: ({ name, address, lat, lng, placeId }) =>
+        set({
+          meetingPointName: String(name || "").trim(),
+          meetingPoint: String(address || name || "").trim(),
+          meetingPointLat:
+            lat == null || !Number.isFinite(lat) ? null : lat,
+          meetingPointLng:
+            lng == null || !Number.isFinite(lng) ? null : lng,
+          meetingPointPlaceId: String(placeId || "").trim(),
+        }),
+
+      setMeetingLogisticsConfirmed: (meetingLogisticsConfirmed) =>
+        set({ meetingLogisticsConfirmed: Boolean(meetingLogisticsConfirmed) }),
+
       setTripMode: (mode) =>
         set({
           tripMode: mode === "single_day" ? "single_day" : "multi_day",
@@ -1687,13 +1840,13 @@ export const useBuilderStore = create<BuilderState & BuilderActions>()(
         }
         const raw = String(s.tempBookingRef || "").trim();
         if (raw) {
-          // Legacy TMP- → JPN- (same body); drop short TK- drafts for a fresh JPN-
-          if (isTempBookingRef(raw)) {
-            const next = normalizeBookingPNR(raw);
-            set({ tempBookingRef: next });
-            return next;
-          }
           const normalized = normalizeBookingPNR(raw);
+          // Keep DRAFT- until guest contact promotes it (see promoteDraftOnContact).
+          if (isTempBookingRef(normalized)) {
+            if (normalized !== raw) set({ tempBookingRef: normalized });
+            return normalized;
+          }
+          // Drop short TK- drafts for a fresh DRAFT-
           if (TK_PNR_RE.test(normalized)) {
             const next = generateTempPNR();
             set({ tempBookingRef: next, bookingStatus: "draft" });
@@ -1709,11 +1862,38 @@ export const useBuilderStore = create<BuilderState & BuilderActions>()(
         return next;
       },
 
+      /**
+       * When guest email/name is present, promote DRAFT- → JPN- (same body)
+       * so the header label switches from "Draft Booking Ref" → "Booking Ref".
+       */
+      promoteDraftOnContact: (hasContact: boolean) => {
+        if (!hasContact) return get().tempBookingRef || "";
+        if (!useBuilderStore.persist.hasHydrated()) {
+          return get().tempBookingRef || "";
+        }
+        const s = get();
+        const raw = String(s.tempBookingRef || "").trim();
+        if (!raw || !isTempBookingRef(raw)) {
+          return s.confirmedBookingRef || s.tempBookingRef || "";
+        }
+        const official = promoteTempToOfficial(raw);
+        set({
+          tempBookingRef: official,
+          confirmedBookingRef: s.confirmedBookingRef || official,
+          bookingStatus:
+            s.bookingStatus === "draft"
+              ? "in_progress"
+              : normalizeBookingStatus(s.bookingStatus),
+        });
+        return official;
+      },
+
       confirmBookingRef: (ref, status = "in_progress") => {
         const official = isValidBookingPNR(ref)
           ? normalizeBookingPNR(ref)
           : promoteTempToOfficial(ref);
         set({
+          tempBookingRef: official,
           confirmedBookingRef: official,
           bookingStatus: normalizeBookingStatus(status),
         });
@@ -1732,7 +1912,7 @@ export const useBuilderStore = create<BuilderState & BuilderActions>()(
         if (s.confirmedBookingRef && s.bookingStatus !== "draft") {
           return s.confirmedBookingRef;
         }
-        return resolveOfficialPNR(s.tempBookingRef || generateTempPNR());
+        return resolveOfficialPNR(s.tempBookingRef || generateConfirmedPNR());
       },
 
       totalGuests: () => {

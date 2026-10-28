@@ -225,7 +225,34 @@ export async function POST(req: Request) {
       }
     }
 
+    if (def.category === "hero") {
+      try {
+        buffer = Buffer.from(
+          await sharp(buffer)
+            .resize({ width: 1600, withoutEnlargement: true })
+            .webp({ quality: 80 })
+            .toBuffer()
+        );
+      } catch {
+        /* keep converted buffer */
+      }
+    }
     await writeFile(disk, buffer);
+    // Heroes are stable branding slots: also write the mobile proxy
+    // ({slot}--mobile.webp) so this editor and Site Branding stay
+    // literally the same image files — no second copy anywhere.
+    if (def.category === "hero") {
+      try {
+        const mobileDisk = disk.replace(/\.webp$/i, "--mobile.webp");
+        const mobile = await sharp(buffer)
+          .resize({ width: 768, withoutEnlargement: true })
+          .webp({ quality: 75 })
+          .toBuffer();
+        await writeFile(mobileDisk, mobile);
+      } catch {
+        /* web slot still saved */
+      }
+    }
     const row = await buildRow(def);
     const savedExt = path.extname(def.path).replace(".", "").toUpperCase();
     return NextResponse.json({

@@ -4,13 +4,12 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type PocketBase from "pocketbase";
 import { formatPbError } from "@/lib/pocketbase/admin-schema";
 import {
-  assignDriver,
   assignGuide,
   clearGuideAssignment,
-  postDriverBoard,
   postGuideBoard,
   type OpsDispatchRow,
 } from "@/lib/opsDispatch";
+import { DriverDispatchConsole } from "@/components/ops/DriverDispatchConsole";
 import {
   updateTicketsByPnr,
   type OpsTicketsRow,
@@ -35,11 +34,14 @@ import {
 } from "@/lib/bookingStatus";
 import { GuideDispatchTab } from "@/components/staff/GuideDispatchTab";
 import { OpsActivityLogPanel } from "@/components/staff/OpsActivityLogPanel";
-import { OpsCommsRemindersTab } from "@/components/staff/OpsCommsRemindersTab";
-import { OpsPaymentStatusBadges } from "@/components/staff/OpsPaymentStatusBadges";
+import { SingleBookingCommsTab } from "@/components/ops/SingleBookingCommsTab";
+import { PaymentMilestoneBar } from "@/components/ops/PaymentMilestoneBar";
+import { BulkJourneyDispatchButton } from "@/components/ops/BulkJourneyDispatchButton";
+import { NotifyLockDatesButton } from "@/components/ops/NotifyLockDatesButton";
 import { GuestRequirementsTab } from "@/components/staff/GuestRequirementsTab";
 import {
   listGuideJobsForPnr,
+  normalizeGuideJobStatus,
   type GuideJobRow,
 } from "@/lib/guideJobs";
 import {
@@ -54,6 +56,7 @@ import {
 } from "@/components/staff/opsHubClient";
 import { useTeamAuth } from "@/store/useTeamAuth";
 import { canAccessMoney } from "@/lib/staffRoles";
+import { journeyItineraryHref } from "@/lib/builderRoutes";
 
 type InspectorTab =
   | "requirements"
@@ -97,7 +100,7 @@ function getDispatchStrategy(opts: {
   if (!rawDate) {
     return {
       label: "TIMING NOT SET",
-      style: "border-zinc-500/30 bg-zinc-500/20 text-zinc-400",
+      style: "border-slate-300 bg-slate-100 text-slate-600",
     };
   }
 
@@ -107,7 +110,7 @@ function getDispatchStrategy(opts: {
   if (Number.isNaN(start.getTime())) {
     return {
       label: "TIMING NOT SET",
-      style: "border-zinc-500/30 bg-zinc-500/20 text-zinc-400",
+      style: "border-slate-300 bg-slate-100 text-slate-600",
     };
   }
 
@@ -137,20 +140,20 @@ function getDispatchStrategy(opts: {
     return {
       label:
         "⚠️ CHECK GUIDE AVAILABILITY FIRST (Do Not Request Payment Yet)",
-      style: "border-amber-500/30 bg-amber-500/20 text-amber-300",
+      style: "border-amber-500/40 bg-amber-50 text-amber-800",
     };
   }
 
   if (diffMonths >= 3) {
     return {
       label: "💳 30% DEPOSIT ONLY (Defer Guide Assignment)",
-      style: "border-blue-500/30 bg-blue-500/20 text-blue-300",
+      style: "border-blue-500/40 bg-blue-50 text-blue-800",
     };
   }
 
   return {
     label: "✅ COLLECT PAYMENT FIRST (Assign Guide Later)",
-    style: "border-emerald-500/30 bg-emerald-500/20 text-emerald-300",
+    style: "border-emerald-500/40 bg-emerald-50 text-emerald-800",
   };
 }
 
@@ -207,7 +210,7 @@ function TabPanel({
 }) {
   return (
     <div className="space-y-4">
-      <h3 className="font-sans text-[11px] font-semibold tracking-[0.14em] text-zinc-500 uppercase">
+      <h3 className="font-sans text-[11px] font-semibold tracking-[0.14em] text-slate-500 uppercase">
         {title}
       </h3>
       {children}
@@ -262,7 +265,6 @@ export function OpsBookingInspector({
   );
   const [agentId, setAgentId] = useState(row.assigned_agent_id || "");
   const [guideId, setGuideId] = useState(dispatch?.assigned_guide_id || "");
-  const [driverId, setDriverId] = useState(dispatch?.assigned_driver_id || "");
   const [ticketerId, setTicketerId] = useState(
     tickets?.assigned_ticketer_id || row.assigned_ticketer_id || ""
   );
@@ -277,6 +279,8 @@ export function OpsBookingInspector({
   const [saveVersion, setSaveVersion] = useState<number | null>(null);
   const [balUpdated, setBalUpdated] = useState<string | null>(null);
   const [productLabel, setProductLabel] = useState("");
+  /** BAL `bookings_and_leads.type` for this PNR — Journey routing discriminator. */
+  const [leadType, setLeadType] = useState("");
   const rowRef = useRef(row);
   rowRef.current = row;
   const reqsPnrRef = useRef<string>("");
@@ -291,6 +295,7 @@ export function OpsBookingInspector({
     setSaveVersion(null);
     setBalUpdated(null);
     setProductLabel("");
+    setLeadType("");
     const pnr = String(row.pnr || "")
       .trim()
       .toUpperCase()
@@ -315,6 +320,7 @@ export function OpsBookingInspector({
         setBalUpdated(
           String(bal.last_saved_at || bal.updated || "").trim() || null
         );
+        setLeadType(String(bal.type || ""));
         setProductLabel(
           opsProductLabelFromLead({
             type: bal.type,
@@ -328,6 +334,7 @@ export function OpsBookingInspector({
           setSaveVersion(null);
           setBalUpdated(null);
           setProductLabel("");
+          setLeadType("");
         }
       }
     })();
@@ -343,7 +350,6 @@ export function OpsBookingInspector({
     setPaymentConfirmed(Boolean(row.payment_confirmed));
     setAgentId(row.assigned_agent_id || "");
     setGuideId(dispatch?.assigned_guide_id || "");
-    setDriverId(dispatch?.assigned_driver_id || "");
     setTicketerId(
       tickets?.assigned_ticketer_id || row.assigned_ticketer_id || ""
     );
@@ -417,11 +423,47 @@ export function OpsBookingInspector({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pb, row.pnr, activeTab]);
 
-  const guideStatus = normalizeGuideConfirmStatus(dispatch?.guide_mode, {
-    boardVisible: Boolean(dispatch?.guide_board_visible),
-    assignedGuideId: dispatch?.assigned_guide_id,
-    guideResponse: dispatch?.guide_response,
-  });
+  /** Prefer guide_jobs rollup when present; else ops_dispatch guide_mode/response. */
+  const guideStatus = useMemo(() => {
+    if (guideJobs.length > 0) {
+      const statuses = guideJobs.map((j) => normalizeGuideJobStatus(j.status));
+      if (statuses.some((s) => s === "ACCEPTED" || s === "COMPLETED")) {
+        return "guide_confirmed" as const;
+      }
+      if (statuses.some((s) => s === "OFFERED")) {
+        return "pending_guide_acceptance" as const;
+      }
+      if (statuses.some((s) => s === "OPEN_BOARD")) {
+        return "posted_open_board" as const;
+      }
+      if (statuses.some((s) => s === "REJECTED")) {
+        return "refused" as const;
+      }
+      const hasAssigned = guideJobs.some(
+        (j) => Boolean(String(j.assigned_guide_staff_id || "").trim())
+      );
+      if (hasAssigned) return "pending_guide_acceptance" as const;
+      return "unassigned" as const;
+    }
+    return normalizeGuideConfirmStatus(dispatch?.guide_mode, {
+      boardVisible: Boolean(dispatch?.guide_board_visible),
+      assignedGuideId: dispatch?.assigned_guide_id,
+      guideResponse: dispatch?.guide_response,
+    });
+  }, [
+    guideJobs,
+    dispatch?.guide_mode,
+    dispatch?.guide_board_visible,
+    dispatch?.assigned_guide_id,
+    dispatch?.guide_response,
+  ]);
+
+  const guidePillTone =
+    guideStatus === "guide_confirmed"
+      ? ("ok" as const)
+      : guideStatus === "unassigned"
+        ? ("neutral" as const)
+        : ("warn" as const);
 
   const ticketBadge = useMemo(() => {
     const lines = Array.isArray(tickets?.ticket_lines)
@@ -507,14 +549,6 @@ export function OpsBookingInspector({
     onReloadPockets,
   ]);
 
-  const driverNeeded =
-    row.driver_needed === true ||
-    dispatch?.driver_needed === true ||
-    Boolean(driverId) ||
-    Boolean(dispatch?.assigned_driver_id);
-  const driverMode = String(dispatch?.driver_mode || "unassigned");
-  const driverApplies = driverNeeded;
-
   const saveGeneralStatus = (payload?: BookingStatusSavePayload) =>
     onSave(
       `${row.id}:status`,
@@ -537,6 +571,18 @@ export function OpsBookingInspector({
           nextStatusRaw,
           nextPayment
         );
+        const prevAgentId = String(row.assigned_agent_id || "").trim();
+        const agentChanged = nextAgentId !== prevAgentId;
+        // Assignment is immediate — no pending-accept flow.
+        const nextAgentResponse: "none" | "accepted" = nextAgentId
+          ? "accepted"
+          : "none";
+        const agentDisplayName =
+          agent?.name ||
+          agent?.email ||
+          (staffId && nextAgentId === String(staffId) ? staffName : "") ||
+          (agentChanged ? "" : row.assigned_agent) ||
+          "";
 
         if (payload) {
           setStatus(nextStatusRaw);
@@ -544,18 +590,33 @@ export function OpsBookingInspector({
           setAgentId(nextAgentId);
         }
 
-        await pb.collection("ops_hub").update(
-          row.id,
-          {
-            status: nextStatus,
-            payment_confirmed: nextPayment,
-            tour_payment_status: nextTourPay,
-            assigned_agent_id: nextAgentId,
-            assigned_agent:
-              agent?.name || agent?.email || row.assigned_agent || "",
-          },
-          { requestKey: null }
-        );
+        const hubPatch: Record<string, unknown> = {
+          status: nextStatus,
+          payment_confirmed: nextPayment,
+          tour_payment_status: nextTourPay,
+          assigned_agent_id: nextAgentId,
+          assigned_agent: agentDisplayName,
+          agent_response: nextAgentResponse,
+        };
+        try {
+          await pb
+            .collection("ops_hub")
+            .update(row.id, hubPatch, { requestKey: null });
+        } catch (e) {
+          // Pre-migration: agent_response select may not exist yet
+          const msg = formatPbError(e);
+          if (
+            "agent_response" in hubPatch &&
+            (msg.includes("agent_response") || msg.includes("Unknown field"))
+          ) {
+            const { agent_response: _drop, ...rest } = hubPatch;
+            await pb
+              .collection("ops_hub")
+              .update(row.id, rest, { requestKey: null });
+          } else {
+            throw e;
+          }
+        }
         if (typeof nextStatus === "string" && nextStatus !== row.status) {
           const { syncDetailStatusFromOpsHub } = await import(
             "@/lib/syncOpsStatusToDetail"
@@ -669,11 +730,11 @@ export function OpsBookingInspector({
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      {/* Compact blue PNR header card */}
-      <div className="shrink-0 border-b border-zinc-800 px-3 pt-3 pb-2 sm:px-4">
-        <div className="rounded-xl border border-[#075473] bg-[#075473]/30 p-3 text-white shadow-lg">
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0 flex-1">
+      {/* Compact PNR header — solid dark island on cream shell */}
+      <div className="shrink-0 border-b border-slate-200 px-3 pt-3 pb-2 sm:px-4">
+        <div className="rounded-xl border border-zinc-700 bg-[#23262c] p-3 text-white shadow-lg">
+          <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-x-3 gap-y-1">
+            <div className="min-w-0">
               <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
                 <span className="font-mono text-[0.8025rem] font-semibold tracking-wide text-cyan-300">
                   PNR {row.pnr}
@@ -686,58 +747,64 @@ export function OpsBookingInspector({
                 ) : null}
               </div>
               {(productLabel || reqs?.productLabel) ? (
-                <p className="mt-0.5 text-[11px] text-white/60">
+                <p className="mt-0.5 truncate text-[11px] text-white/60">
                   {productLabel || reqs?.productLabel}
                 </p>
               ) : null}
-              <h3 className="mt-0.5 truncate text-[0.9rem] font-bold leading-snug text-white">
-                {[
-                  reqs?.guestName?.trim() && reqs.guestName !== "—"
-                    ? reqs.guestName.trim()
-                    : null,
-                  row.primary_city || "—",
-                  paxLabel,
-                ]
-                  .filter(Boolean)
-                  .join(" · ")}
-              </h3>
-              {!headerCollapsed ? (
-                <p className="mt-0.5 text-xs text-white/70">
-                  {row.tour_date ? String(row.tour_date).slice(0, 10) : "—"}
-                  {row.guest_summary
-                    ? ` · ${row.guest_summary}`
-                    : ""}
-                  {" · "}
-                  Last mod {formatLastModified(balUpdated || row.updated)}
+              {!headerCollapsed &&
+              reqs?.guestName?.trim() &&
+              reqs.guestName !== "—" ? (
+                <p className="mt-0.5 truncate text-[11px] text-white/70">
+                  {reqs.guestName.trim()}
                 </p>
-              ) : (
-                <p className="mt-0.5 text-xs text-white/60">
-                  {row.tour_date ? String(row.tour_date).slice(0, 10) : "—"}
-                </p>
-              )}
+              ) : null}
             </div>
-            <button
-              type="button"
-              onClick={() => setHeaderCollapsed((v) => !v)}
-              className="shrink-0 rounded-lg bg-white/10 px-3 py-1 text-[10px] font-semibold tracking-wide text-white uppercase transition hover:bg-white/20"
-            >
-              {headerCollapsed ? "Expand" : "Compact"}
-            </button>
+            <div className="min-w-0 max-w-[14rem] text-center sm:max-w-[18rem]">
+              <p className="truncate text-[0.9rem] font-bold leading-snug text-white">
+                {[row.primary_city || "—", paxLabel].join(" · ")}
+              </p>
+              <p className="mt-0.5 truncate text-xs text-white/60">
+                {row.tour_date ? String(row.tour_date).slice(0, 10) : "—"}
+                {!headerCollapsed && row.guest_summary
+                  ? ` · ${row.guest_summary}`
+                  : ""}
+                {!headerCollapsed
+                  ? ` · Last mod ${formatLastModified(balUpdated || row.updated)}`
+                  : ""}
+              </p>
+            </div>
+            <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5">
+              <button
+                type="button"
+                onClick={() => setHeaderCollapsed((v) => !v)}
+                className="rounded-lg bg-white/10 px-3 py-1 text-[10px] font-semibold tracking-wide text-white uppercase transition hover:bg-white/20"
+              >
+                {headerCollapsed ? "Expand" : "Compact"}
+              </button>
+              {row.pnr ? (
+                <a
+                  href={journeyItineraryHref(row.pnr, {
+                    type: leadType || undefined,
+                    productLabel:
+                      productLabel || reqs?.productLabel || undefined,
+                  })}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="rounded-lg bg-[#F6A724] px-3 py-1 text-[10px] font-bold tracking-wide text-black uppercase transition hover:bg-[#ffb63e]"
+                  title="Open the guest Journey dossier for this PNR (1-Day Express Pass → Single-Day Builder, otherwise Grand Japan Journey)"
+                >
+                  View Journey
+                </a>
+              ) : null}
+            </div>
           </div>
           {!headerCollapsed ? (
             <div className="mt-2.5 flex flex-wrap gap-2">
               <StatusPill label="Booking" value={bookingStatusLabel} tone="info" />
-              <OpsPaymentStatusBadges row={row} className="gap-2" />
               <StatusPill
                 label="Guide"
                 value={guideConfirmStaffLabel(guideStatus)}
-                tone={
-                  guideStatus === "guide_confirmed"
-                    ? "ok"
-                    : guideStatus === "unassigned"
-                      ? "neutral"
-                      : "warn"
-                }
+                tone={guidePillTone}
               />
               <StatusPill
                 label="Tickets"
@@ -748,17 +815,38 @@ export function OpsBookingInspector({
           ) : (
             <div className="mt-2 flex flex-wrap gap-1.5">
               <OpsStatusBadge status={effectiveStatus} />
-              <OpsPaymentStatusBadges row={row} />
-              <span className="rounded-md border border-amber-500/30 bg-amber-500/10 px-1.5 py-0.5 text-[9px] text-amber-300">
-                Guide: {guideConfirmStaffLabel(guideStatus)}
-              </span>
+              <PaymentMilestoneBar hub={row} compact />
+              <StatusPill
+                label="Guide"
+                value={guideConfirmStaffLabel(guideStatus)}
+                tone={guidePillTone}
+              />
             </div>
           )}
+          {!headerCollapsed ? (
+            <div className="mt-3 space-y-2">
+              <PaymentMilestoneBar hub={row} />
+              <NotifyLockDatesButton
+                pnr={row.pnr}
+                hub={row}
+                pb={pb}
+                onDone={() => void onReloadPockets()}
+              />
+              <BulkJourneyDispatchButton
+                pnr={row.pnr}
+                hub={row}
+                pb={pb}
+                onDone={() => void onReloadPockets()}
+              />
+            </div>
+          ) : null}
         </div>
       </div>
 
+      {/* Tabs + content sit on cream; PNR header above stays dark chrome */}
+      <div className="flex min-h-0 flex-1 flex-col bg-[#faf9f4]">
       {/* File-folder tab bar */}
-      <div className="shrink-0 border-b border-zinc-800 px-3 pt-2 pb-0">
+      <div className="shrink-0 border-b border-slate-200 px-3 pt-2 pb-0">
         <div
           className="flex gap-1 overflow-x-auto pb-2"
           role="tablist"
@@ -775,8 +863,8 @@ export function OpsBookingInspector({
                 onClick={() => setActiveTab(tab.id)}
                 className={`shrink-0 rounded-t-lg border px-3 py-2 text-[10px] font-bold tracking-wide uppercase whitespace-nowrap transition ${
                   active
-                    ? "border-amber-500/60 border-b-transparent bg-[#075473] text-white"
-                    : "border-white/10 bg-zinc-900/50 text-zinc-400 hover:text-zinc-200"
+                    ? "border-amber-500/60 border-b-transparent bg-[#23262c] text-white"
+                    : "border-[#23262c]/50 bg-[#23262c]/80 text-zinc-400 hover:bg-[#23262c] hover:text-zinc-200"
                 }`}
               >
                 {tab.label}
@@ -791,9 +879,9 @@ export function OpsBookingInspector({
         {activeTab === "requirements" ? (
           <TabPanel title="Guest requirements">
             {reqsError ? (
-              <p className="text-xs text-red-400">{reqsError}</p>
+              <p className="text-xs text-red-600">{reqsError}</p>
             ) : !reqs ? (
-              <p className="text-xs text-zinc-500">Loading booking context…</p>
+              <p className="text-xs text-slate-500">Loading booking context…</p>
             ) : (
               <GuestRequirementsTab
                 reqs={reqs}
@@ -851,100 +939,28 @@ export function OpsBookingInspector({
 
         {activeTab === "driver" ? (
           <TabPanel title="Driver dispatch & transit">
-            <p className="text-xs text-zinc-500">
-              Requirement:{" "}
-              <span className="text-zinc-300">
-                {driverApplies ? "Driver needed" : "Not required"}
-              </span>
-              {" · "}
-              Status:{" "}
-              <span className="text-zinc-300">
-                {driverMode === "claimed"
-                  ? "Claimed"
-                  : driverMode === "open"
-                    ? "Posted on board"
-                    : driverMode === "direct"
-                      ? "Assigned"
-                      : "Unassigned"}
-              </span>
-              {dispatch?.assigned_driver
-                ? ` · ${dispatch.assigned_driver}`
-                : ""}
-            </p>
-            <div className="flex flex-wrap gap-2">
-              <select
-                className="min-w-[12rem] flex-1 rounded-lg border border-zinc-700 bg-zinc-950 px-2 py-1.5 text-xs"
-                value={driverId}
-                disabled={saving}
-                onChange={(e) => setDriverId(e.target.value)}
-              >
-                <option value="">Assign driver / fleet…</option>
-                {drivers.map((d) => (
-                  <option key={d.id} value={d.id}>
-                    {d.name || d.email}
-                  </option>
-                ))}
-              </select>
-              <button
-                type="button"
-                disabled={saving || !driverId}
-                className="rounded-lg bg-[#075473] px-3 py-1.5 text-[11px] font-semibold text-white disabled:opacity-40"
-                onClick={() =>
-                  void onSave(
-                    `${row.id}:driver`,
-                    async () => {
-                      const d = drivers.find((x) => x.id === driverId);
-                      await assignDriver(pb, {
-                        pnr: row.pnr,
-                        staffId: driverId,
-                        staffName: d?.name || d?.email || "",
-                        byStaffId: staffId || undefined,
-                      });
-                      await onReloadPockets();
-                    },
-                    "Driver assignment saved"
-                  )
-                }
-              >
-                Save Driver Assignment
-              </button>
-              <button
-                type="button"
-                disabled={saving}
-                className="rounded-lg border border-zinc-600 px-3 py-1.5 text-[11px] text-zinc-300 disabled:opacity-40"
-                onClick={() =>
-                  void onSave(
-                    `${row.id}:driver-board`,
-                    async () => {
-                      await postDriverBoard(pb, {
-                        pnr: row.pnr,
-                        byStaffId: staffId || undefined,
-                      });
-                      setDriverId("");
-                      await onReloadPockets();
-                    },
-                    "Driver posted to board"
-                  )
-                }
-              >
-                Post Driver Board
-              </button>
-            </div>
-            <p className="text-[11px] text-zinc-600">
-              Use for pick-up / drop-off or special private car. Leave empty when
-              not required. Vehicle tier & rate-sheet lookup live on the Driver
-              portal rate card.
-            </p>
+            <DriverDispatchConsole
+              pb={pb}
+              row={row}
+              dispatch={dispatch}
+              drivers={drivers}
+              reqs={reqs}
+              saving={saving}
+              staffId={staffId}
+              onJobsChanged={async () => {
+                await onReloadPockets();
+              }}
+            />
           </TabPanel>
         ) : null}
 
         {activeTab === "tickets" ? (
           <TabPanel title="Tickets & logistics">
             <div className="grid gap-3 sm:grid-cols-2">
-              <label className="block text-[10px] font-bold tracking-wider text-zinc-500 uppercase">
+              <label className="block text-[10px] font-bold tracking-wider text-slate-500 uppercase">
                 Access / ticket purchase status
                 <select
-                  className="mt-1 w-full rounded-lg border border-zinc-700 bg-zinc-950 px-2 py-1.5 text-xs"
+                  className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-900"
                   value={ticketStatus}
                   disabled={saving}
                   onChange={(e) => setTicketStatus(e.target.value)}
@@ -957,10 +973,10 @@ export function OpsBookingInspector({
                   </option>
                 </select>
               </label>
-              <label className="block text-[10px] font-bold tracking-wider text-zinc-500 uppercase">
+              <label className="block text-[10px] font-bold tracking-wider text-slate-500 uppercase">
                 Ticketer assigned
                 <select
-                  className="mt-1 w-full rounded-lg border border-zinc-700 bg-zinc-950 px-2 py-1.5 text-xs"
+                  className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-900"
                   value={ticketerId}
                   disabled={saving}
                   onChange={(e) => setTicketerId(e.target.value)}
@@ -972,25 +988,6 @@ export function OpsBookingInspector({
                     </option>
                   ))}
                 </select>
-              </label>
-              <label className="block text-[10px] font-bold tracking-wider text-zinc-500 uppercase sm:col-span-2">
-                Tickets required / instructions
-                <textarea
-                  className="mt-1 h-16 w-full rounded-lg border border-zinc-700 bg-zinc-900 px-2 py-1.5 text-xs text-white"
-                  value={ticketNotes}
-                  disabled={saving}
-                  onChange={(e) => setTicketNotes(e.target.value)}
-                  placeholder="e.g. 4× teamLab Planets entries for 10:30"
-                />
-              </label>
-              <label className="block text-[10px] font-bold tracking-wider text-zinc-500 uppercase sm:col-span-2">
-                Pickup & meeting notes
-                <textarea
-                  className="mt-1 h-16 w-full rounded-lg border border-zinc-700 bg-zinc-900 px-2 py-1.5 text-xs text-white"
-                  value={pickupNotes}
-                  disabled={saving}
-                  onChange={(e) => setPickupNotes(e.target.value)}
-                />
               </label>
             </div>
             <div className="flex flex-wrap items-center gap-2">
@@ -1009,8 +1006,44 @@ export function OpsBookingInspector({
               pnr={row.pnr}
               tourDate={row.tour_date}
               tickets={tickets}
+              guestPaxLabel={paxLabel}
               onReload={() => void onReloadPockets()}
             />
+
+            <details className="mt-3 rounded-xl border border-slate-200 bg-white p-3">
+              <summary className="cursor-pointer text-[10px] font-bold tracking-wider text-slate-500 uppercase">
+                Secondary notes (optional)
+              </summary>
+              <div className="mt-3 grid gap-3">
+                <label className="block text-[10px] font-bold tracking-wider text-slate-500 uppercase">
+                  Tickets required / instructions
+                  <textarea
+                    className="mt-1 h-14 w-full rounded-lg border border-slate-200 bg-slate-50 px-2 py-1.5 text-xs text-slate-900"
+                    value={ticketNotes}
+                    disabled={saving}
+                    onChange={(e) => setTicketNotes(e.target.value)}
+                    placeholder="Free-text notes for the ticketer (checklist above is primary)"
+                  />
+                </label>
+                <label className="block text-[10px] font-bold tracking-wider text-slate-500 uppercase">
+                  Pickup & meeting notes
+                  <textarea
+                    className="mt-1 h-14 w-full rounded-lg border border-slate-200 bg-slate-50 px-2 py-1.5 text-xs text-slate-900"
+                    value={pickupNotes}
+                    disabled={saving}
+                    onChange={(e) => setPickupNotes(e.target.value)}
+                  />
+                </label>
+                <button
+                  type="button"
+                  disabled={saving}
+                  className="w-fit rounded-lg border border-slate-300 px-3 py-1.5 text-[11px] text-slate-700 disabled:opacity-40"
+                  onClick={() => void saveLogistics()}
+                >
+                  {saving ? "Saving…" : "Save notes"}
+                </button>
+              </div>
+            </details>
           </TabPanel>
         ) : null}
 
@@ -1028,18 +1061,14 @@ export function OpsBookingInspector({
 
         {activeTab === "comms" ? (
           <TabPanel title="Comms & reminders">
-            <OpsCommsRemindersTab
+            <SingleBookingCommsTab
               row={row}
               pb={pb}
-              guestName={
-                reqs?.guestName?.trim() && reqs.guestName !== "—"
-                  ? reqs.guestName.trim()
-                  : null
-              }
               onSent={() => void onReloadPockets()}
             />
           </TabPanel>
         ) : null}
+      </div>
       </div>
     </div>
   );

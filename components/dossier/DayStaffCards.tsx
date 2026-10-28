@@ -106,7 +106,7 @@ export function StaffIdentityCard({
   /** e.g. “Vehicle secured · Pending assignment” */
   serviceHint?: string | null;
 }) {
-  const label = role === "guide" ? "Guide" : "Driver";
+  const label = role === "guide" ? "Tour Guide" : "Driver";
   const assigned = Boolean(name && String(name).trim());
   const secured = !assigned && Boolean(serviceTitle && String(serviceTitle).trim());
   const pendingCopy =
@@ -120,52 +120,54 @@ export function StaffIdentityCard({
   const wa = String(whatsappDigits || "").replace(/\D/g, "");
   const phoneDisplay = String(phone || "").trim();
   return (
-    <div className="flex items-center gap-3 rounded-xl border border-white/10 bg-black/30 px-3 py-2 print:border-gray-300 print:bg-transparent">
+    <div className="flex items-center gap-3 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 print:border-gray-300 print:bg-transparent">
       {photoUrl && assigned ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
           src={photoUrl}
           alt=""
-          className="h-12 w-12 shrink-0 rounded-xl object-cover ring-1 ring-white/10"
+          className="h-12 w-12 shrink-0 rounded-xl object-cover ring-1 ring-gray-200"
         />
       ) : (
         <div
           className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border text-[10px] font-bold tracking-wider uppercase print:border-gray-300 print:bg-transparent print:text-gray-700 ${
             assigned
-              ? "border-cyan-500/30 bg-cyan-950/40 text-cyan-300"
+              ? "border-cyan-600/30 bg-cyan-50 text-cyan-700"
               : secured
-                ? "border-amber-500/40 bg-amber-500/10 text-amber-300"
-                : "border-white/10 bg-zinc-900 text-zinc-600"
+                ? "border-amber-500/40 bg-amber-50 text-amber-700"
+                : "border-gray-200 bg-white text-gray-400"
           }`}
         >
           {secured ? <Icon className="h-5 w-5" aria-hidden /> : "ID"}
         </div>
       )}
       <div className="min-w-0">
-        <p className="text-[9px] font-semibold tracking-wider text-zinc-500 uppercase print:text-gray-600">
+        <p
+          className={`${role === "guide" ? "text-[10.5px]" : "text-[9px]"} font-semibold tracking-wider text-gray-500 uppercase print:text-gray-600`}
+        >
           {label}
         </p>
         {assigned ? (
           <>
-            <p className="truncate text-sm font-semibold text-white print:text-gray-900">
+            <p className="truncate text-sm font-semibold text-[#060A0F] print:text-gray-900">
               {name}
             </p>
             {email ? (
               <a
                 href={`mailto:${email}`}
-                className="block truncate text-[11px] text-cyan-300/80 hover:underline print:text-gray-700"
+                className="block truncate text-[11px] text-cyan-700 hover:underline print:text-gray-700"
               >
                 {email}
               </a>
             ) : null}
             {phoneDisplay || wa ? (
-              <p className="truncate text-[11px] text-zinc-400 print:text-gray-700">
+              <p className="truncate text-[11px] text-gray-500 print:text-gray-700">
                 {wa ? (
                   <a
                     href={`https://wa.me/${wa}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-emerald-300/90 hover:underline"
+                    className="text-emerald-700 hover:underline"
                   >
                     WhatsApp
                   </a>
@@ -175,22 +177,22 @@ export function StaffIdentityCard({
               </p>
             ) : null}
             {unlockMessage ? (
-              <p className="mt-0.5 text-[10px] leading-snug text-amber-300/85 print:text-gray-600">
+              <p className="mt-0.5 text-[10px] leading-snug text-amber-700 print:text-gray-600">
                 {unlockMessage}
               </p>
             ) : null}
           </>
         ) : secured ? (
           <>
-            <p className="truncate text-sm font-semibold text-white print:text-gray-900">
+            <p className="truncate text-sm font-semibold text-[#060A0F] print:text-gray-900">
               {serviceTitle}
             </p>
-            <p className="truncate text-[11px] text-amber-300/85 print:text-gray-700">
+            <p className="truncate text-[11px] text-amber-700 print:text-gray-700">
               {serviceHint || defaultHint}
             </p>
           </>
         ) : (
-          <p className="text-xs text-zinc-500 print:text-gray-600">
+          <p className="text-xs text-gray-500 print:text-gray-600">
             {pendingCopy}
           </p>
         )}
@@ -204,6 +206,7 @@ export function TicketStubCard({
   title,
   subtitle,
   accessType,
+  kindBadge,
   thumbUrl,
   stopNumber,
   durationHours,
@@ -212,11 +215,14 @@ export function TicketStubCard({
   subtitle?: string;
   /** tours.access_type — Ticket vs Admission vs VIP vs Timed */
   accessType?: string | null;
+  /** Catalog kind chip (Experience & Ticket / Area…) — preferred over accessType */
+  kindBadge?: string | null;
   thumbUrl?: string;
   stopNumber?: number;
   durationHours?: number;
 }) {
-  const badge = accessTypeGuestBadge(accessType);
+  const badge =
+    String(kindBadge || "").trim() || accessTypeGuestBadge(accessType);
   return (
     <PaperActivityTicketCard
       kind="ticket"
@@ -234,12 +240,22 @@ export function TicketStubCard({
 export function DayServiceIdleRow({
   label,
   message,
+  surface = "dark",
 }: {
   label: string;
   message: string;
+  /** `light` when the row sits on a white itinerary page (not a dark card). */
+  surface?: "dark" | "light";
 }) {
+  const onLight = surface === "light";
   return (
-    <div className="rounded-xl border border-dashed border-white/10 bg-zinc-950/40 px-3 py-2">
+    <div
+      className={`rounded-xl border border-dashed px-3 py-2 ${
+        onLight
+          ? "border-slate-300 bg-slate-50"
+          : "border-white/10 bg-zinc-950/40"
+      }`}
+    >
       <p className="text-[9px] font-semibold tracking-wider text-zinc-500 uppercase">
         {label}
       </p>
@@ -250,8 +266,12 @@ export function DayServiceIdleRow({
 
 const ticketActionIdleClass =
   "inline-flex h-9 w-9 items-center justify-center rounded-lg border border-white/10 bg-zinc-900/70 text-zinc-500 opacity-45 cursor-not-allowed";
+const ticketActionIdleClassLight =
+  "inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-slate-100 text-slate-400 opacity-60 cursor-not-allowed";
 const ticketActionReadyClass =
   "inline-flex h-9 w-9 items-center justify-center rounded-lg border border-emerald-500/40 bg-emerald-500/15 text-emerald-200 transition hover:bg-emerald-500/25";
+const ticketActionReadyClassLight =
+  "inline-flex h-9 w-9 items-center justify-center rounded-lg border border-emerald-600/40 bg-emerald-50 text-emerald-700 transition hover:bg-emerald-100";
 
 /**
  * Agent-services ticket row for guest Day Services (Suica, Teamlab, entry…).
@@ -263,6 +283,7 @@ export function DayServiceTicketRow({
   downloadUrl,
   downloadFilename,
   guestEmail,
+  surface = "dark",
 }: {
   title: string;
   ready: boolean;
@@ -270,7 +291,10 @@ export function DayServiceTicketRow({
   downloadFilename?: string | null;
   /** Optional prefill for send-by-email mailto. */
   guestEmail?: string | null;
+  /** `light` when the row sits on a white itinerary page (not a dark card). */
+  surface?: "dark" | "light";
 }) {
+  const onLight = surface === "light";
   const href = String(downloadUrl || "").trim();
   const filename =
     String(downloadFilename || "").trim() || "TokioTours_Ticket_Voucher.pdf";
@@ -285,20 +309,32 @@ export function DayServiceTicketRow({
       : `Your ticket (${title}) is ready. Check your TokioTours booking for the voucher.\n`
   );
   const mailtoHref = `mailto:${to}?subject=${mailSubject}&body=${mailBody}`;
+  const idleAction = onLight ? ticketActionIdleClassLight : ticketActionIdleClass;
+  const readyAction = onLight
+    ? ticketActionReadyClassLight
+    : ticketActionReadyClass;
 
   return (
     <div
       className={`flex items-center gap-3 rounded-xl border px-3 py-2 ${
         ready
-          ? "border-emerald-500/40 bg-emerald-500/10"
-          : "border-amber-500/35 bg-amber-500/10"
+          ? onLight
+            ? "border-emerald-600/35 bg-emerald-50"
+            : "border-emerald-500/40 bg-emerald-500/10"
+          : onLight
+            ? "border-amber-500/40 bg-amber-50"
+            : "border-amber-500/35 bg-amber-500/10"
       }`}
     >
       <div
         className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border ${
           ready
-            ? "border-emerald-500/40 bg-emerald-950/40 text-emerald-300"
-            : "border-amber-500/40 bg-amber-950/30 text-amber-300"
+            ? onLight
+              ? "border-emerald-600/35 bg-emerald-100 text-emerald-700"
+              : "border-emerald-500/40 bg-emerald-950/40 text-emerald-300"
+            : onLight
+              ? "border-amber-500/40 bg-amber-100 text-amber-700"
+              : "border-amber-500/40 bg-amber-950/30 text-amber-300"
         }`}
       >
         <Ticket className="h-5 w-5" aria-hidden />
@@ -307,10 +343,22 @@ export function DayServiceTicketRow({
         <p className="text-[9px] font-semibold tracking-wider text-zinc-500 uppercase">
           Ticket
         </p>
-        <p className="truncate text-sm font-semibold text-white">{title}</p>
+        <p
+          className={`truncate text-sm font-semibold ${
+            onLight ? "text-slate-900" : "text-white"
+          }`}
+        >
+          {title}
+        </p>
         <p
           className={`truncate text-[11px] ${
-            ready ? "text-emerald-300/90" : "text-amber-300/85"
+            ready
+              ? onLight
+                ? "text-emerald-700"
+                : "text-emerald-300/90"
+              : onLight
+                ? "text-amber-700"
+                : "text-amber-300/85"
           }`}
         >
           {ready ? "Ready" : "Pending"}
@@ -323,7 +371,7 @@ export function DayServiceTicketRow({
             download={filename}
             target="_blank"
             rel="noopener noreferrer"
-            className={ticketActionReadyClass}
+            className={readyAction}
             title="Download ticket"
             aria-label={`Download ${title}`}
           >
@@ -331,7 +379,7 @@ export function DayServiceTicketRow({
           </a>
         ) : (
           <span
-            className={ticketActionIdleClass}
+            className={idleAction}
             title={ready ? "Voucher file not available yet" : pendingTip}
             aria-label={`Download ${title} unavailable`}
             aria-disabled="true"
@@ -342,7 +390,7 @@ export function DayServiceTicketRow({
         {canEmail ? (
           <a
             href={mailtoHref}
-            className={ticketActionReadyClass}
+            className={readyAction}
             title="Send ticket by email"
             aria-label={`Email ${title}`}
           >
@@ -350,7 +398,7 @@ export function DayServiceTicketRow({
           </a>
         ) : (
           <span
-            className={ticketActionIdleClass}
+            className={idleAction}
             title={pendingTip}
             aria-label={`Email ${title} unavailable`}
             aria-disabled="true"

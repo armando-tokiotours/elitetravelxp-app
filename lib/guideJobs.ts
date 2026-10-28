@@ -4,23 +4,76 @@
  */
 
 import type PocketBase from "pocketbase";
+import { experienceNeedsEntryTicket } from "@/lib/accessType";
 import {
   estimateGuidePayout,
   parseTourHoursLabel,
 } from "@/lib/guideMatcher";
 import {
+  DEFAULT_DAY_EXPENSES_JPY,
+  loadGuidePayRules,
+  loadGuidePaySettings,
+  resolveGuidePayBreakdown,
+  sumGuidePayout,
+  type GuidePayRuleRow,
+  type GuidePaySettings,
+} from "@/lib/guidePayBreakdown";
+import {
   isGuideServiceItem,
+  isTicketServiceItem,
   parseOpsHubExtras,
   type ServiceLineItem,
 } from "@/lib/agentServices";
 import type { OpsHubRow } from "@/components/staff/opsHubClient";
 import type {
+  OpsDayTour,
   OpsGuestRequirements,
   OpsItineraryDay,
   OpsItineraryStop,
 } from "@/lib/opsGuestRequirements";
+import { catalogKind } from "@/lib/experiencesPlaces";
 import { addDaysIso } from "@/lib/dateCascade";
 import { getGuideByStaff } from "@/lib/roleProfiles";
+
+/**
+ * Ticketed attractions (TeamLab, Ghibli, Sumo, etc.) do not need guide
+ * Accept/Decline — they appear as informational itinerary items only.
+ */
+export function isTicketOnlyGuideItineraryTitle(title?: string | null): boolean {
+  return experienceNeedsEntryTicket({ title });
+}
+
+export type GuideDispatchTourFields = {
+  title?: string | null;
+  category?: string | null;
+  entry_type?: string | null;
+  access_type?: string | null;
+  is_extra?: boolean | null;
+  description?: string | null;
+};
+
+/**
+ * Private guide dispatch only for Guided Tours (main booked routes).
+ * Experiences & Tickets, Areas/Places, and ticketed attractions are excluded.
+ */
+export function isGuidedTourForDispatch(
+  item: GuideDispatchTourFields
+): boolean {
+  if (item.is_extra === true) return false;
+  const kind = catalogKind(item);
+  if (kind === "activity" || kind === "cluster") return false;
+  if (
+    experienceNeedsEntryTicket({
+      title: item.title,
+      description: item.description,
+      access_type: item.access_type,
+      category: item.category,
+    })
+  ) {
+    return false;
+  }
+  return true;
+}
 
 export type GuideJobStatus =
   | "UNASSIGNED"
@@ -41,13 +94,21 @@ export type GuideJobRow = {
   service_line_id?: string;
   duration_hours?: number;
   pax_count?: number;
+  /** Flat total = base + expenses + specialty (kept for legacy rollups). */
   payout_jpy?: number;
+  base_pay_jpy?: number;
+  expenses_jpy?: number;
+  specialty_bonus_jpy?: number;
   status: GuideJobStatus | string;
   assigned_guide_staff_id?: string;
   assigned_guide_name?: string;
   assigned_guide?: string;
+  /** ISO timestamp when status became OFFERED (48h expire cron). */
+  offered_at?: string | null;
   day_index?: number;
   notes?: string;
+  created?: string;
+  updated?: string;
 };
 
 function safePnr(pnr: string): string {
@@ -156,9 +217,61 @@ type DraftJob = {
   service_line_id: string;
   duration_hours: number;
   pax_count: number;
+  base_pay_jpy: number;
+  expenses_jpy: number;
+  specialty_bonus_jpy: number;
   payout_jpy: number;
   day_index: number;
 };
+
+function provisionalPayFields(hours: number): Pick<
+  DraftJob,
+  "base_pay_jpy" | "expenses_jpy" | "specialty_bonus_jpy" | "payout_jpy"
+> {
+  const base = estimateGuidePayout({
+    tourHours: hours,
+    baseRate6hJpy: 18000,
+    baseRate8hJpy: 24000,
+  }).totalPayoutJpy;
+  const expenses = DEFAULT_DAY_EXPENSES_JPY;
+  return {
+    base_pay_jpy: base,
+    expenses_jpy: expenses,
+    specialty_bonus_jpy: 0,
+    payout_jpy: sumGuidePayout({
+      basePayJpy: base,
+      expensesJpy: expenses,
+      specialtyBonusJpy: 0,
+    }),
+  };
+}
+
+function applyMatrixToDraft(
+  draft: DraftJob,
+  rules: GuidePayRuleRow[],
+  settings: GuidePaySettings,
+  specialtyBonusJpy = 0
+): DraftJob {
+  const year = draft.tour_date
+    ? Number(String(draft.tour_date).slice(0, 4)) || undefined
+    : undefined;
+  const bd = resolveGuidePayBreakdown({
+    rules,
+    year,
+    tourName: draft.tour_name,
+    durationHours: draft.duration_hours,
+    paxCount: draft.pax_count,
+    specialtyBonusJpy,
+    defaultExpensesJpy: settings.default_expenses_jpy,
+  });
+  return {
+    ...draft,
+    base_pay_jpy: bd.basePayJpy,
+    expenses_jpy: bd.expensesJpy,
+    specialty_bonus_jpy: bd.specialtyBonusJpy,
+    payout_jpy: bd.totalPayoutJpy,
+  };
+}
 
 function draftFromDayTour(opts: {
   pnr: string;
@@ -173,7 +286,6 @@ function draftFromDayTour(opts: {
   serviceLineId?: string;
 }): DraftJob {
   const hours = Math.max(1, opts.hours || 6);
-  const payout = estimateGuidePayout({ tourHours: hours });
   const dayIndex = Math.max(1, Number(opts.day.dayIndex) || opts.occ || 1);
   const tour_date = resolveJobDate({
     dayDate: opts.day.date,
@@ -200,7 +312,7 @@ function draftFromDayTour(opts: {
     service_line_id: opts.serviceLineId || "",
     duration_hours: hours,
     pax_count: opts.pax,
-    payout_jpy: payout.totalPayoutJpy,
+    ...provisionalPayFields(hours),
     day_index: dayIndex,
   };
 }
@@ -223,14 +335,27 @@ export function buildGuideJobDrafts(opts: {
   const seen = new Set<string>();
 
   const stops = opts.reqs?.itineraryStops || [];
+  let itineraryHadDispatchableContent = false;
   for (const stop of stops) {
     for (const day of stop.days || []) {
       const tours = day.tours || [];
-      if (tours.length > 0) {
+      if (
+        tours.length > 0 ||
+        day.hasGuide ||
+        day.hasTickets ||
+        (day.tickets || []).length > 0
+      ) {
+        itineraryHadDispatchableContent = true;
+      }
+      // Guided Tours only — Experiences, Tickets, Areas stay outside guide dispatch
+      const guidedTours = tours.filter((t: OpsDayTour) =>
+        isGuidedTourForDispatch(t)
+      );
+      if (guidedTours.length > 0) {
         let dayTourOcc = 0;
-        for (const t of tours) {
+        for (const t of guidedTours) {
           dayTourOcc += 1;
-          const title = String(t.title || "Guided experience").trim();
+          const title = String(t.title || "Guided tour").trim();
           const hours =
             Number(t.hours) ||
             parseTourHoursLabel(opts.reqs?.durationLabel) ||
@@ -265,7 +390,8 @@ export function buildGuideJobDrafts(opts: {
           seen.add(key);
           drafts.push(d);
         }
-      } else if (day.hasGuide) {
+      } else if (day.hasGuide && guidedTours.length === 0 && tours.length === 0) {
+        // hasGuide without tour rows — real guided day placeholder
         const d = draftFromDayTour({
           pnr,
           stop,
@@ -282,6 +408,7 @@ export function buildGuideJobDrafts(opts: {
           drafts.push(d);
         }
       }
+      // Experience / ticket / area days: no Accept/Decline job created
     }
   }
 
@@ -291,6 +418,15 @@ export function buildGuideJobDrafts(opts: {
     let cartIdx = 0;
     for (const item of services) {
       if (!isGuideServiceItem(item)) continue;
+      if (isTicketServiceItem(item)) continue;
+      if (
+        !isGuidedTourForDispatch({
+          title: item.title,
+          category: item.category,
+        })
+      ) {
+        continue;
+      }
       if (item.status === "DECLINED") continue;
       cartIdx += 1;
       const title = String(item.title || "Tour").trim();
@@ -329,7 +465,6 @@ export function buildGuideJobDrafts(opts: {
         });
       }
       seen.add(key);
-      const payout = estimateGuidePayout({ tourHours: hours });
       drafts.push({
         job_key: key,
         pnr,
@@ -344,21 +479,37 @@ export function buildGuideJobDrafts(opts: {
         service_line_id: item.id,
         duration_hours: hours,
         pax_count: Math.max(1, Number(item.quantity) || pax),
-        payout_jpy: payout.totalPayoutJpy,
+        ...provisionalPayFields(hours),
         day_index: cartIdx,
       });
     }
   }
 
-  // Fallback: single package job so Dispatch is never blank for guided PNRs
-  if (drafts.length === 0 && opts.hub?.guide_needed !== false) {
+  // Fallback: single package job so Dispatch is never blank for guided PNRs.
+  // Skip when itinerary already listed only Experiences/Tickets/Areas, or
+  // when hub is ticket-only / experience-only (no guide required).
+  const cartHasGuided = (opts.services || []).some(
+    (item) =>
+      isGuideServiceItem(item) &&
+      !isTicketServiceItem(item) &&
+      isGuidedTourForDispatch({
+        title: item.title,
+        category: item.category,
+      }) &&
+      item.status !== "DECLINED"
+  );
+  if (
+    drafts.length === 0 &&
+    !itineraryHadDispatchableContent &&
+    opts.hub?.guide_needed !== false &&
+    (cartHasGuided || opts.hub?.guide_needed === true)
+  ) {
     const date = hubDate;
     const hours = parseTourHoursLabel(opts.reqs?.durationLabel) || 6;
     const title =
       opts.reqs?.tourTitle ||
       opts.hub?.guest_summary ||
       `Guided package · ${opts.hub?.primary_city || pnr}`;
-    const payout = estimateGuidePayout({ tourHours: hours });
     drafts.push({
       job_key: jobKey({
         pnr,
@@ -376,7 +527,7 @@ export function buildGuideJobDrafts(opts: {
       service_line_id: "",
       duration_hours: hours,
       pax_count: pax,
-      payout_jpy: payout.totalPayoutJpy,
+      ...provisionalPayFields(hours),
       day_index: 1,
     });
   }
@@ -539,13 +690,27 @@ export async function syncGuideJobsForBooking(
   }
 ): Promise<GuideJobRow[]> {
   const pnr = safePnr(opts.pnr);
-  const drafts = buildGuideJobDrafts(opts);
+  const [rules, settings] = await Promise.all([
+    loadGuidePayRules(pb),
+    loadGuidePaySettings(pb),
+  ]);
+  const drafts = buildGuideJobDrafts(opts).map((d) =>
+    applyMatrixToDraft(d, rules, settings, 0)
+  );
   const existing = await listGuideJobsForPnr(pb, pnr);
   const claimedIds = new Set<string>();
   const draftKeys = new Set(drafts.map((d) => d.job_key));
 
-  for (const d of drafts) {
-    const prev = findMatchingExistingJob(existing, d, claimedIds);
+  for (const raw of drafts) {
+    const prev = findMatchingExistingJob(existing, raw, claimedIds);
+    const preservedSpecialty = Math.max(
+      0,
+      Math.round(Number(prev?.specialty_bonus_jpy) || 0)
+    );
+    const d =
+      preservedSpecialty > 0
+        ? applyMatrixToDraft(raw, rules, settings, preservedSpecialty)
+        : raw;
     const tourDate = normalizeTourDateIso(d.tour_date) || null;
     if (prev) {
       claimedIds.add(prev.id);
@@ -566,6 +731,9 @@ export async function syncGuideJobsForBooking(
         status === "OPEN_BOARD" ||
         status === "REJECTED"
       ) {
+        patch.base_pay_jpy = d.base_pay_jpy;
+        patch.expenses_jpy = d.expenses_jpy;
+        patch.specialty_bonus_jpy = d.specialty_bonus_jpy;
         patch.payout_jpy = d.payout_jpy;
       }
       try {
@@ -614,6 +782,9 @@ export async function syncGuideJobsForBooking(
               duration_hours: d.duration_hours,
               pax_count: d.pax_count,
               day_index: d.day_index,
+              base_pay_jpy: d.base_pay_jpy,
+              expenses_jpy: d.expenses_jpy,
+              specialty_bonus_jpy: d.specialty_bonus_jpy,
               payout_jpy: d.payout_jpy,
             },
             { requestKey: null }
@@ -653,7 +824,8 @@ async function resolveGuideRelationId(
   }
 }
 
-async function dualWriteHubPrimaryGuide(
+/** Recompute ops_hub / ops_dispatch primary guide from day jobs. */
+export async function dualWriteHubPrimaryGuide(
   pb: PocketBase,
   pnr: string
 ): Promise<void> {
@@ -719,22 +891,82 @@ async function dualWriteHubPrimaryGuide(
   }
 }
 
+/** Recompute payout fields when specialty bonus changes (or on assign). */
+export async function applyGuideJobPayFields(
+  pb: PocketBase,
+  jobId: string,
+  opts?: { specialtyBonusJpy?: number }
+): Promise<Partial<GuideJobRow>> {
+  const job = await pb.collection("guide_jobs").getOne<GuideJobRow>(jobId, {
+    requestKey: null,
+  });
+  const specialty =
+    opts?.specialtyBonusJpy != null
+      ? Math.max(0, Math.round(Number(opts.specialtyBonusJpy) || 0))
+      : Math.max(0, Math.round(Number(job.specialty_bonus_jpy) || 0));
+
+  let base = Math.max(0, Math.round(Number(job.base_pay_jpy) || 0));
+  let expenses = Math.max(0, Math.round(Number(job.expenses_jpy) || 0));
+
+  if (base <= 0) {
+    const [rules, settings] = await Promise.all([
+      loadGuidePayRules(pb),
+      loadGuidePaySettings(pb),
+    ]);
+    const year = job.tour_date
+      ? Number(String(job.tour_date).slice(0, 4)) || undefined
+      : undefined;
+    const bd = resolveGuidePayBreakdown({
+      rules,
+      year,
+      tourName: job.tour_name || "",
+      durationHours: Number(job.duration_hours) || 6,
+      paxCount: Number(job.pax_count) || 1,
+      specialtyBonusJpy: specialty,
+      defaultExpensesJpy: settings.default_expenses_jpy,
+    });
+    base = bd.basePayJpy;
+    expenses = bd.expensesJpy;
+  } else if (expenses <= 0) {
+    const settings = await loadGuidePaySettings(pb);
+    expenses = settings.default_expenses_jpy;
+  }
+
+  return {
+    base_pay_jpy: base,
+    expenses_jpy: expenses,
+    specialty_bonus_jpy: specialty,
+    payout_jpy: sumGuidePayout({
+      basePayJpy: base,
+      expensesJpy: expenses,
+      specialtyBonusJpy: specialty,
+    }),
+  };
+}
+
 export async function offerGuideJob(
   pb: PocketBase,
   opts: {
     jobId: string;
     staffId: string;
     staffName: string;
+    /** Optional specialty bonus applied at assign time. */
+    specialtyBonusJpy?: number;
   }
 ): Promise<GuideJobRow> {
   const guideRel = await resolveGuideRelationId(pb, opts.staffId);
+  const payFields = await applyGuideJobPayFields(pb, opts.jobId, {
+    specialtyBonusJpy: opts.specialtyBonusJpy,
+  });
   const updated = (await pb.collection("guide_jobs").update(
     opts.jobId,
     {
       status: "OFFERED",
       assigned_guide_staff_id: opts.staffId,
       assigned_guide_name: opts.staffName,
+      offered_at: new Date().toISOString(),
       ...(guideRel ? { assigned_guide: guideRel } : {}),
+      ...payFields,
     },
     { requestKey: null }
   )) as GuideJobRow;
@@ -803,6 +1035,7 @@ export async function acceptGuideJob(
       status: "ACCEPTED",
       assigned_guide_staff_id: opts.staffId,
       assigned_guide_name: opts.staffName,
+      offered_at: null,
       ...(guideRel ? { assigned_guide: guideRel } : {}),
     },
     { requestKey: null }
@@ -822,6 +1055,11 @@ export async function acceptGuideJob(
   return updated;
 }
 
+/**
+ * Client-side refuse → Open Board (clears assignment).
+ * Prefer POST /api/ops/contractor-fallback from Guide Portal so Ops is emailed.
+ * Kept for offline/legacy callers; does not send transactional mail.
+ */
 export async function refuseGuideJobDay(
   pb: PocketBase,
   opts: { jobId: string; staffId: string }
@@ -838,10 +1076,11 @@ export async function refuseGuideJobDay(
   const updated = (await pb.collection("guide_jobs").update(
     opts.jobId,
     {
-      status: "REJECTED",
+      status: "OPEN_BOARD",
       assigned_guide_staff_id: "",
       assigned_guide_name: "",
       assigned_guide: null,
+      offered_at: null,
     },
     { requestKey: null }
   )) as GuideJobRow;
@@ -884,4 +1123,107 @@ export async function listGuideJobsForStaff(
 export function servicesFromHub(hub?: OpsHubRow | null): ServiceLineItem[] {
   if (!hub) return [];
   return parseOpsHubExtras(hub.extras).agent_services || [];
+}
+
+export type GuidePortalTicketItem = {
+  title: string;
+  type: string;
+  date: string | null;
+  dayIndex: number | null;
+};
+
+/**
+ * Informational ticketed itinerary items for the guide portal
+ * (no Accept/Decline). Merges day.tickets from ops guest reqs + cart tickets.
+ */
+export function collectGuidePortalTicketItems(opts: {
+  reqs?: OpsGuestRequirements | null;
+  hub?: OpsHubRow | null;
+}): GuidePortalTicketItem[] {
+  const out: GuidePortalTicketItem[] = [];
+  const seen = new Set<string>();
+
+  const push = (item: GuidePortalTicketItem) => {
+    const key = `${item.date || ""}|${item.title}`.toLowerCase();
+    if (seen.has(key)) return;
+    seen.add(key);
+    out.push(item);
+  };
+
+  for (const stop of opts.reqs?.itineraryStops || []) {
+    for (const day of stop.days || []) {
+      const date = normalizeTourDateIso(day.date) || null;
+      for (const t of day.tickets || []) {
+        push({
+          title: String(t.title || "Ticket").trim(),
+          type: String(t.type || "Ticket").trim() || "Ticket",
+          date,
+          dayIndex: day.dayIndex || null,
+        });
+      }
+      for (const t of day.tours || []) {
+        if (isGuidedTourForDispatch(t)) continue;
+        const kind = catalogKind(t);
+        push({
+          title: String(t.title || "Experience").trim(),
+          type:
+            kind === "cluster"
+              ? "Area / place"
+              : kind === "activity" || t.is_extra === true
+                ? "Experience"
+                : "Ticketed experience",
+          date,
+          dayIndex: day.dayIndex || null,
+        });
+      }
+    }
+  }
+
+  for (const item of servicesFromHub(opts.hub)) {
+    if (
+      !isTicketServiceItem(item) &&
+      isGuidedTourForDispatch({
+        title: item.title,
+        category: item.category,
+      })
+    ) {
+      continue;
+    }
+    if (item.status === "DECLINED") continue;
+    push({
+      title: String(item.title || "Ticket").trim(),
+      type: String(item.category || "TICKET").trim() || "TICKET",
+      date:
+        normalizeTourDateIso(item.serviceDate) ||
+        normalizeTourDateIso(item.scheduledDate) ||
+        null,
+      dayIndex: null,
+    });
+  }
+
+  return out.sort((a, b) => {
+    const da = a.date || "";
+    const db = b.date || "";
+    if (da !== db) return da.localeCompare(db);
+    return a.title.localeCompare(b.title);
+  });
+}
+
+export function ticketItemsForJobDay(
+  items: GuidePortalTicketItem[],
+  job: Pick<GuideJobRow, "tour_date" | "day_index">
+): GuidePortalTicketItem[] {
+  const date = normalizeTourDateIso(job.tour_date);
+  const dayIndex =
+    job.day_index != null && Number.isFinite(Number(job.day_index))
+      ? Number(job.day_index)
+      : null;
+  return items.filter((t) => {
+    if (date && t.date && t.date === date) return true;
+    if (dayIndex != null && t.dayIndex != null && t.dayIndex === dayIndex)
+      return true;
+    // Trip-wide / undated tickets show once under first day only when no date
+    if (!t.date && !date) return true;
+    return false;
+  });
 }

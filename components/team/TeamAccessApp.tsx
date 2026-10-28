@@ -52,6 +52,11 @@ import {
   Settings2,
 } from "lucide-react";
 import { ShortcutTile } from "@/components/staff/ShortcutTile";
+import { CatalogSlotCell } from "@/components/catalog/CatalogSlotPhoto";
+import {
+  catalogPhotoCollection,
+  ensureCatalogPlaceholder,
+} from "@/lib/catalogMedia";
 
 type PbClient = PocketBase;
 
@@ -103,6 +108,7 @@ export function TeamAccessApp() {
   const isAuthenticated = useTeamAuth((s) => s.isAuthenticated);
   const email = useTeamAuth((s) => s.email);
   const role = useTeamAuth((s) => s.role);
+  const forcePasswordChange = useTeamAuth((s) => s.forcePasswordChange);
   const logout = useTeamAuth((s) => s.logout);
   const hydrateAuth = useTeamAuth((s) => s.hydrateAuth);
   const getClient = useTeamAuth((s) => s.getClient);
@@ -122,10 +128,14 @@ export function TeamAccessApp() {
 
   useEffect(() => {
     if (!ready || !isAuthenticated) return;
+    if (forcePasswordChange) {
+      router.replace("/staff/change-password");
+      return;
+    }
     if (!canAccessTeamAccess(role) && role) {
       router.replace(homePathForRole(role));
     }
-  }, [ready, isAuthenticated, role, router]);
+  }, [ready, isAuthenticated, role, router, forcePasswordChange]);
 
   if (!ready) {
     return (
@@ -408,9 +418,13 @@ function rowSubtitle(def: CollectionDef, row: Record<string, unknown>): string {
   if (def.id === "tours") {
     const tier = formatTourTierSummary(row as never);
     const hrs = row.duration_hours;
-    const isActivity =
-      String(row.category || "tour").toLowerCase() === "activity";
-    const cat = isActivity ? "Activity" : "Tour";
+    const rawCat = String(row.category || "tour").toLowerCase();
+    const cat =
+      rawCat === "activity"
+        ? "Experience"
+        : rawCat === "cluster"
+          ? "Cluster"
+          : "Tour";
     const vibes = Array.isArray(row.vibe_tags)
       ? (row.vibe_tags as unknown[])
           .map((v) => String(v))
@@ -529,23 +543,30 @@ function SourceOfTruthPanel({ getClient }: { getClient: () => PbClient }) {
   const [editing, setEditing] = useState<Record<string, unknown> | null>(null);
   const [creating, setCreating] = useState(false);
   const [tourCategoryFilter, setTourCategoryFilter] = useState<
-    "all" | "tour" | "activity"
+    "all" | "tour" | "activity" | "cluster"
   >("all");
 
   const tourRows = category === "tours" ? rows : [];
-  const toursOnlyCount = tourRows.filter(
-    (r) => String(r.category || "tour").toLowerCase() !== "activity"
-  ).length;
+  const toursOnlyCount = tourRows.filter((r) => {
+    const c = String(r.category || "tour").toLowerCase();
+    return c !== "activity" && c !== "cluster";
+  }).length;
   const activitiesOnlyCount = tourRows.filter(
     (r) => String(r.category || "tour").toLowerCase() === "activity"
+  ).length;
+  const clustersOnlyCount = tourRows.filter(
+    (r) => String(r.category || "").toLowerCase() === "cluster"
   ).length;
   const displayedRows =
     category === "tours" && tourCategoryFilter !== "all"
       ? rows.filter((r) => {
+          const raw = String(r.category || "tour").toLowerCase();
           const cat =
-            String(r.category || "tour").toLowerCase() === "activity"
+            raw === "activity"
               ? "activity"
-              : "tour";
+              : raw === "cluster"
+                ? "cluster"
+                : "tour";
           return cat === tourCategoryFilter;
         })
       : rows;
@@ -733,11 +754,15 @@ function SourceOfTruthPanel({ getClient }: { getClient: () => PbClient }) {
                 },
                 {
                   id: "tour" as const,
-                  label: `🗺️ Guided Tours (${toursOnlyCount})`,
+                  label: `Guided Tours (${toursOnlyCount})`,
                 },
                 {
                   id: "activity" as const,
-                  label: `🎟️ Activities & Experiences (${activitiesOnlyCount})`,
+                  label: `Experiences (${activitiesOnlyCount})`,
+                },
+                {
+                  id: "cluster" as const,
+                  label: `Clusters (${clustersOnlyCount})`,
                 },
               ] as const
             ).map((tab) => {
@@ -818,7 +843,15 @@ function SourceOfTruthPanel({ getClient }: { getClient: () => PbClient }) {
                       className="border-b border-zinc-800/60"
                     >
                       <td className="py-3 pr-2">
-                        {thumb && row.media_type !== "Video" ? (
+                        {catalogPhotoCollection(def.id) ? (
+                          <CatalogSlotCell
+                            recordId={String(row.id)}
+                            fallbackSrc={
+                              row.media_type === "Video" ? "" : thumb
+                            }
+                            getToken={() => getClient().authStore.token}
+                          />
+                        ) : thumb && row.media_type !== "Video" ? (
                           // eslint-disable-next-line @next/next/no-img-element
                           <img
                             src={thumb}
@@ -1134,12 +1167,15 @@ function RecordEditModal({
 
   const tourCategory =
     def.id === "tours"
-      ? String(form.category || "tour").toLowerCase() === "activity"
-        ? "activity"
-        : "tour"
+      ? (() => {
+          const raw = String(form.category || "tour").toLowerCase();
+          if (raw === "activity") return "activity" as const;
+          if (raw === "cluster") return "cluster" as const;
+          return "tour" as const;
+        })()
       : null;
 
-  const setTourCategory = (next: "tour" | "activity") => {
+  const setTourCategory = (next: "tour" | "activity" | "cluster") => {
     setForm((f) => {
       const nextForm: Record<string, string> = { ...f, category: next };
       if (next === "activity") {
@@ -1159,6 +1195,18 @@ function RecordEditModal({
         if (!f.access_type || f.access_type === "guided_route") {
           nextForm.access_type = "direct_ticket";
         }
+      } else if (next === "cluster") {
+        // Neighborhood sector: €0 item price, time budget only, self-guided places.
+        nextForm.price_1_pax = "0";
+        nextForm.price_2_pax = "0";
+        nextForm.price_3_pax = "0";
+        nextForm.price_4_pax = "0";
+        nextForm.price_extra_pax = "0";
+        nextForm.base_price_eur = "0";
+        nextForm.is_self_guided = "true";
+        nextForm.guide_required = "false";
+        if (!f.duration_hours) nextForm.duration_hours = "2.5";
+        nextForm.access_type = "guided_route";
       } else {
         if (!f.access_type || f.access_type === "direct_ticket") {
           nextForm.access_type = "guided_route";
@@ -1281,16 +1329,31 @@ function RecordEditModal({
 
       // Tours: keep legacy `price` / `price_per_person` in sync for old readers
       if (def.id === "tours") {
+        const raw = String(form.category || "tour").toLowerCase();
         const cat =
-          String(form.category || "tour").toLowerCase() === "activity"
+          raw === "activity"
             ? "activity"
-            : "tour";
+            : raw === "cluster"
+              ? "cluster"
+              : "tour";
+        fd.set("category", cat);
         fd.set(
           "access_type",
-          cat === "tour"
-            ? "guided_route"
-            : form.access_type || "direct_ticket"
+          cat === "activity"
+            ? form.access_type || "direct_ticket"
+            : "guided_route"
         );
+        if (cat === "cluster") {
+          fd.set("price_1_pax", "0");
+          fd.set("price_2_pax", "0");
+          fd.set("price_3_pax", "0");
+          fd.set("price_4_pax", "0");
+          fd.set("price_extra_pax", "0");
+          fd.set("base_price_eur", "0");
+          fd.set("is_self_guided", "true");
+          fd.set("guide_required", "false");
+          if (!form.duration_hours) fd.set("duration_hours", "2.5");
+        }
         // Enforce vibe limits on save
         try {
           const parsed = JSON.parse(form.vibe_tags || "[]");
@@ -1312,6 +1375,22 @@ function RecordEditModal({
           fd.set("price", p1);
           fd.set("price_per_person", p1);
         }
+        if (cat !== "cluster" && p1 !== "") {
+          // Blank tier fields were never appended above (number fields
+          // only append when non-empty), so PocketBase would store €0
+          // for those party sizes — and lib/tourPricing.ts
+          // calculateTourPrice reads a stored 0 tier literally, pricing
+          // 2/3/4/extra-pax parties free. Fill blanks with the 1-pax
+          // sell price instead. base_price_eur (our cost) is untouched.
+          for (const k of [
+            "price_2_pax",
+            "price_3_pax",
+            "price_4_pax",
+            "price_extra_pax",
+          ] as const) {
+            if (!(form[k] || "").trim()) fd.set(k, p1);
+          }
+        }
       }
 
       let hubId = initial?.id ? String(initial.id) : "";
@@ -1320,6 +1399,22 @@ function RecordEditModal({
       } else {
         const created = await pb.collection(def.id).create(fd);
         hubId = String(created.id);
+        // CREATE-only auto-placeholder for photo collections when no
+        // file was supplied in the form. Best-effort — the record
+        // already saved, so a failure must never fail the save.
+        if (
+          catalogPhotoCollection(def.id) &&
+          !Object.values(files).some(Boolean) &&
+          !(form.cover_url || "").trim() &&
+          !(form.media_url || "").trim()
+        ) {
+          const rec = created as unknown as Record<string, unknown>;
+          await ensureCatalogPlaceholder(
+            hubId,
+            String(rec.title || rec.name || form.title || form.name || ""),
+            pb.authStore.token
+          ).catch(() => false);
+        }
       }
 
       if (def.id === "hubs" && hubId) {
@@ -1481,9 +1576,28 @@ function RecordEditModal({
             if (
               def.id === "tours" &&
               f.key === "access_type" &&
-              tourCategory === "tour"
+              (tourCategory === "tour" || tourCategory === "cluster")
             ) {
-              // Tours always use guided_route — hide the activity-only flags.
+              // Tours/clusters use guided_route (or N/A) — hide ticket access flags.
+              return null;
+            }
+            // Clusters are €0 time-budget sectors — hide guest price tiers.
+            if (
+              def.id === "tours" &&
+              tourCategory === "cluster" &&
+              [
+                "price_1_pax",
+                "price_2_pax",
+                "price_3_pax",
+                "price_4_pax",
+                "price_extra_pax",
+                "base_price_eur",
+                "pricing_tier",
+                "display_badge",
+                "is_bonus",
+                "guide_required",
+              ].includes(f.key)
+            ) {
               return null;
             }
 
@@ -1507,7 +1621,7 @@ function RecordEditModal({
                   ? "Hyper-focused matching — one core category only."
                   : "Tours combine multiple sights and neighborhoods into a guided route."
                 : def.id === "tours" && f.key === "category"
-                  ? "Tour = guided multi-stop day · Activity = ticket / VIP / single experience"
+                  ? "Tour = guided day · Experience = ticketed attraction · Cluster = neighborhood sector (€0, time budget)"
                   : def.id === "tours" && f.key === "access_type"
                     ? "Ticket · Admission · Time-Sensitive · VIP Exclusive"
                     : f.hint;
@@ -1566,14 +1680,16 @@ function RecordEditModal({
                     })}
                   </div>
                 ) : f.type === "select" && f.key === "category" ? (
-                  <div className="inline-flex rounded-full border border-[#2C2C2E] bg-[#121212] p-1">
-                    {(f.options || ["tour", "activity"]).map((o) => {
+                  <div className="inline-flex flex-wrap rounded-full border border-[#2C2C2E] bg-[#121212] p-1">
+                    {(f.options || ["tour", "activity", "cluster"]).map((o) => {
                       const label =
                         o === "activity"
-                          ? "Activity / Experience"
+                          ? "Experience / Ticket"
                           : o === "tour"
                             ? "Tour"
-                            : o.charAt(0).toUpperCase() + o.slice(1);
+                            : o === "cluster"
+                              ? "Cluster"
+                              : o.charAt(0).toUpperCase() + o.slice(1);
                       const current = form[f.key] || "tour";
                       return (
                         <button
@@ -1581,7 +1697,11 @@ function RecordEditModal({
                           type="button"
                           onClick={() =>
                             setTourCategory(
-                              o === "activity" ? "activity" : "tour"
+                              o === "activity"
+                                ? "activity"
+                                : o === "cluster"
+                                  ? "cluster"
+                                  : "tour"
                             )
                           }
                           className={`rounded-full px-4 py-1.5 text-sm font-medium transition ${

@@ -65,7 +65,7 @@ export function SingleDayExperiencesSection({
 
   const catalogHeadline = useMemo(() => {
     if (selectedRows.length === 0) {
-      return "Select experiences for your day";
+      return "Tours, experiences & areas for your day";
     }
     if (selectedRows.length === 1) {
       return selectedRows[0].title;
@@ -94,7 +94,7 @@ export function SingleDayExperiencesSection({
 
   const summary =
     selectedRows.length === 0
-      ? "Pick experiences & places"
+      ? "Pick tours, experiences & areas"
       : extraHours > 0
         ? `${selectedRows.length} stop${selectedRows.length === 1 ? "" : "s"} · guide ${formatDurationBadge(guideUsed)} / ${formatDurationBadge(tourHours)} · +${formatDurationBadge(extraHours)} extra`
         : `${selectedRows.length} stop${selectedRows.length === 1 ? "" : "s"} · guide ${formatDurationBadge(guideUsed)} / ${formatDurationBadge(tourHours)}`;
@@ -120,7 +120,7 @@ export function SingleDayExperiencesSection({
   return (
     <SectionBlock
       number={3}
-      title="Experiences & Places"
+      title="Tours & Experiences"
       id="section-experiences"
       icon="tour"
       summary={summary}

@@ -1,0 +1,17 @@
+<svg version="1.2" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 750 500" width="750" height="500">
+	<defs>
+		<linearGradient id="g1" x2="1" gradientUnits="userSpaceOnUse" gradientTransform="matrix(-3.431,-346.487,225.385,-2.232,256.441,447.96)">
+			<stop offset="0" stop-color="#caf0ff"/>
+			<stop offset=".628" stop-color="#84acd9"/>
+			<stop offset="1" stop-color="#3d68b3"/>
+		</linearGradient>
+	</defs>
+	<style>
+		.s0 { fill: url(#g1) } 
+	</style>
+	<g id="OBJECTS">
+		<g id="&lt;Clip Group&gt;">
+			<path id="&lt;Path&gt;" class="s0" d="m646.22 433.76h-540.77c-6.69 0-12.11-5.42-12.11-12.11v-343.3c0-6.69 5.42-12.11 12.11-12.11h540.77c6.69 0 12.11 5.42 12.11 12.11v343.3c0 6.69-5.42 12.11-12.11 12.11z"/>
+		</g>
+	</g>
+</svg>

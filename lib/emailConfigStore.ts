@@ -3,6 +3,8 @@
  * Visual admin writes here; send-itinerary reads on each dispatch.
  */
 
+import "server-only";
+
 import fs from "fs";
 import path from "path";
 import {

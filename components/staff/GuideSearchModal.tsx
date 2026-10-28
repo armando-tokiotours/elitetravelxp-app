@@ -11,8 +11,17 @@ import {
   evaluateGuideWorkload,
   type GuideDayBooking,
 } from "@/lib/guideScheduleRules";
+import {
+  DEFAULT_SPECIALTY_TIERS,
+  formatYenJpy,
+  type SpecialtyTier,
+} from "@/lib/guidePayBreakdown";
 
 type MatchTab = "BEST" | "PARTIAL" | "ALL";
+
+export type GuideAssignMeta = {
+  specialtyBonusJpy: number;
+};
 
 /**
  * Multi-tier smart guide picker with workload locks + assign confirmations.
@@ -26,6 +35,8 @@ export function GuideSearchModal({
   guideAlreadyConfirmed,
   allGuides,
   dayBookings,
+  specialtyTiers,
+  initialSpecialtyBonusJpy = 0,
   onClose,
   onSelectGuide,
 }: {
@@ -38,8 +49,14 @@ export function GuideSearchModal({
   guideAlreadyConfirmed: boolean;
   allGuides: GuideMatchProfile[];
   dayBookings: GuideDayBooking[];
+  /** Presets from Guide Pay Matrix (Super User). */
+  specialtyTiers?: SpecialtyTier[];
+  initialSpecialtyBonusJpy?: number;
   onClose: () => void;
-  onSelectGuide: (guideId: string) => void | Promise<void>;
+  onSelectGuide: (
+    guideId: string,
+    meta?: GuideAssignMeta
+  ) => void | Promise<void>;
 }) {
   const [searchTerm, setSearchTerm] = useState("");
   const [activeTab, setActiveTab] = useState<MatchTab>("BEST");
@@ -48,6 +65,25 @@ export function GuideSearchModal({
   );
   const [showReassignWarning, setShowReassignWarning] = useState(false);
   const [isExecuting, setIsExecuting] = useState(false);
+  const tiers =
+    specialtyTiers && specialtyTiers.length > 0
+      ? specialtyTiers
+      : DEFAULT_SPECIALTY_TIERS;
+  // Strictly preset tiers only — ignore any legacy/custom amount.
+  const initialBonusJpy = Math.max(
+    0,
+    Math.round(Number(initialSpecialtyBonusJpy) || 0)
+  );
+  const initialTierBonusJpy = tiers.some(
+    (tier) => tier.amount_jpy === initialBonusJpy
+  )
+    ? initialBonusJpy
+    : 0;
+  const [specialtyEnabled, setSpecialtyEnabled] = useState(
+    initialTierBonusJpy > 0
+  );
+  const [specialtyBonusJpy, setSpecialtyBonusJpy] =
+    useState(initialTierBonusJpy);
 
   const scoredList = useMemo(
     () => filterAndScoreGuides(booking, allGuides),
@@ -103,11 +139,20 @@ export function GuideSearchModal({
     setShowReassignWarning(guideAlreadyConfirmed);
   };
 
+  // Only a currently-offered preset tier can ever be paid out.
+  const resolvedSpecialty =
+    specialtyEnabled &&
+    tiers.some((tier) => tier.amount_jpy === specialtyBonusJpy)
+      ? specialtyBonusJpy
+      : 0;
+
   const handleConfirmAssignment = async () => {
     if (!pendingGuide || isExecuting) return;
     setIsExecuting(true);
     try {
-      await onSelectGuide(pendingGuide.id);
+      await onSelectGuide(pendingGuide.id, {
+        specialtyBonusJpy: resolvedSpecialty,
+      });
     } finally {
       setIsExecuting(false);
       setPendingGuide(null);
@@ -167,6 +212,68 @@ export function GuideSearchModal({
             placeholder="Search guide name, language (e.g. Dutch, English)…"
             className="w-full rounded-xl border border-white/10 bg-[#0D1117] py-2.5 pr-4 pl-9 text-xs text-white placeholder:text-gray-500 focus:border-[#075473] focus:outline-none"
           />
+        </div>
+
+        <div className="mt-3 rounded-xl border border-[#F6A724]/25 bg-[#F6A724]/5 p-3">
+          <label className="flex cursor-pointer items-center justify-between gap-3">
+            <div>
+              <p className="text-[10px] font-bold tracking-wider text-[#F6A724] uppercase">
+                Add specialty bonus
+              </p>
+              <p className="mt-0.5 text-[10px] text-zinc-500">
+                Optional for high difficulty, specialty subject, or custom routes
+              </p>
+            </div>
+            <input
+              type="checkbox"
+              checked={specialtyEnabled}
+              onChange={(e) => {
+                const enabled = e.target.checked;
+                setSpecialtyEnabled(enabled);
+                if (!enabled) {
+                  setSpecialtyBonusJpy(0);
+                } else if (
+                  !tiers.some(
+                    (tier) => tier.amount_jpy === specialtyBonusJpy
+                  ) &&
+                  tiers[0]
+                ) {
+                  setSpecialtyBonusJpy(tiers[0].amount_jpy);
+                }
+              }}
+              className="h-4 w-4 rounded border-white/20 bg-black/50 text-[#F6A724] focus:ring-[#F6A724]"
+            />
+          </label>
+          {specialtyEnabled ? (
+            <div className="mt-2 space-y-2">
+              <div className="flex flex-wrap gap-1.5">
+                {tiers.map((tier) => (
+                  <button
+                    key={tier.id}
+                    type="button"
+                    aria-pressed={specialtyBonusJpy === tier.amount_jpy}
+                    onClick={() =>
+                      setSpecialtyBonusJpy((current) =>
+                        current === tier.amount_jpy ? 0 : tier.amount_jpy
+                      )
+                    }
+                    className={`rounded-lg border px-2.5 py-1 text-[10px] font-semibold transition ${
+                      specialtyBonusJpy === tier.amount_jpy
+                        ? "border-[#F6A724] bg-[#F6A724]/20 text-[#F6A724]"
+                        : "border-white/10 bg-black/40 text-zinc-300 hover:border-white/25"
+                    }`}
+                  >
+                    {tier.label} · {formatYenJpy(tier.amount_jpy)}
+                  </button>
+                ))}
+              </div>
+              {resolvedSpecialty > 0 ? (
+                <p className="text-[10px] font-semibold text-[#F6A724]">
+                  +{formatYenJpy(resolvedSpecialty)} on total payout
+                </p>
+              ) : null}
+            </div>
+          ) : null}
         </div>
 
         <div className="my-3 grid grid-cols-3 gap-1 rounded-xl border border-white/5 bg-black/40 p-1 text-[10px] font-bold sm:text-[11px]">
@@ -300,6 +407,12 @@ export function GuideSearchModal({
                 <span className="text-[#F6A724]">{pendingGuide.name}</span> to
                 PNR <span className="text-cyan-300">{pnr}</span>?
               </h3>
+              {resolvedSpecialty > 0 ? (
+                <p className="text-xs text-[#F6A724]">
+                  Specialty bonus +{formatYenJpy(resolvedSpecialty)} will be
+                  added to this day&apos;s payout.
+                </p>
+              ) : null}
             </div>
             <div className="flex w-full max-w-xs items-center gap-3">
               <button

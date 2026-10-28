@@ -9,7 +9,6 @@ import { getAdminPocketBase } from "@/lib/pocketbase/admin";
 import { advanceBookingToInProgress } from "@/lib/bookingLifecycle";
 import { buildItineraryPdf } from "@/lib/itineraryPdf";
 import { sendItineraryEmail, resolveMailConfigured } from "@/lib/email";
-import { TEAM_EMAIL_CONFIG } from "@/lib/emailConfigStore";
 import type { BuilderState } from "@/store/useBuilderStore";
 import type { QuoteResult } from "@/lib/builder-pricing";
 
@@ -391,7 +390,7 @@ export async function handleSendItinerary(
       mailId,
       mailNote: mailSent ? undefined : mailNote,
       message: mailSent
-        ? `Proposal emailed to ${contactEmail}. A team copy also went to ${TEAM_EMAIL_CONFIG.routing.bccRecipient}. Your booking PNR is ${bookingRef}.`
+        ? `Proposal emailed to ${contactEmail}. A copy of this was sent to the TokioTours team. Your booking PNR is ${bookingRef}.`
         : `Saved with PNR ${bookingRef}. Email could not be sent yet — keep your PNR to retrieve this itinerary.`,
     });
   } catch (err) {

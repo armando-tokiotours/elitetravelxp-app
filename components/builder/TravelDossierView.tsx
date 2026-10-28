@@ -33,6 +33,7 @@ import {
 import {
   formatDisplayDate,
   normalizeCityHotelPref,
+  normalizeDateIso,
   sanitizeHotelUrl,
   useBuilderStore,
   type CityTransitType,
@@ -52,14 +53,17 @@ import {
 import { isTransitHubStop } from "@/lib/transitHubs";
 import { TRAVEL_STYLES, labelFor } from "@/lib/preEliteBuilder";
 import { travelStyleTierRules } from "@/lib/preEliteHydrate";
-import { DossierSectionOutline } from "@/components/builder/DossierSectionOutline";
 import { BoardingPassCard } from "@/components/builder/BoardingPassCard";
 import { JapanBookingPass } from "@/components/dossier/JapanBookingPass";
+import {
+  YourTravelBriefWidget,
+  type TravelBriefAnswers,
+} from "@/components/dossier/PreBuilderSummaryWidget";
+import { syncMultiDayBookingLead } from "@/lib/syncBookingLead";
 import { CoordinationTeamSection } from "@/components/dossier/CoordinationTeamSection";
 import { DossierTermsFooterSection } from "@/components/dossier/DossierTermsFooterSection";
 import {
   DayServiceTicketRow,
-  StaffIdentityCard,
   SuicaPassCard,
   TicketStubCard,
 } from "@/components/dossier/DayStaffCards";
@@ -73,34 +77,20 @@ import {
   type ServiceLineItem,
 } from "@/lib/agentServices";
 import {
-  normalizeTourDateIso,
-  type DayGuideAssignment,
-} from "@/lib/guideJobs";
-import {
   partitionGuestTickets,
   stayDatesForRange,
 } from "@/lib/guestItineraryDays";
-
-function dayGuideForDate(
-  dayGuides: DayGuideAssignment[],
-  date: string
-): DayGuideAssignment | undefined {
-  if (!dayGuides.length) return undefined;
-  if (date && date !== "undated") {
-    const iso = normalizeTourDateIso(date);
-    return dayGuides.find((g) => g.tourDate === iso && g.name);
-  }
-  return dayGuides.find((g) => g.name);
-}
 import {
   buildDossierQrUrl,
   buildRouteBreakdown,
+  buildSingleDayHighlights,
   experienceTierLabel,
   formatGuestCountText,
   formatPassDateLine,
   mapBookingStatusToPass,
   resolvePnr,
 } from "@/lib/dossier/bookingPassHelpers";
+import { BUILDER_ROUTES } from "@/lib/builderRoutes";
 import { useItineraryStore } from "@/store/useItineraryStore";
 import { usePreBuilderStore } from "@/store/usePreBuilderStore";
 
@@ -246,7 +236,6 @@ export function TravelDossierView({
   const guideName = ops.guideName;
   const driverName = ops.driverName;
   const guideLabel = ops.guideLabel;
-  const driverLabel = ops.driverLabel;
   const guidePhotoUrl = ops.guidePhotoUrl;
   const guideEmail = ops.guideEmail;
   const guidePhone = ops.guidePhone;
@@ -258,6 +247,27 @@ export function TravelDossierView({
   const driverPhone = ops.driverPhone;
   const driverUnlockMessage = ops.driverUnlockMessage;
   const agentDisplay = ops.assignedAgent || conciergeAgentName || null;
+  // Coordination Team: compact per-day guide rows (labelled by day/date)
+  // when distinct day guides exist; otherwise a single guide entry below.
+  // Driver is passed only when a driver is actually assigned (name present).
+  const namedDayGuides = dayGuides.filter((g) => g.name);
+  const coordinationGuides = namedDayGuides.map((g) => ({
+    name: g.name,
+    photoUrl: g.photoUrl,
+    email: g.email,
+    phone: g.phone,
+    whatsappDigits: g.whatsappDigits,
+    unlockMessage: g.unlockMessage || guideUnlockMessage,
+    serviceTitle: g.tourName || null,
+    serviceHint: "Confirmed for this day",
+    dayLabel:
+      [
+        g.dayIndex > 0 ? `Day ${g.dayIndex}` : null,
+        g.tourDate ? formatDisplayDate(g.tourDate) || g.tourDate : null,
+      ]
+        .filter(Boolean)
+        .join(" · ") || null,
+  }));
   const passStatus =
     ops.passStatus ||
     mapBookingStatusToPass(state.bookingStatus, {
@@ -265,17 +275,39 @@ export function TravelDossierView({
       hasPaidFull,
     });
   const routeBreakdown = buildRouteBreakdown(state.locations, cityName);
+  // Single-day passes (tripMode "single_day" rendered through this view)
+  // show booked tour titles under HIGHLIGHTS & AREA — not city + movement.
+  // Multi-day passes keep ROUTE & NIGHTS (routeBreakdown) untouched.
+  const singleDayHighlights =
+    state.tripMode === "single_day"
+      ? buildSingleDayHighlights({
+          cityFocus: firstCityLabel,
+          experiences: sortSelectedToursChronologically(
+            Object.values(state.selectedTours || {}).flat()
+          ).map((t) => ({
+            title: t.title,
+            access_type: t.access_type,
+          })),
+          // Cart category passed through — IC/subway lines land in
+          // ticketItems (tickets win in the cart classifiers) and must
+          // still be filtered out of Highlights here.
+          fallbackTitles: [
+            ...dayCart.guideItems.map((i) => ({
+              title: i.title,
+              category: i.category,
+            })),
+            ...dayCart.ticketItems.map((i) => ({
+              title: i.title,
+              category: i.category,
+            })),
+          ],
+        })
+      : undefined;
   const hasSuica =
     (state.locations || []).some((l) => {
       const t = String(l.ticketType || "").toLowerCase();
       return t.includes("suica") || t.includes("pasmo") || t === "ic_card";
     }) || guestTickets.tripWide.length > 0;
-  const hasPrivateDriver =
-    Object.values(state.chauffeurSelections || {}).some((byDate) =>
-      Object.values(byDate || {}).some((sel) => sel && sel.mode !== "none")
-    ) ||
-    (state.locations || []).some((l) => l.transitType === "private") ||
-    Boolean(dayCart.transitTitle);
   const hasGuidedTours =
     Object.values(state.selectedTours || {}).some(
       (rows) => (rows || []).length > 0
@@ -284,6 +316,48 @@ export function TravelDossierView({
     state.experienceService,
     state.isEliteConcierge
   );
+
+  /** Optimistic brief save → existing BAL upsert (Ops reads the same selections). */
+  const handleSaveQuizAnswers = async (
+    next: TravelBriefAnswers
+  ): Promise<boolean> => {
+    const prev: TravelBriefAnswers = {
+      travelStyle: state.preEliteTravelStyle,
+      travelPace: state.travelPace,
+      tourLanguage: state.preferredTourLanguage,
+      guestSpecialRequirements: state.guestSpecialRequirements,
+      interests: state.preEliteInterests,
+      motivation: state.preEliteMotivation,
+      painPoints: state.preElitePainPoints,
+    };
+    const apply = (a: TravelBriefAnswers) => {
+      useBuilderStore.setState({
+        preEliteTravelStyle: a.travelStyle,
+        preEliteInterests: [...a.interests],
+        preEliteMotivation: a.motivation,
+        preElitePainPoints: [...a.painPoints],
+        travelPace: a.travelPace,
+        preferredTourLanguage: a.tourLanguage || "EN",
+      });
+      // Setter (not setState) so guestSpecialRequirementsAcked +
+      // legacy specialNeeds stay in sync with the new requirements.
+      useBuilderStore
+        .getState()
+        .setGuestSpecialRequirements(a.guestSpecialRequirements);
+    };
+    apply(next);
+    // No contact/PNR yet — builder store is persisted locally and the next
+    // syncMultiDayBookingLead (Save / checkout) carries these selections.
+    if (!passengerEmail || !pnrCode || pnrCode === "······") return true;
+    const ok = await syncMultiDayBookingLead({
+      bookingRef: pnrCode,
+      email: passengerEmail,
+      state: useBuilderStore.getState(),
+      cityNames: cityMap,
+    });
+    if (!ok) apply(prev);
+    return ok;
+  };
 
   const saveLeg = (choice: {
     mode: CityTransitType;
@@ -304,43 +378,107 @@ export function TravelDossierView({
       id="itinerary-dossier-view"
       className="w-full space-y-4 overflow-visible px-0 print:bg-white print:text-black"
     >
-      {/* Section 2 — reusable Japan Booking Pass */}
-      <JapanBookingPass
-        pnrCode={pnrCode}
-        guestName={passengerName || "GUEST"}
-        guestEmail={passengerEmail || undefined}
-        partyText={formatGuestCountText(state.adults, state.children)}
-        travelStyle={styleLabel || "—"}
-        tripType={state.tripMode === "single_day" ? "single" : "multi"}
-        experienceType={experienceType}
-        originCode={originCode}
-        originLabel="TOKYO ENTRY"
-        destinationCode={destinationCode}
-        destinationLabel="DEPARTURE"
-        durationText={`${days} DAY${days === 1 ? "" : "S"}`}
-        startDateText={startDateText}
-        endDateText={endDateText}
-        routeBreakdown={routeBreakdown}
-        status={passStatus}
-        depositPaidEur={depositPaidEur}
-        hasPaidFull={hasPaidFull}
-        qrValue={buildDossierQrUrl(pnrCode, "/builder/itinerary")}
-        conciergeAgentName={agentDisplay}
-        editHref="/builder"
-      />
+      {/* Dark itinerary / pass shell — solid so fixed city cover only shows in gaps */}
+      <div className="mx-4 mb-8 sm:mx-5">
+        <div className="rounded-3xl bg-[#23262c] p-6">
+          <JapanBookingPass
+            pnrCode={pnrCode}
+            guestName={passengerName || "GUEST"}
+            guestEmail={passengerEmail || undefined}
+            partyText={formatGuestCountText(state.adults, state.children)}
+            travelStyle={styleLabel || "—"}
+            tripType={state.tripMode === "single_day" ? "single" : "multi"}
+            experienceType={experienceType}
+            originCode={originCode}
+            originLabel="TOKYO ENTRY"
+            destinationCode={destinationCode}
+            destinationLabel="DEPARTURE"
+            durationText={`${days} DAY${days === 1 ? "" : "S"}`}
+            startDateText={startDateText}
+            endDateText={endDateText}
+            routeBreakdown={routeBreakdown}
+            singleDayHighlights={singleDayHighlights}
+            status={passStatus}
+            depositPaidEur={depositPaidEur}
+            hasPaidFull={hasPaidFull}
+            qrValue={buildDossierQrUrl(pnrCode, BUILDER_ROUTES.japanJourneyItinerary)}
+            conciergeAgentName={agentDisplay}
+            editHref="/builder"
+          />
+        </div>
+      </div>
 
-      <CoordinationTeamSection
-        pnr={pnrCode}
-        agentName={agentDisplay}
-        guestEmail={passengerEmail || undefined}
-        guestName={passengerName || undefined}
-        tripPath="/builder/itinerary"
-      />
+      {/* Coordination Team above Guest Vision Brief — mb opens parallax window */}
+      <div className="mb-8 flex w-full flex-col gap-4">
+        <CoordinationTeamSection
+          pnr={pnrCode}
+          agentName={agentDisplay}
+          guestEmail={passengerEmail || undefined}
+          guestName={passengerName || undefined}
+          tripPath="/builder/itinerary"
+          guides={coordinationGuides}
+          guide={
+            coordinationGuides.length === 0 && hasGuidedTours
+              ? {
+                  name: guideName,
+                  photoUrl: guidePhotoUrl,
+                  email: guideEmail,
+                  phone: guidePhone,
+                  whatsappDigits: guideWhatsapp,
+                  unlockMessage: guideUnlockMessage,
+                  emptyLabel: guideLabel,
+                  serviceTitle: dayCart.guideTitle,
+                  serviceHint: "Pending assignment",
+                }
+              : null
+          }
+          driver={
+            driverName
+              ? {
+                  name: driverName,
+                  photoUrl: driverPhotoUrl,
+                  email: driverEmail,
+                  phone: driverPhone,
+                  unlockMessage: driverUnlockMessage,
+                }
+              : null
+          }
+        />
+
+        <YourTravelBriefWidget
+          answers={{
+            travelStyle: state.preEliteTravelStyle,
+            travelPace: state.travelPace,
+            tourLanguage: state.preferredTourLanguage,
+            guestSpecialRequirements: state.guestSpecialRequirements,
+            interests: state.preEliteInterests,
+            motivation: state.preEliteMotivation,
+            painPoints: state.preElitePainPoints,
+          }}
+          onSave={handleSaveQuizAnswers}
+          guestName={passengerName}
+          pnrCode={pnrCode}
+          tripTypeLabel={
+            state.tripMode === "single_day"
+              ? "1-Day Express Pass"
+              : "Grand Japan Journey"
+          }
+          timingLabel={dateSpan}
+          groupLabel={formatGuestCountText(state.adults, state.children)}
+        />
+      </div>
 
       {afterSummary}
 
-      {/* Section 5 — Continuous day-by-day itinerary */}
-      <DossierSectionOutline label="Section 5: Day Timeline">
+      {/* Section 5 — Continuous day-by-day itinerary (title format matches
+          single-day: gold title above a borderless transparent container,
+          dotted line below the title) */}
+      <div className="mx-auto my-6 w-full max-w-2xl px-8 sm:px-10 print:break-inside-avoid">
+        <div className="mb-3 flex items-center justify-between gap-2 border-b border-dotted border-slate-300 pb-2 print:border-gray-300">
+          <p className="text-[0.8125rem] font-semibold tracking-[0.35em] text-[#075473] uppercase print:text-gray-900">
+            Day Timeline
+          </p>
+        </div>
         <div className="space-y-4 print:break-inside-avoid">
           {(state.experienceService === "concierge" ||
             state.isEliteConcierge) && (
@@ -400,21 +538,6 @@ export function TravelDossierView({
                   state={state}
                   onOpenTransit={(leg) => openLeg(leg)}
                   totalGuests={totalGuests}
-                  guideLabel={hasGuidedTours ? guideLabel : undefined}
-                  guideUnlockMessage={
-                    hasGuidedTours ? guideUnlockMessage : null
-                  }
-                  dayGuides={hasGuidedTours ? dayGuides : []}
-                  driverName={hasPrivateDriver ? driverName : null}
-                  driverLabel={hasPrivateDriver ? driverLabel : undefined}
-                  driverPhotoUrl={hasPrivateDriver ? driverPhotoUrl : null}
-                  driverEmail={hasPrivateDriver ? driverEmail : null}
-                  driverPhone={hasPrivateDriver ? driverPhone : null}
-                  driverUnlockMessage={
-                    hasPrivateDriver ? driverUnlockMessage : null
-                  }
-                  carServiceTitle={dayCart.transitTitle}
-                  guideServiceTitle={dayCart.guideTitle}
                   ticketStatus={ops.ticketStatus}
                   ticketVoucherUrl={ticketVoucher?.url}
                   ticketVoucherFilename={ticketVoucher?.filename}
@@ -439,7 +562,7 @@ export function TravelDossierView({
             className="mt-2"
           />
         </div>
-      </DossierSectionOutline>
+      </div>
 
       <DossierTermsFooterSection />
 
@@ -468,17 +591,6 @@ function LocationSegment({
   state,
   onOpenTransit,
   totalGuests,
-  guideLabel,
-  guideUnlockMessage,
-  dayGuides = [],
-  driverName,
-  driverLabel,
-  driverPhotoUrl,
-  driverEmail,
-  driverPhone,
-  driverUnlockMessage,
-  carServiceTitle,
-  guideServiceTitle,
   ticketStatus,
   ticketVoucherUrl,
   ticketVoucherFilename,
@@ -500,17 +612,6 @@ function LocationSegment({
   state: BuilderState;
   onOpenTransit: (leg: InterCityTransitLeg) => void;
   totalGuests: number;
-  guideLabel?: string;
-  guideUnlockMessage?: string | null;
-  dayGuides?: DayGuideAssignment[];
-  driverName?: string | null;
-  driverLabel?: string;
-  driverPhotoUrl?: string | null;
-  driverEmail?: string | null;
-  driverPhone?: string | null;
-  driverUnlockMessage?: string | null;
-  carServiceTitle?: string | null;
-  guideServiceTitle?: string | null;
   ticketStatus?: string | null;
   ticketVoucherUrl?: string | null;
   ticketVoucherFilename?: string | null;
@@ -712,7 +813,7 @@ function LocationSegment({
           {showTripWidePasses ? (
             <div className="mt-3 space-y-2 border-t border-dashed border-white/10 pt-3">
               {(hasSuica || tripWideTickets.length > 0) && (
-                <>
+                <div className="ml-6 space-y-2 sm:ml-10">
                   <p className="text-[9px] font-semibold tracking-wider text-zinc-500 uppercase print:text-gray-600">
                     Trip-wide passes
                   </p>
@@ -740,7 +841,7 @@ function LocationSegment({
                       />
                     );
                   })}
-                </>
+                </div>
               )}
             </div>
           ) : null}
@@ -782,16 +883,6 @@ function LocationSegment({
                       ? t.scheduledDate === date
                       : dayIdx === 0
                   );
-                  const chauffeur = chauffeurByDate[date];
-                  const hasCar = Boolean(
-                    chauffeur && chauffeur.mode !== "none"
-                  );
-                  const dayGuide = dayGuideForDate(dayGuides, date);
-                  const needsGuide = dayTours.some((row) => {
-                    const tour = config?.tours.find((t) => t.id === row.tourId);
-                    return tour?.is_self_guided !== true;
-                  });
-                  const showGuide = Boolean(dayGuide?.name) || needsGuide;
                   const dayTickets = ticketsByDate[date] || [];
                   const dayNum = tripDayIndex(state.arrivalDate, date);
                   const isLastStayDay = dayIdx === uniqueDates.length - 1;
@@ -807,52 +898,9 @@ function LocationSegment({
                         </span>
                       </h3>
 
-                      {hasCar ? (
-                        <StaffIdentityCard
-                          role="driver"
-                          name={driverName}
-                          photoUrl={driverPhotoUrl}
-                          email={driverEmail}
-                          phone={driverPhone}
-                          unlockMessage={driverUnlockMessage}
-                          emptyLabel={driverLabel}
-                          serviceTitle={carServiceTitle}
-                          serviceHint="Vehicle secured · Pending assignment"
-                        />
-                      ) : null}
-
-                      {showGuide ? (
-                        <StaffIdentityCard
-                          role="guide"
-                          name={dayGuide?.name || null}
-                          photoUrl={dayGuide?.photoUrl || null}
-                          email={dayGuide?.email || null}
-                          phone={dayGuide?.phone || null}
-                          whatsappDigits={dayGuide?.whatsappDigits || null}
-                          unlockMessage={
-                            dayGuide?.unlockMessage ||
-                            (!dayGuide?.name ? null : guideUnlockMessage)
-                          }
-                          emptyLabel={
-                            dayGuide
-                              ? undefined
-                              : guideLabel || "Pending assignment"
-                          }
-                          serviceTitle={
-                            dayGuide?.name
-                              ? dayGuide.tourName
-                              : guideServiceTitle
-                          }
-                          serviceHint={
-                            dayGuide?.name
-                              ? "Confirmed for this day"
-                              : "Pending assignment"
-                          }
-                        />
-                      ) : null}
-
+                      {/* Guide & driver live in Coordination Team above */}
                       {dayTickets.length > 0 ? (
-                        <div className="space-y-2">
+                        <div className="ml-6 space-y-2 sm:ml-10">
                           <p className="text-[9px] font-bold uppercase tracking-widest text-white/45">
                             Today&apos;s tickets
                           </p>
@@ -1216,8 +1264,11 @@ function hubShort(h: PbHub | PbTransfer | null): string {
 
 function tripDayIndex(arrivalIso: string | null, date: string): number {
   if (!arrivalIso || !date) return 1;
-  const [ay, am, ad] = arrivalIso.split("-").map(Number);
-  const [by, bm, bd] = date.split("-").map(Number);
+  const aYmd = normalizeDateIso(arrivalIso);
+  const bYmd = normalizeDateIso(date);
+  if (!aYmd || !bYmd) return 1;
+  const [ay, am, ad] = aYmd.split("-").map(Number);
+  const [by, bm, bd] = bYmd.split("-").map(Number);
   if (!ay || !am || !ad || !by || !bm || !bd) return 1;
   const a = Date.UTC(ay, am - 1, ad);
   const b = Date.UTC(by, bm - 1, bd);

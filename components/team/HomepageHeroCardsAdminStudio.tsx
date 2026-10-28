@@ -1,30 +1,23 @@
 "use client";
 
 import type PocketBase from "pocketbase";
-import {
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-  type PointerEvent as ReactPointerEvent,
-} from "react";
-import { JapanKeyword } from "@/components/branding/JapanKeyword";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { optimizeFileForUpload } from "@/lib/optimizeUploadClient";
+import { uploadToVps } from "@/lib/vpsUploadClient";
 import { formatPbError } from "@/lib/pocketbase/admin-schema";
 import {
   DEFAULT_HOMEPAGE_HERO_INTRO,
-  DEFAULT_HOMEPAGE_HERO_TEXT_SLOTS,
   fetchSiteBranding,
-  heroTextOrientationStyle,
-  heroTextRoleClass,
+  parseVideoEmbed,
   resolveHomepageHeroIntro,
   serializeHomepageHeroIntroConfig,
+  HOMEPAGE_HERO_GRID_PANEL_IDS,
   type HomepageHeroCardId,
   type HomepageHeroCardConfig,
+  type HomepageHeroCardMediaType,
+  type HomepageHeroGridPanelId,
+  type HomepageHeroGridPanelMedia,
   type HomepageHeroIntroTextId,
-  type HomepageHeroOverlayLayout,
-  type HomepageHeroTextOrientation,
-  type HomepageHeroTextRole,
   type HomepageHeroTextSlot,
   type PbSiteBranding,
 } from "@/lib/pocketbase/client";
@@ -33,11 +26,12 @@ type PbClient = PocketBase;
 
 type CardDraft = Omit<HomepageHeroCardConfig, "route" | "tripType"> & {
   photoFile: File | null;
+  videoFile: File | null;
+  removeVideo: boolean;
 };
 
-type SelectedTarget =
-  | { kind: "intro"; id: HomepageHeroIntroTextId }
-  | { kind: "overlay"; id: HomepageHeroCardId };
+const MAX_VIDEO_BYTES = 50 * 1024 * 1024;
+
 
 const CARD_LABELS: Record<HomepageHeroCardId, string> = {
   single: "1-Day Express Pass",
@@ -51,17 +45,71 @@ const CARD_ORDER: HomepageHeroCardId[] = [
   "multiday",
 ];
 
-const INTRO_ELEMENTS: Array<{ id: HomepageHeroIntroTextId; label: string }> = [
-  { id: "scriptTitle", label: "1 · Highlight (DESIGN)" },
-  { id: "mainTitle", label: "2 · H1 (dream trip)" },
-  { id: "tagline", label: "3 · Supporting line" },
-];
 
-const PHOTO_FIELD: Record<HomepageHeroCardId, string> = {
-  single: "hero_card_single_photo",
-  experience: "hero_card_experience_photo",
-  multiday: "hero_card_multiday_photo",
+const VIDEO_FIELD: Record<HomepageHeroCardId, string> = {
+  single: "hero_card_single_video",
+  experience: "hero_card_experience_video",
+  multiday: "hero_card_multiday_video",
 };
+
+type PanelDraft = HomepageHeroGridPanelMedia & {
+  imageFile: File | null;
+  videoFile: File | null;
+  removeImage: boolean;
+  removeVideo: boolean;
+};
+
+const PANEL_LABELS: Record<HomepageHeroGridPanelId, string> = {
+  p1: "Panel 1 · Sky (top-left) — built-in 5.webp",
+  p2: "Panel 2 · Fuji (center) — built-in 4.webp",
+  p3: "Panel 3 · Character (right) — built-in 2.webp",
+  p4: "Panel 4 · Purple text panel (background) — built-in purple",
+  p5: "Panel 5 · Garden path — built-in 7.webp",
+  p6: "Panel 6 · Torii gate — built-in 8.webp",
+};
+
+/** Built-in artwork per panel (same paths the homepage hero renders). */
+const PANEL_BUILT_IN: Record<HomepageHeroGridPanelId, string> = {
+  p1: "/assets/base4/processed/5.webp",
+  p2: "/assets/base4/processed/4.webp",
+  p3: "/assets/base4/processed/2.webp",
+  p4: "",
+  p5: "/assets/base4/processed/7.webp",
+  p6: "/assets/base4/processed/8.webp",
+};
+
+/**
+ * Panel media lives OUTSIDE PocketBase in stable per-panel slots:
+ * /uploads/hero-panels/hero-panel-p{n}[.ext] (image) and
+ * hero-panel-p{n}-video[.ext] (video). Re-uploads overwrite the same
+ * file, so the URL stored in hero_intro_config JSON never changes.
+ */
+const PANEL_IMAGE_STABLE_KEY = (id: HomepageHeroGridPanelId) =>
+  `hero-panel-${id}`;
+const PANEL_VIDEO_STABLE_KEY = (id: HomepageHeroGridPanelId) =>
+  `hero-panel-${id}-video`;
+
+function panelDraftsFromIntro(
+  gridPanels: Record<HomepageHeroGridPanelId, HomepageHeroGridPanelMedia>
+): Record<HomepageHeroGridPanelId, PanelDraft> {
+  const next = {} as Record<HomepageHeroGridPanelId, PanelDraft>;
+  for (const id of HOMEPAGE_HERO_GRID_PANEL_IDS) {
+    const p = gridPanels[id];
+    next[id] = {
+      mediaType: p?.mediaType ?? "image",
+      mediaEmbedUrl: p?.mediaEmbedUrl ?? "",
+      mediaImageUrl: p?.mediaImageUrl ?? "",
+      mediaVideoUrl: p?.mediaVideoUrl ?? "",
+      mediaImageVersion: p?.mediaImageVersion ?? "",
+      mediaVideoVersion: p?.mediaVideoVersion ?? "",
+      imageFile: null,
+      videoFile: null,
+      removeImage: false,
+      removeVideo: false,
+    };
+  }
+  return next;
+}
 
 function draftsFromIntro(
   cards: HomepageHeroCardConfig[]
@@ -79,8 +127,13 @@ function draftsFromIntro(
       japaneseTextPosition: c.japaneseTextPosition,
       overlay: { ...c.overlay },
       heroPhotoUrl: c.heroPhotoUrl,
+      mediaType: c.mediaType ?? "image",
+      mediaVideoUrl: c.mediaVideoUrl ?? "",
+      mediaEmbedUrl: c.mediaEmbedUrl ?? "",
       order: c.order,
       photoFile: null,
+      videoFile: null,
+      removeVideo: false,
     };
   }
   return next;
@@ -108,6 +161,12 @@ export function HomepageHeroCardsAdminStudio({
   const [scriptTitle, setScriptTitle] = useState(
     DEFAULT_HOMEPAGE_HERO_INTRO.scriptTitle
   );
+  const [panelColor, setPanelColor] = useState(
+    DEFAULT_HOMEPAGE_HERO_INTRO.panelColor
+  );
+  const [panelText, setPanelText] = useState(
+    DEFAULT_HOMEPAGE_HERO_INTRO.panelText
+  );
   const [tagline, setTagline] = useState(DEFAULT_HOMEPAGE_HERO_INTRO.tagline);
   const [textLayouts, setTextLayouts] = useState(() =>
     cloneTextLayouts(DEFAULT_HOMEPAGE_HERO_INTRO.textLayouts)
@@ -115,10 +174,9 @@ export function HomepageHeroCardsAdminStudio({
   const [drafts, setDrafts] = useState(() =>
     draftsFromIntro(DEFAULT_HOMEPAGE_HERO_INTRO.cards)
   );
-  const [selected, setSelected] = useState<SelectedTarget>({
-    kind: "intro",
-    id: "scriptTitle",
-  });
+  const [panelDrafts, setPanelDrafts] = useState(() =>
+    panelDraftsFromIntro(DEFAULT_HOMEPAGE_HERO_INTRO.gridPanels)
+  );
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState<
@@ -127,14 +185,6 @@ export function HomepageHeroCardsAdminStudio({
   const [error, setError] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
 
-  const canvasRef = useRef<HTMLDivElement>(null);
-  const dragRef = useRef<{
-    target: SelectedTarget;
-    startX: number;
-    startY: number;
-    originLeft: number;
-    originTop: number;
-  } | null>(null);
   const autosaveTimer = useRef<number | null>(null);
   const skipNextAutosave = useRef(true);
   const textEditingRef = useRef(false);
@@ -143,40 +193,86 @@ export function HomepageHeroCardsAdminStudio({
     record,
     mainTitle,
     scriptTitle,
+    panelColor,
+    panelText,
     tagline,
     textLayouts,
     drafts,
+    panelDrafts,
   });
   snapshotRef.current = {
     record,
     mainTitle,
     scriptTitle,
+    panelColor,
+    panelText,
     tagline,
     textLayouts,
     drafts,
+    panelDrafts,
   };
 
   const applyRecord = useCallback((row: PbSiteBranding | null) => {
     const intro = resolveHomepageHeroIntro(row);
     setMainTitle(intro.mainTitle);
     setScriptTitle(intro.scriptTitle);
+    setPanelColor(intro.panelColor);
+    setPanelText(intro.panelText);
     setTagline(intro.tagline);
     setTextLayouts(cloneTextLayouts(intro.textLayouts));
     setDrafts(draftsFromIntro(intro.cards));
+    setPanelDrafts(panelDraftsFromIntro(intro.gridPanels));
   }, []);
 
-  /** After save: keep local copy; only refresh photo URLs from the server. */
+  /** After save: keep local copy; only refresh photo/video URLs from the server. */
   const mergePhotosFromRecord = useCallback((row: PbSiteBranding | null) => {
     if (!row) return;
     const intro = resolveHomepageHeroIntro(row);
     setDrafts((prev) => {
       const next = { ...prev };
       for (const id of CARD_ORDER) {
-        const serverUrl = intro.cards.find((c) => c.id === id)?.heroPhotoUrl;
-        if (!serverUrl) continue;
-        // Keep local blob preview while a new file is queued
-        if (prev[id].photoFile) continue;
-        next[id] = { ...prev[id], heroPhotoUrl: serverUrl, photoFile: null };
+        const serverCard = intro.cards.find((c) => c.id === id);
+        const serverUrl = serverCard?.heroPhotoUrl;
+        if (serverUrl && !prev[id].photoFile) {
+          next[id] = { ...next[id], heroPhotoUrl: serverUrl, photoFile: null };
+        }
+        // Video file was just persisted (or removed) — adopt server URL.
+        if (prev[id].videoFile || prev[id].removeVideo) {
+          next[id] = {
+            ...next[id],
+            mediaVideoUrl: serverCard?.mediaVideoUrl ?? "",
+            videoFile: null,
+            removeVideo: false,
+          };
+        }
+      }
+      return next;
+    });
+    setPanelDrafts((prev) => {
+      const next = { ...prev };
+      for (const id of HOMEPAGE_HERO_GRID_PANEL_IDS) {
+        const server = intro.gridPanels[id];
+        const d = prev[id];
+        let merged = { ...d };
+        if (d.imageFile || d.removeImage) {
+          merged = {
+            ...merged,
+            mediaImageUrl: server?.mediaImageUrl ?? "",
+            mediaImageVersion: server?.mediaImageVersion ?? "",
+            imageFile: null,
+            removeImage: false,
+          };
+        }
+        if (d.videoFile || d.removeVideo) {
+          merged = {
+            ...merged,
+            mediaVideoUrl: server?.mediaVideoUrl ?? "",
+            mediaVideoVersion: server?.mediaVideoVersion ?? "",
+            videoFile: null,
+            removeVideo: false,
+          };
+        }
+        next[id] = merged;
       }
       return next;
     });
@@ -212,7 +308,59 @@ export function HomepageHeroCardsAdminStudio({
     setError(null);
     setMsg(null);
     try {
+      // Validate embed URLs before saving (empty = gradient/photo fallback).
+      for (const id of CARD_ORDER) {
+        const d = snap.drafts[id];
+        if (
+          d.mediaType === "youtube_link" &&
+          (d.mediaEmbedUrl || "").trim() &&
+          !parseVideoEmbed(d.mediaEmbedUrl)
+        ) {
+          setError(
+            `${CARD_LABELS[id]}: video link must be a YouTube (watch / youtu.be / embed / shorts), Vimeo, or direct .mp4/.webm URL.`
+          );
+          setSaveStatus("error");
+          setSaving(false);
+          return;
+        }
+      }
+      for (const id of HOMEPAGE_HERO_GRID_PANEL_IDS) {
+        const d = snap.panelDrafts[id];
+        if (
+          d.mediaType === "youtube_link" &&
+          (d.mediaEmbedUrl || "").trim() &&
+          !parseVideoEmbed(d.mediaEmbedUrl)
+        ) {
+          setError(
+            `${PANEL_LABELS[id]}: video link must be a YouTube (watch / youtu.be / embed / shorts), Vimeo, or direct .mp4/.webm URL.`
+          );
+          setSaveStatus("error");
+          setSaving(false);
+          return;
+        }
+      }
       const pb = getClient();
+      const token0 = pb.authStore.token || "";
+      // Card cover photos → stable branding slots OUTSIDE PocketBase
+      // (/uploads/branding/home-card-{id}.webp + --mobile): same ID on
+      // every replace, URL stored in hero_intro_config JSON below.
+      const uploadedPhoto = {} as Record<
+        HomepageHeroCardId,
+        { url?: string; version?: string }
+      >;
+      for (const id of CARD_ORDER) {
+        uploadedPhoto[id] = {};
+        const file = snap.drafts[id].photoFile;
+        if (file) {
+          const saved = await uploadToVps(file, "branding", token0, {
+            stableKey: `home-card-${id}`,
+          });
+          uploadedPhoto[id] = {
+            url: saved.url,
+            version: String(Date.now()),
+          };
+        }
+      }
       const cards = CARD_ORDER.map((id) => {
         const d = snap.drafts[id];
         return {
@@ -223,21 +371,106 @@ export function HomepageHeroCardsAdminStudio({
           japaneseTextPosition: d.japaneseTextPosition,
           overlay: d.overlay,
           order: d.order,
+          mediaType: d.mediaType ?? "image",
+          mediaEmbedUrl: d.mediaEmbedUrl ?? "",
+          heroPhotoUrl: uploadedPhoto[id].url ?? d.heroPhotoUrl ?? "",
+          heroPhotoVersion:
+            uploadedPhoto[id].version ?? d.heroPhotoVersion ?? "",
         };
       });
+      // Panel media → external VPS storage (public/uploads/hero-panels),
+      // NEVER PocketBase files. Each panel has ONE stable slot
+      // (hero-panel-p{n} / hero-panel-p{n}-video): re-uploads overwrite
+      // the same file, the stored URL never changes, and a fresh version
+      // stamp busts browser/CDN caches at display time.
+      const token = pb.authStore.token || "";
+      const uploaded = {} as Record<
+        HomepageHeroGridPanelId,
+        { imageUrl?: string; imageVersion?: string; videoUrl?: string; videoVersion?: string }
+      >;
+      for (const id of HOMEPAGE_HERO_GRID_PANEL_IDS) {
+        const d = snap.panelDrafts[id];
+        uploaded[id] = {};
+        if (d.imageFile) {
+          const saved = await uploadToVps(d.imageFile, "hero-panels", token, {
+            stableKey: PANEL_IMAGE_STABLE_KEY(id),
+          });
+          uploaded[id].imageUrl = saved.url;
+          uploaded[id].imageVersion = String(Date.now());
+        }
+        if (d.videoFile) {
+          const saved = await uploadToVps(d.videoFile, "hero-panels", token, {
+            stableKey: PANEL_VIDEO_STABLE_KEY(id),
+          });
+          uploaded[id].videoUrl = saved.url;
+          uploaded[id].videoVersion = String(Date.now());
+        }
+      }
+      const gridPanels = {} as Record<
+        HomepageHeroGridPanelId,
+        Pick<
+          HomepageHeroGridPanelMedia,
+          | "mediaType"
+          | "mediaEmbedUrl"
+          | "mediaImageUrl"
+          | "mediaVideoUrl"
+          | "mediaImageVersion"
+          | "mediaVideoVersion"
+        >
+      >;
+      for (const id of HOMEPAGE_HERO_GRID_PANEL_IDS) {
+        const d = snap.panelDrafts[id];
+        gridPanels[id] = {
+          mediaType: d.mediaType ?? "image",
+          mediaEmbedUrl: d.mediaEmbedUrl ?? "",
+          mediaImageUrl: d.removeImage
+            ? ""
+            : (uploaded[id].imageUrl ?? d.mediaImageUrl ?? ""),
+          mediaVideoUrl: d.removeVideo
+            ? ""
+            : (uploaded[id].videoUrl ?? d.mediaVideoUrl ?? ""),
+          mediaImageVersion: d.removeImage
+            ? ""
+            : (uploaded[id].imageVersion ?? d.mediaImageVersion ?? ""),
+          mediaVideoVersion: d.removeVideo
+            ? ""
+            : (uploaded[id].videoVersion ?? d.mediaVideoVersion ?? ""),
+        };
+      }
       const payload = serializeHomepageHeroIntroConfig({
         mainTitle: snap.mainTitle,
         scriptTitle: snap.scriptTitle,
+        panelColor: snap.panelColor,
+        panelText: snap.panelText,
         tagline: snap.tagline,
         textLayouts: snap.textLayouts,
         cards,
+        gridPanels,
       });
       const fd = new FormData();
       fd.append("hero_intro_config", payload);
+      // NOTE: card cover photos are NOT PocketBase files anymore — they
+      // were uploaded above to stable /uploads/branding/home-card-{id}
+      // slots and their URLs ride in hero_intro_config JSON. Legacy
+      // hero_card_*_photo fields keep resolving until re-uploaded.
       for (const id of CARD_ORDER) {
-        const file = snap.drafts[id].photoFile;
-        if (file) fd.append(PHOTO_FIELD[id], file);
+        const d = snap.drafts[id];
+        if (d.videoFile) {
+          fd.append(VIDEO_FIELD[id], d.videoFile);
+        } else if (d.removeVideo && snap.record) {
+          // PocketBase file-delete syntax: "<field>-" + existing filename
+          const current = String(
+            (snap.record as unknown as Record<string, unknown>)[
+              VIDEO_FIELD[id]
+            ] || ""
+          ).trim();
+          if (current) fd.append(`${VIDEO_FIELD[id]}-`, current);
+        }
       }
+      // NOTE: no hero_panel_* files are written to PocketBase anymore —
+      // panel media URLs (stable /uploads/hero-panels/… slots) ride in
+      // hero_intro_config JSON above. Legacy PB-file panels still resolve
+      // via the file-field fallback until an admin re-uploads them.
 
       let saved: PbSiteBranding;
       if (snap.record?.id) {
@@ -265,9 +498,11 @@ export function HomepageHeroCardsAdminStudio({
       if (gen !== saveGenRef.current) return;
       const err = formatPbError(e);
       setError(
-        err.includes("hero_intro") || err.includes("Unknown field")
-          ? `${err} — apply PocketBase migration 1790930000_homepage_hero_cards first.`
-          : err
+        err.includes("_video")
+          ? `${err} — apply PocketBase migration 1791300000_site_branding_hero_card_videos first.`
+          : err.includes("hero_intro") || err.includes("Unknown field")
+            ? `${err} — apply PocketBase migration 1790930000_homepage_hero_cards first.`
+            : err
       );
       setSaveStatus("error");
     } finally {
@@ -299,15 +534,17 @@ export function HomepageHeroCardsAdminStudio({
     loading,
     mainTitle,
     scriptTitle,
+    panelColor,
+    panelText,
     tagline,
     textLayouts,
     drafts,
+    panelDrafts,
     scheduleSave,
   ]);
 
-  const beginTextEdit = (id?: HomepageHeroIntroTextId) => {
+  const beginTextEdit = () => {
     textEditingRef.current = true;
-    if (id) setSelected({ kind: "intro", id });
   };
 
   const endTextEdit = () => {
@@ -315,26 +552,6 @@ export function HomepageHeroCardsAdminStudio({
     if (autosaveTimer.current) window.clearTimeout(autosaveTimer.current);
     void persist();
   };
-  const updateIntroSlot = (
-    id: HomepageHeroIntroTextId,
-    patch: Partial<HomepageHeroTextSlot>
-  ) => {
-    setTextLayouts((prev) => ({
-      ...prev,
-      [id]: { ...prev[id], ...patch },
-    }));
-  };
-
-  const updateOverlay = (
-    id: HomepageHeroCardId,
-    patch: Partial<HomepageHeroOverlayLayout>
-  ) => {
-    setDrafts((prev) => ({
-      ...prev,
-      [id]: { ...prev[id], overlay: { ...prev[id].overlay, ...patch } },
-    }));
-  };
-
   const updateCard = <K extends keyof CardDraft>(
     id: HomepageHeroCardId,
     key: K,
@@ -356,72 +573,104 @@ export function HomepageHeroCardsAdminStudio({
     }));
   };
 
-  const currentLeftTop = (): { left: number; top: number } => {
-    if (selected.kind === "intro") {
-      const s = textLayouts[selected.id];
-      return { left: s.left, top: s.top };
-    }
-    const o = drafts[selected.id].overlay;
-    return { left: o.left, top: o.top };
-  };
-
-  const onPointerDown = (target: SelectedTarget, e: ReactPointerEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setSelected(target);
-    const pos =
-      target.kind === "intro"
-        ? textLayouts[target.id]
-        : drafts[target.id].overlay;
-    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-    dragRef.current = {
-      target,
-      startX: e.clientX,
-      startY: e.clientY,
-      originLeft: pos.left,
-      originTop: pos.top,
-    };
-  };
-
-  const onPointerMove = (e: ReactPointerEvent) => {
-    const drag = dragRef.current;
-    const box = canvasRef.current;
-    if (!drag || !box) return;
-    const rect = box.getBoundingClientRect();
-    if (rect.width < 1 || rect.height < 1) return;
-    const dxPct = ((e.clientX - drag.startX) / rect.width) * 100;
-    const dyPct = ((e.clientY - drag.startY) / rect.height) * 100;
-    const left = Math.min(
-      90,
-      Math.max(0, Math.round((drag.originLeft + dxPct) * 10) / 10)
-    );
-    const top = Math.min(
-      90,
-      Math.max(0, Math.round((drag.originTop + dyPct) * 10) / 10)
-    );
-    if (drag.target.kind === "intro") {
-      updateIntroSlot(drag.target.id, { left, top });
-    } else {
-      updateOverlay(drag.target.id, { left, top });
-    }
-  };
-
-  const onPointerUp = () => {
-    if (dragRef.current) {
-      dragRef.current = null;
-      // Force save after drag so position always lands in PocketBase
-      if (autosaveTimer.current) window.clearTimeout(autosaveTimer.current);
-      void persist();
+  const handleVideo = (id: HomepageHeroCardId, file: File | null) => {
+    if (!file) return;
+    const isVideoType =
+      file.type === "video/mp4" ||
+      file.type === "video/webm" ||
+      /\.(mp4|webm)$/i.test(file.name);
+    if (!isVideoType) {
+      setError(`${file.name}: only .mp4 / .webm videos are allowed.`);
       return;
     }
-    dragRef.current = null;
+    if (file.size > MAX_VIDEO_BYTES) {
+      setError(
+        `${file.name}: ${(file.size / 1024 / 1024).toFixed(1)}MB — max 50MB.`
+      );
+      return;
+    }
+    setError(null);
+    const url = URL.createObjectURL(file);
+    setDrafts((prev) => ({
+      ...prev,
+      [id]: {
+        ...prev[id],
+        videoFile: file,
+        mediaVideoUrl: url,
+        removeVideo: false,
+      },
+    }));
   };
 
-  const selectedSlot =
-    selected.kind === "intro" ? textLayouts[selected.id] : null;
-  const selectedOverlay =
-    selected.kind === "overlay" ? drafts[selected.id].overlay : null;
-  const pos = currentLeftTop();
+  const handleRemoveVideo = (id: HomepageHeroCardId) => {
+    setDrafts((prev) => ({
+      ...prev,
+      [id]: {
+        ...prev[id],
+        videoFile: null,
+        mediaVideoUrl: "",
+        removeVideo: true,
+      },
+    }));
+  };
+
+  const updatePanel = <K extends keyof PanelDraft>(
+    id: HomepageHeroGridPanelId,
+    key: K,
+    value: PanelDraft[K]
+  ) => {
+    setPanelDrafts((prev) => ({ ...prev, [id]: { ...prev[id], [key]: value } }));
+  };
+
+  const handlePanelImage = async (
+    id: HomepageHeroGridPanelId,
+    file: File | null
+  ) => {
+    if (!file) return;
+    const { file: optimized } = await optimizeFileForUpload(file);
+    const url = URL.createObjectURL(optimized);
+    setPanelDrafts((prev) => ({
+      ...prev,
+      [id]: {
+        ...prev[id],
+        imageFile: optimized,
+        mediaImageUrl: url,
+        removeImage: false,
+      },
+    }));
+  };
+
+  const handlePanelVideo = (
+    id: HomepageHeroGridPanelId,
+    file: File | null
+  ) => {
+    if (!file) return;
+    const isVideoType =
+      file.type === "video/mp4" ||
+      file.type === "video/webm" ||
+      /\.(mp4|webm)$/i.test(file.name);
+    if (!isVideoType) {
+      setError(`${file.name}: only .mp4 / .webm videos are allowed.`);
+      return;
+    }
+    if (file.size > MAX_VIDEO_BYTES) {
+      setError(
+        `${file.name}: ${(file.size / 1024 / 1024).toFixed(1)}MB — max 50MB.`
+      );
+      return;
+    }
+    setError(null);
+    const url = URL.createObjectURL(file);
+    setPanelDrafts((prev) => ({
+      ...prev,
+      [id]: {
+        ...prev[id],
+        videoFile: file,
+        mediaVideoUrl: url,
+        removeVideo: false,
+      },
+    }));
+  };
 
   if (loading) {
     return (
@@ -436,14 +685,13 @@ export function HomepageHeroCardsAdminStudio({
       <div className="flex flex-wrap items-start justify-between gap-3 border-b border-white/10 pb-4">
         <div>
           <h3 className="font-godiva text-lg text-[#F6A724]">
-            Homepage Hero Cards &amp; Typography Control Studio
+            Homepage Cards &amp; Hero
           </h3>
           <p className="mt-1 text-xs text-gray-400">
-            Edit titles freely — they save on{" "}
-            <span className="text-zinc-200">blur</span> or{" "}
-            <span className="text-zinc-200">Save changes</span> (no more wipe
-            while typing). Drag layouts still autosave. Homepage refreshes on
-            tab focus.
+            Hero script word and the three homepage booking cards. Edits save
+            on <span className="text-zinc-200">blur</span> or{" "}
+            <span className="text-zinc-200">Save changes</span>. Homepage
+            refreshes on tab focus.
           </p>
         </div>
         <button
@@ -463,407 +711,307 @@ export function HomepageHeroCardsAdminStudio({
       ) : null}
       {msg ? <p className="text-sm text-emerald-400">{msg}</p> : null}
 
-      <div className="grid gap-6 lg:grid-cols-[1fr_16rem]">
-        <div className="rounded-2xl border border-zinc-800 bg-[#0D1117] p-4 sm:p-5">
-          <p className="mb-3 text-[0.65rem] font-semibold tracking-[0.18em] text-[#075473] uppercase">
-            Homepage preview · drag any text / layover
-          </p>
-          <div
-            ref={canvasRef}
-            className="tokio-ambient-bg relative min-h-[20rem] overflow-hidden rounded-xl border border-dashed border-zinc-700/80 sm:min-h-[22rem]"
-            onPointerMove={onPointerMove}
-            onPointerUp={onPointerUp}
-            onPointerCancel={onPointerUp}
-          >
-            {INTRO_ELEMENTS.map((el) => {
-              const slot = textLayouts[el.id];
-              const on = selected.kind === "intro" && selected.id === el.id;
-              const copy =
-                el.id === "mainTitle"
-                  ? mainTitle
-                  : el.id === "scriptTitle"
-                    ? scriptTitle
-                    : tagline;
-              return (
-                <div
-                  key={el.id}
-                  role="button"
-                  tabIndex={0}
-                  onPointerDown={(e) =>
-                    onPointerDown({ kind: "intro", id: el.id }, e)
-                  }
-                  className={`absolute z-30 cursor-grab px-1.5 py-1 active:cursor-grabbing ${
-                    on
-                      ? "rounded-md ring-2 ring-[#075473] ring-offset-1 ring-offset-[#05080C]"
-                      : "hover:ring-1 hover:ring-white/30"
-                  }`}
-                  style={{
-                    left: `${slot.left}%`,
-                    top: `${slot.top}%`,
-                    maxWidth: `${slot.maxWidth}%`,
-                    fontSize: `${Math.max(10, slot.fontSize * 0.12)}px`,
-                    ...heroTextOrientationStyle(slot.orientation),
-                  }}
-                >
-                  {el.id === "scriptTitle" ? (
-                    <JapanKeyword
-                      className={`text-[#E02B49] ${heroTextRoleClass(slot.role)}`}
-                    >
-                      {copy || "DESIGN"}
-                    </JapanKeyword>
-                  ) : (
-                    <span
-                      className={`text-white whitespace-pre-line ${heroTextRoleClass(slot.role)} ${
-                        el.id === "tagline" ? "text-gray-300" : ""
-                      }`}
-                    >
-                      {copy || el.label}
-                    </span>
-                  )}
-                </div>
-              );
-            })}
-
-            <div className="absolute inset-x-4 bottom-3 grid grid-cols-3 gap-2 sm:inset-x-6">
-              {CARD_ORDER.map((id) => {
-                const card = drafts[id];
-                const on = selected.kind === "overlay" && selected.id === id;
-                return (
-                  <div
-                    key={id}
-                    className="relative aspect-[9/16] overflow-hidden rounded-lg border border-white/10 bg-zinc-900/80"
-                  >
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={card.heroPhotoUrl}
-                      alt=""
-                      className="h-full w-full object-cover opacity-80"
-                    />
-                    <div
-                      role="button"
-                      tabIndex={0}
-                      onPointerDown={(e) =>
-                        onPointerDown({ kind: "overlay", id }, e)
-                      }
-                      className={`absolute z-20 cursor-grab active:cursor-grabbing ${
-                        on
-                          ? "ring-2 ring-[#F6A724] ring-offset-1 ring-offset-black"
-                          : ""
-                      }`}
-                      style={{
-                        left: `${card.overlay.left}%`,
-                        top: `${card.overlay.top}%`,
-                        fontSize: `${Math.max(8, card.overlay.fontSize * 0.09)}px`,
-                        ...heroTextOrientationStyle(card.overlay.orientation),
-                      }}
-                    >
-                      <span
-                        className={`inline-block rounded border border-white/20 bg-black/25 px-1.5 py-0.5 tracking-widest text-white/90 uppercase backdrop-blur-[2px] ${heroTextRoleClass(
-                          card.overlay.role
-                        )}`}
-                      >
-                        {card.japaneseText || "JP"}
-                      </span>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
+      <div className="space-y-4 rounded-xl border border-white/5 bg-black/40 p-4">
+        <h4 className="text-xs font-bold tracking-wider text-cyan-400 uppercase">
+          Hero script word (purple panel / headline)
+        </h4>
+        <div className="text-xs">
+          <label className="mb-1 block text-gray-400">
+            Script word — shown as “&#123;word&#125; — your Japan, your way”
+          </label>
+          <input
+            type="text"
+            value={scriptTitle}
+            onChange={(e) => setScriptTitle(e.target.value)}
+            onFocus={() => beginTextEdit()}
+            onBlur={endTextEdit}
+            className="w-full rounded border border-white/10 bg-white/5 px-3 py-2 text-white sm:max-w-sm"
+          />
         </div>
 
-        <div className="space-y-4">
-          <div className="rounded-2xl border border-zinc-800 bg-zinc-900/60 p-4">
-            <p className="text-[0.65rem] font-semibold tracking-[0.18em] text-zinc-500 uppercase">
-              Elements
-            </p>
-            <ul className="mt-2 max-h-56 space-y-1 overflow-y-auto">
-              {INTRO_ELEMENTS.map((el) => (
-                <li key={el.id}>
-                  <button
-                    type="button"
-                    onClick={() => setSelected({ kind: "intro", id: el.id })}
-                    className={
-                      selected.kind === "intro" && selected.id === el.id
-                        ? "flex w-full rounded-lg bg-[#075473]/30 px-2 py-1.5 text-left text-xs font-semibold text-[#7dd3fc]"
-                        : "flex w-full rounded-lg px-2 py-1.5 text-left text-xs text-zinc-400 hover:bg-zinc-800"
-                    }
-                  >
-                    {el.label}
-                  </button>
-                </li>
-              ))}
-              <li className="pt-2 text-[0.6rem] font-semibold tracking-wider text-zinc-600 uppercase">
-                Card layovers
-              </li>
-              {CARD_ORDER.map((id) => (
-                <li key={id}>
-                  <button
-                    type="button"
-                    onClick={() => setSelected({ kind: "overlay", id })}
-                    className={
-                      selected.kind === "overlay" && selected.id === id
-                        ? "flex w-full rounded-lg bg-[#F6A724]/20 px-2 py-1.5 text-left text-xs font-semibold text-[#F6A724]"
-                        : "flex w-full rounded-lg px-2 py-1.5 text-left text-xs text-zinc-400 hover:bg-zinc-800"
-                    }
-                  >
-                    Overlay · {CARD_LABELS[id]}
-                  </button>
-                </li>
-              ))}
-            </ul>
+        <div className="border-t border-white/5 pt-4 text-xs">
+          <p className="mb-2 font-bold tracking-wider text-cyan-400 uppercase">
+            Purple panel (bottom-left) — dynamic text &amp; colour
+          </p>
+          <label className="mb-1 block text-gray-400">
+            Panel text — exact words on the purple panel (empty = the script
+            line above)
+          </label>
+          <input
+            type="text"
+            value={panelText}
+            onChange={(e) => setPanelText(e.target.value)}
+            onFocus={() => beginTextEdit()}
+            onBlur={endTextEdit}
+            placeholder={`e.g. DESIGN — YOUR JAPAN, YOUR WAY`}
+            className="w-full rounded border border-white/10 bg-white/5 px-3 py-2 text-white"
+          />
+          <label className="mt-3 mb-1 block text-gray-400">
+            Panel colour — background of the purple panel
+          </label>
+          <div className="flex items-center gap-3">
+            <input
+              type="color"
+              value={
+                /^#[0-9a-fA-F]{6}$/.test(panelColor) ? panelColor : "#9333EA"
+              }
+              onChange={(e) => setPanelColor(e.target.value)}
+              className="h-10 w-14 shrink-0 cursor-pointer rounded border border-white/10 bg-white/5"
+            />
+            <input
+              type="text"
+              value={panelColor}
+              onChange={(e) => setPanelColor(e.target.value)}
+              onFocus={() => beginTextEdit()}
+              onBlur={endTextEdit}
+              placeholder="#9333EA"
+              spellCheck={false}
+              className="w-full rounded border border-white/10 bg-white/5 px-3 py-2 font-mono text-white sm:max-w-[12rem]"
+            />
           </div>
-
-          <div className="rounded-2xl border border-zinc-800 bg-zinc-900/60 p-4">
-            <p className="text-[0.65rem] font-semibold tracking-[0.18em] text-zinc-500 uppercase">
-              Selected ·{" "}
-              {selected.kind === "intro"
-                ? INTRO_ELEMENTS.find((e) => e.id === selected.id)?.label
-                : `Overlay · ${CARD_LABELS[selected.id]}`}
-            </p>
-
-            <label className="mt-3 block text-xs text-zinc-400">
-              Left % ({pos.left})
-              <input
-                type="range"
-                min={0}
-                max={90}
-                step={0.5}
-                value={pos.left}
-                onChange={(e) => {
-                  const left = Number(e.target.value);
-                  if (selected.kind === "intro")
-                    updateIntroSlot(selected.id, { left });
-                  else updateOverlay(selected.id, { left });
-                }}
-                className="mt-1 w-full accent-[#075473]"
-              />
-            </label>
-            <label className="mt-2 block text-xs text-zinc-400">
-              Top % ({pos.top})
-              <input
-                type="range"
-                min={0}
-                max={90}
-                step={0.5}
-                value={pos.top}
-                onChange={(e) => {
-                  const top = Number(e.target.value);
-                  if (selected.kind === "intro")
-                    updateIntroSlot(selected.id, { top });
-                  else updateOverlay(selected.id, { top });
-                }}
-                className="mt-1 w-full accent-[#075473]"
-              />
-            </label>
-
-            {selectedSlot ? (
-              <>
-                <label className="mt-2 block text-xs text-zinc-400">
-                  Max width % ({selectedSlot.maxWidth})
-                  <input
-                    type="range"
-                    min={10}
-                    max={100}
-                    step={1}
-                    value={selectedSlot.maxWidth}
-                    onChange={(e) =>
-                      updateIntroSlot(selected.id as HomepageHeroIntroTextId, {
-                        maxWidth: Number(e.target.value),
-                      })
-                    }
-                    className="mt-1 w-full accent-[#075473]"
-                  />
-                </label>
-                <label className="mt-2 block text-xs text-zinc-400">
-                  Size % ({selectedSlot.fontSize})
-                  <input
-                    type="range"
-                    min={20}
-                    max={220}
-                    step={1}
-                    value={selectedSlot.fontSize}
-                    onChange={(e) =>
-                      updateIntroSlot(selected.id as HomepageHeroIntroTextId, {
-                        fontSize: Number(e.target.value),
-                      })
-                    }
-                    className="mt-1 w-full accent-[#075473]"
-                  />
-                </label>
-                <label className="mt-2 block text-xs text-zinc-400">
-                  Type role
-                  <select
-                    value={selectedSlot.role}
-                    onChange={(e) =>
-                      updateIntroSlot(selected.id as HomepageHeroIntroTextId, {
-                        role: e.target.value as HomepageHeroTextRole,
-                      })
-                    }
-                    className="mt-1 w-full rounded border border-white/10 bg-[#0A1017] px-2 py-1.5 text-white"
-                  >
-                    <option value="h1">H1</option>
-                    <option value="h2">H2</option>
-                    <option value="body">Body / text</option>
-                  </select>
-                </label>
-                <label className="mt-2 block text-xs text-zinc-400">
-                  Orientation
-                  <select
-                    value={selectedSlot.orientation}
-                    onChange={(e) =>
-                      updateIntroSlot(selected.id as HomepageHeroIntroTextId, {
-                        orientation: e.target
-                          .value as HomepageHeroTextOrientation,
-                      })
-                    }
-                    className="mt-1 w-full rounded border border-white/10 bg-[#0A1017] px-2 py-1.5 text-white"
-                  >
-                    <option value="horizontal">Horizontal</option>
-                    <option value="vertical">Vertical</option>
-                  </select>
-                </label>
-                <button
-                  type="button"
-                  onClick={() =>
-                    updateIntroSlot(
-                      selected.id as HomepageHeroIntroTextId,
-                      DEFAULT_HOMEPAGE_HERO_TEXT_SLOTS[
-                        selected.id as HomepageHeroIntroTextId
-                      ]
-                    )
-                  }
-                  className="mt-3 w-full rounded-lg border border-zinc-700 px-2 py-1.5 text-[10px] font-semibold tracking-wider text-zinc-400 uppercase hover:border-zinc-500"
-                >
-                  Reset this text
-                </button>
-              </>
-            ) : null}
-
-            {selectedOverlay && selected.kind === "overlay" ? (
-              <>
-                <label className="mt-2 block text-xs text-zinc-400">
-                  Size % ({selectedOverlay.fontSize})
-                  <input
-                    type="range"
-                    min={20}
-                    max={220}
-                    step={1}
-                    value={selectedOverlay.fontSize}
-                    onChange={(e) =>
-                      updateOverlay(selected.id, {
-                        fontSize: Number(e.target.value),
-                      })
-                    }
-                    className="mt-1 w-full accent-[#F6A724]"
-                  />
-                </label>
-                <label className="mt-2 block text-xs text-zinc-400">
-                  Type role
-                  <select
-                    value={selectedOverlay.role}
-                    onChange={(e) =>
-                      updateOverlay(selected.id, {
-                        role: e.target.value as HomepageHeroTextRole,
-                      })
-                    }
-                    className="mt-1 w-full rounded border border-white/10 bg-[#0A1017] px-2 py-1.5 text-white"
-                  >
-                    <option value="h1">H1</option>
-                    <option value="h2">H2</option>
-                    <option value="body">Body / text</option>
-                  </select>
-                </label>
-                <label className="mt-2 block text-xs text-zinc-400">
-                  Orientation
-                  <select
-                    value={selectedOverlay.orientation}
-                    onChange={(e) =>
-                      updateOverlay(selected.id, {
-                        orientation: e.target
-                          .value as HomepageHeroTextOrientation,
-                      })
-                    }
-                    className="mt-1 w-full rounded border border-white/10 bg-[#0A1017] px-2 py-1.5 text-white"
-                  >
-                    <option value="horizontal">Horizontal</option>
-                    <option value="vertical">Vertical</option>
-                  </select>
-                </label>
-              </>
-            ) : null}
-          </div>
+          <p className="mt-1 text-gray-500">
+            Default #9333EA. Invalid colours fall back to the default.
+          </p>
         </div>
       </div>
 
       <div className="space-y-4 rounded-xl border border-white/5 bg-black/40 p-4">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <h4 className="text-xs font-bold tracking-wider text-cyan-400 uppercase">
-            Main Header Titles — exact order
-          </h4>
-          <button
-            type="button"
-            disabled={saving}
-            onClick={() => {
-              const nextScript = DEFAULT_HOMEPAGE_HERO_INTRO.scriptTitle;
-              const nextMain = DEFAULT_HOMEPAGE_HERO_INTRO.mainTitle;
-              const nextTag = DEFAULT_HOMEPAGE_HERO_INTRO.tagline;
-              textEditingRef.current = false;
-              setScriptTitle(nextScript);
-              setMainTitle(nextMain);
-              setTagline(nextTag);
-              snapshotRef.current = {
-                ...snapshotRef.current,
-                scriptTitle: nextScript,
-                mainTitle: nextMain,
-                tagline: nextTag,
-              };
-              skipNextAutosave.current = true;
-              void persist();
-            }}
-            className="rounded-lg border border-[#F6A724]/40 bg-[#F6A724]/10 px-3 py-1.5 text-[10px] font-bold tracking-wider text-[#F6A724] uppercase hover:bg-[#F6A724]/20 disabled:opacity-50"
-          >
-            Load this design copy
-          </button>
-        </div>
-        <div className="grid grid-cols-1 gap-4 text-xs sm:grid-cols-2">
-          <div>
-            <label className="mb-1 block text-gray-400">
-              1 · Highlight (H1 line 1)
-            </label>
-            <input
-              type="text"
-              value={scriptTitle}
-              onChange={(e) => setScriptTitle(e.target.value)}
-              onFocus={() => beginTextEdit("scriptTitle")}
-              onBlur={endTextEdit}
-              className="w-full rounded border border-white/10 bg-white/5 px-3 py-2 text-white"
-            />
-          </div>
-          <div className="sm:col-span-2">
-            <label className="mb-1 block text-gray-400">
-              2 · H1 (line 2 — use Enter for second row)
-            </label>
-            <textarea
-              value={mainTitle}
-              rows={2}
-              onChange={(e) => setMainTitle(e.target.value)}
-              onFocus={() => beginTextEdit("mainTitle")}
-              onBlur={endTextEdit}
-              className="w-full rounded border border-white/10 bg-white/5 px-3 py-2 text-white uppercase"
-            />
-          </div>
-          <div className="sm:col-span-2">
-            <label className="mb-1 block text-gray-400">3 · Supporting line</label>
-            <textarea
-              value={tagline}
-              rows={3}
-              onChange={(e) => setTagline(e.target.value)}
-              onFocus={() => beginTextEdit("tagline")}
-              onBlur={endTextEdit}
-              className="w-full rounded border border-white/10 bg-white/5 px-3 py-2 text-white"
-            />
-          </div>
+        <h4 className="text-xs font-bold tracking-wider text-cyan-400 uppercase">
+          HERO GRID PANELS
+        </h4>
+        <p className="text-[11px] text-zinc-500">
+          Replace the built-in artwork of each scrubbed hero panel. Empty =
+          built-in artwork. Video / links play only while the panel is on
+          screen. Panel 4 media sits behind the purple text panel.
+        </p>
+        <div className="space-y-4">
+          {HOMEPAGE_HERO_GRID_PANEL_IDS.map((panelId) => {
+            const panel = panelDrafts[panelId];
+            // ── Live preview: mirror exactly what the homepage renders ──
+            const builtInSrc = PANEL_BUILT_IN[panelId];
+            const pType = panel.mediaType ?? "image";
+            const pEmbed =
+              pType === "youtube_link"
+                ? parseVideoEmbed(panel.mediaEmbedUrl)
+                : null;
+            const pYtThumb =
+              pEmbed?.provider === "youtube"
+                ? `https://i.ytimg.com/vi/${(pEmbed.embedUrl.match(/\/embed\/([\w-]{6,})/) || [])[1] || ""}/hqdefault.jpg`
+                : "";
+            const pVideoSrc =
+              pType === "video"
+                ? (panel.mediaVideoUrl || "").trim()
+                : pEmbed?.provider === "file"
+                  ? pEmbed.embedUrl
+                  : "";
+            const pImgSrc =
+              pType === "image"
+                ? (panel.mediaImageUrl || "").trim() || builtInSrc
+                : builtInSrc;
+            const purplePreviewText =
+              (panelText || "").trim() ||
+              `${scriptTitle || "DESIGN"} — your Japan, your way`;
+            const previewCaption = pVideoSrc
+              ? "Live preview — your uploaded video"
+              : pYtThumb
+                ? "Live preview — YouTube link (thumbnail)"
+                : pEmbed?.provider === "vimeo"
+                  ? "Live preview — Vimeo link (built-in shown here; video plays on the homepage)"
+                  : pType === "image" && (panel.mediaImageUrl || "").trim()
+                    ? "Live preview — your uploaded image"
+                    : panelId === "p4"
+                      ? "Live preview — purple panel (colour + text above)"
+                      : "Live preview — built-in artwork";
+            return (
+              <div
+                key={panelId}
+                className="space-y-3 rounded-lg border border-white/5 bg-white/[0.02] p-3 text-xs"
+              >
+                <h5 className="font-bold text-amber-400 uppercase">
+                  {PANEL_LABELS[panelId]}
+                </h5>
+
+                {/* ── Live preview: what visitors see on this panel now ── */}
+                <div className="overflow-hidden rounded-lg border border-white/10">
+                  <div className="relative aspect-video w-full bg-[#0B1015]">
+                    {pVideoSrc ? (
+                      <video
+                        src={pVideoSrc}
+                        autoPlay
+                        muted
+                        loop
+                        playsInline
+                        preload="metadata"
+                        className="absolute inset-0 h-full w-full object-cover"
+                      />
+                    ) : pYtThumb || pImgSrc ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={pYtThumb || pImgSrc}
+                        alt=""
+                        className="absolute inset-0 h-full w-full object-cover"
+                      />
+                    ) : null}
+                    {panelId === "p4" ? (
+                      <>
+                        <div
+                          className="absolute inset-0"
+                          style={{
+                            backgroundColor: panelColor,
+                            opacity: pVideoSrc || pYtThumb || pImgSrc ? 0.8 : 1,
+                          }}
+                          aria-hidden
+                        />
+                        <div className="absolute inset-0 flex items-center justify-center p-4 text-center">
+                          <span className="text-sm font-black tracking-tight text-white uppercase">
+                            {purplePreviewText}
+                          </span>
+                        </div>
+                      </>
+                    ) : null}
+                  </div>
+                  <p className="bg-black/40 px-2 py-1 text-[10px] text-zinc-400">
+                    {previewCaption}
+                  </p>
+                </div>
+                <label className="block text-gray-400">
+                  Media
+                  <select
+                    value={panel.mediaType ?? "image"}
+                    onChange={(e) =>
+                      updatePanel(
+                        panelId,
+                        "mediaType",
+                        e.target.value as HomepageHeroCardMediaType
+                      )
+                    }
+                    className="mt-1 w-full rounded border border-white/10 bg-[#0A1017] px-3 py-1.5 text-white"
+                  >
+                    <option value="image">Image Upload</option>
+                    <option value="video">Video Upload (.mp4/.webm)</option>
+                    <option value="youtube_link">
+                      Video Link (YouTube/Vimeo)
+                    </option>
+                  </select>
+                </label>
+
+                {(panel.mediaType ?? "image") === "image" ? (
+                  <div className="space-y-2">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => {
+                        void handlePanelImage(
+                          panelId,
+                          e.target.files?.[0] ?? null
+                        );
+                        e.target.value = "";
+                      }}
+                      className="w-full rounded border border-white/10 bg-white/5 px-2 py-1.5 text-[11px] text-gray-300"
+                    />
+                    {panel.mediaImageUrl ? (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setPanelDrafts((prev) => ({
+                              ...prev,
+                              [panelId]: {
+                                ...prev[panelId],
+                                imageFile: null,
+                                mediaImageUrl: "",
+                                removeImage: true,
+                              },
+                            }))
+                          }
+                          className="rounded-full border border-red-900/60 px-3 py-1 text-[10px] font-semibold tracking-wider text-red-300 uppercase transition hover:border-red-500"
+                        >
+                          Remove image
+                        </button>
+                      </>
+                    ) : (
+                      <p className="text-[10px] text-zinc-500">
+                        No image uploaded — built-in artwork is used.
+                      </p>
+                    )}
+                  </div>
+                ) : null}
+
+                {panel.mediaType === "video" ? (
+                  <div className="space-y-2">
+                    <input
+                      type="file"
+                      accept="video/mp4,video/webm"
+                      onChange={(e) => {
+                        handlePanelVideo(panelId, e.target.files?.[0] ?? null);
+                        e.target.value = "";
+                      }}
+                      className="w-full rounded border border-white/10 bg-white/5 px-2 py-1.5 text-[11px] text-gray-300"
+                    />
+                    {panel.mediaVideoUrl ? (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setPanelDrafts((prev) => ({
+                              ...prev,
+                              [panelId]: {
+                                ...prev[panelId],
+                                videoFile: null,
+                                mediaVideoUrl: "",
+                                removeVideo: true,
+                              },
+                            }))
+                          }
+                          className="rounded-full border border-red-900/60 px-3 py-1 text-[10px] font-semibold tracking-wider text-red-300 uppercase transition hover:border-red-500"
+                        >
+                          Remove video
+                        </button>
+                      </>
+                    ) : (
+                      <p className="text-[10px] text-zinc-500">
+                        No video uploaded — built-in artwork is used. Max
+                        50MB.
+                      </p>
+                    )}
+                  </div>
+                ) : null}
+
+                {panel.mediaType === "youtube_link" ? (
+                  <div className="space-y-1">
+                    <input
+                      type="url"
+                      value={panel.mediaEmbedUrl ?? ""}
+                      placeholder="https://www.youtube.com/watch?v=… or https://vimeo.com/…"
+                      onChange={(e) =>
+                        updatePanel(panelId, "mediaEmbedUrl", e.target.value)
+                      }
+                      onFocus={() => beginTextEdit()}
+                      onBlur={endTextEdit}
+                      className="w-full rounded border border-white/10 bg-white/5 px-3 py-1.5 text-white"
+                    />
+                    {(panel.mediaEmbedUrl || "").trim() ? (
+                      parseVideoEmbed(panel.mediaEmbedUrl) ? (
+                        <p className="text-[10px] text-emerald-400">
+                          ✓ Valid — plays muted &amp; looped only while this
+                          panel is on screen.
+                        </p>
+                      ) : (
+                        <p className="text-[10px] text-red-300">
+                          Must be a YouTube (watch / youtu.be / embed /
+                          shorts), Vimeo, or direct .mp4/.webm URL.
+                        </p>
+                      )
+                    ) : (
+                      <p className="text-[10px] text-zinc-500">
+                        Empty = built-in artwork fallback.
+                      </p>
+                    )}
+                  </div>
+                ) : null}
+              </div>
+            );
+          })}
         </div>
       </div>
 
@@ -947,7 +1095,7 @@ export function HomepageHeroCardsAdminStudio({
 
                 <div>
                   <label className="mb-1 block text-gray-400">
-                    Text Inside Photo Box (layover)
+                    Japanese tag (expanded panel chip)
                   </label>
                   <input
                     type="text"
@@ -955,18 +1103,117 @@ export function HomepageHeroCardsAdminStudio({
                     onChange={(e) =>
                       updateCard(cardKey, "japaneseText", e.target.value)
                     }
-                    onFocus={() => {
-                      beginTextEdit();
-                      setSelected({ kind: "overlay", id: cardKey });
-                    }}
+                    onFocus={() => beginTextEdit()}
                     onBlur={endTextEdit}
                     className="mb-2 w-full rounded border border-white/10 bg-white/5 px-3 py-1.5 text-white"
                   />
                   <p className="text-[10px] text-zinc-500">
-                    Position / size / H1·H2·body / orientation via Elements list
-                    or preview drag. Click Save changes when done.
+                    Shown as the chip on the expanded accordion panel. Click
+                    Save changes when done.
                   </p>
                 </div>
+              </div>
+
+              {/* Per-card accordion media */}
+              <div className="space-y-3 rounded-lg border border-white/5 bg-white/[0.02] p-3">
+                <label className="block text-gray-400">
+                  Media (expanded accordion panel)
+                  <select
+                    value={card.mediaType ?? "image"}
+                    onChange={(e) =>
+                      updateCard(
+                        cardKey,
+                        "mediaType",
+                        e.target.value as HomepageHeroCardMediaType
+                      )
+                    }
+                    className="mt-1 w-full rounded border border-white/10 bg-[#0A1017] px-3 py-1.5 text-white"
+                  >
+                    <option value="image">Image Upload</option>
+                    <option value="video">Video Upload (.mp4/.webm)</option>
+                    <option value="youtube_link">
+                      Video Link (YouTube/Vimeo)
+                    </option>
+                  </select>
+                </label>
+
+                {(card.mediaType ?? "image") === "image" ? (
+                  <p className="text-[10px] text-zinc-500">
+                    Uses the Card Cover Photo above (accent gradient when no
+                    photo is set).
+                  </p>
+                ) : null}
+
+                {card.mediaType === "video" ? (
+                  <div className="space-y-2">
+                    <input
+                      type="file"
+                      accept="video/mp4,video/webm"
+                      onChange={(e) => {
+                        handleVideo(cardKey, e.target.files?.[0] ?? null);
+                        e.target.value = "";
+                      }}
+                      className="w-full rounded border border-white/10 bg-white/5 px-2 py-1.5 text-[11px] text-gray-300"
+                    />
+                    {card.mediaVideoUrl ? (
+                      <>
+                        <video
+                          src={card.mediaVideoUrl}
+                          muted
+                          loop
+                          playsInline
+                          preload="metadata"
+                          className="aspect-video w-full max-w-xs rounded-lg border border-white/10 object-cover"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveVideo(cardKey)}
+                          className="rounded-full border border-red-900/60 px-3 py-1 text-[10px] font-semibold tracking-wider text-red-300 uppercase transition hover:border-red-500"
+                        >
+                          Remove video
+                        </button>
+                      </>
+                    ) : (
+                      <p className="text-[10px] text-zinc-500">
+                        No video uploaded — expanded panel falls back to the
+                        cover photo / gradient. Max 50MB.
+                      </p>
+                    )}
+                  </div>
+                ) : null}
+
+                {card.mediaType === "youtube_link" ? (
+                  <div className="space-y-1">
+                    <input
+                      type="url"
+                      value={card.mediaEmbedUrl ?? ""}
+                      placeholder="https://www.youtube.com/watch?v=… or https://vimeo.com/…"
+                      onChange={(e) =>
+                        updateCard(cardKey, "mediaEmbedUrl", e.target.value)
+                      }
+                      onFocus={() => beginTextEdit()}
+                      onBlur={endTextEdit}
+                      className="w-full rounded border border-white/10 bg-white/5 px-3 py-1.5 text-white"
+                    />
+                    {(card.mediaEmbedUrl || "").trim() ? (
+                      parseVideoEmbed(card.mediaEmbedUrl) ? (
+                        <p className="text-[10px] text-emerald-400">
+                          ✓ Valid — plays muted &amp; looped only while this
+                          panel is expanded.
+                        </p>
+                      ) : (
+                        <p className="text-[10px] text-red-300">
+                          Must be a YouTube (watch / youtu.be / embed /
+                          shorts), Vimeo, or direct .mp4/.webm URL.
+                        </p>
+                      )
+                    ) : (
+                      <p className="text-[10px] text-zinc-500">
+                        Empty = cover photo / gradient fallback.
+                      </p>
+                    )}
+                  </div>
+                ) : null}
               </div>
             </div>
           );

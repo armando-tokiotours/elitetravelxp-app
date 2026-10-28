@@ -29,7 +29,7 @@ interface PreBuilderState extends PreEliteDraft {
   /** Server/local count of boarding-pass emails dispatched for this PNR. */
   emailSentCount: number;
   setStep: (step: number) => void;
-  setTravelStyle: (travelStyle: TravelStyleId) => void;
+  setTravelStyle: (travelStyle: TravelStyleId | null) => void;
   toggleInterest: (id: InterestId) => void;
   setTripMotivation: (tripMotivation: MotivationId) => void;
   togglePainPoint: (id: PainPointId) => void;

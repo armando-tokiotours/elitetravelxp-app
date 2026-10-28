@@ -12,6 +12,102 @@ import {
 } from "@/lib/chatTopics";
 import { guestFacingStaffLabel } from "@/lib/specialistDirectChat";
 import { ChatMessageItem } from "@/components/chat/ChatMessageItem";
+import {
+  assignedAgentGreeting,
+  countStaffMessages,
+  setCommSeenStaffCount,
+} from "@/lib/guestTalkChat";
+
+function formatGreetingTime(raw: string): string {
+  const d = new Date(raw);
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+}
+
+/**
+ * Display-only initial greeting from the assigned concierge agent —
+ * not a persisted comm message. Only rendered when an agent is assigned.
+ */
+function AssignedAgentGreeting({
+  guestName,
+  agentName,
+  agentPhotoUrl,
+}: {
+  guestName?: string;
+  agentName: string;
+  agentPhotoUrl?: string | null;
+}) {
+  const [avatarFailed, setAvatarFailed] = useState(false);
+  // Captured once per chat mount so re-renders/reloads don't duplicate or drift.
+  const [greetingAt] = useState(() => new Date().toISOString());
+  const showPhoto = Boolean(agentPhotoUrl) && !avatarFailed;
+  return (
+    <div className="flex items-start gap-2">
+      {showPhoto ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={agentPhotoUrl || undefined}
+          alt=""
+          className="h-9 w-9 shrink-0 rounded-full object-cover ring-1 ring-white/10"
+          onError={() => setAvatarFailed(true)}
+        />
+      ) : (
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#075473]/40 text-xs font-bold text-cyan-200 ring-1 ring-white/10">
+          {agentName.charAt(0).toUpperCase()}
+        </span>
+      )}
+      <div className="mr-6 max-w-[90%] rounded-xl bg-zinc-900 px-2.5 py-2 text-xs sm:text-sm">
+        <p className="mb-0.5 flex flex-wrap items-center justify-between gap-2 text-[9px] tracking-wide text-zinc-400 uppercase sm:text-[10px]">
+          <span>{agentName}</span>
+          <span className="font-mono normal-case opacity-70">
+            {formatGreetingTime(greetingAt)}
+          </span>
+        </p>
+        <p className="whitespace-pre-wrap break-words text-zinc-100">
+          {assignedAgentGreeting(guestName, agentName)}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Circular agent avatar for the chat header (reference: top bar, photo on
+ * the right beside "Chat with …" + booking ref). Letter fallback when there
+ * is no photo / the image fails; "T" for TokioTours when unassigned.
+ */
+function HeaderAgentAvatar({
+  agentName,
+  agentPhotoUrl,
+}: {
+  agentName: string | null;
+  agentPhotoUrl: string | null;
+}) {
+  const [failedPhotoUrl, setFailedPhotoUrl] = useState<string | null>(null);
+  const showPhoto = Boolean(agentPhotoUrl) && failedPhotoUrl !== agentPhotoUrl;
+  const label = agentName || "TokioTours Concierge";
+  if (showPhoto) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={agentPhotoUrl || undefined}
+        alt={label}
+        title={label}
+        className="h-11 w-11 shrink-0 rounded-full border border-white/15 object-cover ring-1 ring-white/10"
+        onError={() => setFailedPhotoUrl(agentPhotoUrl)}
+      />
+    );
+  }
+  return (
+    <span
+      aria-hidden
+      title={label}
+      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-white/15 bg-[#075473]/40 text-sm font-bold text-cyan-200 ring-1 ring-white/10"
+    >
+      {(agentName?.charAt(0) || "T").toUpperCase()}
+    </span>
+  );
+}
 
 type Msg = {
   id: string;
@@ -80,6 +176,7 @@ export function GuestCommPage({
 
   const [messages, setMessages] = useState<Msg[]>([]);
   const [agentName, setAgentName] = useState<string | null>(null);
+  const [agentPhotoUrl, setAgentPhotoUrl] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
   const [pendingFile, setPendingFile] = useState<File | null>(null);
   const [selectedTopic, setSelectedTopic] = useState<ChatTopic | null>(null);
@@ -98,22 +195,22 @@ export function GuestCommPage({
       if (!res.ok) return;
       const data = (await res.json()) as {
         messages?: Msg[];
-        agent?: { name?: string } | null;
+        agent?: { name?: string; photoUrl?: string | null } | null;
       };
       setMessages(data.messages || []);
+      // /api/comm resolves the assigned concierge via findConciergeAgentByPnr
+      // (photoUrl is already the /api/staff/avatar/… URL when present).
       setAgentName(data.agent?.name || null);
-      const staffMsgs = (data.messages || []).filter(
-        (m) => m.author_role === "agent" || m.author_role === "ops"
-      ).length;
-      try {
-        sessionStorage.setItem(`comm-seen-${pnr}`, String(staffMsgs));
-      } catch {
-        /* ignore */
+      setAgentPhotoUrl(data.agent?.photoUrl || null);
+      // Embedded modal: GuestTalkBubble marks seen when FAB opens.
+      // Standalone /comm route: navigating here is an explicit open.
+      if (!embedded) {
+        setCommSeenStaffCount(pnr, countStaffMessages(data.messages || []));
       }
     } catch {
       /* ignore */
     }
-  }, [pnr]);
+  }, [pnr, embedded]);
 
   useEffect(() => {
     void reload();
@@ -303,13 +400,14 @@ export function GuestCommPage({
           </Link>
         )}
         <div className="min-w-0 flex-1">
-          <p className="text-[10px] font-semibold tracking-wider text-zinc-500 uppercase">
+          <p className="font-mono text-[10px] font-semibold tracking-wider text-zinc-500 uppercase">
             {pnr}
           </p>
           <h1 className="font-godiva truncate text-lg tracking-wide uppercase">
             {title}
           </h1>
         </div>
+        <HeaderAgentAvatar agentName={agentName} agentPhotoUrl={agentPhotoUrl} />
       </div>
 
       <div
@@ -323,7 +421,13 @@ export function GuestCommPage({
           </p>
         ) : null}
         {messages.length === 0 ? (
-          <p className="text-sm text-zinc-600">No messages yet.</p>
+          agentName ? (
+            <AssignedAgentGreeting
+              guestName={guestName}
+              agentName={agentName}
+              agentPhotoUrl={agentPhotoUrl}
+            />
+          ) : null
         ) : (
           messages.map((m) => {
             const isGuest =

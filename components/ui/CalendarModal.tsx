@@ -49,7 +49,12 @@ function sameDay(a: Date, b: Date): boolean {
 
 function fromIso(iso: string | null | undefined): Date | null {
   if (!iso) return null;
-  const [y, m, d] = iso.split("-").map(Number);
+  // Tolerate PB datetimes ("2026-11-02 00:00:00.000Z") — take the date part.
+  const ymd = String(iso).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!ymd) return null;
+  const y = Number(ymd[1]);
+  const m = Number(ymd[2]);
+  const d = Number(ymd[3]);
   if (!y || !m || !d) return null;
   return startOfDay(new Date(y, m - 1, d));
 }
@@ -300,6 +305,11 @@ type DatePickerTriggerProps = {
   disablePast?: boolean;
   /** Override default zinc micro-label (e.g. Builder S tour date). */
   labelClassName?: string;
+  /**
+   * When true, strip border/fill glass so label + value sit flat on the page
+   * canvas (Hours & Date). Default keeps the card chrome for Builder M.
+   */
+  bare?: boolean;
 };
 
 /** Arrival-date trigger + portal calendar for builder configure sheets. */
@@ -310,6 +320,7 @@ export function DatePickerField({
   title = "CHOOSE ARRIVAL DATE",
   disablePast = true,
   labelClassName,
+  bare = false,
 }: DatePickerTriggerProps) {
   const [open, setOpen] = useState(false);
   const selected = fromIso(value);
@@ -318,7 +329,13 @@ export function DatePickerField({
 
   return (
     <>
-      <div className="flex min-h-[44px] flex-col justify-center rounded-xl border border-zinc-800 bg-zinc-900/80 p-3 backdrop-blur-sm">
+      <div
+        className={
+          bare
+            ? "flex min-h-[57px] flex-col justify-center border-0 bg-transparent p-0"
+            : "flex min-h-[44px] flex-col justify-center rounded-xl border border-zinc-800 bg-zinc-900/80 p-3 backdrop-blur-sm"
+        }
+      >
         <p
           className={
             labelClassName ??
@@ -334,14 +351,35 @@ export function DatePickerField({
             e.preventDefault();
             openPicker();
           }}
-          className="relative mt-1 flex min-h-[44px] w-full items-center justify-between gap-2 rounded-lg bg-transparent py-1.5 text-left text-sm text-white outline-none transition active:bg-white/5"
+          className={
+            bare
+              ? "relative mt-1 flex min-h-[57px] w-full items-center justify-start gap-3 rounded-lg bg-transparent py-2.5 text-left text-[18px] text-[#0A1017] outline-none transition active:bg-black/[0.04]"
+              : "relative mt-1 flex min-h-[44px] w-full items-center justify-between gap-2 rounded-lg bg-transparent py-1.5 text-left text-sm text-white outline-none transition active:bg-white/5"
+          }
           aria-haspopup="dialog"
           aria-expanded={open}
         >
-          <span className={selected ? "text-white" : "text-zinc-500"}>
+          <span
+            className={
+              selected
+                ? bare
+                  ? "text-[#0A1017]"
+                  : "text-white"
+                : bare
+                  ? "text-[#64748b]"
+                  : "text-zinc-500"
+            }
+          >
             {selected ? formatDay(selected) : "Tap to choose date"}
           </span>
-          <CalendarDays className="h-4 w-4 shrink-0 text-zinc-500" aria-hidden />
+          <CalendarDays
+            className={
+              bare
+                ? "h-[21px] w-[21px] shrink-0 text-[#64748b]"
+                : "h-4 w-4 shrink-0 text-zinc-500"
+            }
+            aria-hidden
+          />
         </button>
       </div>
 

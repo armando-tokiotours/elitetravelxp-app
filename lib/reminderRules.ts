@@ -182,9 +182,9 @@ function buildTemplates(opts: {
       };
     case "day_before":
       return {
-        subject: `Final details · tomorrow · ${pnr}`,
-        previewText: `${greet}\n\nFinal check-in for ${pnr} tomorrow (${tour}). Confirm pickup time on your itinerary and save your guide contact once unlocked.\n\n— TokioTours Concierge`,
-        previewHtml: `<p>${greet}</p><p>Final check-in for <strong>${pnr}</strong> tomorrow (<strong>${tour}</strong>). Confirm pickup time on your itinerary and save your guide contact once unlocked.</p><p>— TokioTours Concierge</p>`,
+        subject: `Final details · ${pnr}`,
+        previewText: `${greet}\n\nFinal check-in for ${pnr} — your tour is on ${tour}. Confirm pickup time on your itinerary and save your guide contact once unlocked.\n\n— TokioTours Concierge`,
+        previewHtml: `<p>${greet}</p><p>Final check-in for <strong>${pnr}</strong> — your tour is on <strong>${tour}</strong>. Confirm pickup time on your itinerary and save your guide contact once unlocked.</p><p>— TokioTours Concierge</p>`,
       };
     case "post_tour_survey":
       return {
@@ -237,7 +237,16 @@ export function computeReminders(input: ComputeRemindersInput): ReminderItem[] {
         roundEur(Number(input.estimated_total_eur) || 0)
       ).fullyPaid);
 
-  const depositIsh = isDepositIshPaid(input);
+  const daysUntil = tour
+    ? Math.round(
+        (startOfDay(tour).getTime() - now.getTime()) / 86_400_000
+      )
+    : null;
+  const daysSinceEnd = end
+    ? Math.round(
+        (now.getTime() - startOfDay(end).getTime()) / 86_400_000
+      )
+    : null;
 
   type Spec = {
     id: ReminderId;
@@ -245,6 +254,8 @@ export function computeReminders(input: ComputeRemindersInput): ReminderItem[] {
     due: Date | null;
     eligible: boolean;
     reason: string;
+    /** True when calendar is inside the dispatch window for this category. */
+    inWindow: boolean;
   };
 
   const specs: Spec[] = [
@@ -252,42 +263,53 @@ export function computeReminders(input: ComputeRemindersInput): ReminderItem[] {
       id: "balance_reminder",
       title: "Balance reminder (~90 days out)",
       due: tour ? addDays(tour, -90) : null,
-      eligible: Boolean(tour && depositIsh && !fullyPaid),
+      // Not fully paid + dated — window (≤90 & >14) gates "due" lane
+      eligible: Boolean(tour && !fullyPaid),
+      inWindow:
+        daysUntil != null && daysUntil > 14 && daysUntil <= 90 && !fullyPaid,
       reason: !tour
         ? "Tour date missing"
         : fullyPaid
           ? "Already fully paid"
-          : !depositIsh
-            ? "No deposit / fee paid yet"
-            : "Deposit paid — balance still open",
+          : daysUntil != null && daysUntil <= 14
+            ? "Inside final 14 days — use prep / final details"
+            : daysUntil != null && daysUntil > 90
+              ? "More than 90 days out"
+              : "Balance still open · 15–90 days out",
     },
     {
       id: "week_prep",
       title: "1-week prep",
       due: tour ? addDays(tour, -7) : null,
       eligible: Boolean(tour && fullyPaid),
+      inWindow:
+        daysUntil != null && daysUntil > 2 && daysUntil <= 7 && fullyPaid,
       reason: !tour
         ? "Tour date missing"
         : !fullyPaid
           ? "Requires full payment"
-          : "Fully paid — prep window",
+          : "Fully paid — prep window (~7d)",
     },
     {
       id: "day_before",
-      title: "1-day final details",
-      due: tour ? addDays(tour, -1) : null,
+      title: "Final details (~2 days out)",
+      due: tour ? addDays(tour, -2) : null,
       eligible: Boolean(tour && fullyPaid),
+      inWindow:
+        daysUntil != null && daysUntil >= 0 && daysUntil <= 2 && fullyPaid,
       reason: !tour
         ? "Tour date missing"
         : !fullyPaid
           ? "Requires full payment"
-          : "Fully paid — final details",
+          : "Fully paid — final details (~2d)",
     },
     {
       id: "post_tour_survey",
       title: "Post-tour survey (~2 days after)",
       due: end ? addDays(end, 2) : null,
       eligible: Boolean(end),
+      inWindow:
+        daysSinceEnd != null && daysSinceEnd >= 2 && daysSinceEnd <= 14,
       reason: !end
         ? "End / tour date missing"
         : "After trip wrap-up",
@@ -305,11 +327,7 @@ export function computeReminders(input: ComputeRemindersInput): ReminderItem[] {
     let lane: ReminderLane = "pending";
     if (sentAt) {
       lane = "sent";
-    } else if (
-      spec.eligible &&
-      spec.due &&
-      startOfDay(spec.due).getTime() <= now.getTime()
-    ) {
+    } else if (spec.eligible && spec.inWindow) {
       lane = "due";
     } else {
       lane = "pending";

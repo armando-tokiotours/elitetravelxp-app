@@ -1,5 +1,6 @@
 import type { PbCity } from "@/lib/pocketbase/client";
 import { cityPhoto, pbFileUrl } from "@/lib/pocketbase/client";
+import { catalogMediaWebUrl } from "@/lib/catalogMedia";
 import { PB_THUMBS } from "@/lib/mediaThumbs";
 
 /** Ultimate fallback when PocketBase + static city assets fail. */
@@ -43,6 +44,11 @@ export function cityImageCandidates(
   const variant = opts?.variant ?? "thumb";
   const thumb = opts?.thumb ?? PB_THUMBS.pill;
   const list: string[] = [];
+  // Slot-first by record ID: /uploads/catalog/{cityId}_1.webp — consumers
+  // (CityThumb) walk this list onError, so a missing slot file falls back
+  // cleanly to the PocketBase cover, then static assets, then placeholder.
+  const slot = city ? catalogMediaWebUrl(city.id, 1) : "";
+  if (slot) list.push(slot);
   const pb = cityPbImageUrl(city, thumb);
   if (pb) list.push(pb);
   if (slug) {

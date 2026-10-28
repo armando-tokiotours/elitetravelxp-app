@@ -8,6 +8,7 @@
 
 import { getAdminPocketBase } from "@/lib/pocketbase/admin";
 import {
+  isProcurementServiceItem,
   isTicketServiceItem,
   mergeExtrasPatch,
   normalizeServiceLineItem,
@@ -18,7 +19,12 @@ import {
   deleteBlobByUrlOrPathname,
   uploadTicketPdfBlob,
 } from "@/lib/blobStorage";
-import { ensureTicketsRow } from "@/lib/opsTickets";
+import { updateTicketsByPnr } from "@/lib/opsTickets";
+import {
+  extractProcurementCartItems,
+  extractProcurementItems,
+  type NormalizedProcurementItem,
+} from "@/lib/ticketNormalizer";
 
 export type TicketVoucherItem = {
   itemId: string;
@@ -133,7 +139,8 @@ export async function listTicketCartItemsForPnr(
         end_date?: string;
       }>(`pnr="${pnr}"`, { requestKey: null });
     const extras = parseOpsHubExtras(hub.extras);
-    const items = (extras.agent_services || []).filter(isTicketServiceItem);
+    // Shared engine: tickets, IC/rail passes, attractions, hotels (+ bonus gifts)
+    const items = extractProcurementCartItems(extras.agent_services);
     return {
       pnr,
       items,
@@ -142,6 +149,58 @@ export async function listTicketCartItemsForPnr(
     };
   } catch {
     return { pnr, items: [], tourEndDate: null };
+  }
+}
+
+/**
+ * Full procurement checklist for a PNR — cart + optional access rollup / day tickets.
+ * Uploadable rows are those with cartItem (agent_services).
+ */
+export async function listProcurementItemsForPnr(
+  pnrRaw: string
+): Promise<{
+  pnr: string;
+  items: NormalizedProcurementItem[];
+  cartItems: ServiceLineItem[];
+  tourEndDate: string | null;
+}> {
+  const pnr = safePnr(pnrRaw);
+  if (!pnr) {
+    return { pnr: "", items: [], cartItems: [], tourEndDate: null };
+  }
+  try {
+    const pb = await getAdminPocketBase();
+    const hub = await pb
+      .collection("ops_hub")
+      .getFirstListItem<{
+        extras?: unknown;
+        tour_date?: string;
+        end_date?: string;
+      }>(`pnr="${pnr}"`, { requestKey: null });
+    const extras = parseOpsHubExtras(hub.extras);
+    const rawExtras =
+      typeof hub.extras === "string"
+        ? (() => {
+            try {
+              return JSON.parse(hub.extras as string);
+            } catch {
+              return hub.extras;
+            }
+          })()
+        : hub.extras;
+    const items = extractProcurementItems({
+      agentServices: extras.agent_services,
+      extras: rawExtras,
+    });
+    return {
+      pnr,
+      items,
+      cartItems: extractProcurementCartItems(extras.agent_services),
+      tourEndDate:
+        String(hub.end_date || hub.tour_date || "").slice(0, 10) || null,
+    };
+  } catch {
+    return { pnr, items: [], cartItems: [], tourEndDate: null };
   }
 }
 
@@ -180,8 +239,10 @@ export async function uploadTicketVoucherForItem(opts: {
     );
   }
   const current = services[idx];
-  if (!isTicketServiceItem(current)) {
-    throw new Error("Selected cart line is not a ticket/pass item");
+  if (!isProcurementServiceItem(current)) {
+    throw new Error(
+      "Selected cart line is not a ticket / pass / accommodation procurement item"
+    );
   }
 
   // Replace prior local file for this line (best-effort)
@@ -215,20 +276,37 @@ export async function uploadTicketVoucherForItem(opts: {
     .update(hub.id, { extras: nextExtras }, { requestKey: null });
 
   // Keep tour_end_date on ops_tickets for legacy PB hook / dating; no PDF file field.
+  // Guest dossier reads voucherUrl from agent_services (same pointer).
   const end =
     String(opts.tourEndDate || hub.end_date || hub.tour_date || "").slice(
       0,
       10
     ) || "";
+
+  // ISSUED equivalent in schema: ticket_status = "done" when all procurement
+  // lines have a voucher; otherwise "ordered" (partial issue).
+  const procurement = services.filter((s) => isProcurementServiceItem(s));
+  const allIssued =
+    procurement.length > 0 &&
+    procurement.every((s) => Boolean(String(s.voucherUrl || "").trim()));
+  const issuedStatus = allIssued ? "done" : "ordered";
+
   try {
-    const tix = await ensureTicketsRow(pb, pnr);
-    await pb.collection("ops_tickets").update(
-      tix.id,
+    await updateTicketsByPnr(pb, pnr, {
+      tour_end_date: end || undefined,
+      voucher_filename: uploaded.filename,
+      ticket_status: issuedStatus,
+      ticket_notes: allIssued
+        ? `ISSUED — all vouchers attached (${uploaded.filename})`
+        : `Partial issue — voucher attached for ${next.title} (${uploaded.filename})`,
+      // Clear legacy PB file field — binaries live on local disk now
+      voucher_pdf: null as unknown as undefined,
+    });
+    await pb.collection("ops_hub").update(
+      hub.id,
       {
-        tour_end_date: end || tix.tour_end_date || "",
-        voucher_filename: uploaded.filename,
-        // Clear legacy PB file field — binaries live on local disk now
-        voucher_pdf: null,
+        tickets_needed: !allIssued,
+        ticket_status: issuedStatus,
       },
       { requestKey: null }
     );

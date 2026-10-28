@@ -9,6 +9,7 @@ import type { BookingPassProps } from "@/components/dossier/JapanBookingPass.typ
 import {
   buildDossierQrUrl,
   buildRouteBreakdown,
+  buildSingleDayHighlights,
   experienceTierLabel,
   formatGuestCountText,
   formatPassDateLine,
@@ -20,6 +21,10 @@ import { useBuilderStore } from "@/store/useBuilderStore";
 import { useItineraryStore } from "@/store/useItineraryStore";
 import { getCityName } from "@/lib/cityLabels";
 import { useConciergeAgentName } from "@/lib/useConciergeAgentName";
+import {
+  BUILDER_ROUTES,
+  journeyItineraryHref,
+} from "@/lib/builderRoutes";
 
 function PassPreviewInner() {
   const params = useParams();
@@ -90,7 +95,26 @@ function PassPreviewInner() {
       routeBreakdown: buildRouteBreakdown(state.locations, (id) =>
         getCityName(id)
       ),
-      qrValue: buildDossierQrUrl(code, "/builder/itinerary"),
+      singleDayHighlights:
+        state.tripMode === "single_day"
+          ? buildSingleDayHighlights({
+              cityFocus: state.locations?.[0]
+                ? getCityName(state.locations[0].cityId)
+                : "",
+              experiences: Object.values(state.selectedTours || {})
+                .flat()
+                .map((t) => ({
+                  title: t.title,
+                  access_type: t.access_type,
+                })),
+            })
+          : undefined,
+      qrValue: buildDossierQrUrl(
+        code,
+        state.tripMode === "single_day"
+          ? BUILDER_ROUTES.dayPassItinerary
+          : BUILDER_ROUTES.japanJourneyItinerary
+      ),
     };
   }, [state, clientName, departureIso, pnrParam]);
 
@@ -170,7 +194,7 @@ function PassPreviewInner() {
         ) : null}
 
         {pass ? (
-          <JapanBookingPass {...pass} showSectionOutline={false} />
+          <JapanBookingPass {...pass} />
         ) : (
           <div className="rounded-2xl border border-white/10 bg-[#0A1017]/90 p-6 text-center">
             <p className="font-mono text-lg text-[#F6A724]">{pnrParam || "—"}</p>
@@ -189,7 +213,10 @@ function PassPreviewInner() {
             Download Japan Pass PDF
           </a>
           <Link
-            href={`/builder/itinerary?ref=${encodeURIComponent(pnrParam)}&view=dossier`}
+            href={journeyItineraryHref(pnrParam, {
+              type: pass?.tripType,
+              tripMode: state.tripMode,
+            })}
             className="rounded-xl bg-[#075473] px-4 py-2.5 text-[11px] font-bold tracking-wider text-white uppercase"
           >
             Open booking on website

@@ -443,6 +443,7 @@ export function OpsCommsHub({
             const patch: Record<string, unknown> = {
               assigned_agent_id: staffId,
               assigned_agent: staffName || displayName || "",
+              agent_response: "accepted",
               last_action_by: staffId,
               last_action_date: new Date().toISOString().slice(0, 10),
             };

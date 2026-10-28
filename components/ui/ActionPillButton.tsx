@@ -14,6 +14,7 @@ export function ActionPillButton({
   className = "",
   pulse = false,
   label: labelOverride,
+  stackLabel = false,
 }: {
   conciergeFeePaid?: boolean;
   paymentConfirmed?: boolean;
@@ -24,11 +25,14 @@ export function ActionPillButton({
   pulse?: boolean;
   /** Custom label — overrides Secure Dates / Pay Balance */
   label?: string;
+  /** Render each word of the label on its own line (e.g. Secure / Dates) */
+  stackLabel?: boolean;
 }) {
   if (paymentConfirmed && !labelOverride) return null;
 
   const label =
     labelOverride ?? (conciergeFeePaid ? "Pay Balance" : CTA_SECURE_DEPOSIT);
+  const labelWords = stackLabel ? label.split(/\s+/).filter(Boolean) : null;
 
   return (
     <button
@@ -47,9 +51,25 @@ export function ActionPillButton({
       />
 
       {/* Inner white stroke + pill fill */}
-      <span className="relative flex w-full items-center justify-center gap-2.5 rounded-full border border-white/85 bg-gradient-to-r from-[#075473] via-[#075473]/92 to-[#0A1017] px-4 py-2.5 transition-all group-hover:border-white sm:gap-3 sm:px-5 sm:py-3">
+      <span
+        className={`relative flex w-full items-center justify-center rounded-full border border-white/85 bg-gradient-to-r from-[#075473] via-[#075473]/92 to-[#0A1017] transition-all group-hover:border-white ${
+          stackLabel
+            ? "gap-2 px-3.5 py-1.5 sm:gap-2.5 sm:px-4 sm:py-2"
+            : "gap-2.5 px-4 py-2.5 sm:gap-3 sm:px-5 sm:py-3"
+        }`}
+      >
         <span className="font-godiva text-[10px] font-bold tracking-[0.14em] text-white uppercase drop-shadow-sm sm:text-xs sm:tracking-[0.16em]">
-          {label}
+          {labelWords ? (
+            <span className="flex flex-col items-center text-center leading-[1.1]">
+              {labelWords.map((word, i) => (
+                <span key={`${word}-${i}`} className="block">
+                  {word}
+                </span>
+              ))}
+            </span>
+          ) : (
+            label
+          )}
         </span>
         <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-white text-[9px] font-bold text-[#075473] shadow-md transition-transform group-hover:translate-x-0.5">
           ▶

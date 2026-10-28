@@ -36,20 +36,20 @@ function normalizeStatus(status: string): BadgeStatus {
 function StatusBadge({ status }: { status: BadgeStatus }) {
   if (status === "ACCEPTED") {
     return (
-      <span className="inline-flex items-center rounded-md border border-emerald-500/40 bg-emerald-500/20 px-1.5 py-0.5 text-[9px] font-bold tracking-wide text-emerald-300 uppercase print:border-gray-300 print:bg-transparent print:text-gray-700">
+      <span className="inline-flex items-center rounded-md border border-emerald-300 bg-emerald-50 px-1.5 py-0.5 text-[9px] font-bold tracking-wide text-emerald-700 uppercase print:border-gray-300 print:bg-transparent print:text-gray-700">
         ACCEPTED ✓
       </span>
     );
   }
   if (status === "PENDING") {
     return (
-      <span className="inline-flex items-center rounded-md border border-amber-500/40 bg-amber-500/15 px-1.5 py-0.5 text-[9px] font-bold tracking-wide text-amber-300 uppercase print:border-gray-300 print:bg-transparent print:text-gray-700">
+      <span className="inline-flex items-center rounded-md border border-amber-300 bg-amber-50 px-1.5 py-0.5 text-[9px] font-bold tracking-wide text-amber-700 uppercase print:border-gray-300 print:bg-transparent print:text-gray-700">
         PENDING
       </span>
     );
   }
   return (
-    <span className="inline-flex items-center rounded-md border border-white/10 bg-zinc-800/80 px-1.5 py-0.5 text-[9px] font-bold tracking-wide text-gray-400 uppercase print:border-gray-200 print:bg-transparent print:text-gray-600">
+    <span className="inline-flex items-center rounded-md border border-slate-200 bg-slate-100 px-1.5 py-0.5 text-[9px] font-bold tracking-wide text-slate-500 uppercase print:border-gray-200 print:bg-transparent print:text-gray-600">
       OPTIONAL
     </span>
   );
@@ -144,24 +144,24 @@ export function FlatInvoiceBrief({
     : null;
 
   return (
-    <div className="rounded-3xl border border-white/10 bg-[#0A1017] p-5 print:break-inside-avoid print:rounded-none print:border print:border-gray-300 print:bg-transparent print:p-4 print:shadow-none">
+    <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-[0_12px_28px_rgba(0,0,0,0.08)] print:break-inside-avoid print:rounded-none print:border print:border-gray-300 print:bg-transparent print:p-4 print:shadow-none">
       {/* Header */}
-      <div className="flex items-center justify-between gap-3 border-b border-white/10 pb-3 print:border-gray-200">
-        <span className="text-[11px] font-bold tracking-wider text-white uppercase print:text-gray-900">
+      <div className="flex items-center justify-between gap-3 border-b border-slate-200 pb-3 print:border-gray-200">
+        <span className="text-[11px] font-bold tracking-wider text-slate-900 uppercase print:text-gray-900">
           Service Description
         </span>
-        <span className="text-[10px] font-bold tracking-wider text-zinc-500 uppercase print:text-gray-600">
+        <span className="text-[10px] font-bold tracking-wider text-slate-500 uppercase print:text-gray-600">
           {isExact ? "Agreed Rate" : "Estimated Rate"}
         </span>
       </div>
 
       {/* Flat service rows */}
       {items.length === 0 ? (
-        <p className="py-8 text-center text-[11px] text-zinc-500 print:text-gray-600">
+        <p className="py-8 text-center text-[11px] text-slate-500 print:text-gray-600">
           No services selected yet.
         </p>
       ) : (
-        <ul className="divide-y divide-white/5 print:divide-gray-200">
+        <ul className="divide-y divide-slate-100 print:divide-gray-200">
           {items.map((item) => {
             const status = normalizeStatus(item.status);
             const muted = status !== "ACCEPTED" && !item.isBonus;
@@ -182,16 +182,16 @@ export function FlatInvoiceBrief({
                 }`}
               >
                 <div className="min-w-0 flex-1 space-y-1">
-                  <p className="flex items-center gap-1.5 truncate text-sm font-bold text-white print:text-gray-900">
+                  <p className="flex items-center gap-1.5 truncate text-sm font-bold text-slate-900 print:text-gray-900">
                     {item.isBonus ? <span aria-hidden>🎁</span> : null}
                     <span className="truncate">{title}</span>
                   </p>
                   <div className="flex flex-wrap items-center gap-1.5">
-                    <span className="font-mono text-[10px] font-bold tracking-wide text-zinc-500 uppercase print:text-gray-600">
+                    <span className="font-mono text-[10px] font-bold tracking-wide text-slate-500 uppercase print:text-gray-600">
                       {item.category}
                     </span>
                     {item.isBonus ? (
-                      <span className="rounded-md border border-[#F6A724]/40 bg-[#F6A724]/20 px-1.5 py-0.5 text-[9px] font-bold tracking-wide text-[#F6A724] uppercase print:border-gray-300 print:bg-transparent print:text-gray-900">
+                      <span className="rounded-md border border-purple-300 bg-purple-50 px-1.5 py-0.5 text-[9px] font-bold tracking-wide text-purple-700 uppercase print:border-gray-300 print:bg-transparent print:text-gray-900">
                         COMPLIMENTARY
                       </span>
                     ) : (
@@ -204,7 +204,7 @@ export function FlatInvoiceBrief({
                     <span className="font-mono text-sm font-bold text-[#F6A724] tabular-nums print:text-gray-900">
                       {giftValue > 0 ? (
                         <>
-                          <span className="mr-1 text-gray-400 line-through opacity-50 print:text-gray-500">
+                          <span className="mr-1 text-slate-400 line-through opacity-50 print:text-gray-500">
                             {formatEur(giftValue)}
                           </span>
                           FREE
@@ -214,13 +214,13 @@ export function FlatInvoiceBrief({
                       )}
                     </span>
                   ) : status === "ACCEPTED" ? (
-                    <span className="font-mono text-sm font-bold text-emerald-400 tabular-nums print:text-gray-700">
+                    <span className="font-mono text-sm font-bold text-slate-900 tabular-nums print:text-gray-700">
                       {lineExact
                         ? formatEur(Math.max(0, Math.round(item.minPrice)))
                         : formatPriceRange(item.minPrice, item.maxPrice)}
                     </span>
                   ) : (
-                    <span className="font-mono text-sm text-zinc-500 line-through tabular-nums print:text-gray-600">
+                    <span className="font-mono text-sm text-slate-400 line-through tabular-nums print:text-gray-600">
                       {formatEur(0)}
                     </span>
                   )}
@@ -232,24 +232,24 @@ export function FlatInvoiceBrief({
       )}
 
       {/* Totals — same parent, no second card */}
-      <div className="mt-2 space-y-3 border-t border-white/10 pt-4 print:border-gray-200">
-        <div className="flex items-center justify-between gap-3 text-xs text-gray-300 print:text-gray-700">
+      <div className="mt-2 space-y-3 border-t border-slate-200 pt-4 print:border-gray-200">
+        <div className="flex items-center justify-between gap-3 text-xs text-slate-600 print:text-gray-700">
           <span>
             {isDealLocked
               ? "Final Approved Package"
               : "Itemized estimate subtotal"}
           </span>
-          <span className="font-mono font-bold text-white tabular-nums print:text-gray-900">
+          <span className="font-mono font-bold text-slate-900 tabular-nums print:text-gray-900">
             {isDealLocked
               ? formatEur(approved!)
               : formatPriceRange(subtotalMin, subtotalMax)}
           </span>
         </div>
         {baseDepositPaid > 0 ? (
-          <div className="flex items-center justify-between gap-3 text-xs text-emerald-400 print:text-gray-700">
+          <div className="flex items-center justify-between gap-3 text-xs text-emerald-700 print:text-gray-700">
             <span className="leading-snug">
               Concierge Deposit
-              <span className="mt-0.5 block text-[10px] font-normal text-emerald-400/80 print:text-gray-600">
+              <span className="mt-0.5 block text-[10px] font-normal text-emerald-600/80 print:text-gray-600">
                 (100% credited)
               </span>
             </span>
@@ -259,10 +259,10 @@ export function FlatInvoiceBrief({
           </div>
         ) : null}
         {extraPaid > 0 ? (
-          <div className="flex items-center justify-between gap-3 text-xs text-emerald-400 print:text-gray-700">
+          <div className="flex items-center justify-between gap-3 text-xs text-emerald-700 print:text-gray-700">
             <span className="leading-snug">
               30% Milestone Payment
-              <span className="mt-0.5 block text-[10px] font-normal text-emerald-400/80 print:text-gray-600">
+              <span className="mt-0.5 block text-[10px] font-normal text-emerald-600/80 print:text-gray-600">
                 (Installment received)
               </span>
             </span>
@@ -271,9 +271,9 @@ export function FlatInvoiceBrief({
             </span>
           </div>
         ) : null}
-        <div className="flex items-center justify-between gap-3 text-sm font-bold text-[#F6A724] print:text-gray-900">
+        <div className="flex items-center justify-between gap-3 text-sm font-bold text-slate-900 print:text-gray-900">
           <span>Pending balance due</span>
-          <span className="font-mono text-base tabular-nums">
+          <span className="font-mono text-base text-[#F6A724] tabular-nums print:text-gray-900">
             {pendingLocked != null
               ? formatEur(pendingLocked)
               : formatPriceRange(pendingMin, pendingMax)}
@@ -281,7 +281,7 @@ export function FlatInvoiceBrief({
         </div>
       </div>
 
-      <p className="mt-4 border-t border-white/5 pt-3 text-center font-mono text-[10px] text-gray-500 print:border-gray-200 print:text-gray-600">
+      <p className="mt-4 border-t border-slate-100 pt-3 text-center font-mono text-[10px] text-slate-500 print:border-gray-200 print:text-gray-600">
         {isDealLocked
           ? "Confirmed package total. Concierge-approved rate locked."
           : "Estimates. Final exact rate is confirmed upon concierge approval."}

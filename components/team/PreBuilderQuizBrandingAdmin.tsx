@@ -5,23 +5,19 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { optimizeFileForUpload } from "@/lib/optimizeUploadClient";
 import { formatPbError } from "@/lib/pocketbase/admin-schema";
-import { isVideoFilename } from "@/lib/brandingUi";
+import type { PbBrandingUiItem } from "@/lib/pocketbase/client";
+import { uploadToVps } from "@/lib/vpsUploadClient";
 import {
-  brandingUiMediaUrl,
-  brandingUiPosterUrl,
-  brandingUiSlide3Url,
-  brandingUiCardUrl,
-  brandingUiCardPosterUrl,
-  brandingUiMediaPosterUrl,
-  brandingUiSlide2PosterUrl,
-  brandingUiSlide3PosterUrl,
-  type PbBrandingUiItem,
-} from "@/lib/pocketbase/client";
-import { videoPosterUrlForSrc } from "@/lib/videoPosterUrl";
+  brandingSlotWebUrl,
+  preEliteCardSlot,
+  preEliteSlidePosterSlot,
+  preEliteSlideSlot,
+} from "@/lib/brandingImageSlots";
 import {
   PRE_ELITE_BRANDING_CATEGORY,
   PRE_ELITE_QUIZ_SECTIONS,
   preEliteBrandingKey,
+  preEliteMediaVersion,
   writePreEliteQuizLocalEntry,
   type PreEliteQuizSectionId,
 } from "@/lib/preEliteBranding";
@@ -94,6 +90,13 @@ function emptyDraft(
   };
 }
 
+/** Stable-slot preview URL (+ record-version cache-buster). */
+function slotPreview(slot: string, version?: string): string {
+  const url = brandingSlotWebUrl(slot);
+  const v = String(version || "").trim();
+  return v ? `${url}?v=${encodeURIComponent(v)}` : url;
+}
+
 function draftFromRow(
   optionId: string,
   fallbackTitle: string,
@@ -101,11 +104,30 @@ function draftFromRow(
   row: PbBrandingUiItem | undefined
 ): OptionDraft {
   const base = emptyDraft(optionId, fallbackTitle, fallbackDesc);
-  if (!row) return base;
-  const media = brandingUiMediaUrl(row) || base.mediaPreview;
-  const poster = brandingUiPosterUrl(row) || base.posterPreview;
-  const slide3 = brandingUiSlide3Url(row) || base.slide3Preview;
-  const card = brandingUiCardUrl(row) || base.cardPreview;
+  const version = preEliteMediaVersion(row);
+  // Slot-only previews: the stable branding slot
+  // (/uploads/branding/preelite-…) is the one source of truth
+  // (numbered placeholder until replaced). Legacy PocketBase
+  // videos/files in these spaces are retired and never previewed.
+  const previews = {
+    mediaPreview: slotPreview(preEliteSlideSlot(optionId, 1), version),
+    posterPreview: slotPreview(preEliteSlideSlot(optionId, 2), version),
+    slide3Preview: slotPreview(preEliteSlideSlot(optionId, 3), version),
+    cardPreview: slotPreview(preEliteCardSlot(optionId), version),
+    mediaPosterPreview: slotPreview(
+      preEliteSlidePosterSlot(optionId, 1),
+      version
+    ),
+    slide2PosterPreview: slotPreview(
+      preEliteSlidePosterSlot(optionId, 2),
+      version
+    ),
+    slide3PosterPreview: slotPreview(
+      preEliteSlidePosterSlot(optionId, 3),
+      version
+    ),
+  };
+  if (!row) return { ...base, ...previews };
   return {
     recordId: row.id,
     title: row.title?.trim() || base.title,
@@ -123,13 +145,7 @@ function draftFromRow(
     mediaPosterFile: null,
     slide2PosterFile: null,
     slide3PosterFile: null,
-    mediaPreview: media,
-    posterPreview: poster,
-    slide3Preview: slide3,
-    cardPreview: card,
-    mediaPosterPreview: brandingUiMediaPosterUrl(row) || "",
-    slide2PosterPreview: brandingUiSlide2PosterUrl(row) || "",
-    slide3PosterPreview: brandingUiSlide3PosterUrl(row) || "",
+    ...previews,
   };
 }
 
@@ -139,6 +155,9 @@ export function PreBuilderQuizBrandingAdmin({
   getClient: () => PbClient;
 }) {
   const [section, setSection] = useState<PreEliteQuizSectionId>("travel_style");
+  const [optionBySection, setOptionBySection] = useState<
+    Partial<Record<PreEliteQuizSectionId, string>>
+  >({});
   const [drafts, setDrafts] = useState<Record<string, OptionDraft>>({});
   const [loading, setLoading] = useState(true);
   const [savingId, setSavingId] = useState<string | null>(null);
@@ -210,43 +229,65 @@ export function PreBuilderQuizBrandingAdmin({
       fd.append("credit_body", draft.slide2Caption);
       fd.append("inclusion_title", draft.slide3Title);
       fd.append("credit_title", draft.slide3Caption);
-      if (draft.mediaFile) {
-        const opt = await optimizeFileForUpload(draft.mediaFile);
-        fd.append("media", opt.file);
-        if (!draft.mediaPosterFile && opt.posterFile) {
-          fd.append("media_poster", opt.posterFile);
-        }
+      // IMAGES go OUTSIDE PocketBase into stable branding slots
+      // (/uploads/branding/preelite-{optionId}-…): same ID on every
+      // replace, web + mobile WebP generated server-side, no orphans.
+      // Videos keep the legacy PocketBase file fields for now.
+      const token = pb.authStore.token || "";
+      const uploaded: Record<string, string> = {};
+      const upImage = async (
+        file: File | null,
+        slot: string,
+        field: string
+      ) => {
+        if (!file || !file.type.startsWith("image/")) return false;
+        const opt = await optimizeFileForUpload(file);
+        const saved = await uploadToVps(opt.file, "branding", token, {
+          stableKey: slot,
+        });
+        uploaded[field] = saved.url;
+        return true;
+      };
+      await upImage(draft.mediaFile, preEliteSlideSlot(optionId, 1), "mediaUrl");
+      await upImage(
+        draft.mediaPosterFile,
+        preEliteSlidePosterSlot(optionId, 1),
+        "mediaPosterUrl"
+      );
+      await upImage(draft.posterFile, preEliteSlideSlot(optionId, 2), "posterUrl");
+      await upImage(
+        draft.slide2PosterFile,
+        preEliteSlidePosterSlot(optionId, 2),
+        "slide2PosterUrl"
+      );
+      await upImage(draft.slide3File, preEliteSlideSlot(optionId, 3), "slide3Url");
+      await upImage(
+        draft.slide3PosterFile,
+        preEliteSlidePosterSlot(optionId, 3),
+        "slide3PosterUrl"
+      );
+      await upImage(draft.cardFile, preEliteCardSlot(optionId), "cardUrl");
+
+      // Image now lives in its stable slot → clear the legacy
+      // PocketBase file field so PocketBase deletes the old binary:
+      // no orphan files, and the old photo can never resurface.
+      const PB_FIELD_BY_UPLOAD: Record<string, string> = {
+        mediaUrl: "media",
+        posterUrl: "poster",
+        slide3Url: "slide3",
+        cardUrl: "card",
+        mediaPosterUrl: "media_poster",
+        slide2PosterUrl: "slide2_poster",
+        slide3PosterUrl: "slide3_poster",
+      };
+      for (const [field, pbField] of Object.entries(PB_FIELD_BY_UPLOAD)) {
+        if (uploaded[field]) fd.append(pbField, "");
       }
-      if (draft.mediaPosterFile) {
-        const opt = await optimizeFileForUpload(draft.mediaPosterFile);
-        fd.append("media_poster", opt.file);
-      }
-      if (draft.posterFile) {
-        const opt = await optimizeFileForUpload(draft.posterFile);
-        fd.append("poster", opt.file);
-        if (!draft.slide2PosterFile && opt.posterFile) {
-          fd.append("slide2_poster", opt.posterFile);
-        }
-      }
-      if (draft.slide2PosterFile) {
-        const opt = await optimizeFileForUpload(draft.slide2PosterFile);
-        fd.append("slide2_poster", opt.file);
-      }
-      if (draft.slide3File) {
-        const opt = await optimizeFileForUpload(draft.slide3File);
-        fd.append("slide3", opt.file);
-        if (!draft.slide3PosterFile && opt.posterFile) {
-          fd.append("slide3_poster", opt.posterFile);
-        }
-      }
-      if (draft.slide3PosterFile) {
-        const opt = await optimizeFileForUpload(draft.slide3PosterFile);
-        fd.append("slide3_poster", opt.file);
-      }
-      if (draft.cardFile) {
-        const opt = await optimizeFileForUpload(draft.cardFile);
-        fd.append("card", opt.file);
-        if (opt.posterFile) fd.append("card_poster", opt.posterFile);
+      // Bump the media version stamp: slot IDs never change, so this
+      // stamp (media_version field) is what makes guests/admin fetch
+      // the replaced photo instead of the cache.
+      if (Object.keys(uploaded).length) {
+        fd.append("media_version", String(Date.now()));
       }
 
       let saved: PbBrandingUiItem;
@@ -261,21 +302,21 @@ export function PreBuilderQuizBrandingAdmin({
           .create(fd)) as unknown as PbBrandingUiItem;
       }
 
-      const mediaUrl = brandingUiMediaUrl(saved) || draft.mediaPreview;
-      const posterUrl = brandingUiPosterUrl(saved) || draft.posterPreview;
-      const slide3Url = brandingUiSlide3Url(saved) || draft.slide3Preview;
-      const cardUrl = brandingUiCardUrl(saved) || draft.cardPreview;
-      const cardPosterUrl =
-        brandingUiCardPosterUrl(saved) ||
-        (cardUrl && isVideoFilename(cardUrl)
-          ? videoPosterUrlForSrc(cardUrl)
-          : "");
-      const mediaPosterUrl =
-        brandingUiMediaPosterUrl(saved) || draft.mediaPosterPreview || "";
-      const slide2PosterUrl =
-        brandingUiSlide2PosterUrl(saved) || draft.slide2PosterPreview || "";
-      const slide3PosterUrl =
-        brandingUiSlide3PosterUrl(saved) || draft.slide3PosterPreview || "";
+      // Images always resolve to their stable slot — never PocketBase.
+      const mediaUrl = brandingSlotWebUrl(preEliteSlideSlot(optionId, 1));
+      const posterUrl = brandingSlotWebUrl(preEliteSlideSlot(optionId, 2));
+      const slide3Url = brandingSlotWebUrl(preEliteSlideSlot(optionId, 3));
+      const cardUrl = brandingSlotWebUrl(preEliteCardSlot(optionId));
+      const cardPosterUrl = "";
+      const mediaPosterUrl = brandingSlotWebUrl(
+        preEliteSlidePosterSlot(optionId, 1)
+      );
+      const slide2PosterUrl = brandingSlotWebUrl(
+        preEliteSlidePosterSlot(optionId, 2)
+      );
+      const slide3PosterUrl = brandingSlotWebUrl(
+        preEliteSlidePosterSlot(optionId, 3)
+      );
       writePreEliteQuizLocalEntry(optionId, {
         title: draft.title,
         subtitle: draft.subtitle,
@@ -296,6 +337,12 @@ export function PreBuilderQuizBrandingAdmin({
       });
       useSiteBrandingStore.setState({ loaded: false, itemsByKey: {} });
 
+      // Slot URLs never change on replace, so bust the browser cache
+      // for the admin previews — the new image shows immediately.
+      const bust = (u: string) =>
+        u.startsWith("/uploads/branding/")
+          ? `${u}${u.includes("?") ? "&" : "?"}v=${Date.now()}`
+          : u;
       patchDraft(optionId, {
         recordId: saved.id,
         mediaFile: null,
@@ -305,13 +352,13 @@ export function PreBuilderQuizBrandingAdmin({
         mediaPosterFile: null,
         slide2PosterFile: null,
         slide3PosterFile: null,
-        mediaPreview: mediaUrl,
-        posterPreview: posterUrl,
-        slide3Preview: slide3Url,
-        cardPreview: cardUrl,
-        mediaPosterPreview: mediaPosterUrl,
-        slide2PosterPreview: slide2PosterUrl,
-        slide3PosterPreview: slide3PosterUrl,
+        mediaPreview: bust(mediaUrl),
+        posterPreview: bust(posterUrl),
+        slide3Preview: bust(slide3Url),
+        cardPreview: bust(cardUrl),
+        mediaPosterPreview: bust(mediaPosterUrl),
+        slide2PosterPreview: bust(slide2PosterUrl),
+        slide3PosterPreview: bust(slide3PosterUrl),
       });
       setMsg(
         `Saved “${draft.title}”. Card + slides + fast preload posters update on Pre-Builder.`
@@ -332,6 +379,13 @@ export function PreBuilderQuizBrandingAdmin({
   const activeSection =
     PRE_ELITE_QUIZ_SECTIONS.find((s) => s.id === section) ||
     PRE_ELITE_QUIZ_SECTIONS[0];
+  const activeOptionId =
+    optionBySection[activeSection.id] &&
+    activeSection.options.some(
+      (o) => o.id === optionBySection[activeSection.id]
+    )
+      ? (optionBySection[activeSection.id] as string)
+      : activeSection.options[0]?.id;
 
   return (
     <div className="space-y-6">
@@ -345,8 +399,11 @@ export function PreBuilderQuizBrandingAdmin({
             <strong className="font-semibold text-zinc-200">card photo</strong>{" "}
             (shown when that option is selected) plus{" "}
             <strong className="font-semibold text-zinc-200">3 story slides</strong>
-            . Each can be image or video (MP4 / WebM, up to 50MB). Saves to
-            PocketBase and updates{" "}
+            . Images save OUTSIDE PocketBase to a stable ID
+            (<code className="text-zinc-300">/uploads/branding/preelite-…</code>,
+            web + mobile versions, replaced in place — same ID forever).
+            Videos are no longer used in these spaces (old PocketBase videos
+            stay stored but unused). Text saves to PocketBase and updates{" "}
             <code className="text-zinc-300">/pre-elite-builder</code> live.
           </p>
         </div>
@@ -397,8 +454,31 @@ export function PreBuilderQuizBrandingAdmin({
         <h3 className="font-geosans text-xs font-semibold uppercase tracking-[0.22em] text-[#075473]">
           {activeSection.label}
         </h3>
+        <div className="mt-4 flex flex-wrap gap-2 overflow-x-auto border-b border-zinc-800 pb-4">
+          {activeSection.options.map((opt) => (
+            <button
+              key={opt.id}
+              type="button"
+              onClick={() =>
+                setOptionBySection((prev) => ({
+                  ...prev,
+                  [activeSection.id]: opt.id,
+                }))
+              }
+              className={
+                activeOptionId === opt.id
+                  ? "rounded-full border border-[#075473] bg-[#075473]/25 px-4 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-[#7dd3fc]"
+                  : "rounded-full border border-zinc-700 bg-zinc-950 px-4 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-zinc-400 hover:border-zinc-500"
+              }
+            >
+              {opt.title}
+            </button>
+          ))}
+        </div>
         <div className="mt-5 space-y-6">
-          {activeSection.options.map((opt) => {
+          {activeSection.options
+            .filter((opt) => opt.id === activeOptionId)
+            .map((opt) => {
             const d = drafts[opt.id];
             if (!d) return null;
             const busy = savingId === opt.id;
@@ -628,20 +708,16 @@ function MediaSlot({
   /** card = wide Pre-Builder row · story = tall 9:16 · still = image-only poster */
   variant?: "card" | "story" | "still";
 }) {
-  const isVideo =
-    variant !== "still" &&
-    ((pendingFile ? pendingFile.type.startsWith("video/") : false) ||
-      isVideoFilename(preview));
+  const isVideo = false;
+  void pendingFile;
   const isCard = variant === "card";
   const isStill = variant === "still";
   const hint = isStill
-    ? "Still image only · shown until the slide video is ready (leave empty to auto-grab a frame)"
+    ? "Still image only · fast preload still for this slide"
     : isCard
-      ? "Image or video · landscape 16:9 (≈1600×900) · under 50MB — matches selected card strip"
-      : "Image or video · portrait 9:16 (1080×1920) · under 50MB — matches story window";
-  const accept = isStill
-    ? "image/jpeg,image/png,image/webp,image/*"
-    : "image/*,video/mp4,video/webm,video/quicktime,.m4v";
+      ? "Image only · landscape 16:9 (≈1600×900) — matches selected card strip"
+      : "Image only · portrait 9:16 (1080×1920) — matches story window";
+  const accept = "image/*";
 
   return (
     <div>

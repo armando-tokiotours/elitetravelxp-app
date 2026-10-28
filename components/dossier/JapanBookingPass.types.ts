@@ -64,5 +64,4 @@ export interface BookingPassProps {
   actions?: ReactNode;
   onDownloadWalletPass?: () => void;
   onRefreshPass?: () => void;
-  showSectionOutline?: boolean;
 }

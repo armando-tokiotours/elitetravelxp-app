@@ -15,6 +15,8 @@ export interface StorySlide {
   /** Public path under `/brand`, `/images`, … — empty = plain grey card */
   imageUrl: string;
   videoUrl?: string;
+  /** Used if imageUrl (stable branding slot) is missing on disk. */
+  fallbackImageUrl?: string;
 }
 
 export interface StoryExplanation {

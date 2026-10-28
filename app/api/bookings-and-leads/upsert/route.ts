@@ -3,6 +3,7 @@ import {
   isTempBookingRef,
   isValidBookingPNR,
   normalizeBookingPNR,
+  promoteTempToOfficial,
 } from "@/utils/pnr";
 import {
   upsertBookingsAndLeads,
@@ -10,6 +11,7 @@ import {
   type BookingLeadType,
   type BookingLeadSelections,
 } from "@/lib/bookingsAndLeads";
+import { serializeGuestSpecialRequirements } from "@/lib/guestSpecialRequirements";
 
 /**
  * POST /api/bookings-and-leads/upsert
@@ -18,9 +20,13 @@ import {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const bookingRef = normalizeBookingPNR(
+    const rawBookingRef = normalizeBookingPNR(
       String(body?.bookingRef || body?.booking_ref || body?.pnr || "")
     );
+    // Upsert always has guest email → promote DRAFT-/TMP- → official JPN-
+    const bookingRef = isTempBookingRef(rawBookingRef)
+      ? promoteTempToOfficial(rawBookingRef)
+      : rawBookingRef;
     const email = String(body?.email || body?.contactEmail || "")
       .trim()
       .toLowerCase();
@@ -43,6 +49,33 @@ export async function POST(request: Request) {
     const dossierPdfUrl =
       body?.dossierPdfUrl ?? body?.dossier_pdf_url ?? null;
     const recordEmailSent = Boolean(body?.recordEmailSent);
+    const guestSpecialRequirements = serializeGuestSpecialRequirements(
+      body?.guestSpecialRequirements ??
+        body?.guest_special_requirements ??
+        (selections as { guestSpecialRequirements?: unknown })
+          ?.guestSpecialRequirements
+    );
+    const guestName = String(
+      body?.guestName ||
+        body?.fullName ||
+        body?.contactName ||
+        body?.guest_name ||
+        body?.full_name ||
+        (selections as { guestName?: unknown; fullName?: unknown })
+          ?.guestName ||
+        (selections as { fullName?: unknown })?.fullName ||
+        ""
+    ).trim();
+    const whatsapp = String(
+      body?.whatsapp ||
+        body?.guestPhone ||
+        body?.contactPhone ||
+        body?.phone ||
+        (selections as { whatsapp?: unknown; guestPhone?: unknown })
+          ?.whatsapp ||
+        (selections as { guestPhone?: unknown })?.guestPhone ||
+        ""
+    ).trim();
 
     // Accept official JPN- (and legacy TMP-/TK- on normalize).
     if (!isValidBookingPNR(bookingRef) && !isTempBookingRef(bookingRef)) {
@@ -107,6 +140,9 @@ export async function POST(request: Request) {
       meetingPointPlaceId: String(
         body?.meetingPointPlaceId || body?.meeting_point_place_id || ""
       ).trim(),
+      guestSpecialRequirements,
+      guestName: guestName || undefined,
+      whatsapp: whatsapp || undefined,
     });
 
     if (!result.ok) {

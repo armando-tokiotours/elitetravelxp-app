@@ -32,12 +32,20 @@ export type SystemMessageKey =
   | "sending_pdf"
   | "guest_comm_needs_agent"
   | "guest_comm_needs_deposit"
-  | "guest_comm_unavailable";
+  | "guest_comm_unavailable"
+  | "dispatch_guide_lock_30_subject"
+  | "dispatch_guide_lock_30_body"
+  | "dispatch_guide_lock_100_subject"
+  | "dispatch_guide_lock_100_body"
+  | "dispatch_driver_lock_30_subject"
+  | "dispatch_driver_lock_30_body"
+  | "dispatch_driver_lock_100_subject"
+  | "dispatch_driver_lock_100_body";
 
 export type SystemMessageDef = {
   key: SystemMessageKey;
   label: string;
-  group: "pre_elite" | "builder_m" | "builder_s" | "itinerary";
+  group: "pre_elite" | "builder_m" | "builder_s" | "itinerary" | "dispatch";
   defaultText: string;
 };
 
@@ -211,7 +219,7 @@ export const SYSTEM_MESSAGE_CATALOG: readonly SystemMessageDef[] = [
     label: "Itinerary · chat needs Concierge Deposit",
     group: "itinerary",
     defaultText:
-      "In-app messaging unlocks after your €60 Concierge Deposit — 100% credited toward your tour.",
+      "Secure your dates before using direct chat.",
   },
   {
     key: "guest_comm_unavailable",
@@ -219,6 +227,58 @@ export const SYSTEM_MESSAGE_CATALOG: readonly SystemMessageDef[] = [
     group: "itinerary",
     defaultText:
       "In-app messaging unlocks once your Concierge Deposit is secured and your agent is assigned.",
+  },
+  {
+    key: "dispatch_guide_lock_30_subject",
+    label: "Dispatch · guide 30% subject",
+    group: "dispatch",
+    defaultText: "Dates locked · {{pnr}} · please confirm your calendar",
+  },
+  {
+    key: "dispatch_guide_lock_30_body",
+    label: "Dispatch · guide 30% body",
+    group: "dispatch",
+    defaultText:
+      "Hi {{assigneeName}},\n\nGuest {{guestName}} ({{pnr}}) has secured a 30% deposit. Tour date: {{tourDate}}.\n\nPlease lock these dates on your calendar. Accept or decline guided day jobs in the Guide Portal when offered.\n\nTicketed attractions on the itinerary are informational only — no Accept/Decline needed for those.\n\n— TokioTours Ops",
+  },
+  {
+    key: "dispatch_guide_lock_100_subject",
+    label: "Dispatch · guide 100% subject",
+    group: "dispatch",
+    defaultText: "Fully paid · {{pnr}} · calendar confirmed",
+  },
+  {
+    key: "dispatch_guide_lock_100_body",
+    label: "Dispatch · guide 100% body",
+    group: "dispatch",
+    defaultText:
+      "Hi {{assigneeName}},\n\nGuest {{guestName}} ({{pnr}}) is fully paid. Tour date: {{tourDate}}.\n\nDates are locked. Confirm any open guided day jobs in the Guide Portal.\n\n— TokioTours Ops",
+  },
+  {
+    key: "dispatch_driver_lock_30_subject",
+    label: "Dispatch · driver 30% subject",
+    group: "dispatch",
+    defaultText: "Dates locked · {{pnr}} · please hold the vehicle",
+  },
+  {
+    key: "dispatch_driver_lock_30_body",
+    label: "Dispatch · driver 30% body",
+    group: "dispatch",
+    defaultText:
+      "Hi {{assigneeName}},\n\nGuest {{guestName}} ({{pnr}}) has secured a 30% deposit. Service date: {{tourDate}}.\n\nPlease lock these dates on your calendar / fleet schedule.\n\n— TokioTours Ops",
+  },
+  {
+    key: "dispatch_driver_lock_100_subject",
+    label: "Dispatch · driver 100% subject",
+    group: "dispatch",
+    defaultText: "Fully paid · {{pnr}} · vehicle hold confirmed",
+  },
+  {
+    key: "dispatch_driver_lock_100_body",
+    label: "Dispatch · driver 100% body",
+    group: "dispatch",
+    defaultText:
+      "Hi {{assigneeName}},\n\nGuest {{guestName}} ({{pnr}}) is fully paid. Service date: {{tourDate}}.\n\nDates are locked — hold the vehicle as assigned.\n\n— TokioTours Ops",
   },
 ] as const;
 

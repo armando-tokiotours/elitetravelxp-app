@@ -5,6 +5,7 @@ import {
   sumPaymentsLedgerEur,
   syncOpsHubTotalPaidFromLedger,
 } from "@/lib/paymentsLedger";
+import { maybeAutoDispatchAfterPayment } from "@/lib/paymentDispatchEngine";
 
 export type PaymentKind =
   | "concierge_deposit"
@@ -203,6 +204,9 @@ export async function POST(request: Request) {
           amount,
           estimatedTotalEur: body.estimatedTotalEur,
         });
+        if (kind !== "concierge_deposit") {
+          void maybeAutoDispatchAfterPayment(pb, pnr);
+        }
         return NextResponse.json({
           ok: true,
           id: existing.id,
@@ -266,6 +270,17 @@ export async function POST(request: Request) {
       amount,
       estimatedTotalEur: body.estimatedTotalEur,
     });
+
+    // Auto-dispatch when tour deposit / partial / full hits 30% or 100%.
+    // Concierge fee alone does not lock dates.
+    if (
+      kind === "tour_deposit" ||
+      kind === "tour_partial" ||
+      kind === "tour_full" ||
+      kind === "other"
+    ) {
+      void maybeAutoDispatchAfterPayment(pb, pnr);
+    }
 
     return NextResponse.json({
       ok: true,

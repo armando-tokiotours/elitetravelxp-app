@@ -1,8 +1,21 @@
 "use client";
 
 import type PocketBase from "pocketbase";
-import { useCallback, useRef, useState, type ReactNode } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import * as XLSX from "xlsx";
+import {
+  DEFAULT_DAY_EXPENSES_JPY,
+  DEFAULT_SPECIALTY_TIERS,
+  loadGuidePaySettings,
+  saveGuidePaySettings,
+  type SpecialtyTier,
+} from "@/lib/guidePayBreakdown";
 import { formatPbError } from "@/lib/pocketbase/admin-schema";
 
 type PbClient = PocketBase;
@@ -52,10 +65,25 @@ function cell(row: Record<string, unknown>, ...keys: string[]): string {
 }
 
 function num(row: Record<string, unknown>, ...keys: string[]): number | null {
-  const raw = cell(row, ...keys).replace(/[€$£,\s]/g, "");
+  // Accept plain numbers or yen-formatted cells (¥18,000 / ￥18000) so CSV
+  // stays clearly JPY and is not confused with € elsewhere in Source of Truth.
+  const raw = cell(row, ...keys)
+    .replace(/[¥￥€$£,\s]/g, "")
+    .replace(/jpy/gi, "")
+    .trim();
   if (!raw) return null;
+  // Meet & Assist rows often use – / — / n/a for duration → store as 0h.
+  if (raw === "-" || raw === "–" || raw === "—" || /^n\/?a$/i.test(raw)) {
+    return 0;
+  }
   const n = Number(raw);
   return Number.isFinite(n) ? n : null;
+}
+
+/** Display JPY in CSV downloads so pay columns are never mistaken for EUR. */
+function yenCsv(n: number): string {
+  const v = Math.max(0, Math.round(Number(n) || 0));
+  return `¥${v.toLocaleString("en-US")}`;
 }
 
 function boolish(raw: string, fallback = false): boolean {
@@ -101,9 +129,63 @@ export function GuidePayMatrixAdmin({
   trailing?: ReactNode;
 }) {
   const fileRef = useRef<HTMLInputElement>(null);
-  const [busy, setBusy] = useState<"down" | "up" | null>(null);
+  const [busy, setBusy] = useState<"down" | "up" | "settings" | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
+  /** Preserved on save — no longer edited in this UI (Dispatch/portal still use it). */
+  const storedDefaultExpensesRef = useRef(DEFAULT_DAY_EXPENSES_JPY);
+  const [tiers, setTiers] = useState<SpecialtyTier[]>(DEFAULT_SPECIALTY_TIERS);
+  const [settingsMsg, setSettingsMsg] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const settings = await loadGuidePaySettings(getClient());
+        if (cancelled) return;
+        storedDefaultExpensesRef.current =
+          settings.default_expenses_jpy || DEFAULT_DAY_EXPENSES_JPY;
+        setTiers(
+          settings.specialty_tiers.length
+            ? settings.specialty_tiers
+            : DEFAULT_SPECIALTY_TIERS
+        );
+      } catch {
+        /* keep defaults */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [getClient]);
+
+  const saveSettings = useCallback(async () => {
+    setBusy("settings");
+    setErr(null);
+    setSettingsMsg(null);
+    try {
+      const cleaned = tiers
+        .map((t, i) => ({
+          id: String(t.id || `tier_${i}`).trim() || `tier_${i}`,
+          label: String(t.label || "").trim(),
+          amount_jpy: Math.max(0, Math.round(Number(t.amount_jpy) || 0)),
+        }))
+        .filter((t) => t.label && t.amount_jpy > 0);
+      // Keep existing default_expenses_jpy (or ¥3000) — expense is matrix/CSV-driven.
+      await saveGuidePaySettings(getClient(), {
+        default_expenses_jpy:
+          storedDefaultExpensesRef.current || DEFAULT_DAY_EXPENSES_JPY,
+        specialty_tiers: cleaned.length ? cleaned : DEFAULT_SPECIALTY_TIERS,
+      });
+      setTiers(cleaned.length ? cleaned : DEFAULT_SPECIALTY_TIERS);
+      setSettingsMsg("Baseline settings saved — used by Guide Dispatch payouts.");
+      await onSynced();
+    } catch (e) {
+      setErr(formatPbError(e));
+    } finally {
+      setBusy(null);
+    }
+  }, [getClient, onSynced, tiers]);
 
   const download = useCallback(async () => {
     setBusy("down");
@@ -120,8 +202,8 @@ export function GuidePayMatrixAdmin({
         tour_name: String(r.tour_name ?? ""),
         duration_hours: Number(r.duration_hours) || "",
         pax_count: Number(r.pax_count) || "",
-        guide_pay_jpy: Number(r.guide_pay_jpy) || "",
-        expenses_jpy: Number(r.expenses_jpy) || 0,
+        guide_pay_jpy: yenCsv(Number(r.guide_pay_jpy) || 0),
+        expenses_jpy: yenCsv(Number(r.expenses_jpy) || 0),
         is_meet_and_greet: r.is_meet_and_greet === true,
         notes: String(r.notes ?? ""),
       }));
@@ -275,13 +357,14 @@ export function GuidePayMatrixAdmin({
   );
 
   return (
-    <div className="mb-4 space-y-2">
+    <div className="mb-4 space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="font-display text-2xl text-white">{title}</h2>
           <p className="mt-1 text-xs text-zinc-400">
-            PocketBase <code className="text-[#F6A724]">guide_pay_rules</code> —
-            download, edit in Excel, upload to upsert (by id or year/tour/hours/pax/M&amp;G).
+            Super User baseline for guide day payouts: matrix rows (base rates) +
+            specialty bonus tiers. Per-row expenses stay in the CSV. Used by Guide
+            Dispatch and the Guide Portal.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -322,7 +405,9 @@ export function GuidePayMatrixAdmin({
       </div>
       <p className="text-[11px] text-zinc-500">
         Columns: id, year, tour_name, duration_hours, pax_count, guide_pay_jpy,
-        expenses_jpy, is_meet_and_greet, notes
+        expenses_jpy, is_meet_and_greet, notes. Pay amounts are{" "}
+        <span className="text-[#F6A724]">Japanese yen (¥)</span> — e.g.{" "}
+        <code className="text-zinc-300">¥18,000</code> is accepted on upload.
       </p>
       {msg ? (
         <p className="rounded-xl border border-emerald-500/40 bg-emerald-950/40 px-3 py-2 text-sm text-emerald-300">
@@ -334,6 +419,113 @@ export function GuidePayMatrixAdmin({
           {err}
         </p>
       ) : null}
+
+      <div className="rounded-2xl border border-white/10 bg-[#0D1117]/80 p-4">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h3 className="text-sm font-bold tracking-wider text-[#F6A724] uppercase">
+              Guide pay matrix · baselines
+            </h3>
+            <p className="mt-1 text-[11px] text-zinc-500">
+              Base day rates and per-row expenses live in the CSV matrix (e.g. 6h
+              = ¥18,000 / 8h = ¥24,000). Specialty tiers below feed Dispatch
+              assign and portal totals.
+            </p>
+          </div>
+          <button
+            type="button"
+            disabled={!!busy}
+            onClick={() => void saveSettings()}
+            className="rounded-full bg-[#075473] px-3.5 py-2 text-sm font-semibold text-white hover:bg-[#054F70] disabled:opacity-50"
+          >
+            {busy === "settings" ? "Saving…" : "Save baselines"}
+          </button>
+        </div>
+
+        <div className="mt-4">
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+            <span className="text-[10px] font-bold tracking-wider text-zinc-500 uppercase">
+              Specialty bonus tiers
+            </span>
+            <button
+              type="button"
+              onClick={() =>
+                setTiers((prev) => [
+                  ...prev,
+                  {
+                    id: `tier_${Date.now()}`,
+                    label: "New specialty",
+                    amount_jpy: 3000,
+                  },
+                ])
+              }
+              className="rounded-lg border border-white/15 px-2.5 py-1 text-[10px] font-bold tracking-wider text-zinc-300 uppercase hover:border-white/30"
+            >
+              + Add tier
+            </button>
+          </div>
+          <div className="space-y-2">
+            {tiers.map((tier, idx) => (
+              <div
+                key={tier.id}
+                className="flex flex-wrap items-center gap-2 rounded-xl border border-white/10 bg-black/40 p-2"
+              >
+                <input
+                  type="text"
+                  value={tier.label}
+                  onChange={(e) =>
+                    setTiers((prev) =>
+                      prev.map((t, i) =>
+                        i === idx ? { ...t, label: e.target.value } : t
+                      )
+                    )
+                  }
+                  placeholder="Label"
+                  className="min-w-[10rem] flex-1 rounded-lg border border-white/10 bg-[#0A1017] px-2.5 py-1.5 text-xs text-white focus:border-[#F6A724] focus:outline-none"
+                />
+                <div className="flex items-center gap-1">
+                  <span className="text-xs text-zinc-500">¥</span>
+                  <input
+                    type="number"
+                    min={0}
+                    step={500}
+                    value={tier.amount_jpy}
+                    onChange={(e) =>
+                      setTiers((prev) =>
+                        prev.map((t, i) =>
+                          i === idx
+                            ? {
+                                ...t,
+                                amount_jpy: Math.max(
+                                  0,
+                                  Math.round(Number(e.target.value) || 0)
+                                ),
+                              }
+                            : t
+                        )
+                      )
+                    }
+                    className="w-24 rounded-lg border border-white/10 bg-[#0A1017] px-2.5 py-1.5 font-mono text-xs text-white focus:border-[#F6A724] focus:outline-none"
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setTiers((prev) => prev.filter((_, i) => i !== idx))
+                  }
+                  className="rounded-lg border border-red-500/30 px-2 py-1 text-[10px] font-bold text-red-300 uppercase hover:bg-red-950/40"
+                >
+                  Remove
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {settingsMsg ? (
+          <p className="mt-3 text-sm text-emerald-300">{settingsMsg}</p>
+        ) : null}
+      </div>
     </div>
   );
 }

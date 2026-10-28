@@ -1,13 +1,32 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import type { GuestSpecialRequirements } from "@/lib/guestSpecialRequirements";
+import {
+  EMPTY_GUEST_SPECIAL_REQUIREMENTS,
+  guestSpecialRequirementsChoicesComplete,
+  migrateUnsetGuestSpecialRequirements,
+  normalizeGuestSpecialRequirements,
+} from "@/lib/guestSpecialRequirements";
+import {
+  clampCustomTourHours,
+  resolveTourHoursTier,
+} from "@/lib/tourHoursTier";
+import type { ExperienceTimingIntent } from "@/lib/experienceTiming";
 
-export type TourDurationHours = 3 | 6 | 8;
+export type { ExperienceTimingIntent } from "@/lib/experienceTiming";
+
+export type TourDurationHours = 6 | 8;
 export type GuidePreference = "private_guide" | "local_host" | "self_paced";
-export type IntraCityTransport = "walk" | "subway" | "private_driver";
+/** Preferred day movement. `walk` kept for stop-level / legacy only. */
+export type IntraCityTransport =
+  | "walk"
+  | "subway"
+  | "private_driver"
+  | "mix";
 export type DayBlockId = "morning" | "afternoon" | "evening";
 export type SingleDayTravelPace = "fast" | "moderate" | "relaxed" | null;
 
-export const TOUR_HOUR_PRESETS: TourDurationHours[] = [3, 6, 8];
+export const TOUR_HOUR_PRESETS: TourDurationHours[] = [6, 8];
 
 export interface DayStop {
   id: string;
@@ -32,11 +51,24 @@ export interface SingleDaySelectedExperience {
   price?: number;
   /** tours.access_type — drives Ops ticketer demand */
   access_type?: string;
+  /** Catalog category: tour | activity | cluster | place — badge + tickets */
+  category?: string;
+  /** experiences_and_places.entry_type when sourced from EAP */
+  entry_type?: string;
   /**
    * Ticket / place / activity extras sit outside the guide-hour budget.
    * Guided tour stops keep this false/undefined for capacity checks.
    */
   is_extra?: boolean;
+  /**
+   * Guest intent for extras: during tour / after tour / other day.
+   * Guided stops leave this unset.
+   */
+  timingIntent?: ExperienceTimingIntent;
+  /** Required when timingIntent === other_day — date Ticketer buys for */
+  ticketDate?: string | null;
+  /** Cached Ops/ticketer internal note */
+  opsTimingNote?: string;
 }
 
 export interface SingleDayBuilderState {
@@ -45,9 +77,14 @@ export interface SingleDayBuilderState {
   tourDate: string | null;
   adults: number;
   children: number;
-  /** Tour length in hours (presets 3/6/8 or custom ≥ 1). */
+  /** Dietary / mobility / notes → PB guest_special_requirements */
+  guestSpecialRequirements: GuestSpecialRequirements;
+  guestSpecialRequirementsAcked: boolean;
+  /** Tour length in hours (presets 6/8 or custom 5–10). */
   tourHours: number;
   tourHoursCustom: boolean;
+  /** True when duration is 9–10h (day-trip / needs ops confirmation). */
+  needsAgentConfirmation: boolean;
   travelPace: SingleDayTravelPace;
   startTime: string;
   guidePreference: GuidePreference;
@@ -61,6 +98,8 @@ export interface SingleDayBuilderState {
   meetingPointLat?: number | null;
   meetingPointLng?: number | null;
   meetingPointPlaceId?: string;
+  /** True after Meeting Point & Language step is confirmed (guests may skip map). */
+  meetingLogisticsConfirmed: boolean;
   /** Preferred intra-city movement for the day. */
   preferredMovement: IntraCityTransport | null;
   /** Rail / IC answers when Subway is chosen (same as Multi Public). */
@@ -80,6 +119,8 @@ export interface SingleDayBuilderState {
   setTourDate: (iso: string | null) => void;
   setAdults: (n: number) => void;
   setChildren: (n: number) => void;
+  setGuestSpecialRequirements: (reqs: GuestSpecialRequirements) => void;
+  ackGuestSpecialRequirements: () => void;
   setTourHours: (hours: number) => void;
   setTourHoursCustom: (custom: boolean) => void;
   setTravelPace: (pace: SingleDayTravelPace) => void;
@@ -101,11 +142,12 @@ export interface SingleDayBuilderState {
     lng: number | null;
     placeId?: string;
   }) => void;
+  setMeetingLogisticsConfirmed: (confirmed: boolean) => void;
   setPreferredMovement: (value: IntraCityTransport | null) => void;
   setGuestTransitPasses: (answers: {
-    guestHasJRPass: boolean;
-    guestHasICCard: boolean;
-    guestNeedsTransitHelp: boolean;
+    guestHasJRPass?: boolean;
+    guestHasICCard?: boolean;
+    guestNeedsTransitHelp?: boolean;
   }) => void;
   setSuicaPreference: (opts: {
     suicaNeeded: boolean;
@@ -143,46 +185,11 @@ function emptyStop(): DayStop {
   };
 }
 
+/** Empty day blocks — live stops live in `selectedExperiences`, not mock rows. */
 const initialBlocks: DayBlock[] = [
-  {
-    id: "morning",
-    label: "Morning",
-    stops: [
-      {
-        id: "m1",
-        location: "Asakusa",
-        experience: "Senso-ji & Nakamise walk",
-        durationMinutes: 90,
-        transportToNext: "subway",
-      },
-    ],
-  },
-  {
-    id: "afternoon",
-    label: "Afternoon",
-    stops: [
-      {
-        id: "a1",
-        location: "Yanaka",
-        experience: "Hidden temple lanes & café stop",
-        durationMinutes: 120,
-        transportToNext: "walk",
-      },
-    ],
-  },
-  {
-    id: "evening",
-    label: "Evening",
-    stops: [
-      {
-        id: "e1",
-        location: "Golden Gai",
-        experience: "Intimate bar hop with host",
-        durationMinutes: 90,
-        transportToNext: "walk",
-      },
-    ],
-  },
+  { id: "morning", label: "Morning", stops: [] },
+  { id: "afternoon", label: "Afternoon", stops: [] },
+  { id: "evening", label: "Evening", stops: [] },
 ];
 
 const initialState = {
@@ -190,8 +197,11 @@ const initialState = {
   tourDate: null as string | null,
   adults: 2,
   children: 0,
+  guestSpecialRequirements: { ...EMPTY_GUEST_SPECIAL_REQUIREMENTS },
+  guestSpecialRequirementsAcked: false,
   tourHours: 6,
   tourHoursCustom: false,
+  needsAgentConfirmation: false,
   travelPace: null as SingleDayTravelPace,
   startTime: "09:00",
   guidePreference: "private_guide" as GuidePreference,
@@ -202,6 +212,7 @@ const initialState = {
   meetingPointLat: null as number | null,
   meetingPointLng: null as number | null,
   meetingPointPlaceId: "",
+  meetingLogisticsConfirmed: false,
   preferredMovement: null as IntraCityTransport | null,
   guestHasJRPass: null as boolean | null,
   guestHasICCard: null as boolean | null,
@@ -223,12 +234,26 @@ export const useSingleDayBuilderStore = create<SingleDayBuilderState>()(
       setAdults: (adults) => set({ adults: Math.max(1, Math.min(20, adults)) }),
       setChildren: (children) =>
         set({ children: Math.max(0, Math.min(20, children)) }),
+      setGuestSpecialRequirements: (reqs) => {
+        const next = normalizeGuestSpecialRequirements(reqs);
+        set({
+          guestSpecialRequirements: next,
+          // null ≠ acked — only when both Dietary & Mobility are Yes/No
+          guestSpecialRequirementsAcked:
+            guestSpecialRequirementsChoicesComplete(next),
+        });
+      },
+      ackGuestSpecialRequirements: () => {
+        const reqs = get().guestSpecialRequirements;
+        if (!guestSpecialRequirementsChoicesComplete(reqs)) return;
+        set({ guestSpecialRequirementsAcked: true });
+      },
       setTourHours: (tourHours) => {
-        const next = Math.max(1, Math.min(16, Math.round(tourHours) || 1));
-        const isPreset = ([3, 6, 8] as number[]).includes(next);
+        const next = clampCustomTourHours(tourHours);
+        const { needsAgentConfirmation } = resolveTourHoursTier(next);
         set({
           tourHours: next,
-          ...(isPreset ? { tourHoursCustom: false } : {}),
+          needsAgentConfirmation,
         });
       },
       setTourHoursCustom: (tourHoursCustom) => set({ tourHoursCustom }),
@@ -245,6 +270,7 @@ export const useSingleDayBuilderStore = create<SingleDayBuilderState>()(
           meetingPointLat: null,
           meetingPointLng: null,
           meetingPointPlaceId: "",
+          meetingLogisticsConfirmed: false,
           selectedExperiences: [],
           experiencesStepDone: false,
           preferredTourLanguage: "EN",
@@ -273,16 +299,31 @@ export const useSingleDayBuilderStore = create<SingleDayBuilderState>()(
             lng == null || !Number.isFinite(lng) ? null : lng,
           meetingPointPlaceId: String(placeId || "").trim(),
         }),
+      setMeetingLogisticsConfirmed: (meetingLogisticsConfirmed) =>
+        set({ meetingLogisticsConfirmed: Boolean(meetingLogisticsConfirmed) }),
       setPreferredMovement: (preferredMovement) => set({ preferredMovement }),
       setGuestTransitPasses: (answers) =>
-        set({
-          guestHasJRPass: Boolean(answers.guestHasJRPass),
-          guestHasICCard: Boolean(answers.guestHasICCard),
-          guestNeedsTransitHelp: Boolean(answers.guestNeedsTransitHelp),
-          // Help arranging passes / no IC → Suica prepare for Ticketer
-          suicaNeeded:
-            !Boolean(answers.guestHasICCard) ||
-            Boolean(answers.guestNeedsTransitHelp),
+        set((state) => {
+          const guestHasJRPass =
+            typeof answers.guestHasJRPass === "boolean"
+              ? answers.guestHasJRPass
+              : state.guestHasJRPass;
+          const guestHasICCard =
+            typeof answers.guestHasICCard === "boolean"
+              ? answers.guestHasICCard
+              : state.guestHasICCard;
+          const guestNeedsTransitHelp =
+            typeof answers.guestNeedsTransitHelp === "boolean"
+              ? answers.guestNeedsTransitHelp
+              : state.guestNeedsTransitHelp;
+          return {
+            guestHasJRPass,
+            guestHasICCard,
+            guestNeedsTransitHelp,
+            // Help arranging passes / no IC → Suica prepare for Ticketer
+            suicaNeeded:
+              guestHasICCard === false || guestNeedsTransitHelp === true,
+          };
         }),
       setSuicaPreference: (opts) =>
         set({
@@ -390,7 +431,7 @@ export const useSingleDayBuilderStore = create<SingleDayBuilderState>()(
     }),
     {
       name: "single-day-builder",
-      version: 9,
+      version: 13,
       migrate: (persisted, version) => {
         const p = (persisted || {}) as Record<string, unknown>;
         if (version < 3) {
@@ -398,7 +439,7 @@ export const useSingleDayBuilderStore = create<SingleDayBuilderState>()(
           const tourHours = Number.isFinite(rawHours) && rawHours >= 1
             ? rawHours
             : 6;
-          const isPreset = ([3, 6, 8] as number[]).includes(tourHours);
+          const isPreset = (TOUR_HOUR_PRESETS as number[]).includes(tourHours);
           return {
             ...initialState,
             ...p,
@@ -494,6 +535,60 @@ export const useSingleDayBuilderStore = create<SingleDayBuilderState>()(
               typeof p.suicaValueEur === "number" && p.suicaValueEur > 0
                 ? p.suicaValueEur
                 : 15,
+          };
+        }
+        if (version < 10) {
+          const prior = p as unknown as SingleDayBuilderState;
+          return {
+            ...prior,
+            meetingLogisticsConfirmed:
+              prior.meetingLogisticsConfirmed === true ||
+              Boolean(String(prior.meetingPoint || "").trim()),
+          };
+        }
+        if (version < 11) {
+          const prior = p as unknown as SingleDayBuilderState;
+          const raw = Number(prior.tourHours);
+          // Drop legacy 3h preset → 6h; clamp custom into 5–10.
+          const normalized =
+            raw === 3 ? 6 : Number.isFinite(raw) ? clampCustomTourHours(raw) : 6;
+          const isPreset = (TOUR_HOUR_PRESETS as number[]).includes(normalized);
+          const { needsAgentConfirmation } = resolveTourHoursTier(normalized);
+          return {
+            ...prior,
+            tourHours: normalized,
+            tourHoursCustom: isPreset
+              ? false
+              : typeof prior.tourHoursCustom === "boolean"
+                ? prior.tourHoursCustom
+                : true,
+            needsAgentConfirmation,
+          };
+        }
+        if (version < 12) {
+          const prior = p as unknown as SingleDayBuilderState;
+          const acked = prior.guestSpecialRequirementsAcked === true;
+          const guestSpecialRequirements = migrateUnsetGuestSpecialRequirements(
+            prior.guestSpecialRequirements,
+            acked
+          );
+          return {
+            ...prior,
+            guestSpecialRequirements,
+            guestSpecialRequirementsAcked:
+              acked &&
+              guestSpecialRequirementsChoicesComplete(guestSpecialRequirements),
+          };
+        }
+        if (version < 13) {
+          const prior = p as unknown as SingleDayBuilderState;
+          // Drop legacy mock Senso-ji / Yanaka / Golden Gai seed blocks.
+          return {
+            ...prior,
+            blocks: initialBlocks.map((b) => ({
+              ...b,
+              stops: b.stops.map((s) => ({ ...s })),
+            })),
           };
         }
         return p as unknown as SingleDayBuilderState;

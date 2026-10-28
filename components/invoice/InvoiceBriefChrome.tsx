@@ -6,7 +6,7 @@ import {
   resolveExactPackageTotalEur,
   type PriceMode,
 } from "@/lib/agentServices";
-import { formatEur } from "@/lib/singleDayPricing";
+import { useCurrency } from "@/components/providers/CurrencyProvider";
 
 /** Flat label/value row — no per-row card chrome. */
 export function InvoiceMetaRow({
@@ -18,10 +18,10 @@ export function InvoiceMetaRow({
 }) {
   return (
     <div className="flex flex-col gap-0.5 py-3 sm:flex-row sm:items-baseline sm:justify-between sm:gap-4">
-      <span className="text-[10px] font-bold uppercase tracking-widest text-gray-500 print:text-gray-600">
+      <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500 print:text-gray-600">
         {label}
       </span>
-      <span className="font-bold text-white print:text-gray-900 sm:text-right">
+      <span className="font-bold text-slate-900 print:text-gray-900 sm:text-right">
         {value}
       </span>
     </div>
@@ -41,9 +41,9 @@ export function InvoiceMetaList({
 }) {
   return (
     <div
-      className={`w-full overflow-hidden rounded-3xl border border-white/10 bg-[#0A1017] print:break-inside-avoid print:rounded-none print:border print:border-gray-300 print:bg-transparent print:shadow-none ${className}`.trim()}
+      className={`w-full overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_12px_28px_rgba(0,0,0,0.08)] print:break-inside-avoid print:rounded-none print:border print:border-gray-300 print:bg-transparent print:shadow-none ${className}`.trim()}
     >
-      <div className="divide-y divide-white/10 px-5 print:divide-gray-200">
+      <div className="divide-y divide-slate-200 px-5 print:divide-gray-200">
         {children}
       </div>
     </div>
@@ -73,6 +73,7 @@ export function InvoiceBriefEstimateBox({
   /** Ops Pricing Studio: estimate | exact (ops_hub.extras.price_mode). */
   priceMode?: PriceMode | null;
 }) {
+  const { formatPrice } = useCurrency();
   const pax = Math.max(1, partySize);
   const min = Math.max(0, Math.round(packageMinEur));
   const max = Math.max(min, Math.round(packageMaxEur));
@@ -97,11 +98,13 @@ export function InvoiceBriefEstimateBox({
   const minPerPerson = Math.round(min / pax);
   const maxPerPerson = Math.round(max / pax);
   const rangeLabel =
-    min === max ? formatEur(min) : `${formatEur(min)} ~ ${formatEur(max)}`;
+    min === max
+      ? formatPrice(min)
+      : `${formatPrice(min)} ~ ${formatPrice(max)}`;
   const perPersonLabel =
     minPerPerson === maxPerPerson
-      ? formatEur(minPerPerson)
-      : `${formatEur(minPerPerson)} ~ ${formatEur(maxPerPerson)}`;
+      ? formatPrice(minPerPerson)
+      : `${formatPrice(minPerPerson)} ~ ${formatPrice(maxPerPerson)}`;
 
   return (
     <div className="relative overflow-hidden rounded-3xl border border-[#F6A724]/30 bg-[#0A1017] p-5 shadow-2xl print:break-inside-avoid print:rounded-none print:border print:border-gray-300 print:bg-transparent print:p-4 print:shadow-none">
@@ -141,10 +144,10 @@ export function InvoiceBriefEstimateBox({
           {isDealLocked && lockedTotal != null ? (
             <>
               <div className="mt-1 font-mono text-2xl font-bold text-[#F6A724] tabular-nums print:text-gray-900">
-                {formatEur(lockedTotal)}
+                {formatPrice(lockedTotal)}
               </div>
               <div className="mt-0.5 font-mono text-[11px] text-gray-400 tabular-nums print:text-gray-600">
-                {formatEur(lockedPerPerson)} / person
+                {formatPrice(lockedPerPerson)} / person
               </div>
             </>
           ) : (

@@ -8,6 +8,7 @@ import type { QuoteResult } from "@/lib/builder-pricing";
 import {
   buildDossierQrUrl,
   buildRouteBreakdown,
+  buildSingleDayHighlights,
   formatGuestCountText,
   formatPassDateLine,
 } from "@/lib/dossier/bookingPassHelpers";
@@ -106,11 +107,23 @@ export function buildMobilePassData(
     startDateText: formatPassDateLine(tourDate || state.arrivalDate),
     endDateText: formatPassDateLine(dep),
     singleDayHighlights: single
-      ? String(
-          (state as { cityFocus?: string }).cityFocus ||
+      ? buildSingleDayHighlights({
+          cityFocus:
+            (state as { cityFocus?: string }).cityFocus ||
             cityNames[state.locations?.[0]?.cityId || ""] ||
-            "TOKYO"
-        ).toUpperCase()
+            "",
+          experiences: [
+            ...((state as { selectedExperiences?: unknown[] })
+              .selectedExperiences || []),
+            ...Object.values(state.selectedTours || {}).flat(),
+          ] as Array<{
+            title?: string;
+            is_extra?: boolean;
+            category?: string;
+            entry_type?: string;
+            access_type?: string;
+          }>,
+        })
       : undefined,
     routeLines: single ? undefined : routeLines,
     dossierUrl,

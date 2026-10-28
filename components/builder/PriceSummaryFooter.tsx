@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
-import { formatEstimateSummary, formatUsd } from "@/lib/builder-pricing";
+import { formatEstimateSummary } from "@/lib/builder-pricing";
 import { ELITE_CONCIERGE_FEE } from "@/lib/eliteConcierge";
 import {
   CTA_PAY_BALANCE,
@@ -11,6 +11,7 @@ import {
 } from "@/lib/balanceSettlement";
 import { CTA_SECURE_DEPOSIT } from "@/lib/tourPaymentStatus";
 import { useBuilderStore } from "@/store/useBuilderStore";
+import { useCurrency } from "@/components/providers/CurrencyProvider";
 import { ExplainerModal } from "./ExplainerModal";
 import { DossierSectionOutline } from "@/components/builder/DossierSectionOutline";
 
@@ -46,6 +47,7 @@ export function PriceSummaryFooter({
   packageTotalEur?: number;
 }) {
   const [conciergeVideoOpen, setConciergeVideoOpen] = useState(false);
+  const { formatPrice } = useCurrency();
   const customBudgetTarget = useBuilderStore((s) => s.customBudgetTarget);
   const isEliteConcierge = useBuilderStore((s) => s.isEliteConcierge);
   const experienceService = useBuilderStore((s) => s.experienceService);
@@ -59,8 +61,15 @@ export function PriceSummaryFooter({
   const payBadge = paymentBadgeForAmount(amountPaidEur, packageTotal);
   /** Estimate + custom budget are pre-payment shopping only. */
   const showEstimateShop = payBadge.kind === "none";
-  /** Fully paid → invoice is the source of truth; drop this section. */
-  const hideBudgetSection = payBadge.fullyPaid;
+  /**
+   * Section 4 (Budget & Pay) is hidden in the builder/dossier UI — do not
+   * render its dashed outline or cards (takes no space). All pricing state,
+   * calculations and handlers stay intact: Secure Dates remains reachable
+   * via the Section 1 hero CTA (same onRequestPay) and Set Budget via
+   * /budget-planner. Fully paid also dropped this section (invoice is the
+   * source of truth).
+   */
+  const hideBudgetSection = true;
 
   const zeroAddOns =
     !conciergeActive &&
@@ -83,7 +92,7 @@ export function PriceSummaryFooter({
     !pricesUnlocked
       ? "Est. —— / pax"
       : minPerPerson != null && maxPerPerson != null
-        ? `${formatUsd(minPerPerson)} – ${formatUsd(maxPerPerson)} / pax`
+        ? `${formatPrice(minPerPerson)} – ${formatPrice(maxPerPerson)} / pax`
         : totalLabel;
 
   const videoBanner = conciergeActive ? (
@@ -129,12 +138,12 @@ export function PriceSummaryFooter({
             : "Fee credit applied"}
         </p>
         <p className="text-xs font-extrabold leading-tight text-white sm:text-lg">
-          {formatUsd(payBadge.pendingBalance)} remaining
+          {formatPrice(payBadge.pendingBalance)} remaining
         </p>
         <p className="mt-0.5 text-[9px] leading-snug text-white/45 sm:text-[11px]">
-          Paid {formatUsd(payBadge.amountPaid)}
+          Paid {formatPrice(payBadge.amountPaid)}
           {payBadge.packageTotal > 0
-            ? ` of ${formatUsd(payBadge.packageTotal)}`
+            ? ` of ${formatPrice(payBadge.packageTotal)}`
             : ""}
           {totalGuests > 0 ? ` · ${totalGuests} guests` : ""}
         </p>
@@ -205,7 +214,7 @@ export function PriceSummaryFooter({
           </p>
           <p className="break-words text-xs font-extrabold leading-tight text-white sm:text-lg">
             {hasTarget
-              ? `Target: ${formatUsd(customBudgetTarget)}`
+              ? `Target: ${formatPrice(customBudgetTarget)}`
               : "Custom Budget"}
           </p>
           <p className="mt-0.5 break-words text-[9px] leading-snug text-zinc-400 sm:text-[11px]">

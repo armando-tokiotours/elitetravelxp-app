@@ -27,12 +27,6 @@ const SERVICE_EUR: Record<string, number> = {
   suica: 28,
   bullet_train: 95,
   jr_pass: 220,
-  ghibli_vip: 180,
-  sumo_box: 260,
-  usj_express: 150,
-  michelin_omakase: 320,
-  event_verification: 140,
-  geisha_dinner: 380,
 };
 
 const CATEGORY_DEFAULT_EUR: Record<string, number> = {

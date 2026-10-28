@@ -7,6 +7,9 @@
  * - Other @tokiotours.nl → agent (concierge)
  * - Unknown external → agent + active=false (pending approval)
  * Never blocks creating test / guide / agency accounts with any email.
+ *
+ * Uses model hooks (not *Request) so password/manage updates from
+ * superusers are not aborted by request-hook failures.
  */
 
 const CORE_STAFF_MAP = {
@@ -41,86 +44,86 @@ function normalizeAccountType(raw) {
 }
 
 function applyFlexibleProvisioning(record, isCreate) {
-  const email = normalizeEmail(record.get("email"));
-  const existingRole = String(record.get("role") || "").trim();
-  const accountType = normalizeAccountType(record.get("account_type"));
+  try {
+    const email = normalizeEmail(record.get("email"));
+    const existingRole = String(record.get("role") || "").trim();
+    const accountType = normalizeAccountType(record.get("account_type"));
 
-  // 1) Core leadership matrix (authoritative)
-  if (CORE_STAFF_MAP[email]) {
-    record.set("role", CORE_STAFF_MAP[email]);
-    record.set("account_type", "STAFF");
-    if (record.get("active") === null || record.get("active") === undefined) {
-      record.set("active", true);
+    // 1) Core leadership matrix (authoritative)
+    if (CORE_STAFF_MAP[email]) {
+      record.set("role", CORE_STAFF_MAP[email]);
+      record.set("account_type", "STAFF");
+      if (record.get("active") === null || record.get("active") === undefined) {
+        record.set("active", true);
+      }
+    } else if (existingRole && VALID_ROLES[existingRole]) {
+      // 2) Keep Admin / invite-selected role (guides, agencies, test agents…)
+      record.set("role", existingRole);
+      if (!accountType) {
+        if (existingRole === "guide") record.set("account_type", "GUIDE");
+        else if (existingRole === "agency")
+          record.set("account_type", "TRAVEL_AGENT");
+        else record.set("account_type", "STAFF");
+      }
+      if (record.get("active") === null || record.get("active") === undefined) {
+        record.set("active", true);
+      }
+    } else if (accountType === "GUIDE") {
+      record.set("role", "guide");
+      record.set("account_type", "GUIDE");
+      if (record.get("active") === null || record.get("active") === undefined) {
+        record.set("active", true);
+      }
+    } else if (
+      accountType === "TRAVEL_AGENT" ||
+      accountType === "AGENCY"
+    ) {
+      record.set("role", "agency");
+      record.set("account_type", "TRAVEL_AGENT");
+      if (record.get("active") === null || record.get("active") === undefined) {
+        record.set("active", true);
+      }
+    } else if (
+      email.endsWith("@tokiotours.nl") ||
+      email.endsWith("@travelexperiencesgroup.com")
+    ) {
+      // 3) Flexible / fictitious internal staff
+      record.set("role", "agent");
+      record.set("account_type", "STAFF");
+      if (record.get("active") === null || record.get("active") === undefined) {
+        record.set("active", true);
+      }
+    } else if (isCreate) {
+      // 4) Unknown external — park as pending (login blocked until Ops activates)
+      record.set("role", "agent");
+      record.set("account_type", "PENDING");
+      record.set("active", false);
     }
-  } else if (existingRole && VALID_ROLES[existingRole]) {
-    // 2) Keep Admin / invite-selected role (guides, agencies, test agents…)
-    record.set("role", existingRole);
-    if (!accountType) {
-      if (existingRole === "guide") record.set("account_type", "GUIDE");
-      else if (existingRole === "agency")
-        record.set("account_type", "TRAVEL_AGENT");
-      else record.set("account_type", "STAFF");
-    }
-    if (record.get("active") === null || record.get("active") === undefined) {
-      record.set("active", true);
-    }
-  } else if (accountType === "GUIDE") {
-    record.set("role", "guide");
-    record.set("account_type", "GUIDE");
-    if (record.get("active") === null || record.get("active") === undefined) {
-      record.set("active", true);
-    }
-  } else if (
-    accountType === "TRAVEL_AGENT" ||
-    accountType === "AGENCY"
-  ) {
-    record.set("role", "agency");
-    record.set("account_type", "TRAVEL_AGENT");
-    if (record.get("active") === null || record.get("active") === undefined) {
-      record.set("active", true);
-    }
-  } else if (
-    email.endsWith("@tokiotours.nl") ||
-    email.endsWith("@travelexperiencesgroup.com")
-  ) {
-    // 3) Flexible / fictitious internal staff
-    record.set("role", "agent");
-    record.set("account_type", "STAFF");
-    if (record.get("active") === null || record.get("active") === undefined) {
-      record.set("active", true);
-    }
-  } else if (isCreate) {
-    // 4) Unknown external — park as pending (login blocked until Ops activates)
-    record.set("role", "agent");
-    record.set("account_type", "PENDING");
-    record.set("active", false);
-  }
 
-  if (!String(record.get("name") || "").trim() && email) {
-    const local = email.split("@")[0] || "Staff";
-    record.set("name", local.charAt(0).toUpperCase() + local.slice(1));
+    if (!String(record.get("name") || "").trim() && email) {
+      const local = email.split("@")[0] || "Staff";
+      record.set("name", local.charAt(0).toUpperCase() + local.slice(1));
+    }
+  } catch (err) {
+    console.log("[staff_role_provisioning] apply error:", err);
   }
 }
 
-onRecordCreateRequest((e) => {
-  if (e.collection.name !== "staff") {
-    e.next();
-    return;
-  }
+onRecordCreate((e) => {
   applyFlexibleProvisioning(e.record, true);
   e.next();
 }, "staff");
 
-onRecordUpdateRequest((e) => {
-  if (e.collection.name !== "staff") {
-    e.next();
-    return;
-  }
-  const email = normalizeEmail(e.record.get("email"));
-  // Only re-lock core team on update; everyone else stays as Admin edited
-  if (CORE_STAFF_MAP[email]) {
-    e.record.set("role", CORE_STAFF_MAP[email]);
-    e.record.set("account_type", "STAFF");
+onRecordUpdate((e) => {
+  try {
+    const email = normalizeEmail(e.record.get("email"));
+    // Only re-lock core team on update; everyone else stays as Admin edited
+    if (CORE_STAFF_MAP[email]) {
+      e.record.set("role", CORE_STAFF_MAP[email]);
+      e.record.set("account_type", "STAFF");
+    }
+  } catch (err) {
+    console.log("[staff_role_provisioning] update error:", err);
   }
   e.next();
 }, "staff");

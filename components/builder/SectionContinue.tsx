@@ -8,8 +8,6 @@ import {
   isBuilderStepComplete,
 } from "@/lib/builderSteps";
 import { useBuilderStore } from "@/store/useBuilderStore";
-import { useItineraryStore } from "@/store/useItineraryStore";
-import { usePreBuilderStore } from "@/store/usePreBuilderStore";
 import { useBuilderAccordionOptional } from "./BuilderAccordion";
 
 /** Advances accordion to the next section after validating the current step. */
@@ -65,30 +63,14 @@ export function SectionContinue({
     }
     unlockBuilderStep(next);
 
-    // Final "Save & View Itinerary" — dual-write bookings_and_leads + local cache
+    // Final "Save & View Itinerary" — await PB upsert before navigate so
+    // itinerary ?ref= hydration reads this save, not a stale row.
     if (href) {
-      const builder = useBuilderStore.getState();
-      const email = String(
-        useItineraryStore.getState().clientEmail ||
-          usePreBuilderStore.getState().email ||
-          usePreBuilderStore.getState().lastPayload?.email ||
-          ""
-      )
-        .trim()
-        .toLowerCase();
-      const ref =
-        builder.confirmedBookingRef || builder.tempBookingRef || "";
-      if (email && ref) {
-        void import("@/lib/syncBookingLead").then(({ syncMultiDayBookingLead }) =>
-          syncMultiDayBookingLead({
-            bookingRef: ref,
-            email,
-            state: builder,
-            status: "lead",
-          })
-        );
-      }
-      router.push(href);
+      void (async () => {
+        const { persistMultiDayDraft } = await import("@/lib/syncBookingLead");
+        await persistMultiDayDraft({ status: "lead" });
+        router.push(href);
+      })();
       return;
     }
     if (next > BUILDER_STEP_COUNT) return;

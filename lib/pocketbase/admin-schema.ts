@@ -137,8 +137,8 @@ export const COLLECTIONS: CollectionDef[] = [
         label: "Category",
         type: "select",
         required: true,
-        options: ["tour", "activity"],
-        hint: "Tour = multi-stop guided day · Activity = single experience / ticket",
+        options: ["tour", "activity", "cluster"],
+        hint: "Tour = guided day · Activity = ticketed experience · Cluster = neighborhood sector (time budget, €0)",
       },
       {
         key: "audience",
@@ -222,6 +222,18 @@ export const COLLECTIONS: CollectionDef[] = [
         legacyKey: "image",
       },
       {
+        key: "cover_url",
+        label: "Cover URL (VPS /uploads/…)",
+        type: "text",
+        hint: "Preferred fast path — set by Catalog Wizard VPS upload",
+      },
+      {
+        key: "media_url",
+        label: "Media URL (VPS /uploads/…)",
+        type: "text",
+        hint: "Video/gallery pointer on VPS disk",
+      },
+      {
         key: "price_1_pax",
         label: "1 Pax (€)",
         type: "number",
@@ -291,7 +303,7 @@ export const COLLECTIONS: CollectionDef[] = [
   },
   {
     id: "guide_pay_rules",
-    label: "Guide Pay Matrix",
+    label: "GUIDE PAY MATRIX",
     titleKey: "tour_name",
     sort: "year,tour_name,duration_hours,pax_count",
     detailKeys: ["year", "duration_hours", "pax_count", "guide_pay_jpy"],

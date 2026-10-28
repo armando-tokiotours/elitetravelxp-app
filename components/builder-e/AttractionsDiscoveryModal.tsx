@@ -16,6 +16,7 @@ import {
   type PbTour,
 } from "@/lib/pocketbase/client";
 import { DesktopSafeViewport } from "@/components/layout/DesktopSafeViewport";
+import { CatalogSlotImg } from "@/components/catalog/CatalogSlotPhoto";
 import { TourDetailModal } from "@/components/builder/TourDetailModal";
 import { useBuilderEStore } from "@/store/useBuilderEStore";
 import { showSystemMessage } from "@/store/useSystemMessageStore";
@@ -254,10 +255,14 @@ export function AttractionsDiscoveryModal({
                   }}
                   className="group relative flex h-24 w-full items-center overflow-hidden rounded-2xl border border-white/10 px-5 text-left shadow-xl transition-all hover:border-[#F6A724]"
                 >
-                  <div
-                    className="absolute inset-0 bg-[#2C2C2E] bg-cover bg-center transition-transform duration-500 group-hover:scale-105"
-                    style={thumb ? { backgroundImage: `url(${thumb})` } : undefined}
-                  />
+                  <div className="absolute inset-0 overflow-hidden">
+                    <CatalogSlotImg
+                      recordId={exp.id}
+                      fallbackSrc={thumb}
+                      className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                      emptyClassName="h-full w-full bg-[#2C2C2E]"
+                    />
+                  </div>
                   <div className="absolute inset-0 bg-gradient-to-r from-black/90 via-black/60 to-transparent" />
                   <div className="relative z-10 flex w-full items-center justify-between">
                     <div className="min-w-0 space-y-1 pr-3">
@@ -296,6 +301,13 @@ export function AttractionsDiscoveryModal({
         tours={filtered}
         initialSlide={reelIndex}
         guests={{ adults: 2, children: 0 }}
+        cityName={
+          filtered[reelIndex]
+            ? cityNameOf(filtered[reelIndex])
+            : filtered[0]
+              ? cityNameOf(filtered[0])
+              : ""
+        }
         backLabel="Back to Gallery"
         onClose={() => setReelOpen(false)}
         onAdd={(tour, lang) => {

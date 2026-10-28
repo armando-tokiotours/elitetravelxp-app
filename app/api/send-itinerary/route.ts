@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { TEAM_EMAIL_CONFIG } from "@/lib/emailConfigStore";
 import {
   MailDispatchError,
   resolveMailConfigured,
@@ -108,7 +107,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json({
       success: true,
-      message: `Proposal emailed to ${email}. A team copy also went to ${TEAM_EMAIL_CONFIG.routing.bccRecipient}.`,
+      message: `Proposal emailed to ${email}. A copy of this was sent to the TokioTours team.`,
       id: result.id,
     });
   } catch (err: unknown) {

@@ -19,73 +19,20 @@ export type SubServiceItem = {
   included?: string[];
   routeHint?: string;
   requiresTicket?: boolean;
+  /** PocketBase `tours.id` when sourced from catalog */
+  tourId?: string;
+  /**
+   * Attached catalog-slot ID for this card's OWN picture:
+   * `/uploads/catalog/{catalogId}_1.webp` (see lib/catalogMedia).
+   * Static items with no PocketBase record use their stable static
+   * `id` as the slot key — the slot then holds either their own
+   * uploaded photo or the auto-placeholder stamped with that ID.
+   * BuilderEServiceGrid may override this with a real
+   * `transport_products` record ID when one matches (e.g. Suica).
+   */
+  catalogId?: string;
+  access_type?: string;
 };
-
-export const ADDITIONAL_VIP_SERVICES: SubServiceItem[] = [
-  // 1. HARD-TO-GET TICKETS
-  {
-    id: "ghibli_vip",
-    category: "EXPERIENCE",
-    title: "Ghibli Museum Pass",
-    icon: "🍃",
-    heroMediaUrl: "/images/services/ghibli.jpg",
-    description:
-      "Hard-to-get official Ghibli Museum entry tickets with guaranteed date reservation.",
-    requiresTicket: true,
-  },
-  {
-    id: "sumo_box",
-    category: "EXPERIENCE",
-    title: "Sumo Grand Tournament Box",
-    icon: "🥋",
-    heroMediaUrl: "/images/services/sumo.jpg",
-    description:
-      "Front-row box seat reservations for official Grand Sumo Tournaments in Tokyo/Osaka.",
-    requiresTicket: true,
-  },
-  {
-    id: "usj_express",
-    category: "EXPERIENCE",
-    title: "USJ Express Pass",
-    icon: "🎢",
-    heroMediaUrl: "/images/services/usj.jpg",
-    description:
-      "Universal Studios Japan Express Pass timed entry for Super Nintendo World.",
-    requiresTicket: true,
-  },
-  // 2. JAPANESE PHONE & LOCAL VERIFICATION SERVICES
-  {
-    id: "michelin_omakase",
-    category: "EXPERIENCE",
-    title: "Michelin / Exclusive Omakase",
-    icon: "🍣",
-    heroMediaUrl: "/images/services/sushi.jpg",
-    description:
-      "Local Japanese concierge booking for high-end sushi and Michelin dining strictly requiring local phone verification.",
-    requiresTicket: false,
-  },
-  {
-    id: "event_verification",
-    category: "EXPERIENCE",
-    title: "Concert & SMS Event Pass",
-    icon: "🎟️",
-    heroMediaUrl: "/images/services/concert.jpg",
-    description:
-      "Domestic SMS verification and local Japanese number reservation service for pop-culture events and concerts.",
-    requiresTicket: false,
-  },
-  // 3. SPECIALIZED STANDALONE EXPERIENCES
-  {
-    id: "geisha_dinner",
-    category: "EXPERIENCE",
-    title: "Private Geisha Dinner",
-    icon: "🍵",
-    heroMediaUrl: "/images/services/geisha.jpg",
-    description:
-      "Exclusive private Kyoto Ozashiki dining experience with authentic Geisha performance.",
-    requiresTicket: false,
-  },
-];
 
 export const SUB_SERVICES: SubServiceItem[] = [
   // CHAUFFEUR
@@ -94,12 +41,9 @@ export const SUB_SERVICES: SubServiceItem[] = [
     category: "DRIVER",
     title: "Airport Pickup",
     icon: "🛫",
-    heroMediaUrl: "/brand/widgets/transport-private.jpg",
-    galleryUrls: [
-      "/brand/widgets/transport-private.jpg",
-      "",
-      "/brand/widgets/hotel-tokiotours.jpg",
-    ],
+    catalogId: "pickup",
+    heroMediaUrl: "/uploads/catalog/pickup_1.webp",
+    galleryUrls: ["/uploads/catalog/pickup_1.webp"],
     description:
       "Meet & greet at arrivals, luggage assistance & private hotel transfer.",
     badgeTag: "CHAUFFEUR",
@@ -111,11 +55,9 @@ export const SUB_SERVICES: SubServiceItem[] = [
     category: "DRIVER",
     title: "Airport Drop-off",
     icon: "🛬",
-    heroMediaUrl: "/brand/widgets/hotel-tokiotours.jpg",
-    galleryUrls: [
-      "/brand/widgets/hotel-tokiotours.jpg",
-      "/brand/widgets/transport-private.jpg",
-    ],
+    catalogId: "dropoff",
+    heroMediaUrl: "/uploads/catalog/dropoff_1.webp",
+    galleryUrls: ["/uploads/catalog/dropoff_1.webp"],
     description:
       "Hotel pickup directly to Narita or Haneda departure terminal.",
     badgeTag: "CHAUFFEUR",
@@ -127,12 +69,9 @@ export const SUB_SERVICES: SubServiceItem[] = [
     category: "DRIVER",
     title: "Inter-City Transfer",
     icon: "🛣️",
-    heroMediaUrl: "",
-    galleryUrls: [
-      "",
-      "/brand/widgets/transport-private.jpg",
-      "",
-    ],
+    catalogId: "intercity",
+    heroMediaUrl: "/uploads/catalog/intercity_1.webp",
+    galleryUrls: ["/uploads/catalog/intercity_1.webp"],
     description:
       "Private highway chauffeur transfer between Tokyo, Fuji, Kyoto, or Osaka.",
     badgeTag: "INTER-CITY",
@@ -199,8 +138,9 @@ export const SUB_SERVICES: SubServiceItem[] = [
     category: "TRANSIT",
     title: "Suica IC Card",
     icon: "💳",
-    heroMediaUrl: "/brand/widgets/transport-public.jpg",
-    galleryUrls: ["/brand/widgets/transport-public.jpg"],
+    catalogId: "suica",
+    heroMediaUrl: "/uploads/catalog/suica_1.webp",
+    galleryUrls: ["/uploads/catalog/suica_1.webp"],
     description:
       "Pre-loaded contactless tap pass for Tokyo metro & convenience stores.",
     badgeTag: "IC CARD",
@@ -211,11 +151,9 @@ export const SUB_SERVICES: SubServiceItem[] = [
     category: "TRANSIT",
     title: "Bullet Train",
     icon: "🚅",
-    heroMediaUrl: "/brand/widgets/transport-self.jpg",
-    galleryUrls: [
-      "/brand/widgets/transport-self.jpg",
-      "",
-    ],
+    catalogId: "bullet_train",
+    heroMediaUrl: "/uploads/catalog/bullet_train_1.webp",
+    galleryUrls: ["/uploads/catalog/bullet_train_1.webp"],
     description:
       "Reserved seat tickets for Tokaido Shinkansen (Tokyo → Kyoto/Osaka).",
     badgeTag: "SHINKANSEN",
@@ -227,16 +165,13 @@ export const SUB_SERVICES: SubServiceItem[] = [
     category: "TRANSIT",
     title: "JR Whole Japan Pass",
     icon: "🎫",
-    heroMediaUrl: "/brand/trip-multi-thumb.webp",
-    galleryUrls: [
-      "/brand/trip-multi-thumb.webp",
-      "/brand/widgets/transport-public.jpg",
-    ],
+    catalogId: "jr_pass",
+    heroMediaUrl: "/uploads/catalog/jr_pass_1.webp",
+    galleryUrls: ["/uploads/catalog/jr_pass_1.webp"],
     description: "Unlimited rail travel pass across all JR network lines.",
     badgeTag: "JR PASS",
     included: ["Exchange / activation help", "Delivery options"],
   },
-  ...ADDITIONAL_VIP_SERVICES,
 ];
 
 export function subServicesByCategory(category: BuilderEServiceCategory) {

@@ -6,7 +6,7 @@ import {
 
 export type ApplePassPayload = Omit<
   BookingPassProps,
-  "actions" | "onDownloadWalletPass" | "onRefreshPass" | "showSectionOutline"
+  "actions" | "onDownloadWalletPass" | "onRefreshPass"
 >;
 
 export const WALLET_PASS_STORAGE_KEY = "tokiotours-wallet-pass-payload";

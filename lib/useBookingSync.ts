@@ -9,7 +9,7 @@ import { useItineraryStore } from "@/store/useItineraryStore";
 import { useSingleDayBuilderStore } from "@/store/useSingleDayBuilderStore";
 import { usePreBuilderStore } from "@/store/usePreBuilderStore";
 import { useQuizStore } from "@/store/useQuizStore";
-import { activeBookingRef, generatePNR } from "@/utils/pnr";
+import { activeBookingRef, generateTempPNR } from "@/utils/pnr";
 import {
   cacheBookingLeadLocally,
   LOCAL_LEADS_STORAGE_KEYS,
@@ -137,10 +137,10 @@ export function resetInMemoryBookingStores(): void {
   useItineraryStore.getState().clearUserProfile();
 }
 
-/** Assign a brand-new JPN- booking reference on a clean canvas. */
+/** Assign a brand-new DRAFT- booking reference on a clean canvas. */
 export function mintFreshBookingRef(): string {
-  const newRef = generatePNR();
-  // Stay DRAFT until guest submits or Save & Email — not Incoming yet
+  const newRef = generateTempPNR();
+  // Stay DRAFT- until guest contact promotes to JPN-
   useBuilderStore.setState({
     tempBookingRef: newRef,
     confirmedBookingRef: null,
@@ -213,7 +213,7 @@ export type FullBookingResetResult = {
 };
 
 /**
- * Full restart: capture identity → purge storage/stores → mint JPN- PNR.
+ * Full restart: capture identity → purge storage/stores → mint DRAFT- PNR.
  * Does not auto-email during draft/reset — guest must Save & Email explicitly.
  */
 export async function performFullBookingReset(): Promise<FullBookingResetResult> {

@@ -11,6 +11,7 @@ import {
   brandingUiMediaPosterUrl,
   brandingUiSlide2PosterUrl,
   brandingUiSlide3PosterUrl,
+  brandingUiIconUrl,
   fetchBrandingUiItems,
   type PbBrandingUiItem,
 } from "@/lib/pocketbase/client";
@@ -35,7 +36,14 @@ import {
   quizPaceBrandingKey,
   quizVibeBrandingKey,
 } from "@/lib/brandingUi";
-import { isPublicMediaPath } from "@/lib/preEliteBranding";
+import {
+  isPublicMediaPath,
+  preEliteMediaVersion,
+} from "@/lib/preEliteBranding";
+import {
+  brandingKeyImageSlot,
+  brandingSlotVersionedUrl,
+} from "@/lib/brandingImageSlots";
 
 /** Guest UI: only `public/` paths — ignore PocketBase /api/files blobs. */
 function guestPublicMedia(pbOrPath: string, fallback = ""): string {
@@ -98,10 +106,13 @@ function resolveItem(
   const creditBody =
     plainBrandingText(row?.credit_body) || fallback?.creditBody || "";
   const pbMedia = brandingUiMediaUrl(row);
-  const mediaUrl = guestPublicMedia(
-    pbMedia,
-    fallback?.mediaFallback || ""
-  );
+  const isKeySlot = key.startsWith("pace_") || key.startsWith("transit_");
+  const mediaUrl = isKeySlot
+    ? brandingSlotVersionedUrl(
+        brandingKeyImageSlot(key),
+        preEliteMediaVersion(row)
+      )
+    : guestPublicMedia(pbMedia, fallback?.mediaFallback || "");
   const isVideo = false;
   const pbPoster = brandingUiPosterUrl(row);
   const posterFallback =
@@ -161,6 +172,8 @@ interface SiteBrandingState {
   getActivityMatcherBanner: () => ResolvedBrandingUiItem;
   getBudgetPlanner: () => ResolvedBrandingUiItem;
   getValueProposition: () => ResolvedBrandingUiItem;
+  /** Uploaded ICONS-tab icon URL for a branding key, or "" (emoji fallback). */
+  getBrandingIconUrl: (key: string) => string;
 }
 
 export const useSiteBrandingStore = create<SiteBrandingState>((set, get) => ({
@@ -253,4 +266,6 @@ export const useSiteBrandingStore = create<SiteBrandingState>((set, get) => ({
 
   getValueProposition: () =>
     resolveItem("value_proposition", get().itemsByKey.value_proposition),
+
+  getBrandingIconUrl: (key) => brandingUiIconUrl(get().itemsByKey[key]),
 }));

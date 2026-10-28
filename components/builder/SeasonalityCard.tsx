@@ -15,6 +15,8 @@ type SeasonalityCardProps = {
   crowds?: string | null;
   note?: string | null;
   onOpenExplain?: () => void;
+  /** Speech bubble next to climate mascot (Hours & Date Done without a date). */
+  showPickDateHint?: boolean;
 };
 
 function SeasonLeafIcon() {
@@ -40,6 +42,7 @@ export function SeasonalityCard({
   crowds,
   note,
   onOpenExplain,
+  showPickDateHint = false,
 }: SeasonalityCardProps) {
   const triggerFromDate = useSeasonalFxStore((s) => s.triggerFromDate);
   const hasInsight = Boolean(tier && note);
@@ -49,22 +52,34 @@ export function SeasonalityCard({
     <div className="relative w-full overflow-visible">
       {/* Overlay on far-right edge — keeps Seasonality text readable */}
       <div
-        className="pointer-events-none absolute right-0 top-0 z-20 -translate-y-[42%] translate-x-[18%] sm:translate-x-[22%]"
+        className="pointer-events-none absolute right-[-24px] top-0 z-20 -translate-y-[42%]"
         aria-hidden
       >
-        <AnimatePresence mode="wait">
-          <motion.img
-            key={climate.key + climate.mascotUrl}
-            src={climate.mascotUrl}
-            alt=""
-            initial={{ opacity: 0, y: 4, scale: 0.94 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.94 }}
-            transition={{ duration: 0.25 }}
-            className="h-[10.2rem] w-auto object-contain object-right drop-shadow-[0_8px_16px_rgba(0,0,0,0.55)] sm:h-[12rem]"
-            draggable={false}
-          />
-        </AnimatePresence>
+        <div className="relative">
+          {showPickDateHint ? (
+            <motion.div
+              initial={{ opacity: 0, y: 5 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="absolute -top-10 right-12 z-30 whitespace-nowrap rounded-xl border border-white/20 bg-[#0080A3] px-3 py-1.5 font-mono text-[11px] font-bold text-white shadow-lg"
+            >
+              Please pick a date!
+              <div className="absolute -bottom-1 right-4 h-2 w-2 rotate-45 bg-[#0080A3]" />
+            </motion.div>
+          ) : null}
+          <AnimatePresence mode="wait">
+            <motion.img
+              key={climate.key + climate.mascotUrl}
+              src={climate.mascotUrl}
+              alt=""
+              initial={{ opacity: 0, y: 4, scale: 0.94 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.94 }}
+              transition={{ duration: 0.25 }}
+              className="h-[10.2rem] w-auto object-contain object-right drop-shadow-[0_8px_16px_rgba(0,0,0,0.55)] sm:h-[12rem]"
+              draggable={false}
+            />
+          </AnimatePresence>
+        </div>
       </div>
 
       <button
@@ -86,7 +101,7 @@ export function SeasonalityCard({
         }`}
       >
         <BoxGradingGlow />
-        <div className="relative z-10 max-w-[68%] sm:max-w-[62%]">
+        <div className="relative z-10 max-w-[68%] pr-16 sm:max-w-[62%]">
           <p className="text-[10px] font-medium uppercase tracking-[0.14em] text-zinc-500">
             Seasonality
           </p>

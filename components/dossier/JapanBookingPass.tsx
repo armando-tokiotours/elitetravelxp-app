@@ -14,6 +14,11 @@ import {
   toUnifiedPbStatus,
 } from "@/lib/bookingStatus";
 import type { BookingPassProps } from "./JapanBookingPass.types";
+import { BUILDER_ROUTES } from "@/lib/builderRoutes";
+import {
+  buildDossierQrUrl,
+  isPassHighlightTransportItem,
+} from "@/lib/dossier/bookingPassHelpers";
 
 export type { BookingPassProps, RouteBreakdownItem } from "./JapanBookingPass.types";
 
@@ -58,13 +63,21 @@ export function JapanBookingPass({
   actions,
   onDownloadWalletPass,
   onRefreshPass,
-  showSectionOutline = true,
 }: BookingPassProps) {
   const [walletBusy, setWalletBusy] = useState(false);
   const [walletMsg, setWalletMsg] = useState<string | null>(null);
   const [showDraftModal, setShowDraftModal] = useState(false);
   const [portalReady, setPortalReady] = useState(false);
   const isSingle = tripType === "single";
+  // Last-resort guard for pre-joined payloads (stashed Wallet/preview
+  // strings built before the highlights filter): drop transport tokens.
+  const cleanSingleDayHighlights = singleDayHighlights
+    ? singleDayHighlights
+        .split(" · ")
+        .map((t) => t.trim())
+        .filter((t) => t && !isPassHighlightTransportItem(t))
+        .join(" · ") || undefined
+    : singleDayHighlights;
   const unifiedStatus = toUnifiedPbStatus(status, {
     depositPaidEur,
     hasPaidFull,
@@ -77,7 +90,12 @@ export function JapanBookingPass({
 
   const resolvedQr =
     qrValue ||
-    `https://tokiotours-app.com/builder/itinerary?ref=${encodeURIComponent(pnrCode)}&view=dossier`;
+    buildDossierQrUrl(
+      pnrCode,
+      isSingle
+        ? BUILDER_ROUTES.dayPassItinerary
+        : BUILDER_ROUTES.japanJourneyItinerary
+    );
 
   const nameParts = (guestName || "GUEST")
     .trim()
@@ -106,7 +124,7 @@ export function JapanBookingPass({
         destinationLabel,
         startTime,
         endTime,
-        singleDayHighlights,
+        singleDayHighlights: cleanSingleDayHighlights,
         durationText,
         startDateText,
         endDateText,
@@ -392,14 +410,17 @@ export function JapanBookingPass({
 
           {(isSingle || routeBreakdown.length > 0 || experienceType) && (
             <div className="flex items-start justify-between gap-2 border-t border-white/10 pt-3 text-left">
-              <div className="min-w-0">
+              <div className="min-w-0 flex-1">
                 <span className="block text-[9px] font-semibold tracking-wider text-zinc-500 uppercase">
                   {isSingle ? "HIGHLIGHTS & AREA" : "ROUTE & NIGHTS"}
                 </span>
                 <div className="flex flex-wrap items-center gap-1.5 pt-0.5 font-mono text-[11px] font-bold text-zinc-200">
                   {isSingle ? (
-                    <span className="text-white">
-                      {singleDayHighlights || "TOKYO · DAY TOUR"}
+                    <span
+                      className="line-clamp-2 min-w-0 leading-snug break-words text-white"
+                      title={cleanSingleDayHighlights || undefined}
+                    >
+                      {cleanSingleDayHighlights || "TO BE CURATED"}
                     </span>
                   ) : routeBreakdown.length === 0 ? (
                     <span className="text-zinc-500">—</span>
@@ -532,21 +553,9 @@ export function JapanBookingPass({
     </Link>
   ) : null;
 
-  if (!showSectionOutline) {
-    if (!editControl) return ticket;
-    return (
-      <div className="relative w-full overflow-visible">
-        {editControl}
-        {ticket}
-      </div>
-    );
-  }
-
+  if (!editControl) return ticket;
   return (
-    <div className="relative mx-auto my-6 w-full max-w-2xl overflow-visible rounded-3xl border-2 border-dashed border-white/40 bg-black/20 p-4 print:rounded-none print:border print:border-gray-300 print:bg-transparent">
-      <span className="absolute -top-3 left-4 z-20 rounded border border-white/30 bg-zinc-800 px-2 py-0.5 font-mono text-[9px] tracking-widest text-amber-400 uppercase print:border-gray-300 print:bg-white print:text-gray-900">
-        SECTION 2: BOOKING PASS
-      </span>
+    <div className="relative w-full overflow-visible">
       {editControl}
       {ticket}
     </div>

@@ -272,25 +272,41 @@ export const BRAND_CHARACTERS: BrandCharacterDef[] = [
   {
     id: "hero-background",
     label: "Hero · Multi-Day",
-    path: "",
+    path: "/uploads/branding/builder-multiday-hero.webp",
     category: "hero",
-    usedOn: ["Builder M hero background — empty = grey until public upload"],
+    usedOn: [
+      "Builder M hero background — slot builder-multiday-hero (same image as Site Branding → Multi-Day Hero)",
+    ],
+    optimal: HERO_OPTIMAL,
+  },
+  {
+    id: "builder-activities-hero",
+    label: "Hero · Activities (Builder E)",
+    path: "/uploads/branding/builder-activities-hero.webp",
+    category: "hero",
+    usedOn: [
+      "Builder E hero background — slot builder-activities-hero (same image as Site Branding → Activities Hero)",
+    ],
     optimal: HERO_OPTIMAL,
   },
   {
     id: "hero-single-day",
     label: "Hero · Single-Day",
-    path: "",
+    path: "/uploads/branding/builder-single-hero.webp",
     category: "hero",
-    usedOn: ["Builder S hero background — empty = grey until public upload"],
+    usedOn: [
+      "Builder S hero background — slot builder-single-hero (same image as Site Branding → Builder S Hero)",
+    ],
     optimal: HERO_OPTIMAL,
   },
   {
     id: "hero-japan-pagoda",
     label: "Hero · Japan pagoda",
-    path: "",
+    path: "/uploads/branding/hero-japan-pagoda.webp",
     category: "hero",
-    usedOn: ["Pre-Elite story fallbacks — empty = grey until public upload"],
+    usedOn: [
+      "Pre-Elite story fallbacks — slot hero-japan-pagoda (distinct asset, no builder hero shares it)",
+    ],
     optimal: HERO_OPTIMAL,
   },
 ];

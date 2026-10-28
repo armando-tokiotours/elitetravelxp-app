@@ -2,6 +2,7 @@
 
 import {
   Suspense,
+  useCallback,
   useEffect,
   useRef,
   useState,
@@ -11,13 +12,17 @@ import {
 import { createPortal } from "react-dom";
 import { MessageCircle } from "lucide-react";
 import { GuestCommPage } from "@/components/dossier/GuestCommPage";
+import { WidgetCallingPulse } from "@/components/branding/WidgetCallingPulse";
 import { useConciergeAgent } from "@/lib/useConciergeAgent";
 import { showSystemMessage } from "@/store/useSystemMessageStore";
 import { getSystemMessage } from "@/lib/systemMessages";
 import { DEFAULT_CONCIERGE_FEE_EUR } from "@/lib/conciergeEstimateFlow";
 import {
   GUEST_COMM_OPEN_EVENT,
+  countStaffMessages,
+  countUnreadStaffMessages,
   isGuestTalkUnlocked,
+  setCommSeenStaffCount,
   type GuestCommOpenDetail,
 } from "@/lib/guestTalkChat";
 
@@ -160,8 +165,46 @@ export function GuestTalkBubble({
   const [dragging, setDragging] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
   const dragRef = useRef<DragState | null>(null);
   const suppressClickRef = useRef(false);
+
+  const refreshUnread = useCallback(async () => {
+    if (!ref || ref.startsWith("TMP-")) {
+      setUnreadCount(0);
+      return;
+    }
+    try {
+      const res = await fetch(`/api/comm?pnr=${encodeURIComponent(ref)}`, {
+        cache: "no-store",
+      });
+      if (!res.ok) return;
+      const data = (await res.json()) as {
+        messages?: { author_role?: string }[];
+      };
+      setUnreadCount(countUnreadStaffMessages(ref, data.messages || []));
+    } catch {
+      /* ignore */
+    }
+  }, [ref]);
+
+  /** Mark current staff thread as read — only when chat is explicitly opened/closed. */
+  const markCommSeen = useCallback(async () => {
+    if (!ref || ref.startsWith("TMP-")) return;
+    try {
+      const res = await fetch(`/api/comm?pnr=${encodeURIComponent(ref)}`, {
+        cache: "no-store",
+      });
+      if (!res.ok) return;
+      const data = (await res.json()) as {
+        messages?: { author_role?: string }[];
+      };
+      setCommSeenStaffCount(ref, countStaffMessages(data.messages || []));
+      setUnreadCount(0);
+    } catch {
+      /* ignore */
+    }
+  }, [ref]);
 
   useEffect(() => {
     setMounted(true);
@@ -193,6 +236,27 @@ export function GuestTalkBubble({
       document.body.style.overflow = prev;
     };
   }, [chatOpen]);
+
+  // Mark seen when FAB/Coordination opens chat; refresh again on close
+  // so messages received while open do not re-badge after dismiss.
+  useEffect(() => {
+    if (!chatOpen) return;
+    setUnreadCount(0);
+    void markCommSeen();
+    return () => {
+      void markCommSeen();
+    };
+  }, [chatOpen, markCommSeen]);
+
+  // Poll unread while FAB is visible — never writes "seen" on load.
+  useEffect(() => {
+    if (chatOpen) return;
+    void refreshUnread();
+    const id = window.setInterval(() => {
+      void refreshUnread();
+    }, 30_000);
+    return () => window.clearInterval(id);
+  }, [chatOpen, refreshUnread]);
 
   // Coordination Team (and others) can request the same modal without routing
   useEffect(() => {
@@ -347,6 +411,8 @@ export function GuestTalkBubble({
         )
       : null;
 
+  const showUnread = canOpenChat && !chatOpen && unreadCount > 0;
+
   return (
     <>
       <button
@@ -360,13 +426,26 @@ export function GuestTalkBubble({
         className={`no-print fixed z-50 flex h-14 w-14 cursor-grab items-center justify-center rounded-full bg-[#1CA67F] text-white shadow-2xl transition-[background-color,transform,opacity] hover:bg-[#178f6c] print:hidden ${
           dragging ? "cursor-grabbing scale-105" : "active:scale-95"
         } ${!unlocked ? "ring-2 ring-amber-400/70" : ""}`}
-        aria-label={title}
+        aria-label={
+          showUnread
+            ? `${title} · ${unreadCount} unread`
+            : title
+        }
         title={title}
       >
-        <MessageCircle className="h-6 w-6" aria-hidden />
-        {!canOpenChat ? (
+        <WidgetCallingPulse
+          active={showUnread}
+          roundedClass="rounded-full"
+          tone="cyan"
+        />
+        <MessageCircle className="relative z-10 h-6 w-6" aria-hidden />
+        {showUnread ? (
+          <span className="absolute -top-1 -right-1 z-20 flex h-5 min-w-5 items-center justify-center rounded-full border-2 border-[#0D1117] bg-[#E60F43] px-1 text-[10px] font-bold text-white">
+            {unreadCount > 99 ? "99+" : unreadCount}
+          </span>
+        ) : !canOpenChat ? (
           <span
-            className={`absolute -top-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-[#0D1117] ${
+            className={`absolute -top-0.5 -right-0.5 z-20 h-3 w-3 rounded-full border-2 border-[#0D1117] ${
               !unlocked ? "bg-amber-400" : "bg-zinc-400"
             }`}
             aria-hidden

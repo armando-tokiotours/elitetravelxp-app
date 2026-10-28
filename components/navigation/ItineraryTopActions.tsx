@@ -26,7 +26,7 @@ export function ItineraryTopActions({
         if (tab === "invoice") onInvoice?.();
         else onPlan?.();
       }}
-      className="h-8 w-[7.5rem] shrink-0 sm:h-9 sm:w-36"
+      className="h-[2rem] w-[7rem] shrink-0 sm:h-9 sm:w-36"
     />
   );
 }
