@@ -14,13 +14,19 @@ When the user asks to **push GitHub and/or VPS**:
    ```
    Do not use plain `docker compose up` on the VPS (port 8090 conflicts with other stacks; VPS maps PB to **8091**).
 3. Include **public brand assets** in the git/rsync deploy (`public/brand/*`, icons, SVG characters, hero images, etc.) — design files ship with code.
-4. **Always sync catalog/branding uploads** after code deploy (they are gitignored / volume-mounted — code push alone does **not** update card photos):
+4. **Always sync folder-slot media** after code deploy (gitignored / volume-mounted — code push alone does **not** update photos):
    ```bash
-   npm run catalog:ensure   # local: missing --mobile + white `_1` placeholders from PB
-   npm run catalog:push     # rsync → VPS data/catalog-uploads + data/branding-uploads
+   npm run catalog:ensure   # local: missing --mobile + white `{id}_1` placeholders from PB
+   npm run catalog:push     # rsync catalog + branding + hero-panels → VPS data/*-uploads
    ```
-   VPS `docker-compose.vps.yml` mounts those host dirs into `elite-web`. Do this on every Push All so local and VPS card images stay the same without manual checking.
-5. **Do NOT run `pb:push`** by default. VPS `pb_data` holds live bookings/leads with unique PNRs and related records — leave it alone.
+   Same stable IDs on replace (`/uploads/…/{slot}.webp` + `--mobile`) — no orphans, not PocketBase binaries.
+   VPS mounts: `data/catalog-uploads`, `data/branding-uploads`, `data/hero-panel-uploads`.
+5. **Do NOT run `pb:push`** by default (live bookings/PNRs).  
+   When the user explicitly wants **local = VPS for collections/content** (homepage branding JSON, catalog records, etc.) and says to push collections / “make VPS look like local”, then run:
+   ```bash
+   I_UNDERSTAND_REPLACE_VPS_DATA=yes npm run pb:push
+   ```
+   **Never** overwrite VPS secrets: keep remote `.env` and `config/emailConfig.json` (email/SMTP passwords). Backup emailConfig before content sync if unsure.
 
 ## PocketBase data replace (explicit only)
 

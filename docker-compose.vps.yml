@@ -31,10 +31,11 @@ services:
       # Host dir must be writable by container uid 1001 (nextjs), e.g.:
       #   mkdir -p data/ticket-uploads && chown 1001:1001 data/ticket-uploads
       - ./data/ticket-uploads:/app/public/uploads/tickets
-      # Catalog photos are gitignored — sync with `npm run catalog:push` into
-      # these host dirs so elite-web always serves the same slots as local.
+      # Folder-slot media (gitignored / not in image). Sync with
+      # `npm run catalog:push` so local and VPS stay identical by stable ID.
       - ./data/catalog-uploads:/app/public/uploads/catalog
       - ./data/branding-uploads:/app/public/uploads/branding
+      - ./data/hero-panel-uploads:/app/public/uploads/hero-panels
     depends_on:
       - pocketbase
     networks:
