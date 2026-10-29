@@ -12,6 +12,8 @@
     "pb:seed": "node scripts/seed-pocketbase.mjs",
     "pb:pull": "bash scripts/pb-pull-from-vps.sh",
     "pb:push": "bash scripts/pb-push-to-vps.sh",
+    "catalog:ensure": "node scripts/catalog-ensure-media.mjs",
+    "catalog:push": "bash scripts/catalog-push-to-vps.sh",
     "media:optimize": "node scripts/optimize-existing-media.mjs",
     "media:optimize:pb": "node scripts/optimize-existing-media.mjs --pb",
     "media:optimize:videos": "node scripts/optimize-pb-videos.cjs",
